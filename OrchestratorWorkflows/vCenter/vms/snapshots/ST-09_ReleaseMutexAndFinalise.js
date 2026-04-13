@@ -1,95 +1,109 @@
 /**
  * ST-09  RELEASE MUTEX & FINALISE
  * ─────────────────────────────────────────────────────────────────────────────
- * Final task in the normal execution path:
- *   1. Computes summary counts from runLog
- *   2. Releases the mutex lock
- *   3. Emits the single structured "Snapshot Cleanup Result" log entry
- *   4. Writes runSummaryJson to the workflow output attribute
- *
- * NOTE: ST-08 (Write Audit Log) has been removed from this workflow.
- *       All audit output is captured in the vRO workflow log, which is
- *       ingested by VMware Aria Operations for Logs. The structured result
- *       entry emitted here is the complete per-run record.
- *
- * LOG ENTRY FORMAT (pipe-delimited for Aria Ops for Logs field extraction):
- *   Snapshot Cleanup Result | runId=... | outcome=... | dryRun=... |
- *   ageThreshold=...min | nameFilter=... | descIgnore=... |
- *   deleted=N | dryRun_count=N | skipped=N | deferred=N |
- *   errors=N | enumErrors=N | total=N |
- *   vcenters=... | datastores=N | lockReleased=true/false
+ * Final task. Releases the lock, tallies results, and writes the single
+ * human-readable result summary to the workflow log.
  *
  * WORKFLOW ATTRIBUTE INPUTS:
  *   lockEl, runId, runLog, dryRun,
  *   maxAgeMinutes, nameMatchString, descIgnoreString
  *
- * WORKFLOW ATTRIBUTE OUTPUTS:
- *   runSummaryJson (string)
+ * WORKFLOW ATTRIBUTE OUTPUTS: runSummaryJson
  */
 
-var logEntries = JSON.parse(runLog || "[]");
+var LOG = {
+    ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
+    warn:   function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },
+    fail:   function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); },
+    result: function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [RESULT]  "+m); }
+};
 
-// ── Summary counts ────────────────────────────────────────────────────────────
-var counts = { deleted: 0, dry_run: 0, skipped: 0, deferred: 0, error: 0, enum_error: 0 };
-var vcentersSet   = {};
-var datastoresSet = {};
+// ── Tally results ─────────────────────────────────────────────────────────────
+var logArr = JSON.parse(runLog || "[]");
+var counts = { deleted:0, dry_run:0, skipped:0, deferred:0, error:0, enum_error:0 };
+var vcentersSet = {}, dsSet = {};
 
-for each (var entry in logEntries) {
-    if (counts.hasOwnProperty(entry.action)) counts[entry.action]++;
-    if (entry.vCenter) vcentersSet[entry.vCenter] = true;
-    if (entry.datastoreMoRefs)
-        for each (var ds in entry.datastoreMoRefs) datastoresSet[ds] = true;
+for each (var e in logArr) {
+    if (counts.hasOwnProperty(e.action)) counts[e.action]++;
+    if (e.vCenter) vcentersSet[e.vCenter] = true;
+    if (e.datastoreMoRefs) for each (var d in e.datastoreMoRefs) dsSet[d] = true;
 }
 
-var vcenterList    = Object.keys(vcentersSet).join(",") || "none";
-var datastoreCount = Object.keys(datastoresSet).length;
+var vcList  = Object.keys(vcentersSet).join(", ") || "none";
+var dsCnt   = Object.keys(dsSet).length;
+var total   = logArr.length;
+var mins    = maxAgeMinutes || 60;
+var ageLabel= mins >= 1440 ? Math.round(mins/1440)+" day(s)" : mins+" min";
 
-var outcome = counts.error > 0    ? "COMPLETED_WITH_ERRORS"
-            : counts.deferred > 0  ? "COMPLETED_WITH_DEFERRALS"
-            : dryRun               ? "DRY_RUN_COMPLETE"
+var outcome = counts.error > 0    ? "COMPLETED WITH ERRORS"
+            : counts.deferred > 0  ? "COMPLETED WITH DEFERRALS"
+            : dryRun               ? "DRY RUN COMPLETE"
             : "SUCCESS";
 
 // ── Release mutex ─────────────────────────────────────────────────────────────
 var lockReleased = false;
 try {
     if (lockEl) {
-        lockEl.setAttributeWithKey("runLock", "");
+        lockEl.setAttributeWithKey("runLock","");
         lockReleased = true;
-        System.log("[ST-09] Mutex released: " + runId);
     } else {
-        System.warn("[ST-09] lockEl is null — lock may already have been released.");
+        LOG.warn("FINALISE","Lock element reference is missing -- lock may already have been released.");
     }
 } catch (le) {
-    System.error("[ST-09] CRITICAL: Could not release mutex lock! " +
-                 "Manual clear required in SnapshotCleanup/RuntimeState. Error: " + le.message);
+    LOG.fail("FINALISE","IMPORTANT: Could not release the lock automatically! "
+            +"Please go to SnapshotCleanup/RuntimeState in the vRO configuration and "
+            +"clear the runLock field manually. Error: " + le.message);
 }
 
-// ── Single structured result log entry ───────────────────────────────────────
-System.log(
-    "Snapshot Cleanup Result" +
-    " | runId="        + runId +
-    " | outcome="      + outcome +
-    " | dryRun="       + dryRun +
-    " | ageThreshold=" + (maxAgeMinutes    || 60)    + "min" +
-    " | nameFilter="   + (nameMatchString  || "none") +
-    " | descIgnore="   + (descIgnoreString || "none") +
-    " | deleted="      + counts.deleted +
-    " | dryRun_count=" + counts.dry_run +
-    " | skipped="      + counts.skipped +
-    " | deferred="     + counts.deferred +
-    " | errors="       + counts.error +
-    " | enumErrors="   + counts.enum_error +
-    " | total="        + logEntries.length +
-    " | vcenters="     + vcenterList +
-    " | datastores="   + datastoreCount +
-    " | lockReleased=" + lockReleased
-);
+// ── Single human-readable result summary ─────────────────────────────────────
+LOG.result("FINALISE","================================================");
+LOG.result("FINALISE","  SNAPSHOT CLEANUP COMPLETE");
+LOG.result("FINALISE","  Run ID      : " + runId);
+LOG.result("FINALISE","  Result       : " + outcome);
+LOG.result("FINALISE","  Mode         : " + (dryRun ? "Dry run (nothing was actually deleted)" : "Live"));
+LOG.result("FINALISE","  ── What was done ──────────────────────────");
+if (dryRun) {
+LOG.result("FINALISE","  Would delete : " + counts.dry_run + " snapshot(s)");
+} else {
+LOG.result("FINALISE","  Deleted      : " + counts.deleted  + " snapshot(s)");
+}
+LOG.result("FINALISE","  Skipped      : " + counts.skipped  + " snapshot(s)  (protected or busy)");
+LOG.result("FINALISE","  Deferred     : " + counts.deferred + " snapshot(s)  (storage too busy -- will retry next run)");
+if (counts.error > 0)
+LOG.result("FINALISE","  Errors       : " + counts.error    + " snapshot(s) FAILED -- see [FAIL] entries above");
+if (counts.enum_error > 0)
+LOG.result("FINALISE","  Scan errors  : " + counts.enum_error + " vCenter(s) could not be scanned -- see [FAIL] entries above");
+LOG.result("FINALISE","  ── Scope ──────────────────────────────────");
+LOG.result("FINALISE","  Age filter   : Snapshots older than " + ageLabel);
+LOG.result("FINALISE","  Name filter  : " + (nameMatchString  ? "'" + nameMatchString  + "'" : "None"));
+LOG.result("FINALISE","  Desc ignore  : " + (descIgnoreString ? "'" + descIgnoreString + "'" : "None"));
+LOG.result("FINALISE","  vCenters     : " + vcList);
+LOG.result("FINALISE","  Datastores   : " + dsCnt + " datastore(s) evaluated");
+LOG.result("FINALISE","  ── Status ─────────────────────────────────");
+LOG.result("FINALISE","  Lock released: " + (lockReleased ? "Yes" : "NO -- MANUAL CLEAR REQUIRED"));
+LOG.result("FINALISE","================================================");
+
+if (counts.deferred > 0) {
+    LOG.warn("FINALISE", counts.deferred + " snapshot(s) were deferred because storage I/O was too high. "
+            +"They will be picked up automatically on the next scheduled run.");
+}
+if (counts.error > 0) {
+    LOG.warn("FINALISE", counts.error + " deletion(s) failed. Search the log above for [FAIL] to see details. "
+            +"These will be retried on the next run.");
+}
+if (!lockReleased) {
+    LOG.fail("FINALISE","ACTION REQUIRED: The cleanup lock was NOT released automatically. "
+            +"Future scheduled runs will be blocked until you manually clear the runLock "
+            +"attribute in SnapshotCleanup/RuntimeState.");
+}
+if (lockReleased)
+    LOG.ok("FINALISE","Lock released -- workflow finished cleanly. Ready for next run.");
 
 // ── Structured output attribute ───────────────────────────────────────────────
 runSummaryJson = JSON.stringify({
     runId:        runId,
     completedAt:  new Date().toISOString(),
-    outcome:      outcome,
+    outcome:      outcome.replace(/ /g,"_"),
     dryRun:       dryRun,
     lockReleased: lockReleased,
     filters: {
@@ -104,10 +118,8 @@ runSummaryJson = JSON.stringify({
         deferred:   counts.deferred,
         errors:     counts.error,
         enumErrors: counts.enum_error,
-        total:      logEntries.length
+        total:      total
     },
     vcenters:       Object.keys(vcentersSet),
-    datastoreCount: datastoreCount
+    datastoreCount: dsCnt
 }, null, 2);
-
-System.log("[ST-09] Run complete: " + runId + " — " + outcome);

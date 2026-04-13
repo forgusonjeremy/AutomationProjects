@@ -1,58 +1,58 @@
 /**
  * ST-04  CANDIDATES CHECK (EARLY EXIT GATE)
  * ─────────────────────────────────────────────────────────────────────────────
- * When no candidates are found: emits the single "Snapshot Cleanup Result"
- * log entry, releases the mutex, and throws a CLEAN_EXIT sentinel so the
- * Exception Handler ends the workflow cleanly without an error state.
+ * If no eligible snapshots were found across any vCenter, this task writes
+ * the final result log entry, releases the lock, and exits cleanly.
+ * If snapshots were found, execution continues to ST-05.
  *
- * When candidates exist: records candidateCount and passes control to ST-05.
- *
- * LOGGING: All audit output goes to the vRO workflow log (Aria Ops for Logs).
- * No external file is written. The "Snapshot Cleanup Result" line is the
- * single structured record for this run.
- *
- * WORKFLOW ATTRIBUTE INPUTS:
- *   allCandidatesJson, runLog, runId, lockEl, dryRun,
- *   maxAgeMinutes, nameMatchString, descIgnoreString
- *
- * WORKFLOW ATTRIBUTE OUTPUTS:
- *   candidateCount (number)
- *
- * THROWS:
- *   "CLEAN_EXIT: No snapshot candidates found." — Exception Handler ends cleanly
+ * WORKFLOW ATTRIBUTE INPUTS : allCandidatesJson, runLog, runId, lockEl, dryRun,
+ *                             maxAgeMinutes, nameMatchString, descIgnoreString
+ * WORKFLOW ATTRIBUTE OUTPUTS: candidateCount
+ * THROWS: "CLEAN_EXIT:..." -- Exception Handler treats this as success
  */
 
-var candidates = JSON.parse(allCandidatesJson || "[]");
-candidateCount = candidates.length;
-System.log("[ST-04] Candidate count: " + candidateCount);
+var LOG = {
+    ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
+    warn:   function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },
+    fail:   function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); },
+    result: function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [RESULT]  "+m); }
+};
+
+var cands      = JSON.parse(allCandidatesJson || "[]");
+candidateCount = cands.length;
 
 if (candidateCount === 0) {
-    System.log("[ST-04] No candidates — performing clean exit.");
+    var logArr     = JSON.parse(runLog || "[]");
+    var enumErrors = logArr.filter(function(e){ return e.action === "enum_error"; }).length;
+    var mins       = maxAgeMinutes || 60;
+    var ageLabel   = mins >= 1440 ? Math.round(mins/1440)+" day(s)" : mins+" min";
 
-    var logEntries = JSON.parse(runLog || "[]");
-    var enumErrors = logEntries.filter(function(e) { return e.action === "enum_error"; }).length;
+    LOG.ok("INVENTORY","No eligible snapshots found -- nothing to do. Closing this run cleanly.");
 
-    System.log(
-        "Snapshot Cleanup Result" +
-        " | runId="        + runId +
-        " | outcome=NO_CANDIDATES" +
-        " | dryRun="       + dryRun +
-        " | ageThreshold=" + (maxAgeMinutes    || 60)    + "min" +
-        " | nameFilter="   + (nameMatchString  || "none") +
-        " | descIgnore="   + (descIgnoreString || "none") +
-        " | deleted=0 | dryRun_count=0 | skipped=0 | deferred=0" +
-        " | errors=0 | enumErrors=" + enumErrors + " | total=0"
-    );
+    // ── Final result entry (plain English, easily readable) ──────────────────
+    LOG.result("FINALISE","================================================");
+    LOG.result("FINALISE","  SNAPSHOT CLEANUP COMPLETE");
+    LOG.result("FINALISE","  Run ID      : " + runId);
+    LOG.result("FINALISE","  Result       : Nothing to clean up");
+    LOG.result("FINALISE","  Reason       : No snapshots older than " + ageLabel
+              + (nameMatchString ? " matching name '" + nameMatchString + "'" : "")
+              + " were found on any vCenter.");
+    if (enumErrors > 0)
+        LOG.result("FINALISE","  Warnings     : " + enumErrors + " vCenter(s) could not be scanned -- check [FAIL] entries above.");
+    LOG.result("FINALISE","  Mode         : " + (dryRun ? "Dry run" : "Live"));
+    LOG.result("FINALISE","================================================");
 
+    // Release lock
     try {
-        lockEl.setAttributeWithKey("runLock", "");
-        System.log("[ST-04] Mutex released (clean exit): " + runId);
+        lockEl.setAttributeWithKey("runLock","");
+        LOG.ok("FINALISE","Lock released -- workflow complete.");
     } catch (le) {
-        System.error("[ST-04] CRITICAL: Could not release lock! Manual clear required. " + le.message);
+        LOG.fail("FINALISE","IMPORTANT: Could not release the lock automatically. "
+                +"Please go to SnapshotCleanup/RuntimeState and clear the runLock field manually. "
+                +"Error: " + le.message);
     }
 
-    throw new Error("CLEAN_EXIT: No snapshot candidates found across any vCenter. " +
-                    "Run completed successfully with no actions taken.");
+    throw new Error("CLEAN_EXIT: No snapshot candidates found. Run completed successfully.");
 }
 
-System.log("[ST-04] " + candidateCount + " candidate(s) — continuing to ST-05.");
+LOG.ok("INVENTORY", candidateCount + " snapshot(s) are eligible for cleanup -- continuing...");

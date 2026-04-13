@@ -1,38 +1,49 @@
 /**
  * ST-02  MUTEX CHECK & ACQUIRE
  * ─────────────────────────────────────────────────────────────────────────────
- * Reads the runLock attribute from SnapshotCleanup/RuntimeState.
- * Throws (routes to Exception Handler) if the lock is already held.
- * Acquires the lock when free.
+ * Checks whether another run is already in progress. If yes, this run
+ * aborts immediately -- nothing is touched. If no, claims the lock so no
+ * other run can start while this one is running.
  *
- * WORKFLOW ATTRIBUTE INPUTS : runId (string)
+ * WORKFLOW ATTRIBUTE INPUTS : runId
  * WORKFLOW ATTRIBUTE OUTPUTS: lockEl (ConfigurationElement)
  *
  * THROWS:
- *   "ABORT: Another run is active..." — Exception Handler treats as MUTEX_ABORT
- *   "Configuration element not found" — genuine error
+ *   "ABORT: Another run is active..." -- routes to Exception Handler (MUTEX_ABORT)
  */
 
+var LOG = {
+    ok:   function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
+    warn: function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },
+    fail: function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); }
+};
+
+// Resolve config element
 var cat = Server.getConfigurationElementCategoryWithPath("SnapshotCleanup");
 if (!cat) throw new Error(
-    "Configuration category 'SnapshotCleanup' not found. " +
-    "Create it and the RuntimeState element before running this workflow.");
+    "Configuration category 'SnapshotCleanup' not found. "
+  + "Create it and the RuntimeState element before running this workflow.");
 
 lockEl = null;
 for each (var el in cat.configurationElements) {
     if (el.name === "RuntimeState") { lockEl = el; break; }
 }
 if (!lockEl) throw new Error(
-    "Configuration element 'SnapshotCleanup/RuntimeState' not found. " +
-    "Create it with a 'runLock' string attribute (default: empty string).");
+    "Configuration element 'SnapshotCleanup/RuntimeState' not found. "
+  + "Create it with a 'runLock' string attribute set to empty string.");
 
-var currentLock = lockEl.getAttributeWithKey("runLock").value || "";
-if (currentLock !== "") {
-    var msg = "ABORT: Another run is active (lock held by: " + currentLock +
-              "). New run " + runId + " will not proceed.";
-    System.warn(msg);
-    throw new Error(msg);
+// Check lock
+var held = lockEl.getAttributeWithKey("runLock").value || "";
+if (held !== "") {
+    var msg = "ABORT: Another cleanup run is already in progress (run ID: " + held + "). "
+            + "This run (" + runId + ") will not start. "
+            + "If you are certain no run is active, clear the runLock attribute in "
+            + "SnapshotCleanup/RuntimeState and try again.";
+    LOG.warn("STARTUP", msg);
+    throw new Error("ABORT: Another run is active (lock held by: " + held
+                  + "). New run " + runId + " will not proceed.");
 }
 
+// Acquire lock
 lockEl.setAttributeWithKey("runLock", runId);
-System.log("[ST-02] Mutex acquired: " + runId);
+LOG.ok("STARTUP", "Lock acquired -- this is the only active cleanup run  [" + runId + "]");
