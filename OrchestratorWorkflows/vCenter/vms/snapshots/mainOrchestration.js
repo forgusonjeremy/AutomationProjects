@@ -181,8 +181,8 @@ processQueue(offCandidates, null, true, 999);
 // ============================================================
 // 8. WRITE LOG FILE AND RELEASE LOCK
 // ============================================================
-
-writeAndRelease();
+// Uncomment if you want to write the output of the snapshot cleanups to an external log file (e.g. SMB or NFS share)
+//writeAndRelease();
 
 // ============================================================
 // FUNCTIONS
@@ -351,7 +351,8 @@ function logEntry(vcenter, vmName, powerState, snapName, snapDesc, ageMin,
 /**
  * Write log file and release the mutex lock. Always called on exit.
  */
-function writeAndRelease() {
+// Uncomment if you want to write the output of the snapshot cleanups to an external log file (e.g. SMB or NFS share)
+/*function writeAndRelease() {
     // Summarise
     var deleted  = runLog.filter(function(e) { return e.action === "deleted"; }).length;
     var dryRuns  = runLog.filter(function(e) { return e.action === "dry_run"; }).length;
@@ -386,10 +387,13 @@ function writeAndRelease() {
         System.error("CRITICAL: Could not release lock! Manual clear required. " + le.message);
     }
 }
+*/
+
 
 /**
  * Log an error, write output, release lock, then throw.
  */
+
 function releaseAndExit(msg) {
     System.warn(msg);
     writeAndRelease();
