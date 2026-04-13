@@ -2,25 +2,45 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * ST-03  ENUMERATE vCENTERS & COLLECT CANDIDATES
  * ─────────────────────────────────────────────────────────────────────────────
- * Connects to every registered vCenter and finds all snapshots that match
- * the age, name, and description filter criteria. Per-vCenter errors are
- * caught and logged -- they do not abort the run.
+ * Iterates over every vCenter SDK connection registered in the embedded vRO
+ * appliance and calls getSnapshotCandidates for each one. Results are merged
+ * into a single flat JSON array. Each candidate is annotated with the name of
+ * its source vCenter so downstream tasks can route deletions back to the
+ * correct SDK connection.
+ *
+ * Per-vCenter errors are caught and logged as enum_error entries in runLog.
+ * They do not abort the run — remaining vCenters are still processed.
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name              vRO Type   Source
- *   ──────────────────────────────────────────────────────────────────────────
- *   runId             string     Attribute: runId
- *   runLog            string     Attribute: runLog
- *   maxAgeMinutes     number     Workflow Input: maxAgeMinutes
- *   nameMatchString   string     Workflow Input: nameMatchString
- *   descIgnoreString  string     Workflow Input: descIgnoreString
+ *   Name              vRO Type  Source / Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   runId             string    Attribute: runId
+ *                               Used to annotate any enum_error log entries with the run ID
+ *                               so they can be correlated to this specific execution.
+ *   runLog            string    Attribute: runLog
+ *                               Passed through and updated if any vCenter scan fails.
+ *                               enum_error entries are appended here, not thrown as exceptions.
+ *   maxAgeMinutes     number    Workflow Input: maxAgeMinutes
+ *                               Passed directly to getSnapshotCandidates. Only snapshots
+ *                               older than this value (in minutes) are returned as candidates.
+ *   nameMatchString   string    Workflow Input: nameMatchString
+ *                               Passed to getSnapshotCandidates. When non-empty, only
+ *                               snapshots whose name contains this string are returned.
+ *   descIgnoreString  string    Workflow Input: descIgnoreString
+ *                               Passed to getSnapshotCandidates. Snapshots whose description
+ *                               contains this string are excluded from the returned list.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
- *   Name               vRO Type   Description
- *   ──────────────────────────────────────────────────────────────────────────
- *   allCandidatesJson  string     JSON array of candidate snapshot objects,
- *                                 each annotated with vcenterName
- *   runLog             string     Updated JSON array -- may include enum_error entries
+ *   Name               vRO Type  Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   allCandidatesJson  string    JSON array of all eligible snapshot objects found across
+ *                                every vCenter. Each object carries: vmMoRef, vmName,
+ *                                vmPowerState, snapshotMoRef, snapshotName, snapshotDesc,
+ *                                snapshotAgeMinutes, datastoreMoRefs[], parentSnapshotMoRef,
+ *                                and vcenterName. Empty array "[]" if nothing was found.
+ *   runLog             string    Updated JSON array. Unchanged if all scans succeeded.
+ *                                Contains enum_error entries for any vCenter that could
+ *                                not be reached or scanned.
  */
 var LOG = {
     ok:   function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },

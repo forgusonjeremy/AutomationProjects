@@ -2,26 +2,52 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * ST-09  RELEASE MUTEX & FINALISE
  * ─────────────────────────────────────────────────────────────────────────────
- * Final task in the normal execution path. Releases the lock, tallies all
- * results, and writes the single human-readable result summary to the log.
+ * The final task in the normal execution path. Performs three actions:
+ *   1. Releases the mutex lock so future runs are not blocked.
+ *   2. Tallies all log entries from runLog into summary counts.
+ *   3. Writes the single human-readable "SNAPSHOT CLEANUP COMPLETE" result
+ *      block to the vRO workflow log (ingested by Aria Ops for Logs).
+ *
+ * This task MUST always execute. It is connected to ST-07's success output
+ * AND to the Exception Handler's success output so that the lock is released
+ * regardless of how the workflow exits.
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name              vRO Type                  Source
- *   ──────────────────────────────────────────────────────────────────────────
- *   lockEl            ConfigurationElement      Attribute: lockEl
- *   runId             string                    Attribute: runId
- *   runLog            string                    Attribute: runLog
- *   dryRun            boolean                   Workflow Input: dryRun
- *   maxAgeMinutes     number                    Workflow Input: maxAgeMinutes
- *   nameMatchString   string                    Workflow Input: nameMatchString
- *   descIgnoreString  string                    Workflow Input: descIgnoreString
+ *   Name              vRO Type                Source / Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   lockEl            ConfigurationElement    Attribute: lockEl
+ *                                             Live reference to SnapshotCleanup/RuntimeState.
+ *                                             The task calls setAttributeWithKey("runLock", "")
+ *                                             on this object to release the mutex.
+ *   runId             string                  Attribute: runId
+ *                                             Printed in the result block so the log entry
+ *                                             can be matched to a specific vRO execution.
+ *   runLog            string                  Attribute: runLog
+ *                                             The complete JSON array of all per-snapshot log
+ *                                             entries accumulated during ST-03 through ST-07.
+ *                                             Parsed here to compute summary counts and extract
+ *                                             unique vCenter and datastore names.
+ *   dryRun            boolean                 Workflow Input: dryRun
+ *                                             Included in the result block so the reader knows
+ *                                             whether the run was live or a simulation.
+ *   maxAgeMinutes     number                  Workflow Input: maxAgeMinutes
+ *                                             Included in the result block to show what age
+ *                                             filter was active for this run.
+ *   nameMatchString   string                  Workflow Input: nameMatchString
+ *                                             Included in the result block for full filter context.
+ *   descIgnoreString  string                  Workflow Input: descIgnoreString
+ *                                             Included in the result block for full filter context.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
- *   Name            vRO Type   Description
- *   ──────────────────────────────────────────────────────────────────────────
- *   runSummaryJson  string     JSON object -- structured run summary bound to the
- *                              workflow output attribute; visible in vRO execution
- *                              details and accessible to calling workflows
+ *   Name            vRO Type  Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   runSummaryJson  string    Structured JSON object containing: runId, completedAt,
+ *                             outcome, dryRun flag, lockReleased flag, active filters,
+ *                             per-action counts (deleted, dry_run, skipped, deferred,
+ *                             errors, enumErrors, total), list of vCenters processed,
+ *                             and count of unique datastores evaluated. Bound to the
+ *                             workflow output attribute so it is visible in the vRO
+ *                             execution details pane and accessible to calling workflows.
  */
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },

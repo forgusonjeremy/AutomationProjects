@@ -2,30 +2,61 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE)
  * ─────────────────────────────────────────────────────────────────────────────
- * Processes powered-on and suspended VM snapshots with per-vCenter
- * concurrency limiting and full adaptive I/O governor enforcement.
+ * Processes snapshots on powered-on and suspended VMs. For each candidate:
+ *   1. Enforces per-vCenter concurrency limit (maxParallel simultaneous tasks).
+ *   2. Runs adaptive I/O governor pre-check — waits if storage is too busy.
+ *   3. Calls deleteSnapshot action which performs VM safety checks and executes
+ *      the vCenter task.
+ *   4. Captures pre/post I/O metrics for governor self-calibration.
+ *   5. Appends a log entry to runLog for each outcome.
+ *
+ * Governor calibration state (datastoreStateJson) is passed to ST-07 so the
+ * powered-off fast lane inherits the observed impact deltas from this lane and
+ * does not have to start calibrating from scratch on shared datastores.
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name                     vRO Type   Source
- *   ──────────────────────────────────────────────────────────────────────────
- *   onCandidatesJson         string     Attribute: onCandidatesJson
- *   runId                    string     Attribute: runId
- *   runLog                   string     Attribute: runLog
- *   dryRun                   boolean    Workflow Input: dryRun
- *   latencyThresholdMs       number     Workflow Input: latencyThresholdMs
- *   vsanCongestionThresh     number     Workflow Input: vsanCongestionThresh
- *   vsanResyncThresholdBytes number     Attribute: vsanResyncThresholdBytes
- *   govPollMs                number     Attribute: govPollMs
- *   maxParallel              number     Attribute: maxParallel
- *   taskTimeoutSeconds       number     Workflow Input: taskTimeoutSeconds
+ *   Name                     vRO Type  Source / Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   onCandidatesJson         string    Attribute: onCandidatesJson
+ *                                      Chain-ordered list of powered-on/suspended VM snapshots
+ *                                      from ST-05.
+ *   runId                    string    Attribute: runId
+ *                                      Included in each log entry so every action can be
+ *                                      traced back to this specific run.
+ *   runLog                   string    Attribute: runLog
+ *                                      Accumulates one entry per snapshot processed.
+ *                                      Passed forward to ST-07 and finally ST-09.
+ *   dryRun                   boolean   Workflow Input: dryRun
+ *                                      When true, deleteSnapshot logs [DRY-RUN] and returns
+ *                                      immediately without submitting a vCenter task.
+ *   latencyThresholdMs       number    Workflow Input: latencyThresholdMs
+ *                                      VMFS/NFS governor ceiling. The governor projects
+ *                                      current + observed delta; if projection exceeds this
+ *                                      value the next task is held until I/O settles.
+ *   vsanCongestionThresh     number    Workflow Input: vsanCongestionThresh
+ *                                      vSAN congestion governor ceiling (0-255).
+ *   vsanResyncThresholdBytes number    Attribute: vsanResyncThresholdBytes
+ *                                      vSAN resync queue ceiling in bytes (converted by ST-01).
+ *   govPollMs                number    Attribute: govPollMs
+ *                                      Milliseconds between governor re-checks when a task
+ *                                      is on hold (converted by ST-01).
+ *   maxParallel              number    Attribute: maxParallel
+ *                                      Maximum concurrent consolidation tasks per vCenter
+ *                                      for powered-on VMs (validated by ST-01).
+ *   taskTimeoutSeconds       number    Workflow Input: taskTimeoutSeconds
+ *                                      Passed to deleteSnapshot. Maximum seconds to wait
+ *                                      for the vCenter removal task to reach success or error.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
- *   Name                vRO Type   Description
- *   ──────────────────────────────────────────────────────────────────────────
- *   datastoreStateJson  string     JSON object -- governor calibration data (pre/post
- *                                  I/O metrics per datastore). Passed to ST-07 so the
- *                                  powered-off fast lane inherits calibration data.
- *   runLog              string     Updated JSON array with entries for each snapshot
+ *   Name                vRO Type  Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   datastoreStateJson  string    JSON object keyed by datastore MoRef. Each entry holds
+ *                                 lastPre and lastPost metric snapshots from the most recent
+ *                                 consolidation on that datastore. Passed to ST-07 so the
+ *                                 fast lane inherits calibration data from this lane.
+ *   runLog              string    Updated JSON array. Contains one entry per snapshot
+ *                                 processed, with action, success flag, skip reason,
+ *                                 duration, and any error message.
  */
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },

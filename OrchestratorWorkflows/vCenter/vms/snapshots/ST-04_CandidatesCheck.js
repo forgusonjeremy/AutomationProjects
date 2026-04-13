@@ -2,29 +2,54 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * ST-04  CANDIDATES CHECK  (EARLY EXIT GATE)
  * ─────────────────────────────────────────────────────────────────────────────
- * If no eligible snapshots were found: writes the result log entry,
- * releases the lock, and throws CLEAN_EXIT so the workflow ends cleanly.
- * If snapshots exist: records the count and continues to ST-05.
+ * Checks whether any eligible snapshots were found. If none: writes the
+ * structured result log entry, releases the mutex lock, and throws a
+ * CLEAN_EXIT sentinel so the Exception Handler ends the workflow in a
+ * success state without logging an error. If candidates exist, records
+ * the count and passes control to ST-05.
+ *
+ * This task owns the result log entry and lock release for the no-candidates
+ * path so that ST-09 only runs when there is actual work to report.
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name               vRO Type                  Source
- *   ──────────────────────────────────────────────────────────────────────────
- *   allCandidatesJson  string                    Attribute: allCandidatesJson
- *   runLog             string                    Attribute: runLog
- *   runId              string                    Attribute: runId
- *   lockEl             ConfigurationElement      Attribute: lockEl
- *   dryRun             boolean                   Workflow Input: dryRun
- *   maxAgeMinutes      number                    Workflow Input: maxAgeMinutes
- *   nameMatchString    string                    Workflow Input: nameMatchString
- *   descIgnoreString   string                    Workflow Input: descIgnoreString
+ *   Name               vRO Type                Source / Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   allCandidatesJson  string                  Attribute: allCandidatesJson
+ *                                              The merged candidate list from ST-03.
+ *                                              Parsed to determine whether any candidates exist.
+ *   runLog             string                  Attribute: runLog
+ *                                              Inspected for enum_error count to include in the
+ *                                              result summary when exiting cleanly.
+ *   runId              string                  Attribute: runId
+ *                                              Included in the result log entry and in the
+ *                                              lock release log message.
+ *   lockEl             ConfigurationElement    Attribute: lockEl
+ *                                              Used to clear runLock on clean exit. This task
+ *                                              must release the lock before throwing CLEAN_EXIT
+ *                                              because the Exception Handler does not release
+ *                                              on CLEAN_EXIT (ST-04 already handled it).
+ *   dryRun             boolean                 Workflow Input: dryRun
+ *                                              Included in the result log entry so the reader
+ *                                              knows whether the run was live or a dry run.
+ *   maxAgeMinutes      number                  Workflow Input: maxAgeMinutes
+ *                                              Included in the result entry to show what age
+ *                                              filter was active when no candidates were found.
+ *   nameMatchString    string                  Workflow Input: nameMatchString
+ *                                              Included in the result entry for context.
+ *   descIgnoreString   string                  Workflow Input: descIgnoreString
+ *                                              Included in the result entry for context.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
- *   Name            vRO Type   Description
- *   ──────────────────────────────────────────────────────────────────────────
- *   candidateCount  number     Total number of eligible snapshots found
+ *   Name            vRO Type  Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   candidateCount  number    Total number of eligible snapshots found across all vCenters.
+ *                             Zero triggers the clean exit path in this task. A positive value
+ *                             means the workflow continues to ST-05.
  *
  * ── THROWS ───────────────────────────────────────────────────────────────────
- *   "CLEAN_EXIT:..."  Lock already released by this task. EH ends workflow cleanly.
+ *   "CLEAN_EXIT:..."    No candidates found. Lock already released by this task.
+ *                       Exception Handler receives this, sets outcome = CLEAN_EXIT,
+ *                       and ends the workflow in a success state without re-throwing.
  */
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },

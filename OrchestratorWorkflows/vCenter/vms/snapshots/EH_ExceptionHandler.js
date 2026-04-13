@@ -2,38 +2,74 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * EXCEPTION HANDLER SCRIPTABLE TASK
  * ─────────────────────────────────────────────────────────────────────────────
- * Handles all errors thrown by ST-01 through ST-09.
- * Connect the error output of every scriptable task to this element.
+ * Handles all errors thrown by ST-01 through ST-09. Connect the error output
+ * of every scriptable task on the canvas to this Exception Handler element.
  *
- * CLASSIFICATION:
- *   MUTEX_ABORT  Lock held by another run. This run never started. Lock is not ours.
- *   CLEAN_EXIT   No snapshots found. ST-04 already logged and released the lock.
- *   ERROR        Unexpected failure. We may hold the lock. Must release and log.
+ * Classifies each error into one of three categories and responds accordingly:
+ *
+ *   MUTEX_ABORT  Another run holds the lock. This run never started and took
+ *                no action. The lock belongs to the other run — do not release it.
+ *                Workflow ends in success state. No result log entry is written
+ *                (the run never started, so there is nothing to summarise).
+ *
+ *   CLEAN_EXIT   No eligible snapshots were found. ST-04 already wrote the result
+ *                log entry and released the lock before throwing this sentinel.
+ *                Nothing further to do here. Workflow ends in success state.
+ *
+ *   ERROR        An unexpected exception occurred. This run may hold the lock.
+ *                Releases the lock (if held), writes a partial result log entry
+ *                showing whatever was completed before the error, and re-throws
+ *                so vRO marks the workflow run as FAILED in the Runs tab.
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name              vRO Type                  Source
- *   ──────────────────────────────────────────────────────────────────────────
- *   errorCode         string                    vRO built-in exception variable
- *                                               (bind via Exception element input tab)
- *   lockEl            ConfigurationElement      Attribute: lockEl
- *                                               (may be null if error before ST-02)
- *   runId             string                    Attribute: runId
- *                                               (may be empty if error before ST-01)
- *   runLog            string                    Attribute: runLog
- *   dryRun            boolean                   Workflow Input: dryRun
- *   maxAgeMinutes     number                    Workflow Input: maxAgeMinutes
- *   nameMatchString   string                    Workflow Input: nameMatchString
- *   descIgnoreString  string                    Workflow Input: descIgnoreString
+ *   Name              vRO Type                Source / Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   errorCode         string                  vRO built-in exception variable.
+ *                                             Bind this via the Exception element's own Input
+ *                                             Bindings tab (not the standard binding UI).
+ *                                             Contains the message from the thrown Error object.
+ *                                             May be null if vRO could not capture the message.
+ *   lockEl            ConfigurationElement    Attribute: lockEl
+ *                                             Reference to SnapshotCleanup/RuntimeState.
+ *                                             May be null if the error occurred before ST-02
+ *                                             completed (i.e., before the lock was acquired).
+ *                                             The task checks lockEl for null before attempting
+ *                                             to release.
+ *   runId             string                  Attribute: runId
+ *                                             May be empty string if the error occurred in
+ *                                             ST-01 before the run ID was generated. The task
+ *                                             defaults to "UNKNOWN" in that case.
+ *   runLog            string                  Attribute: runLog
+ *                                             Whatever log entries were accumulated before the
+ *                                             error. May be empty "[]" if the error occurred
+ *                                             early. Used to compute partial result counts for
+ *                                             the ERROR result block.
+ *   dryRun            boolean                 Workflow Input: dryRun
+ *                                             Included in the ERROR result block for context.
+ *   maxAgeMinutes     number                  Workflow Input: maxAgeMinutes
+ *                                             Included in the ERROR result block for context.
+ *   nameMatchString   string                  Workflow Input: nameMatchString
+ *                                             Included in the ERROR result block for context.
+ *   descIgnoreString  string                  Workflow Input: descIgnoreString
+ *                                             Included in the ERROR result block for context.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
- *   Name              vRO Type   Description
- *   ──────────────────────────────────────────────────────────────────────────
- *   workflowOutcome   string     MUTEX_ABORT | CLEAN_EXIT | ERROR
- *   runSummaryJson    string     JSON object -- minimal run summary for this exit path
+ *   Name              vRO Type  Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   workflowOutcome   string    Classification of this exit: MUTEX_ABORT, CLEAN_EXIT, or ERROR.
+ *                               Bound to the workflow output attribute so the outcome is visible
+ *                               in the vRO execution details pane and accessible to calling
+ *                               workflows or vRO scheduled run monitoring.
+ *   runSummaryJson    string    Minimal JSON summary for this exit path containing: runId,
+ *                               completedAt timestamp, outcome, and errorMessage (null for
+ *                               MUTEX_ABORT and CLEAN_EXIT, populated for ERROR). Bound to
+ *                               the workflow output attribute.
  *
  * ── RE-THROW BEHAVIOUR ───────────────────────────────────────────────────────
- *   CLEAN_EXIT and MUTEX_ABORT : workflow ends in SUCCESS state (no re-throw)
- *   ERROR                      : re-throws so vRO marks the run as FAILED
+ *   CLEAN_EXIT and MUTEX_ABORT : no re-throw — workflow ends in SUCCESS state.
+ *   ERROR                      : re-throws the original error — vRO marks the
+ *                                run as FAILED in the Runs tab and sends failure
+ *                                notifications if configured.
  */
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },

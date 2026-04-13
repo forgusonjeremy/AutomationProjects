@@ -2,29 +2,52 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * ST-07  PROCESS POWERED-OFF VMs  (FAST LANE)
  * ─────────────────────────────────────────────────────────────────────────────
- * Processes powered-off VM snapshots. No per-VM concurrency limit
- * (no guest stun lock risk), but still fully governed by I/O governor.
- * Inherits governor calibration state from ST-06.
+ * Processes snapshots on powered-off VMs. Because powered-off VMs have no
+ * running guest workload there is no stun lock risk, so no per-VM concurrency
+ * limit is applied. However, consolidation still generates storage I/O on
+ * shared datastores, so the full adaptive I/O governor still runs before
+ * each task.
+ *
+ * This task inherits the governor calibration state from ST-06. If a datastore
+ * was already calibrated during the powered-on lane, the observed I/O delta from
+ * that lane is used immediately here rather than having to re-learn it.
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name                     vRO Type   Source
- *   ──────────────────────────────────────────────────────────────────────────
- *   offCandidatesJson        string     Attribute: offCandidatesJson
- *   datastoreStateJson       string     Attribute: datastoreStateJson  (from ST-06)
- *   runId                    string     Attribute: runId
- *   runLog                   string     Attribute: runLog
- *   dryRun                   boolean    Workflow Input: dryRun
- *   latencyThresholdMs       number     Workflow Input: latencyThresholdMs
- *   vsanCongestionThresh     number     Workflow Input: vsanCongestionThresh
- *   vsanResyncThresholdBytes number     Attribute: vsanResyncThresholdBytes
- *   govPollMs                number     Attribute: govPollMs
- *   taskTimeoutSeconds       number     Workflow Input: taskTimeoutSeconds
+ *   Name                     vRO Type  Source / Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   offCandidatesJson        string    Attribute: offCandidatesJson
+ *                                      Chain-ordered list of powered-off VM snapshots from ST-05.
+ *   datastoreStateJson       string    Attribute: datastoreStateJson
+ *                                      Governor calibration state produced by ST-06. Contains
+ *                                      pre/post I/O metric pairs per datastore. Parsed and
+ *                                      used immediately so this lane does not start blind.
+ *   runId                    string    Attribute: runId
+ *                                      Included in each log entry for run traceability.
+ *   runLog                   string    Attribute: runLog
+ *                                      Accumulates log entries from this lane. Final value
+ *                                      is passed to ST-09 for result tallying.
+ *   dryRun                   boolean   Workflow Input: dryRun
+ *                                      When true, no deletions are performed.
+ *   latencyThresholdMs       number    Workflow Input: latencyThresholdMs
+ *                                      VMFS/NFS I/O governor ceiling in milliseconds.
+ *   vsanCongestionThresh     number    Workflow Input: vsanCongestionThresh
+ *                                      vSAN congestion governor ceiling (0-255).
+ *   vsanResyncThresholdBytes number    Attribute: vsanResyncThresholdBytes
+ *                                      vSAN resync queue ceiling in bytes (converted by ST-01).
+ *   govPollMs                number    Attribute: govPollMs
+ *                                      Milliseconds between governor re-checks when on hold.
+ *   taskTimeoutSeconds       number    Workflow Input: taskTimeoutSeconds
+ *                                      Maximum seconds to wait for each vCenter removal task.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
- *   Name                vRO Type   Description
- *   ──────────────────────────────────────────────────────────────────────────
- *   runLog              string     Final JSON array passed to ST-09 for tallying
- *   datastoreStateJson  string     Updated governor calibration state
+ *   Name                vRO Type  Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   runLog              string    Final JSON array containing all log entries from both
+ *                                 ST-06 and this task combined. Passed to ST-09 for tallying
+ *                                 and inclusion in the result summary.
+ *   datastoreStateJson  string    Updated governor calibration state including any new
+ *                                 pre/post metric pairs observed during this lane.
+ *                                 Informational at this point — the run ends after ST-09.
  */
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },

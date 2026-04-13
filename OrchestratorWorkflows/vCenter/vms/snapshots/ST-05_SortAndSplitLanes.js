@@ -2,19 +2,33 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * ST-05  SORT & SPLIT EXECUTION LANES
  * ─────────────────────────────────────────────────────────────────────────────
- * Sorts snapshots so children are always processed before parents (required
- * for safe chain deletion). Splits into powered-on and powered-off queues.
+ * Prepares the candidate list for safe, efficient processing by doing two things:
+ *
+ * 1. CHAIN-ORDER SORT: Sorts candidates so child snapshots always appear before
+ *    their parent in the queue. This is required because vCenter cannot delete a
+ *    parent snapshot while one of its children still exists. Within the same VM,
+ *    the oldest sibling snapshots are processed first to maximise storage reclaim.
+ *
+ * 2. LANE SPLIT: Divides candidates into two queues based on VM power state.
+ *    Powered-off VMs have no guest stun lock risk so they can be processed
+ *    without the per-vCenter concurrency limit, making them faster to clean up.
+ *    Powered-on and suspended VMs go to the throttled lane with full governor
+ *    and concurrency enforcement.
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name               vRO Type   Source
- *   ──────────────────────────────────────────────────────────────────────────
- *   allCandidatesJson  string     Attribute: allCandidatesJson
+ *   Name               vRO Type  Source / Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   allCandidatesJson  string    Attribute: allCandidatesJson
+ *                                The complete flat candidate list from ST-03.
+ *                                Parsed, sorted, and split into two sub-lists.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
- *   Name               vRO Type   Description
- *   ──────────────────────────────────────────────────────────────────────────
- *   onCandidatesJson   string     JSON array -- powered-on and suspended VM snapshots
- *   offCandidatesJson  string     JSON array -- powered-off VM snapshots (fast lane)
+ *   Name               vRO Type  Description
+ *   ─────────────────────────────────────────────────────────────────────────────────────────────
+ *   onCandidatesJson   string    JSON array of candidates whose VM power state is poweredOn
+ *                                or suspended. Fed into ST-06 (throttled lane). Chain-ordered.
+ *   offCandidatesJson  string    JSON array of candidates whose VM power state is poweredOff.
+ *                                Fed into ST-07 (fast lane). Chain-ordered.
  */
 var LOG = {
     ok: function(p,m){ System.log("[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); }
