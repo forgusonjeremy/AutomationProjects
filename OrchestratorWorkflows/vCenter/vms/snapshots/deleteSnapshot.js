@@ -1,170 +1,145 @@
 /**
  * ACTION: deleteSnapshot
- * vRO Action — deletes a single snapshot (not children) and awaits task completion.
- * Performs pre-deletion safety checks: backup lock, task conflict, HA event.
- * Returns pre and post I/O metrics for governor calibration.
+ * Module : com.company.snapshotcleanup
  *
- * Inputs:
+ * Executes a single snapshot deletion (removeChildren=false) with full
+ * pre-deletion safety checks and pre/post I/O metric capture for governor
+ * calibration.
+ *
+ * INPUT PARAMETERS:
  *   vcenterSdkConnection : VC:SdkConnection
- *   vmMoRef              : string   — VM managed object reference value
- *   snapshotMoRef        : string   — Snapshot managed object reference value
+ *   vmMoRef              : string
+ *   snapshotMoRef        : string
  *   snapshotName         : string   — for logging
  *   vmName               : string   — for logging
  *   datastoreMoRefsJson  : string   — JSON array of datastore MoRef strings
- *   dryRun               : boolean  — if true, skip actual deletion
- *   taskTimeoutSeconds   : number   — max wait for vCenter task (default 1800)
+ *   dryRun               : boolean  — when true, skip actual deletion
+ *   taskTimeoutSeconds   : number   — max wait for vCenter task
  *
- * Returns: JSON string {
- *   success: boolean,
- *   skipped: boolean,
- *   skipReason: string | null,
- *   preMetricsJson: string,   -- array of metric objects (one per datastore)
- *   postMetricsJson: string,
- *   durationMs: number,
- *   error: string | null
- * }
+ * RETURN TYPE: string (JSON object)
+ *   {
+ *     success, skipped, skipReason,
+ *     preMetricsJson, postMetricsJson,
+ *     durationMs, error
+ *   }
  */
 
-var startMs    = new Date().getTime();
-var timeout    = taskTimeoutSeconds || 1800;
-var dsRefs     = JSON.parse(datastoreMoRefsJson || "[]");
-var result     = { success: false, skipped: false, skipReason: null,
-                   preMetricsJson: "[]", postMetricsJson: "[]",
-                   durationMs: 0, error: null };
+var MODULE   = "com.company.snapshotcleanup";
+var startMs  = new Date().getTime();
+var timeout  = taskTimeoutSeconds || 1800;
+var dsRefs   = JSON.parse(datastoreMoRefsJson || "[]");
+var result   = {
+    success: false, skipped: false, skipReason: null,
+    preMetricsJson: "[]", postMetricsJson: "[]",
+    durationMs: 0, error: null
+};
 
 try {
-    // Resolve VM object
     var vm = VcPlugin.findEntityById("VirtualMachine:" + vmMoRef, vcenterSdkConnection);
     if (!vm) {
-        result.skipped   = true;
+        result.skipped = true;
         result.skipReason = "VM not found (may have been deleted): " + vmMoRef;
         return JSON.stringify(result);
     }
 
-    // Safety check 1: VM is a template (should not happen after inventory filter, but guard anyway)
     if (vm.config && vm.config.template) {
-        result.skipped    = true;
-        result.skipReason = "VM is a template, skipping";
+        result.skipped = true; result.skipReason = "VM is a template";
         return JSON.stringify(result);
     }
 
-    // Safety check 2: Active backup snapshot lock — detect by checking if any running task
-    // on this VM is a CreateSnapshot or BackupAgent task
+    // Safety: check for conflicting active tasks
     var activeTasks = vm.recentTask;
     if (activeTasks) {
         for each (var task in activeTasks) {
-            var taskState = task.info.state.value;
-            var taskDesc  = task.info.descriptionId || "";
-            if (taskState === "running" &&
-                (taskDesc.indexOf("snapshot") !== -1 || taskDesc.indexOf("backup") !== -1 ||
-                 taskDesc.indexOf("clone") !== -1    || taskDesc.indexOf("migrate") !== -1 ||
-                 taskDesc.indexOf("relocate") !== -1)) {
+            var ts  = task.info.state.value;
+            var td  = task.info.descriptionId || "";
+            if (ts === "running" &&
+                (td.indexOf("snapshot") !== -1 || td.indexOf("backup")   !== -1 ||
+                 td.indexOf("clone")    !== -1 || td.indexOf("migrate")  !== -1 ||
+                 td.indexOf("relocate") !== -1)) {
                 result.skipped    = true;
-                result.skipReason = "Conflicting task active on VM (" + taskDesc + ")";
+                result.skipReason = "Conflicting task active on VM (" + td + ")";
                 return JSON.stringify(result);
             }
         }
     }
 
-    // Safety check 3: vSphere HA failover in progress (check cluster runtime)
-    // Check host connection state — if host is disconnected/notResponding, skip
+    // Safety: check host connectivity
     var host = vm.runtime.host;
-    if (host) {
-        var hostConnState = host.runtime && host.runtime.connectionState ?
-                            host.runtime.connectionState.value : "";
-        if (hostConnState === "disconnected" || hostConnState === "notResponding") {
+    if (host && host.runtime && host.runtime.connectionState) {
+        var cs = host.runtime.connectionState.value;
+        if (cs === "disconnected" || cs === "notResponding") {
             result.skipped    = true;
-            result.skipReason = "Host " + host.name + " is " + hostConnState + " — possible HA event, skipping";
+            result.skipReason = "Host " + host.name + " is " + cs + " — possible HA event";
             return JSON.stringify(result);
         }
     }
 
-    // Safety check 4: VM in vMotion or Storage vMotion
-    // Check runtime.connectionState — migrating state
-    if (vm.runtime && vm.runtime.connectionState) {
-        var vmConnState = vm.runtime.connectionState.value;
-        // During live migration runtime.powerState stays poweredOn but task queue will show it
-        // We already checked activeTasks above for migrate/relocate
-    }
-
-    // Resolve snapshot object
+    // Safety: confirm snapshot still exists
     var snapObj = null;
-    if (vm.snapshot && vm.snapshot.rootSnapshotList) {
-        snapObj = findSnapshotByMoRef(vm.snapshot.rootSnapshotList, snapshotMoRef);
-    }
+    if (vm.snapshot && vm.snapshot.rootSnapshotList)
+        snapObj = findSnapshot(vm.snapshot.rootSnapshotList, snapshotMoRef);
     if (!snapObj) {
         result.skipped    = true;
-        result.skipReason = "Snapshot no longer exists (already deleted or consolidated): " + snapshotMoRef;
+        result.skipReason = "Snapshot no longer exists (already deleted or consolidated)";
         return JSON.stringify(result);
     }
 
-    // DRY RUN — log and return without deletion
+    // Dry run — log and return
     if (dryRun) {
         result.success    = true;
-        result.skipped    = false;
-        result.skipReason = null;
         result.durationMs = new Date().getTime() - startMs;
-        System.log("[DRY-RUN] Would delete: VM=" + vmName + " snap=" + snapshotName +
-                   " age=" + Math.floor((new Date().getTime() - snapObj.createTime.getTime()) / 60000) + "min");
+        System.log("[DRY-RUN] Would delete: VM=" + vmName + " snap=" + snapshotName);
         return JSON.stringify(result);
     }
 
-    // Sample pre-deletion metrics across all datastores
+    // Sample pre-deletion metrics
     var preMetrics = [];
     for each (var dsRef in dsRefs) {
-        var mJson = System.getModule("com.company.snapshotcleanup").getDatastoreMetrics(
-                        vcenterSdkConnection, dsRef);
-        preMetrics.push(JSON.parse(mJson));
+        var m = JSON.parse(System.getModule(MODULE).getDatastoreMetrics(vcenterSdkConnection, dsRef));
+        preMetrics.push(m);
     }
     result.preMetricsJson = JSON.stringify(preMetrics);
 
-    // Execute deletion — removeSnapshot_Task(removeChildren=false)
+    // Execute deletion
     System.log("Deleting snapshot: VM=" + vmName + " snap=" + snapshotName);
     var task = snapObj.snapshot.removeSnapshot_Task(false);
 
-    // Poll task to completion
     var waited = 0;
-    var pollInterval = 5000; // 5 seconds
     while (waited < timeout * 1000) {
-        System.sleep(pollInterval);
-        waited += pollInterval;
-        var taskState = task.info.state.value;
-        if (taskState === "success") {
-            break;
-        } else if (taskState === "error") {
-            var errMsg = task.info.error ? task.info.error.localizedMessage : "Unknown task error";
-            result.error = "Task failed: " + errMsg;
+        System.sleep(5000);
+        waited += 5000;
+        task.update();
+        var state = task.info.state.value;
+        if (state === "success") break;
+        if (state === "error") {
+            result.error      = task.info.error ? task.info.error.localizedMessage : "Unknown task error";
             result.durationMs = new Date().getTime() - startMs;
             return JSON.stringify(result);
         }
-        // Still running — update task to refresh state
-        task.update();
     }
 
     if (task.info.state.value !== "success") {
-        result.error = "Task timed out after " + timeout + " seconds";
+        result.error      = "Task timed out after " + timeout + " seconds";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
 
-    // Wait a short settle period before post-sample to let I/O stabilise
-    System.sleep(10000); // 10 seconds
-
-    // Sample post-deletion metrics
+    // Settle then sample post-deletion metrics
+    System.sleep(10000);
     var postMetrics = [];
     for each (var dsRef2 in dsRefs) {
-        var mJson2 = System.getModule("com.company.snapshotcleanup").getDatastoreMetrics(
-                         vcenterSdkConnection, dsRef2);
-        postMetrics.push(JSON.parse(mJson2));
+        var m2 = JSON.parse(System.getModule(MODULE).getDatastoreMetrics(vcenterSdkConnection, dsRef2));
+        postMetrics.push(m2);
     }
     result.postMetricsJson = JSON.stringify(postMetrics);
-    result.success    = true;
-    result.durationMs = new Date().getTime() - startMs;
+    result.success         = true;
+    result.durationMs      = new Date().getTime() - startMs;
 
     System.log("Deleted: VM=" + vmName + " snap=" + snapshotName +
                " duration=" + Math.round(result.durationMs / 1000) + "s");
 
-} catch(e) {
+} catch (e) {
     result.error      = e.message;
     result.durationMs = new Date().getTime() - startMs;
     System.error("deleteSnapshot error: VM=" + vmName + " snap=" + snapshotName + " err=" + e.message);
@@ -172,14 +147,12 @@ try {
 
 return JSON.stringify(result);
 
-// ---- helpers ----
-
-function findSnapshotByMoRef(snapList, moRefValue) {
+function findSnapshot(snapList, moRefValue) {
     for each (var s in snapList) {
         if (s.snapshot && s.snapshot.value === moRefValue) return s;
         if (s.childSnapshotList && s.childSnapshotList.length > 0) {
-            var found = findSnapshotByMoRef(s.childSnapshotList, moRefValue);
-            if (found) return found;
+            var f = findSnapshot(s.childSnapshotList, moRefValue);
+            if (f) return f;
         }
     }
     return null;

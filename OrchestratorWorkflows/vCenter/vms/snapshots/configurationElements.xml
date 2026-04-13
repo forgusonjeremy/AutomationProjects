@@ -1,149 +1,236 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  vRO Configuration Element Definitions
-  Import path: Administration > Configuration > Configuration Elements
+  ═══════════════════════════════════════════════════════════════════════════════
+  vRO CONFIGURATION ELEMENTS — Adaptive Snapshot Cleanup
+  VCF 9.0.2 / Embedded vRO 8.17.x
+  ═══════════════════════════════════════════════════════════════════════════════
 
-  Create TWO configuration elements under category "SnapshotCleanup":
-    1. RuntimeState     — mutex lock and run tracking
-    2. FileLogging      — file share settings and credentials
-    3. Thresholds       — governor threshold defaults (optional — can use workflow inputs instead)
+  CREATE TWO configuration elements under category: SnapshotCleanup
+
+    1. RuntimeState  — distributed mutex lock and run tracking
+    2. Thresholds    — persistent governor defaults for scheduled runs
+
+  NOTE: The FileLogging configuration element has been removed from this
+  solution. All audit output is written to the vRO workflow log, which is
+  ingested directly by VMware Aria Operations for Logs. No network share,
+  no NFS/SMB mount, and no file share credentials are required.
+
+  HOW TO IMPORT:
+    vRO Client > Design > Configuration > right-click SnapshotCleanup category
+    > New Configuration Element > paste attributes from each section below.
+    Alternatively use the vRO REST API to POST to /vco/api/configurations.
+
+  ═══════════════════════════════════════════════════════════════════════════════
 -->
 
-<!-- ================================================================
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
      1. SnapshotCleanup / RuntimeState
-     ================================================================ -->
-<config-element name="RuntimeState" version="0.0.1">
-  <description>Runtime state for the Adaptive Snapshot Cleanup workflow. Holds the distributed mutex lock.</description>
-  <atts>
-    <att
+     Purpose: Holds the distributed mutex lock that prevents concurrent runs.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+
+<configuration-element name="RuntimeState" version="1.0">
+  <description>
+    Runtime state for the Adaptive Snapshot Cleanup workflow.
+    Holds the distributed mutex lock (runLock). If a workflow run terminates
+    abnormally without releasing this lock, clear it manually by setting
+    runLock to an empty string before triggering the next run.
+  </description>
+
+  <attributes>
+
+    <attribute
       name="runLock"
       type="string"
-      read-only="false"
-      description="Active run ID if a run is in progress, empty string if no run is active. DO NOT edit manually unless a run aborted without releasing.">
-      <!-- Default value: empty -->
-      <value encoded="n"><![CDATA[]]></value>
-    </att>
-    <att
+      description="Active run ID when a run is in progress (format: SCR-YYYY-MM-DDTHH-MM-SS).
+                   Empty string when no run is active.
+                   WARNING: Never edit this value while a run is confirmed to be active.
+                   To clear a stuck lock: set this to empty string and save.">
+      <value><![CDATA[]]></value>
+      <!-- DEFAULT: empty string — do not change this default -->
+    </attribute>
+
+    <attribute
       name="lastRunId"
       type="string"
-      read-only="false"
-      description="Run ID of the last completed run (informational).">
-      <value encoded="n"><![CDATA[]]></value>
-    </att>
-    <att
+      description="Run ID of the last completed or aborted run. Informational only.
+                   Updated automatically at the end of each run.">
+      <value><![CDATA[]]></value>
+    </attribute>
+
+    <attribute
       name="lastRunCompletedAt"
       type="string"
-      read-only="false"
-      description="ISO timestamp of the last completed run.">
-      <value encoded="n"><![CDATA[]]></value>
-    </att>
-  </atts>
-</config-element>
+      description="ISO 8601 timestamp of the last run completion. Informational only.">
+      <value><![CDATA[]]></value>
+    </attribute>
 
-<!-- ================================================================
-     2. SnapshotCleanup / FileLogging
-     ================================================================ -->
-<config-element name="FileLogging" version="0.0.1">
-  <description>File share configuration for structured run logs.</description>
-  <atts>
-    <att
-      name="shareType"
+    <attribute
+      name="lastRunOutcome"
       type="string"
-      read-only="false"
-      description="'nfs' or 'smb'. Determines which path and credential set is used.">
-      <value encoded="n"><![CDATA[nfs]]></value>
-    </att>
-    <att
-      name="logFormat"
-      type="string"
-      read-only="false"
-      description="'json' or 'csv'. Format of the written log file.">
-      <value encoded="n"><![CDATA[json]]></value>
-    </att>
+      description="Outcome of the last run: SUCCESS | DRY_RUN_COMPLETE |
+                   COMPLETED_WITH_ERRORS | COMPLETED_WITH_DEFERRALS |
+                   CLEAN_EXIT | MUTEX_ABORT | ERROR. Informational only.">
+      <value><![CDATA[]]></value>
+    </attribute>
 
-    <!-- NFS settings -->
-    <att
-      name="nfsPath"
-      type="string"
-      read-only="false"
-      description="Local mount point on the vRO appliance where the NFS share is mounted. Example: /mnt/vro-logs/snapshot-cleanup — the vRO appliance must have this NFS export mounted at the OS level.">
-      <value encoded="n"><![CDATA[/mnt/vro-logs/snapshot-cleanup]]></value>
-    </att>
+  </attributes>
+</configuration-element>
 
-    <!-- SMB settings -->
-    <att
-      name="smbUncPath"
-      type="string"
-      read-only="false"
-      description="Local mount point on the vRO appliance where the CIFS/SMB share is mounted. Example: /mnt/smb-logs/snapshot-cleanup — mount the share on the vRO appliance with: mount -t cifs //fileserver/share /mnt/smb-logs -o username=USER,password=PASS,domain=DOMAIN">
-      <value encoded="n"><![CDATA[/mnt/smb-logs/snapshot-cleanup]]></value>
-    </att>
-    <att
-      name="smbUsername"
-      type="string"
-      read-only="false"
-      description="Username for SMB share authentication (used when mounting at OS level).">
-      <value encoded="n"><![CDATA[svc-vro-logs]]></value>
-    </att>
-    <att
-      name="smbPassword"
-      type="SecureString"
-      read-only="false"
-      description="Password for the SMB share user. Stored as SecureString (encrypted at rest in vRO).">
-      <value encoded="n"><![CDATA[REPLACE_WITH_PASSWORD]]></value>
-    </att>
-  </atts>
-</config-element>
 
-<!-- ================================================================
-     3. SnapshotCleanup / Thresholds
-     (These are also settable as workflow inputs; config element provides
-     persistent defaults for scheduled runs.)
-     ================================================================ -->
-<config-element name="Thresholds" version="0.0.1">
-  <description>Default I/O governor thresholds for the Adaptive Snapshot Cleanup workflow.</description>
-  <atts>
-    <att
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     2. SnapshotCleanup / Thresholds
+     Purpose: Persistent default values for all governor and execution
+              parameters. These defaults are used by scheduled runs.
+              All values can be overridden at runtime via the workflow
+              input form when running on-demand.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+
+<configuration-element name="Thresholds" version="1.0">
+  <description>
+    Default governor thresholds and execution parameters for the Adaptive
+    Snapshot Cleanup workflow. Used as defaults for scheduled runs.
+    All values are overridable via the workflow input form on on-demand runs.
+    Tune latencyThresholdMs and vsanCongestionThresh based on observed
+    baseline storage performance in your environment.
+  </description>
+
+  <attributes>
+
+    <!-- ── Age filter ─────────────────────────────────────────────────────── -->
+
+    <attribute
+      name="maxAgeMinutes"
+      type="number"
+      description="Snapshots older than this many minutes are candidates for deletion.
+                   TESTING : set to 5-60 minutes to catch recently created test snapshots.
+                   PRODUCTION: set to 10080 (7 days) or as required by policy.
+                   This value does NOT cause automatic deletion — the workflow
+                   must still be triggered manually or via schedule.">
+      <value>10080</value>
+      <!-- 10080 = 7 days. Adjust to match your snapshot retention policy. -->
+    </attribute>
+
+    <!-- ── Name and description filters ──────────────────────────────────── -->
+
+    <attribute
+      name="nameMatchString"
+      type="string"
+      description="Whitelist name filter. When non-empty, ONLY snapshots whose
+                   names contain this string (case-insensitive) are eligible.
+                   Leave empty to target all snapshots regardless of name.
+                   Example: 'pre-patch' — only deletes snapshots named 'pre-patch',
+                   'Pre-Patch-2026-04-10', 'PREPATCH', etc.">
+      <value><![CDATA[]]></value>
+      <!-- DEFAULT: empty — all snapshot names are eligible -->
+    </attribute>
+
+    <attribute
+      name="descIgnoreString"
+      type="string"
+      description="Description ignore filter. Snapshots whose description field
+                   contains this string (case-insensitive) are skipped individually.
+                   The rest of the VM's snapshots are still eligible.
+                   Example: 'do not delete' — protects snapshots tagged with that phrase.">
+      <value><![CDATA[]]></value>
+      <!-- DEFAULT: empty — no description filter applied -->
+    </attribute>
+
+    <!-- ── Execution safety ───────────────────────────────────────────────── -->
+
+    <attribute
+      name="dryRunDefault"
+      type="boolean"
+      description="Default dry-run state for scheduled runs. When true, no
+                   snapshots are deleted — all operations are simulated and
+                   logged. Set to false only after validating dry-run output.
+                   IMPORTANT: The workflow input form always shows this as a
+                   visible field so operators can override it per-run.">
+      <value>false</value>
+      <!-- Set to false for production schedules after dry-run validation. -->
+    </attribute>
+
+    <!-- ── VMFS / NFS I/O governor ────────────────────────────────────────── -->
+
+    <attribute
       name="latencyThresholdMs"
       type="number"
-      read-only="false"
-      description="VMFS/NFS: projected total latency ceiling in milliseconds. Default 30ms. Tune to your storage SLA.">
-      <value encoded="n"><![CDATA[30]]></value>
-    </att>
-    <att
+      description="VMFS and NFS datastores: maximum projected total I/O latency
+                   in milliseconds before the governor holds the next consolidation.
+                   The governor projects: current_latency + observed_delta_from_last_task.
+                   If the projection exceeds this value, the task is held and the
+                   governor polls until conditions improve.
+                   TUNING: set to approximately 2x your observed idle latency during
+                   the cleanup window. If idle latency is 12ms, set this to 24-30ms.
+                   All-flash environments: 8-15ms. Spinning disk: 20-40ms.">
+      <value>30</value>
+    </attribute>
+
+    <!-- ── vSAN I/O governor ──────────────────────────────────────────────── -->
+
+    <attribute
       name="vsanCongestionThresh"
       type="number"
-      read-only="false"
-      description="vSAN: max projected congestion score (0-255). Default 50. Values above 128 indicate serious congestion.">
-      <value encoded="n"><![CDATA[50]]></value>
-    </att>
-    <att
+      description="vSAN datastores: maximum projected vSAN congestion score (0-255).
+                   vSAN reports congestion as an integer; values above 128 indicate
+                   serious congestion affecting all VMs on the cluster.
+                   The governor projects: current_congestion + observed_delta.
+                   TUNING: 30-50 = conservative (fewer concurrent cleanups allowed).
+                           80-100 = moderate. Above 128 = permissive (not recommended).
+                   Default 50 provides a safe margin below the serious-congestion threshold.">
+      <value>50</value>
+    </attribute>
+
+    <attribute
       name="vsanResyncThresholdGB"
       type="number"
-      read-only="false"
-      description="vSAN: max projected resync queue depth in GB. Default 10GB.">
-      <value encoded="n"><![CDATA[10]]></value>
-    </att>
-    <att
+      description="vSAN datastores: maximum projected resync queue depth in gigabytes.
+                   vSAN resync activity competes with guest I/O for storage bandwidth.
+                   A large resync queue (>10GB) indicates significant background
+                   rebalancing is in progress — adding consolidation I/O at this
+                   point risks guest performance degradation.
+                   TUNING: 5GB = conservative. 10GB = default. 20GB = permissive.">
+      <value>10</value>
+    </attribute>
+
+    <!-- ── Concurrency and timing ─────────────────────────────────────────── -->
+
+    <attribute
       name="maxParallelPerVcenter"
       type="number"
-      read-only="false"
-      description="Max concurrent consolidation tasks per vCenter. Default 3. Raise only after validating governor behaviour.">
-      <value encoded="n"><![CDATA[3]]></value>
-    </att>
-    <att
+      description="Maximum number of simultaneous snapshot consolidation tasks
+                   per vCenter for powered-on VMs. Powered-off VMs do not count
+                   against this limit but still count against the I/O governor.
+                   vCenter VPXD default task queue: 35 tasks.
+                   TUNING: 3 = conservative default. Raise to 5-8 only after
+                   validating that the governor correctly limits I/O impact.
+                   Do not exceed 10 without explicit vCenter task queue analysis.">
+      <value>3</value>
+    </attribute>
+
+    <attribute
       name="governorPollIntervalSec"
       type="number"
-      read-only="false"
-      description="How often (seconds) to re-check the governor when blocked. Default 30.">
-      <value encoded="n"><![CDATA[30]]></value>
-    </att>
-    <att
+      description="How often (in seconds) the adaptive I/O governor re-evaluates
+                   datastore metrics when a consolidation task is on hold.
+                   Lower values = more responsive but higher API call frequency.
+                   Higher values = less responsive but fewer performance manager queries.
+                   RECOMMENDED: 30 seconds for most environments.">
+      <value>30</value>
+    </attribute>
+
+    <attribute
       name="taskTimeoutSeconds"
       type="number"
-      read-only="false"
-      description="Max seconds to wait for a vCenter snapshot removal task to complete. Default 1800 (30 min). Large snapshot chains can take longer.">
-      <value encoded="n"><![CDATA[1800]]></value>
-    </att>
-  </atts>
-</config-element>
+      description="Maximum time in seconds to wait for a single vCenter snapshot
+                   removal task to reach a success or error state before treating
+                   it as a timeout failure.
+                   Deep snapshot chains (10+ snapshots) can require longer consolidation.
+                   Thin-provisioned disks on heavily loaded storage may also be slow.
+                   RECOMMENDED: 1800 (30 minutes). Raise to 3600 for environments
+                   with known slow storage or very deep snapshot chains.">
+      <value>1800</value>
+    </attribute>
+
+  </attributes>
+</configuration-element>

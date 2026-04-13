@@ -1,26 +1,23 @@
 /**
  * ACTION: adaptiveGovernorCheck
- * vRO Action — the adaptive I/O governor decision engine.
+ * Module : com.company.snapshotcleanup
  *
- * Called before starting each new consolidation task.
- * Compares current datastore metrics against the calibrated delta
- * learned from the previous consolidation on those datastores.
+ * Adaptive I/O governor decision engine. Called before starting each new
+ * consolidation task. Projects the expected I/O impact of the next task
+ * using the observed delta from the previous consolidation on the same
+ * datastores. If the projected metric would breach the threshold, denies
+ * the task.
  *
- * Inputs:
- *   currentMetricsJson   : string  — JSON array of current metric objects (from getDatastoreMetrics)
- *   baselineMetricsJson  : string  — JSON array of metrics sampled just before the last consolidation
- *                                    on the same datastores (null/empty = first task, skip check)
- *   preConsolidationJson : string  — JSON array of metrics sampled just before the last consolidation started
- *   postConsolidationJson: string  — JSON array of metrics sampled just after last consolidation completed
- *   latencyThresholdMs   : number  — VMFS/NFS: max tolerable total latency in ms (e.g. 30)
- *   vsanCongestionThresh : number  — vSAN: max tolerable congestion value (0-255, e.g. 50)
- *   vsanResyncThresh     : number  — vSAN: max tolerable resync queue depth bytes (e.g. 10737418240 = 10GB)
+ * INPUT PARAMETERS:
+ *   currentMetricsJson    : string  — JSON array of current metric objects
+ *   preConsolidationJson  : string  — JSON array of metrics sampled before last task
+ *   postConsolidationJson : string  — JSON array of metrics sampled after last task
+ *   latencyThresholdMs    : number  — VMFS/NFS: max tolerable projected latency (ms)
+ *   vsanCongestionThresh  : number  — vSAN: max tolerable projected congestion (0-255)
+ *   vsanResyncThresh      : number  — vSAN: max tolerable projected resync depth (bytes)
  *
- * Returns: JSON string {
- *   approved: boolean,
- *   reason:   string,
- *   projectedDeltas: { [datastoreMoRef]: { readLatMs, writeLatMs, vsanCong } }
- * }
+ * RETURN TYPE: string (JSON object)
+ *   { approved: boolean, reason: string, projectedDeltas: object }
  */
 
 var approved = true;
@@ -28,16 +25,19 @@ var reason   = "OK";
 var projectedDeltas = {};
 
 try {
-    var currentMetrics   = JSON.parse(currentMetricsJson   || "[]");
-    var preMetrics       = JSON.parse(preConsolidationJson  || "[]");
-    var postMetrics      = JSON.parse(postConsolidationJson || "[]");
+    var currentMetrics = JSON.parse(currentMetricsJson   || "[]");
+    var preMetrics     = JSON.parse(preConsolidationJson  || "[]");
+    var postMetrics    = JSON.parse(postConsolidationJson || "[]");
 
-    // If no prior run data — first task on these datastores — skip check per spec
-    if (!preMetrics || preMetrics.length === 0 || !postMetrics || postMetrics.length === 0) {
-        return JSON.stringify({ approved: true, reason: "First task — no calibration data yet, proceeding", projectedDeltas: {} });
+    if (!preMetrics || preMetrics.length === 0 ||
+        !postMetrics || postMetrics.length === 0) {
+        return JSON.stringify({
+            approved: true,
+            reason: "First task on these datastores — no calibration data yet, proceeding",
+            projectedDeltas: {}
+        });
     }
 
-    // Build lookup maps keyed by datastoreMoRef
     var preLookup  = buildLookup(preMetrics);
     var postLookup = buildLookup(postMetrics);
     var currLookup = buildLookup(currentMetrics);
@@ -46,65 +46,58 @@ try {
         var curr = currLookup[dsRef];
         var pre  = preLookup[dsRef];
         var post = postLookup[dsRef];
+        if (!pre || !post) continue;
 
-        if (!pre || !post) continue; // No calibration for this DS yet — allow
+        if (curr.datastoreType === "vsan") {
+            var congDelta    = Math.max(0, (post.vsanCongestion || 0) - (pre.vsanCongestion || 0));
+            var projCong     = (curr.vsanCongestion || 0) + congDelta;
+            var resyncDelta  = Math.max(0, (post.vsanResyncQueueDepth || 0) - (pre.vsanResyncQueueDepth || 0));
+            var projResync   = (curr.vsanResyncQueueDepth || 0) + resyncDelta;
 
-        var dsType = curr.datastoreType;
+            projectedDeltas[dsRef] = {
+                projectedVsanCongestion:  Math.round(projCong),
+                projectedVsanResyncBytes: Math.round(projResync),
+                congDelta: Math.round(congDelta),
+                resyncDelta: Math.round(resyncDelta)
+            };
 
-        if (dsType === "vsan") {
-            // vSAN: congestion-based
-            var congDelta = (post.vsanCongestion || 0) - (pre.vsanCongestion || 0);
-            var congDeltaClamped = Math.max(0, congDelta); // only count positive impact
-            var projectedCong = (curr.vsanCongestion || 0) + congDeltaClamped;
-
-            projectedDeltas[dsRef] = { projectedVsanCongestion: Math.round(projectedCong), delta: Math.round(congDeltaClamped) };
-
-            if (projectedCong > vsanCongestionThresh) {
+            if (projCong > vsanCongestionThresh) {
                 approved = false;
-                reason = "vSAN congestion projection " + Math.round(projectedCong) +
+                reason = "vSAN congestion projection " + Math.round(projCong) +
                          " exceeds threshold " + vsanCongestionThresh +
                          " on datastore " + dsRef;
                 break;
             }
-
-            // Also check resync queue
-            var resyncDelta = Math.max(0, (post.vsanResyncQueueDepth || 0) - (pre.vsanResyncQueueDepth || 0));
-            var projectedResync = (curr.vsanResyncQueueDepth || 0) + resyncDelta;
-            if (projectedResync > vsanResyncThresh) {
+            if (projResync > vsanResyncThresh) {
                 approved = false;
-                reason = "vSAN resync queue projection " + Math.round(projectedResync / 1048576) + " MB" +
-                         " exceeds threshold " + Math.round(vsanResyncThresh / 1048576) + " MB" +
-                         " on datastore " + dsRef;
+                reason = "vSAN resync projection " +
+                         Math.round(projResync / 1048576) + " MB exceeds threshold " +
+                         Math.round(vsanResyncThresh / 1048576) + " MB on datastore " + dsRef;
                 break;
             }
-
         } else {
-            // VMFS / NFS: latency-based
-            var readDelta  = Math.max(0, (post.readLatencyMs  || 0) - (pre.readLatencyMs  || 0));
-            var writeDelta = Math.max(0, (post.writeLatencyMs || 0) - (pre.writeLatencyMs || 0));
-
-            var projectedRead  = (curr.readLatencyMs  || 0) + readDelta;
-            var projectedWrite = (curr.writeLatencyMs || 0) + writeDelta;
+            var rDelta = Math.max(0, (post.readLatencyMs  || 0) - (pre.readLatencyMs  || 0));
+            var wDelta = Math.max(0, (post.writeLatencyMs || 0) - (pre.writeLatencyMs || 0));
+            var projR  = (curr.readLatencyMs  || 0) + rDelta;
+            var projW  = (curr.writeLatencyMs || 0) + wDelta;
 
             projectedDeltas[dsRef] = {
-                projectedReadLatMs:  Math.round(projectedRead  * 10) / 10,
-                projectedWriteLatMs: Math.round(projectedWrite * 10) / 10,
-                readDelta:  Math.round(readDelta  * 10) / 10,
-                writeDelta: Math.round(writeDelta * 10) / 10
+                projectedReadLatMs:  Math.round(projR * 10) / 10,
+                projectedWriteLatMs: Math.round(projW * 10) / 10,
+                readDelta:  Math.round(rDelta * 10) / 10,
+                writeDelta: Math.round(wDelta * 10) / 10
             };
 
-            if (projectedRead > latencyThresholdMs || projectedWrite > latencyThresholdMs) {
+            if (projR > latencyThresholdMs || projW > latencyThresholdMs) {
                 approved = false;
-                reason = "Projected latency (R:" + Math.round(projectedRead) + "ms W:" +
-                         Math.round(projectedWrite) + "ms) exceeds threshold " +
+                reason = "Projected latency (R:" + Math.round(projR) + "ms W:" +
+                         Math.round(projW) + "ms) exceeds threshold " +
                          latencyThresholdMs + "ms on datastore " + dsRef;
                 break;
             }
         }
     }
-
-} catch(e) {
-    // On error be conservative — deny
+} catch (e) {
     approved = false;
     reason = "Governor check error: " + e.message + " — denying as precaution";
 }
@@ -112,9 +105,7 @@ try {
 return JSON.stringify({ approved: approved, reason: reason, projectedDeltas: projectedDeltas });
 
 function buildLookup(arr) {
-    var map = {};
-    for (var i = 0; i < arr.length; i++) {
-        map[arr[i].datastoreMoRef] = arr[i];
-    }
-    return map;
+    var m = {};
+    for (var i = 0; i < arr.length; i++) m[arr[i].datastoreMoRef] = arr[i];
+    return m;
 }

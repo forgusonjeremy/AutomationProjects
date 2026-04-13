@@ -1,234 +1,300 @@
-# Adaptive Snapshot Cleanup — Deployment & Operations Guide
+# Implementation & Deployment Guide
+## Adaptive Snapshot Cleanup — Multi-vCenter
 ## VCF 9.0.2 / Embedded vRO 8.17.x
 
 ---
 
-## Package contents
+## Overview
 
-| File | Purpose |
-|---|---|
-| `actions/getSnapshotCandidates.js` | Enumerates VMs and filters snapshot candidates for one vCenter |
-| `actions/getDatastoreMetrics.js` | Samples I/O metrics — auto-detects vSAN vs VMFS/NFS |
-| `actions/adaptiveGovernorCheck.js` | I/O governor decision engine — projects impact before allowing next task |
-| `actions/deleteSnapshot.js` | Executes a single snapshot deletion with pre/post metric capture |
-| `actions/writeLogFile.js` | Writes JSON or CSV log to NFS or SMB share |
-| `workflow/mainOrchestration.js` | Primary workflow scriptable task — orchestration engine |
-| `config/configurationElements.xml` | Reference for all required configuration element attributes |
+This guide covers the complete implementation sequence for the Adaptive Snapshot
+Cleanup workflow. Follow the phases in order — later phases depend on earlier ones.
+
+All audit logging is via the vRO workflow log, ingested by VMware Aria Operations
+for Logs. No network share, NFS mount, SMB mount, or file share credentials are
+required.
 
 ---
 
-## Prerequisites
+## Phase 1 — Environment Preparation
 
-### vRO service account permissions
-The account used by vRO's vCenter connection requires these vSphere privileges:
+### Step 1: Verify vCenter SDK Connection
 
-| Privilege | Reason |
-|---|---|
-| `VirtualMachine.Snapshot.RemoveSnapshot` | Delete snapshots |
-| `VirtualMachine.Snapshot.Manage` | Enumerate snapshot trees |
-| `VirtualMachine.Interact.Pause` | Not required but recommended for HA-aware skipping |
-| `Global.Diagnostics` | Read performance manager data |
-| `Performance.ModifyIntervals` | May be needed for custom perf intervals |
-| `Datastore.Browse` | Enumerate datastore inventory |
+1. Log into vRO at `https://<sddc-manager-fqdn>/orchestration-ui`
+2. Navigate to Administration > Inventory
+3. Expand vSphere vCenter Plugin
+4. Confirm `vcenter.corp.local` appears and the inventory tree is browseable
+5. Browse to a known VM to confirm read access
+6. Repeat for each additional vCenter that should be in scope
 
-Assign at the **vCenter root** level with propagation enabled so all clusters, datastores, and VMs are covered.
+### Step 2: Create vRO Service Account
 
-### vRO appliance — network share mounts
-The workflow writes logs via the vRO appliance filesystem. The share must be mounted at the OS level **before** the workflow runs.
+Create a dedicated least-privilege account for this automation.
 
-**NFS mount (persistent — add to /etc/fstab on vRO appliance):**
-```bash
-# SSH to vRO appliance as root
-mkdir -p /mnt/vro-logs/snapshot-cleanup
-echo "nfsserver.corp.local:/exports/vro-logs  /mnt/vro-logs  nfs  defaults,_netdev  0 0" >> /etc/fstab
-mount -a
-# Verify
-ls /mnt/vro-logs/snapshot-cleanup
-```
+1. In vCenter, create: `svc-vro-snapclean@vsphere.local` (or a domain account)
+2. Create a custom vCenter role with these privileges:
 
-**SMB/CIFS mount (persistent):**
-```bash
-mkdir -p /mnt/smb-logs/snapshot-cleanup
-# Install cifs-utils if not present (VCF 9 vRO appliance is SLES-based)
-zypper install cifs-utils
-echo "//fileserver.corp.local/share  /mnt/smb-logs  cifs  credentials=/etc/vro-smb-creds,_netdev  0 0" >> /etc/fstab
-# Create credentials file (chmod 600)
-cat > /etc/vro-smb-creds << EOF
-username=svc-vro-logs
-password=YOUR_PASSWORD
-domain=CORP
-EOF
-chmod 600 /etc/vro-smb-creds
-mount -a
-```
+| Privilege | Purpose |
+|-----------|---------|
+| VirtualMachine.Snapshot.RemoveSnapshot | Delete snapshots |
+| VirtualMachine.Snapshot.Manage | Enumerate snapshot trees |
+| Global.Diagnostics | Read PerformanceManager data for I/O governor |
+| Datastore.Browse | Enumerate datastore inventory |
+| System.Read | Read host and cluster runtime state for safety checks |
+
+3. Assign the role at vCenter root level with **Propagate to children** enabled
+4. Update the vRO vCenter connection to authenticate as this account
+
+### Step 3: Enable vCenter Performance Statistics
+
+The adaptive I/O governor requires real-time performance data.
+
+1. In vCenter: Administration > vCenter Server Settings > Statistics
+2. Set Statistics Level to **1 or higher** for the 20-second real-time interval
+3. For vSAN environments: Cluster > Configure > vSAN > Services > Performance Service
+   — confirm Performance Service is **Enabled** on each vSAN cluster
 
 ---
 
-## Step 1 — Create the vRO Action module
+## Phase 2 — vRO Object Creation
 
-In vRO client (or via API):
+### Step 4: Create the Action Module
 
-1. Navigate to **Design > Actions**
+1. In vRO: Design > Actions
 2. Create module: `com.company.snapshotcleanup`
-3. Create one Action per `.js` file in the `actions/` folder
-4. Action names must match exactly:
-   - `getSnapshotCandidates`
-   - `getDatastoreMetrics`
-   - `adaptiveGovernorCheck`
-   - `deleteSnapshot`
-   - `writeLogFile`
-5. Paste the corresponding `.js` file content into each action's script body
-6. Set input parameters for each action as documented in the file headers
-7. Set return type to `string` for all actions (they return JSON strings)
+3. Create four actions, one per delivered `.js` file in the `actions/` folder:
 
----
+| Action Name             | Return Type | Source File |
+|-------------------------|-------------|-------------|
+| getSnapshotCandidates   | string      | getSnapshotCandidates.js |
+| getDatastoreMetrics     | string      | getDatastoreMetrics.js |
+| adaptiveGovernorCheck   | string      | adaptiveGovernorCheck.js |
+| deleteSnapshot          | string      | deleteSnapshot.js |
 
-## Step 2 — Create Configuration Elements
+4. For each action: paste the script body, configure input parameters as
+   documented in the file header, set return type to `string`
+5. Save and confirm no syntax errors
 
-1. Navigate to **Design > Configuration**
+### Step 5: Create Configuration Elements
+
+1. Navigate to: Design > Configuration
 2. Create category: `SnapshotCleanup`
-3. Create three configuration elements inside it:
-   - `RuntimeState` — add attribute `runLock` (string, default empty), `lastRunId` (string), `lastRunCompletedAt` (string)
-   - `FileLogging` — add all attributes per `configurationElements.xml`
-   - `Thresholds` — add all attributes per `configurationElements.xml`
-4. Set your actual values (share paths, passwords, thresholds)
+3. Create **two** configuration elements inside it:
 
-**Critical:** The `runLock` attribute in `RuntimeState` must start as an empty string. If a workflow run aborts abnormally without releasing the lock, clear it manually here.
+**SnapshotCleanup/RuntimeState**
 
----
+| Attribute Name      | Type   | Initial Value | Notes |
+|---------------------|--------|---------------|-------|
+| runLock             | string | (empty)       | CRITICAL: must be empty string, never null |
+| lastRunId           | string | (empty)       | Informational — updated automatically |
+| lastRunCompletedAt  | string | (empty)       | Informational — updated automatically |
+| lastRunOutcome      | string | (empty)       | Informational — updated automatically |
 
-## Step 3 — Create the Workflow
+**SnapshotCleanup/Thresholds**
 
-Create a new workflow: **"Adaptive Snapshot Cleanup — Multi-vCenter"**
+| Attribute Name          | Type    | Recommended Initial Value |
+|-------------------------|---------|---------------------------|
+| maxAgeMinutes           | number  | 10080 (7 days)            |
+| nameMatchString         | string  | (empty)                   |
+| descIgnoreString        | string  | (empty)                   |
+| dryRunDefault           | boolean | false                     |
+| latencyThresholdMs      | number  | 30                        |
+| vsanCongestionThresh    | number  | 50                        |
+| vsanResyncThresholdGB   | number  | 10                        |
+| maxParallelPerVcenter   | number  | 3                         |
+| governorPollIntervalSec | number  | 30                        |
+| taskTimeoutSeconds      | number  | 1800                      |
 
-### Input form (Workflow > Inputs tab)
+Refer to `configurationElements.xml` for full attribute descriptions and tuning guidance.
 
-| Name | Type | Default | Label |
-|---|---|---|---|
-| `maxAgeMinutes` | number | `60` | Max snapshot age (minutes) |
-| `nameMatchString` | string | `` | Snapshot name must contain (leave blank = all) |
-| `descIgnoreString` | string | `` | Skip if description contains |
-| `dryRun` | boolean | `true` | Dry-run only (no deletions) |
-| `latencyThresholdMs` | number | `30` | VMFS/NFS latency ceiling (ms) |
-| `vsanCongestionThresh` | number | `50` | vSAN congestion ceiling (0-255) |
-| `vsanResyncThresholdGB` | number | `10` | vSAN resync queue ceiling (GB) |
-| `maxParallelPerVcenter` | number | `3` | Max parallel tasks per vCenter |
-| `governorPollIntervalSec` | number | `30` | Governor poll interval (seconds) |
-| `taskTimeoutSeconds` | number | `1800` | Per-task timeout (seconds) |
+### Step 6: Create the Workflow
 
-**Important:** `dryRun` defaults to `true`. The operator must explicitly set it to `false` to perform real deletions. This is intentional.
-
-### Workflow canvas
-
-1. Add a single **Scriptable Task** element
-2. Bind all workflow inputs to the scriptable task inputs with the same names
-3. Paste the entire content of `workflow/mainOrchestration.js` as the script body
-4. Add an **Exception Handler** on the scriptable task — bind to an error output attribute
-5. The exception handler should also attempt lock release:
-   ```javascript
-   // Exception handler scriptable task
-   try {
-       var cat = Server.getConfigurationElementCategoryWithPath("SnapshotCleanup");
-       var els = cat.configurationElements;
-       for each (var el in els) {
-           if (el.name === "RuntimeState") {
-               el.setAttributeWithKey("runLock", "");
-               System.warn("Lock force-released by exception handler");
-               break;
-           }
-       }
-   } catch(e) { System.error("Exception handler lock release failed: " + e.message); }
-   ```
+1. Navigate to Design > Workflows
+2. Create: **"Adaptive Snapshot Cleanup — Multi-vCenter"**
+3. On the **Inputs** tab, add all 10 input parameters (see VARIABLE_BINDING_REFERENCE.md)
+4. Set `dryRun` default to `true`
+5. On the **Attributes** tab, add all 13 attributes
+6. Build the canvas with 8 scriptable task elements (ST-01 through ST-09,
+   skipping ST-08 which does not exist in this solution)
+7. Add one Exception Handler element connected from all task error outputs
+8. Paste each script file's content into the corresponding task body
+9. Configure all input/output bindings per the VARIABLE_BINDING_REFERENCE.md
+   binding tables
+10. Save and validate
 
 ---
 
-## Step 4 — Configure Scheduling
+## Phase 3 — Validation
 
-1. Navigate to the workflow, click **Schedule**
-2. Click **Add Schedule**
-3. Configure recurrence (e.g. daily at 02:00)
-4. Set default input values for the scheduled run:
-   - `dryRun = false` (after you've validated with dry-run)
-   - `maxAgeMinutes = 10080` (7 days) or your chosen production value
-   - `nameMatchString = ` (empty unless you want to target specific snapshots)
-5. The scheduled run will abort automatically if a previous run is still active (mutex)
+### Step 7: Dry-Run Validation (MANDATORY before any live run)
 
----
+```
+maxAgeMinutes    = 5
+dryRun           = true
+nameMatchString  = (empty)
+descIgnoreString = (empty)
+```
 
-## Test Plan
+Expected results:
+- vRO execution log shows `[DRY-RUN] Would delete:` entries for eligible snapshots
+- Final `Snapshot Cleanup Result` log entry appears with `outcome=DRY_RUN_COMPLETE`
+- `deleted=0` in the result entry
+- Mutex released (check RuntimeState/runLock = empty after run)
 
-### Test 1 — Dry-run validation (run this first, always)
-**Inputs:** `dryRun=true`, `maxAgeMinutes=5`, `nameMatchString=`, `descIgnoreString=`
-**Expected:** Workflow log shows `[DRY-RUN]` entries for all snapshots older than 5 min. Log file written to share. No snapshots deleted. Lock released cleanly.
+### Step 8: Name Filter Validation
 
-### Test 2 — Name filter
-**Inputs:** `dryRun=true`, `maxAgeMinutes=1`, `nameMatchString=test`, `descIgnoreString=`
-**Expected:** Only snapshots whose name contains "test" (case-insensitive) appear in log.
+Create a test snapshot named `TEST-CLEANUP-VALIDATE` on any non-critical VM.
 
-### Test 3 — Description ignore
-**Create** a test snapshot with description containing "protected"
-**Inputs:** `dryRun=true`, `maxAgeMinutes=1`, `descIgnoreString=protected`
-**Expected:** That snapshot appears in log with `action=skipped` or is absent entirely.
+```
+maxAgeMinutes   = 1
+dryRun          = true
+nameMatchString = TEST-CLEANUP-VALIDATE
+```
 
-### Test 4 — Real deletion (single VM, test environment)
-**Inputs:** `dryRun=false`, `maxAgeMinutes=5`, `nameMatchString=TEST-SAFE-TO-DELETE`
-**Expected:** Snapshot deleted, consolidation task appears in vCenter Tasks, post-deletion log entry shows `action=deleted`.
+Expected: only the test snapshot appears in `[DRY-RUN]` log entries.
 
-### Test 5 — Mutex lock (concurrent run protection)
-**Trigger** two runs within seconds of each other (use Run + Schedule or two browser tabs)
-**Expected:** First run acquires lock. Second run logs "ABORT: Another run is active" and exits cleanly without deleting anything.
+### Step 9: Description Filter Validation
 
-### Test 6 — Governor under load (if test environment allows)
-**Saturate a datastore** with a synthetic I/O load (IOMeter, vdbench)
-**Trigger** cleanup on VMs on that datastore
-**Expected:** Governor HOLD entries in log. Cleanup waits for I/O to subside, then proceeds.
+Create a test snapshot with description containing `protected`.
 
----
+```
+maxAgeMinutes    = 1
+dryRun           = true
+descIgnoreString = protected
+```
 
-## Threshold tuning guide
+Expected: that snapshot appears as `SKIP (desc match)` in the workflow log.
 
-| Environment | VMFS/NFS latency threshold | vSAN congestion | Notes |
-|---|---|---|---|
-| Very sensitive production | 15ms | 30 | Conservative — will hold more often |
-| Standard production | 30ms | 50 | Default — suitable for most environments |
-| Less sensitive / dev | 60ms | 80 | More aggressive, faster cleanup |
-| All-flash VMFS | 10ms | n/a | Flash latency baseline is very low |
+### Step 10: First Live Deletion (Controlled)
 
-Monitor your baseline datastore latency in vCenter Performance charts **before your first real run** to calibrate appropriate thresholds. If your idle latency is already 20ms, a 30ms threshold will almost immediately block.
+Create a disposable test snapshot named `TEST-SAFE-TO-DELETE` on a
+non-critical powered-off VM.
 
----
+```
+maxAgeMinutes   = 5
+dryRun          = false
+nameMatchString = TEST-SAFE-TO-DELETE
+```
 
-## Operational runbook
-
-### Clearing a stuck lock
-If the workflow exits abnormally (vRO restart, out-of-memory, network loss to vCenter):
-1. In vRO client: Design > Configuration > SnapshotCleanup > RuntimeState
-2. Set `runLock` attribute value to empty string
-3. Save
-
-### Investigating a run
-1. Check vRO workflow execution log (Runs tab on the workflow)
-2. Open the log file on the share — filename format: `snapshot-cleanup_SCR-YYYY-MM-DDTHH-MM-SS_[DRYRUN].json`
-3. Filter by `"action": "error"` in the JSON to find failures
-4. Filter by `"action": "deferred"` to see snapshots the governor could not clear this run
-
-### Adding a new vCenter
-1. Add the vCenter SDK connection in vRO (Administration > vCenter Server)
-2. No workflow changes required — `VcPlugin.allSdkConnections` discovers all registered connections automatically
-
-### Governor is always blocking — tuning steps
-1. Check baseline latency in vCenter for the affected datastore (last 24h average)
-2. If baseline > threshold, raise `latencyThresholdMs` in the Thresholds config element
-3. Consider running cleanup during off-peak hours via the scheduler
-4. Reduce `maxParallelPerVcenter` to 1 to reduce simultaneous I/O load
+Expected:
+- Snapshot deleted in vCenter
+- `Snapshot Cleanup Result | ... | deleted=1 | outcome=SUCCESS` in vRO log
+- Consolidation task visible in vCenter Task History
 
 ---
 
-## Known limitations and future enhancements
+## Phase 4 — Production Enablement
 
-| Item | Status |
-|---|---|
-| True parallel vCenter threads | Current implementation is sequential per-vCenter. Full parallelism requires vRO Parallel workflow element calling a sub-workflow per vCenter — enhancement for next iteration |
-| vCenter task queue depth check | Not implemented — VPXD queue saturation is rare at maxParallel=3 but add explicit task queue depth check if running at higher concurrency |
-| Email summary notification | Not in current scope — add a `sendEmail` action at the end of writeAndRelease() using vRO's built-in SMTP support |
-| Chain-depth limit | Deep snapshot chains (10+) generate proportionally more consolidation I/O than the governor's single-delta model predicts — consider adding chain-depth as an additional governor input |
+### Step 11: Configure Production Schedule
+
+1. Open the workflow > Schedule > Add Schedule
+2. Set recurrence: **daily, off-peak hours** (e.g. 02:00 in appliance timezone)
+3. Set input defaults:
+   - `dryRun = false`
+   - `maxAgeMinutes = 10080` (or per retention policy)
+   - All governor thresholds from Thresholds config element values
+4. Confirm next run time is as expected
+
+### Step 12: Aria Ops for Logs Integration
+
+The vRO workflow log is automatically ingested by Aria Ops for Logs when the
+vRO integration is configured. To surface snapshot cleanup results:
+
+1. In Aria Ops for Logs, create a saved filter:
+   - Source: vRO workflow logs
+   - Filter: `text contains "Snapshot Cleanup Result"`
+2. Create field extractions for: `outcome`, `deleted`, `errors`, `deferred`
+   using the regex patterns in VARIABLE_BINDING_REFERENCE.md Section 5
+3. Create an alert on: `errors > 0` OR `outcome = COMPLETED_WITH_ERRORS`
+4. Create a dashboard widget showing `deleted` count trend over time
+
+### Step 13: Governor Baseline Calibration
+
+After the first 3-5 live runs, review the vRO execution logs for governor
+HOLD entries. If the governor is holding tasks frequently:
+
+1. Check vCenter performance charts for affected datastores (last 7 days)
+2. Identify average idle latency during the cleanup window
+3. Raise `latencyThresholdMs` in the Thresholds config element to ~2x that value
+4. For vSAN: review the vSAN Performance dashboard for historical congestion scores
+
+---
+
+## Operational Runbook
+
+### Clearing a Stuck Mutex Lock
+
+If the vRO appliance restarts during a run, the mutex may persist and
+block all subsequent runs. All scheduled runs will show `MUTEX_ABORT`.
+
+**Resolution:**
+1. Confirm no run is currently executing (check vRO Runs tab)
+2. Design > Configuration > SnapshotCleanup > RuntimeState
+3. Set `runLock` attribute value to empty string
+4. Save — next run proceeds normally
+
+**Prevention:** The Exception Handler releases the lock on all abnormal exits.
+The only scenario where it cannot is an OOM kill or appliance crash mid-run.
+
+### Investigating a Run
+
+1. Open the workflow > Runs tab > select the run by start time
+2. Review execution log for detailed per-snapshot entries
+3. Search Aria Ops for Logs for `runId=SCR-YYYY-MM-DDTHH-MM-SS`
+4. The `Snapshot Cleanup Result` line contains the complete run summary
+5. Filter by `outcome=ERROR` or `outcome=COMPLETED_WITH_ERRORS` for failures
+6. `action=deferred` entries were skipped by governor max wait — they will
+   be retried on the next scheduled run
+
+### Adding a New vCenter
+
+1. Register the vCenter as an SDK connection in vRO
+   (Administration > vCenter Server)
+2. No workflow changes required
+3. `VcPlugin.allSdkConnections` discovers all registered connections at runtime
+4. Confirm the new vCenter appears in the next dry-run log output
+
+### Governor Is Always Blocking
+
+If HOLD entries appear frequently and waits are long:
+1. Confirm idle storage latency is below `latencyThresholdMs` using vCenter charts
+2. If idle latency > threshold: raise the threshold in Thresholds config element
+3. If governor is calibrating a very large delta (deep chain consolidation):
+   consider running cleanup during a lower-activity window
+4. Reduce `maxParallelPerVcenter` to 1 to reduce concurrent I/O load
+
+### Disabling the Automation Temporarily
+
+- **Disable schedule:** workflow > Schedule > disable or delete the schedule
+- **Block all runs:** set `runLock` in RuntimeState to any non-empty value
+  such as `MAINTENANCE` — all run attempts abort at the mutex check with
+  `MUTEX_ABORT` and emit no result log entry
+
+---
+
+## Files in This Package
+
+```
+actions/
+  getSnapshotCandidates.js    vRO action — VM and snapshot enumeration
+  getDatastoreMetrics.js      vRO action — I/O metric sampling (vSAN + VMFS/NFS)
+  adaptiveGovernorCheck.js    vRO action — I/O governor decision engine
+  deleteSnapshot.js           vRO action — snapshot deletion with safety checks
+
+workflow/
+  ST-01_InitialiseRun.js             Scriptable task 1
+  ST-02_MutexCheckAndAcquire.js      Scriptable task 2
+  ST-03_EnumeratevCenters.js         Scriptable task 3
+  ST-04_CandidatesCheck.js           Scriptable task 4
+  ST-05_SortAndSplitLanes.js         Scriptable task 5
+  ST-06_ProcessPoweredOnVMs.js       Scriptable task 6
+  ST-07_ProcessPoweredOffVMs.js      Scriptable task 7
+  ST-09_ReleaseMutexAndFinalise.js   Scriptable task 9 (ST-08 does not exist)
+  EH_ExceptionHandler.js             Exception handler element
+
+config/
+  configurationElements.xml     Reference for RuntimeState and Thresholds elements
+
+docs/
+  DEPLOYMENT_GUIDE.md           This file
+  VARIABLE_BINDING_REFERENCE.md Workflow inputs, attributes, and per-task bindings
+```
