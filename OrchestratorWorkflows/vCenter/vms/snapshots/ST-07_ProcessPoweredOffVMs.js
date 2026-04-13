@@ -1,18 +1,31 @@
 /**
- * ST-07  PROCESS POWERED-OFF VMs (FAST LANE)
  * ─────────────────────────────────────────────────────────────────────────────
- * Powered-off VMs have no guest stun lock risk so there is no per-VM
- * concurrency limit. The I/O governor still applies because consolidation
- * still generates storage I/O. Inherits governor calibration from ST-06.
+ * ST-07  PROCESS POWERED-OFF VMs  (FAST LANE)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Processes powered-off VM snapshots. No per-VM concurrency limit
+ * (no guest stun lock risk), but still fully governed by I/O governor.
+ * Inherits governor calibration state from ST-06.
  *
- * WORKFLOW ATTRIBUTE INPUTS:
- *   offCandidatesJson, datastoreStateJson, runId, runLog, dryRun,
- *   latencyThresholdMs, vsanCongestionThresh, vsanResyncThresholdBytes,
- *   govPollMs, taskTimeoutSeconds
+ * ── INPUTS ───────────────────────────────────────────────────────────────────
+ *   Name                     vRO Type   Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   offCandidatesJson        string     Attribute: offCandidatesJson
+ *   datastoreStateJson       string     Attribute: datastoreStateJson  (from ST-06)
+ *   runId                    string     Attribute: runId
+ *   runLog                   string     Attribute: runLog
+ *   dryRun                   boolean    Workflow Input: dryRun
+ *   latencyThresholdMs       number     Workflow Input: latencyThresholdMs
+ *   vsanCongestionThresh     number     Workflow Input: vsanCongestionThresh
+ *   vsanResyncThresholdBytes number     Attribute: vsanResyncThresholdBytes
+ *   govPollMs                number     Attribute: govPollMs
+ *   taskTimeoutSeconds       number     Workflow Input: taskTimeoutSeconds
  *
- * WORKFLOW ATTRIBUTE OUTPUTS: runLog, datastoreStateJson
+ * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ *   Name                vRO Type   Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   runLog              string     Final JSON array passed to ST-09 for tallying
+ *   datastoreStateJson  string     Updated governor calibration state
  */
-
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
     skip:   function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [SKIP]    "+m); },

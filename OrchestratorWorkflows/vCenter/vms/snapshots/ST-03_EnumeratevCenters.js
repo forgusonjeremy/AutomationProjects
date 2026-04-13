@@ -1,13 +1,27 @@
 /**
+ * ─────────────────────────────────────────────────────────────────────────────
  * ST-03  ENUMERATE vCENTERS & COLLECT CANDIDATES
  * ─────────────────────────────────────────────────────────────────────────────
  * Connects to every registered vCenter and finds all snapshots that match
- * the age, name, and description filter criteria.
+ * the age, name, and description filter criteria. Per-vCenter errors are
+ * caught and logged -- they do not abort the run.
  *
- * WORKFLOW ATTRIBUTE INPUTS : runId, runLog, maxAgeMinutes, nameMatchString, descIgnoreString
- * WORKFLOW ATTRIBUTE OUTPUTS: allCandidatesJson, runLog
+ * ── INPUTS ───────────────────────────────────────────────────────────────────
+ *   Name              vRO Type   Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   runId             string     Attribute: runId
+ *   runLog            string     Attribute: runLog
+ *   maxAgeMinutes     number     Workflow Input: maxAgeMinutes
+ *   nameMatchString   string     Workflow Input: nameMatchString
+ *   descIgnoreString  string     Workflow Input: descIgnoreString
+ *
+ * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ *   Name               vRO Type   Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   allCandidatesJson  string     JSON array of candidate snapshot objects,
+ *                                 each annotated with vcenterName
+ *   runLog             string     Updated JSON array -- may include enum_error entries
  */
-
 var LOG = {
     ok:   function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
     skip: function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [SKIP]    "+m); },

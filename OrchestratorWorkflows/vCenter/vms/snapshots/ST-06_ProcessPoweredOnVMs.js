@@ -1,20 +1,32 @@
 /**
- * ST-06  PROCESS POWERED-ON VMs (THROTTLED LANE)
  * ─────────────────────────────────────────────────────────────────────────────
- * Processes powered-on and suspended VM snapshots with:
- *   - Per-vCenter concurrency limit (maxParallel simultaneous tasks)
- *   - Full adaptive I/O governor before each deletion
- *   - Complete VM safety checks inside deleteSnapshot action
+ * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Processes powered-on and suspended VM snapshots with per-vCenter
+ * concurrency limiting and full adaptive I/O governor enforcement.
  *
- * WORKFLOW ATTRIBUTE INPUTS:
- *   onCandidatesJson, runId, runLog, dryRun,
- *   latencyThresholdMs, vsanCongestionThresh, vsanResyncThresholdBytes,
- *   govPollMs, maxParallel, taskTimeoutSeconds
+ * ── INPUTS ───────────────────────────────────────────────────────────────────
+ *   Name                     vRO Type   Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   onCandidatesJson         string     Attribute: onCandidatesJson
+ *   runId                    string     Attribute: runId
+ *   runLog                   string     Attribute: runLog
+ *   dryRun                   boolean    Workflow Input: dryRun
+ *   latencyThresholdMs       number     Workflow Input: latencyThresholdMs
+ *   vsanCongestionThresh     number     Workflow Input: vsanCongestionThresh
+ *   vsanResyncThresholdBytes number     Attribute: vsanResyncThresholdBytes
+ *   govPollMs                number     Attribute: govPollMs
+ *   maxParallel              number     Attribute: maxParallel
+ *   taskTimeoutSeconds       number     Workflow Input: taskTimeoutSeconds
  *
- * WORKFLOW ATTRIBUTE OUTPUTS:
- *   datastoreStateJson, runLog
+ * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ *   Name                vRO Type   Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   datastoreStateJson  string     JSON object -- governor calibration data (pre/post
+ *                                  I/O metrics per datastore). Passed to ST-07 so the
+ *                                  powered-off fast lane inherits calibration data.
+ *   runLog              string     Updated JSON array with entries for each snapshot
  */
-
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
     skip:   function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [SKIP]    "+m); },

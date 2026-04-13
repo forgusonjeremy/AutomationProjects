@@ -1,16 +1,31 @@
 /**
- * ST-04  CANDIDATES CHECK (EARLY EXIT GATE)
  * ─────────────────────────────────────────────────────────────────────────────
- * If no eligible snapshots were found across any vCenter, this task writes
- * the final result log entry, releases the lock, and exits cleanly.
- * If snapshots were found, execution continues to ST-05.
+ * ST-04  CANDIDATES CHECK  (EARLY EXIT GATE)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * If no eligible snapshots were found: writes the result log entry,
+ * releases the lock, and throws CLEAN_EXIT so the workflow ends cleanly.
+ * If snapshots exist: records the count and continues to ST-05.
  *
- * WORKFLOW ATTRIBUTE INPUTS : allCandidatesJson, runLog, runId, lockEl, dryRun,
- *                             maxAgeMinutes, nameMatchString, descIgnoreString
- * WORKFLOW ATTRIBUTE OUTPUTS: candidateCount
- * THROWS: "CLEAN_EXIT:..." -- Exception Handler treats this as success
+ * ── INPUTS ───────────────────────────────────────────────────────────────────
+ *   Name               vRO Type                  Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   allCandidatesJson  string                    Attribute: allCandidatesJson
+ *   runLog             string                    Attribute: runLog
+ *   runId              string                    Attribute: runId
+ *   lockEl             ConfigurationElement      Attribute: lockEl
+ *   dryRun             boolean                   Workflow Input: dryRun
+ *   maxAgeMinutes      number                    Workflow Input: maxAgeMinutes
+ *   nameMatchString    string                    Workflow Input: nameMatchString
+ *   descIgnoreString   string                    Workflow Input: descIgnoreString
+ *
+ * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ *   Name            vRO Type   Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   candidateCount  number     Total number of eligible snapshots found
+ *
+ * ── THROWS ───────────────────────────────────────────────────────────────────
+ *   "CLEAN_EXIT:..."  Lock already released by this task. EH ends workflow cleanly.
  */
-
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
     warn:   function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },

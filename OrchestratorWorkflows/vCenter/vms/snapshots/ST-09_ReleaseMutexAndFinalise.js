@@ -1,16 +1,28 @@
 /**
+ * ─────────────────────────────────────────────────────────────────────────────
  * ST-09  RELEASE MUTEX & FINALISE
  * ─────────────────────────────────────────────────────────────────────────────
- * Final task. Releases the lock, tallies results, and writes the single
- * human-readable result summary to the workflow log.
+ * Final task in the normal execution path. Releases the lock, tallies all
+ * results, and writes the single human-readable result summary to the log.
  *
- * WORKFLOW ATTRIBUTE INPUTS:
- *   lockEl, runId, runLog, dryRun,
- *   maxAgeMinutes, nameMatchString, descIgnoreString
+ * ── INPUTS ───────────────────────────────────────────────────────────────────
+ *   Name              vRO Type                  Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   lockEl            ConfigurationElement      Attribute: lockEl
+ *   runId             string                    Attribute: runId
+ *   runLog            string                    Attribute: runLog
+ *   dryRun            boolean                   Workflow Input: dryRun
+ *   maxAgeMinutes     number                    Workflow Input: maxAgeMinutes
+ *   nameMatchString   string                    Workflow Input: nameMatchString
+ *   descIgnoreString  string                    Workflow Input: descIgnoreString
  *
- * WORKFLOW ATTRIBUTE OUTPUTS: runSummaryJson
+ * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ *   Name            vRO Type   Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   runSummaryJson  string     JSON object -- structured run summary bound to the
+ *                              workflow output attribute; visible in vRO execution
+ *                              details and accessible to calling workflows
  */
-
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
     warn:   function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },

@@ -1,21 +1,40 @@
 /**
+ * ─────────────────────────────────────────────────────────────────────────────
  * EXCEPTION HANDLER SCRIPTABLE TASK
  * ─────────────────────────────────────────────────────────────────────────────
  * Handles all errors thrown by ST-01 through ST-09.
- * Classifies the exit type and takes the appropriate action.
+ * Connect the error output of every scriptable task to this element.
  *
  * CLASSIFICATION:
- *   MUTEX_ABORT  -- another run was active; this run never started; lock not ours
- *   CLEAN_EXIT   -- no eligible snapshots found; ST-04 already handled lock + logging
- *   ERROR        -- something genuinely went wrong; we hold the lock; must release
+ *   MUTEX_ABORT  Lock held by another run. This run never started. Lock is not ours.
+ *   CLEAN_EXIT   No snapshots found. ST-04 already logged and released the lock.
+ *   ERROR        Unexpected failure. We may hold the lock. Must release and log.
  *
- * WORKFLOW ATTRIBUTE INPUTS:
- *   errorCode (vRO built-in), lockEl, runId, runLog, dryRun,
- *   maxAgeMinutes, nameMatchString, descIgnoreString
+ * ── INPUTS ───────────────────────────────────────────────────────────────────
+ *   Name              vRO Type                  Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   errorCode         string                    vRO built-in exception variable
+ *                                               (bind via Exception element input tab)
+ *   lockEl            ConfigurationElement      Attribute: lockEl
+ *                                               (may be null if error before ST-02)
+ *   runId             string                    Attribute: runId
+ *                                               (may be empty if error before ST-01)
+ *   runLog            string                    Attribute: runLog
+ *   dryRun            boolean                   Workflow Input: dryRun
+ *   maxAgeMinutes     number                    Workflow Input: maxAgeMinutes
+ *   nameMatchString   string                    Workflow Input: nameMatchString
+ *   descIgnoreString  string                    Workflow Input: descIgnoreString
  *
- * WORKFLOW ATTRIBUTE OUTPUTS: workflowOutcome, runSummaryJson
+ * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ *   Name              vRO Type   Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   workflowOutcome   string     MUTEX_ABORT | CLEAN_EXIT | ERROR
+ *   runSummaryJson    string     JSON object -- minimal run summary for this exit path
+ *
+ * ── RE-THROW BEHAVIOUR ───────────────────────────────────────────────────────
+ *   CLEAN_EXIT and MUTEX_ABORT : workflow ends in SUCCESS state (no re-throw)
+ *   ERROR                      : re-throws so vRO marks the run as FAILED
  */
-
 var LOG = {
     ok:     function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
     warn:   function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },

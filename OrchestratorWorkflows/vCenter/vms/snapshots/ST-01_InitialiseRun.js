@@ -1,32 +1,39 @@
 /**
+ * ─────────────────────────────────────────────────────────────────────────────
  * ST-01  INITIALISE RUN
  * ─────────────────────────────────────────────────────────────────────────────
  * Generates run ID, converts threshold inputs to internal units,
- * initialises the in-memory log array.
+ * and initialises the in-memory log array.
  *
- * WORKFLOW INPUT BINDINGS:
- *   maxAgeMinutes, nameMatchString, descIgnoreString, dryRun,
- *   latencyThresholdMs, vsanCongestionThresh, vsanResyncThresholdGB,
- *   maxParallelPerVcenter, governorPollIntervalSec, taskTimeoutSeconds
+ * ── INPUTS (bind from Workflow Inputs tab) ───────────────────────────────────
+ *   Name                     vRO Type   Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   maxAgeMinutes            number     Workflow Input: maxAgeMinutes
+ *   nameMatchString          string     Workflow Input: nameMatchString
+ *   descIgnoreString         string     Workflow Input: descIgnoreString
+ *   dryRun                   boolean    Workflow Input: dryRun
+ *   latencyThresholdMs       number     Workflow Input: latencyThresholdMs
+ *   vsanCongestionThresh     number     Workflow Input: vsanCongestionThresh
+ *   vsanResyncThresholdGB    number     Workflow Input: vsanResyncThresholdGB
+ *   maxParallelPerVcenter    number     Workflow Input: maxParallelPerVcenter
+ *   governorPollIntervalSec  number     Workflow Input: governorPollIntervalSec
+ *   taskTimeoutSeconds       number     Workflow Input: taskTimeoutSeconds
  *
- * WORKFLOW ATTRIBUTE OUTPUTS:
- *   runId, runLog, vsanResyncThresholdBytes, govPollMs, maxParallel
+ * ── OUTPUTS (bind to Workflow Attributes tab) ─────────────────────────────────
+ *   Name                     vRO Type   Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   runId                    string     Unique run identifier  SCR-YYYY-MM-DDTHH-MM-SS
+ *   runLog                   string     JSON array accumulating per-snapshot log entries
+ *   vsanResyncThresholdBytes number     vsanResyncThresholdGB converted to bytes
+ *   govPollMs                number     governorPollIntervalSec converted to milliseconds
+ *   maxParallel              number     Validated maxParallelPerVcenter (minimum 1)
  */
-
 // ── Logging helper ────────────────────────────────────────────────────────────
 var LOG = {
     ok:   function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
     warn: function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },
     fail: function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); }
 };
-
-var wfTokenId = workflow.id;
-var wfName = workflow.name;
-var marker = "WorkflowName:" + wfName + " - WorkflowRun:" + wfTokenId;
-
-System.log(marker)
-System.setLogMarker(marker);   // WorfklowName:"MyWorkflow - WorkflowRun:workflowTask:sadfksdfkj234092345sdakj320
-
 
 // ── Initialise ────────────────────────────────────────────────────────────────
 runId                    = "SCR-" + new Date().toISOString().replace(/[:.]/g,"-").substring(0,19);

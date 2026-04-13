@@ -1,15 +1,21 @@
 /**
+ * ─────────────────────────────────────────────────────────────────────────────
  * ST-05  SORT & SPLIT EXECUTION LANES
  * ─────────────────────────────────────────────────────────────────────────────
- * Sorts snapshots so child snapshots are always processed before parents
- * (required for safe chain deletion). Then splits the list into two lanes:
- *   - Powered-ON  VMs  : processed with concurrency limits and full I/O governor
- *   - Powered-OFF VMs  : processed faster (no guest stun risk) but still governed
+ * Sorts snapshots so children are always processed before parents (required
+ * for safe chain deletion). Splits into powered-on and powered-off queues.
  *
- * WORKFLOW ATTRIBUTE INPUTS : allCandidatesJson
- * WORKFLOW ATTRIBUTE OUTPUTS: onCandidatesJson, offCandidatesJson
+ * ── INPUTS ───────────────────────────────────────────────────────────────────
+ *   Name               vRO Type   Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   allCandidatesJson  string     Attribute: allCandidatesJson
+ *
+ * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ *   Name               vRO Type   Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   onCandidatesJson   string     JSON array -- powered-on and suspended VM snapshots
+ *   offCandidatesJson  string     JSON array -- powered-off VM snapshots (fast lane)
  */
-
 var LOG = {
     ok: function(p,m){ System.log("[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); }
 };

@@ -1,17 +1,25 @@
 /**
+ * ─────────────────────────────────────────────────────────────────────────────
  * ST-02  MUTEX CHECK & ACQUIRE
  * ─────────────────────────────────────────────────────────────────────────────
- * Checks whether another run is already in progress. If yes, this run
- * aborts immediately -- nothing is touched. If no, claims the lock so no
- * other run can start while this one is running.
+ * Checks whether another run is already in progress. Aborts if yes.
+ * Acquires the distributed lock if no other run is active.
  *
- * WORKFLOW ATTRIBUTE INPUTS : runId
- * WORKFLOW ATTRIBUTE OUTPUTS: lockEl (ConfigurationElement)
+ * ── INPUTS (bind from Workflow Attributes tab) ────────────────────────────────
+ *   Name     vRO Type   Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   runId    string     Attribute: runId
  *
- * THROWS:
- *   "ABORT: Another run is active..." -- routes to Exception Handler (MUTEX_ABORT)
+ * ── OUTPUTS (bind to Workflow Attributes tab) ─────────────────────────────────
+ *   Name     vRO Type                  Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   lockEl   ConfigurationElement      Reference to SnapshotCleanup/RuntimeState
+ *                                      Passed to ST-04, ST-09, and EH for lock release
+ *
+ * ── THROWS ───────────────────────────────────────────────────────────────────
+ *   "ABORT: Another run is active..."  Routes to Exception Handler as MUTEX_ABORT
+ *   "Configuration element not found"  Routes to Exception Handler as ERROR
  */
-
 var LOG = {
     ok:   function(p,m){ System.log(  "[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); },
     warn: function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },
