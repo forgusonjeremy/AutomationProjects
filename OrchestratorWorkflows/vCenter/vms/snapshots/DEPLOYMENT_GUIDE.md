@@ -9,9 +9,15 @@
 This guide covers the complete implementation sequence for the Adaptive Snapshot
 Cleanup workflow. Follow the phases in order — later phases depend on earlier ones.
 
+**Configuration design:**
+All threshold and policy values (age limit, I/O governor thresholds, concurrency
+limits, etc.) are defined as workflow input parameters with default values set
+directly on the workflow Inputs tab. When scheduling the workflow, these defaults
+are set on the schedule definition. One configuration element is required:
+`SnapshotCleanup/RuntimeState`, which holds only the distributed mutex lock.
+
 All audit logging is via the vRO workflow log, ingested by VMware Aria Operations
-for Logs. No network share, NFS mount, SMB mount, or file share credentials are
-required.
+for Logs. No network share, NFS mount, or SMB credentials are required.
 
 ---
 
@@ -74,51 +80,52 @@ The adaptive I/O governor requires real-time performance data.
    documented in the file header, set return type to `string`
 5. Save and confirm no syntax errors
 
-### Step 5: Create Configuration Elements
+### Step 5: Create the RuntimeState Configuration Element
+
+This is the only configuration element required by this solution.
 
 1. Navigate to: Design > Configuration
 2. Create category: `SnapshotCleanup`
-3. Create **two** configuration elements inside it:
+3. Create one configuration element: **RuntimeState**
 
-**SnapshotCleanup/RuntimeState**
+| Attribute Name     | Type   | Initial Value | Notes |
+|--------------------|--------|---------------|-------|
+| runLock            | string | (empty)       | CRITICAL: must be empty string, never null |
+| lastRunId          | string | (empty)       | Informational — updated automatically |
+| lastRunCompletedAt | string | (empty)       | Informational — updated automatically |
+| lastRunOutcome     | string | (empty)       | Informational — updated automatically |
 
-| Attribute Name      | Type   | Initial Value | Notes |
-|---------------------|--------|---------------|-------|
-| runLock             | string | (empty)       | CRITICAL: must be empty string, never null |
-| lastRunId           | string | (empty)       | Informational — updated automatically |
-| lastRunCompletedAt  | string | (empty)       | Informational — updated automatically |
-| lastRunOutcome      | string | (empty)       | Informational — updated automatically |
+Refer to `configurationElements.xml` for full attribute descriptions.
 
-**SnapshotCleanup/Thresholds**
-
-| Attribute Name          | Type    | Recommended Initial Value |
-|-------------------------|---------|---------------------------|
-| maxAgeMinutes           | number  | 10080 (7 days)            |
-| nameMatchString         | string  | (empty)                   |
-| descIgnoreString        | string  | (empty)                   |
-| dryRunDefault           | boolean | false                     |
-| latencyThresholdMs      | number  | 30                        |
-| vsanCongestionThresh    | number  | 50                        |
-| vsanResyncThresholdGB   | number  | 10                        |
-| maxParallelPerVcenter   | number  | 3                         |
-| governorPollIntervalSec | number  | 30                        |
-| taskTimeoutSeconds      | number  | 1800                      |
-
-Refer to `configurationElements.xml` for full attribute descriptions and tuning guidance.
+> **Note:** No Thresholds configuration element is required. All threshold and
+> policy values are set as workflow input defaults in Step 6 below.
 
 ### Step 6: Create the Workflow
 
 1. Navigate to Design > Workflows
 2. Create: **"Adaptive Snapshot Cleanup — Multi-vCenter"**
-3. On the **Inputs** tab, add all 10 input parameters (see VARIABLE_BINDING_REFERENCE.md)
-4. Set `dryRun` default to `true`
-5. On the **Attributes** tab, add all 13 attributes
-6. Build the canvas with 8 scriptable task elements (ST-01 through ST-09,
-   skipping ST-08 which does not exist in this solution)
+3. On the **Inputs** tab, add all 10 input parameters with the default values
+   shown in the table below:
+
+| Parameter Name          | Type    | Default Value | Notes |
+|-------------------------|---------|---------------|-------|
+| maxAgeMinutes           | number  | 10080         | 7 days production; use 5-60 for testing |
+| nameMatchString         | string  | (empty)       | Leave empty to target all snapshot names |
+| descIgnoreString        | string  | (empty)       | Leave empty to apply no description filter |
+| dryRun                  | boolean | true          | MUST default to true |
+| latencyThresholdMs      | number  | 30            | VMFS/NFS: tune to ~2x observed idle latency |
+| vsanCongestionThresh    | number  | 50            | vSAN: 0-255 scale; >128 = serious congestion |
+| vsanResyncThresholdGB   | number  | 10            | vSAN: resync queue ceiling in GB |
+| maxParallelPerVcenter   | number  | 3             | Max concurrent tasks per vCenter |
+| governorPollIntervalSec | number  | 30            | Governor re-check interval when holding |
+| taskTimeoutSeconds      | number  | 1800          | Per-task vCenter task timeout (30 min) |
+
+4. Set `dryRun` default to `true` — operators must explicitly set `false` to perform live deletion
+5. On the **Attributes** tab, add all 13 workflow attributes (see VARIABLE_BINDING_REFERENCE.md)
+6. Build the canvas with 8 scriptable task elements: ST-01 through ST-09 (no ST-08)
 7. Add one Exception Handler element connected from all task error outputs
 8. Paste each script file's content into the corresponding task body
-9. Configure all input/output bindings per the VARIABLE_BINDING_REFERENCE.md
-   binding tables
+9. Configure all input/output bindings per VARIABLE_BINDING_REFERENCE.md
 10. Save and validate
 
 ---
@@ -127,18 +134,17 @@ Refer to `configurationElements.xml` for full attribute descriptions and tuning 
 
 ### Step 7: Dry-Run Validation (MANDATORY before any live run)
 
+Run with:
 ```
-maxAgeMinutes    = 5
-dryRun           = true
-nameMatchString  = (empty)
-descIgnoreString = (empty)
+maxAgeMinutes = 5
+dryRun        = true
 ```
 
 Expected results:
 - vRO execution log shows `[DRY-RUN] Would delete:` entries for eligible snapshots
-- Final `Snapshot Cleanup Result` log entry appears with `outcome=DRY_RUN_COMPLETE`
+- Final `Snapshot Cleanup Result | outcome=DRY_RUN_COMPLETE` appears in log
 - `deleted=0` in the result entry
-- Mutex released (check RuntimeState/runLock = empty after run)
+- Mutex released — confirm `runLock` is empty after run
 
 ### Step 8: Name Filter Validation
 
@@ -177,7 +183,7 @@ nameMatchString = TEST-SAFE-TO-DELETE
 
 Expected:
 - Snapshot deleted in vCenter
-- `Snapshot Cleanup Result | ... | deleted=1 | outcome=SUCCESS` in vRO log
+- `Snapshot Cleanup Result | deleted=1 | outcome=SUCCESS` in vRO log
 - Consolidation task visible in vCenter Task History
 
 ---
@@ -188,34 +194,32 @@ Expected:
 
 1. Open the workflow > Schedule > Add Schedule
 2. Set recurrence: **daily, off-peak hours** (e.g. 02:00 in appliance timezone)
-3. Set input defaults:
+3. On the schedule's input defaults, set:
    - `dryRun = false`
-   - `maxAgeMinutes = 10080` (or per retention policy)
-   - All governor thresholds from Thresholds config element values
+   - `maxAgeMinutes = 10080` (or per your snapshot retention policy)
+   - Governor thresholds at their default values initially; tune after first few runs
 4. Confirm next run time is as expected
 
-### Step 12: Aria Ops for Logs Integration
+### Step 12: Configure Aria Ops for Logs
 
-The vRO workflow log is automatically ingested by Aria Ops for Logs when the
-vRO integration is configured. To surface snapshot cleanup results:
-
-1. In Aria Ops for Logs, create a saved filter:
-   - Source: vRO workflow logs
-   - Filter: `text contains "Snapshot Cleanup Result"`
-2. Create field extractions for: `outcome`, `deleted`, `errors`, `deferred`
+1. Confirm vRO workflow log is a configured source in Aria Ops for Logs
+2. Create a saved filter: `text contains "Snapshot Cleanup Result"`
+3. Set up field extractions for `outcome`, `deleted`, `errors`, `deferred`
    using the regex patterns in VARIABLE_BINDING_REFERENCE.md Section 5
-3. Create an alert on: `errors > 0` OR `outcome = COMPLETED_WITH_ERRORS`
-4. Create a dashboard widget showing `deleted` count trend over time
+4. Create an alert on `outcome=ERROR` or `errors>0`
 
 ### Step 13: Governor Baseline Calibration
 
 After the first 3-5 live runs, review the vRO execution logs for governor
-HOLD entries. If the governor is holding tasks frequently:
+HOLD entries. If the governor holds tasks frequently:
 
 1. Check vCenter performance charts for affected datastores (last 7 days)
 2. Identify average idle latency during the cleanup window
-3. Raise `latencyThresholdMs` in the Thresholds config element to ~2x that value
-4. For vSAN: review the vSAN Performance dashboard for historical congestion scores
+3. Update `latencyThresholdMs` on the **workflow Inputs tab default value**
+   (not a config element — right-click workflow > Edit > Inputs tab)
+4. For vSAN: review the vSAN Performance dashboard for historical congestion
+   scores and update `vsanCongestionThresh` the same way
+5. The updated default will apply to all future scheduled runs automatically
 
 ---
 
@@ -223,14 +227,14 @@ HOLD entries. If the governor is holding tasks frequently:
 
 ### Clearing a Stuck Mutex Lock
 
-If the vRO appliance restarts during a run, the mutex may persist and
-block all subsequent runs. All scheduled runs will show `MUTEX_ABORT`.
+If the vRO appliance restarts during a run, the mutex may persist and block
+all subsequent runs. All scheduled runs will log `MUTEX_ABORT`.
 
 **Resolution:**
-1. Confirm no run is currently executing (check vRO Runs tab)
+1. Confirm no run is currently executing (vRO Runs tab)
 2. Design > Configuration > SnapshotCleanup > RuntimeState
-3. Set `runLock` attribute value to empty string
-4. Save — next run proceeds normally
+3. Set `runLock` to empty string and save
+4. Next run proceeds normally
 
 **Prevention:** The Exception Handler releases the lock on all abnormal exits.
 The only scenario where it cannot is an OOM kill or appliance crash mid-run.
@@ -238,12 +242,25 @@ The only scenario where it cannot is an OOM kill or appliance crash mid-run.
 ### Investigating a Run
 
 1. Open the workflow > Runs tab > select the run by start time
-2. Review execution log for detailed per-snapshot entries
+2. Review execution log for per-snapshot `[DRY-RUN]`, `Deleting`, `SKIP`, and
+   governor HOLD entries
 3. Search Aria Ops for Logs for `runId=SCR-YYYY-MM-DDTHH-MM-SS`
 4. The `Snapshot Cleanup Result` line contains the complete run summary
-5. Filter by `outcome=ERROR` or `outcome=COMPLETED_WITH_ERRORS` for failures
-6. `action=deferred` entries were skipped by governor max wait — they will
-   be retried on the next scheduled run
+5. `action=deferred` entries were held by the governor and will be retried
+   on the next scheduled run
+
+### Tuning Threshold Values
+
+All threshold values are workflow input defaults. To update them permanently:
+
+1. In vRO: Design > Workflows > right-click the workflow > Edit
+2. Click the **Inputs** tab
+3. Click the input to edit (e.g. `latencyThresholdMs`)
+4. Update the Default Value field
+5. Save and close
+
+The updated default applies to all future scheduled runs. On-demand runs can
+still override any value at runtime via the input form.
 
 ### Adding a New vCenter
 
@@ -251,23 +268,13 @@ The only scenario where it cannot is an OOM kill or appliance crash mid-run.
    (Administration > vCenter Server)
 2. No workflow changes required
 3. `VcPlugin.allSdkConnections` discovers all registered connections at runtime
-4. Confirm the new vCenter appears in the next dry-run log output
+4. Confirm the new vCenter appears in the next dry-run output
 
-### Governor Is Always Blocking
+### Disabling the Automation
 
-If HOLD entries appear frequently and waits are long:
-1. Confirm idle storage latency is below `latencyThresholdMs` using vCenter charts
-2. If idle latency > threshold: raise the threshold in Thresholds config element
-3. If governor is calibrating a very large delta (deep chain consolidation):
-   consider running cleanup during a lower-activity window
-4. Reduce `maxParallelPerVcenter` to 1 to reduce concurrent I/O load
-
-### Disabling the Automation Temporarily
-
-- **Disable schedule:** workflow > Schedule > disable or delete the schedule
-- **Block all runs:** set `runLock` in RuntimeState to any non-empty value
-  such as `MAINTENANCE` — all run attempts abort at the mutex check with
-  `MUTEX_ABORT` and emit no result log entry
+- **Disable schedule:** Workflow > Schedule > disable or delete the schedule
+- **Block all runs:** Set `runLock` in RuntimeState to any non-empty value
+  such as `MAINTENANCE` — all run attempts abort with MUTEX_ABORT
 
 ---
 
@@ -275,26 +282,27 @@ If HOLD entries appear frequently and waits are long:
 
 ```
 actions/
-  getSnapshotCandidates.js    vRO action — VM and snapshot enumeration
+  getSnapshotCandidates.js    vRO action — VM and snapshot enumeration with filters
   getDatastoreMetrics.js      vRO action — I/O metric sampling (vSAN + VMFS/NFS)
-  adaptiveGovernorCheck.js    vRO action — I/O governor decision engine
+  adaptiveGovernorCheck.js    vRO action — adaptive I/O governor decision engine
   deleteSnapshot.js           vRO action — snapshot deletion with safety checks
 
 workflow/
-  ST-01_InitialiseRun.js             Scriptable task 1
-  ST-02_MutexCheckAndAcquire.js      Scriptable task 2
-  ST-03_EnumeratevCenters.js         Scriptable task 3
-  ST-04_CandidatesCheck.js           Scriptable task 4
-  ST-05_SortAndSplitLanes.js         Scriptable task 5
-  ST-06_ProcessPoweredOnVMs.js       Scriptable task 6
-  ST-07_ProcessPoweredOffVMs.js      Scriptable task 7
-  ST-09_ReleaseMutexAndFinalise.js   Scriptable task 9 (ST-08 does not exist)
-  EH_ExceptionHandler.js             Exception handler element
+  ST-01_InitialiseRun.js             Scriptable task 1 — run ID, unit conversions, log init
+  ST-02_MutexCheckAndAcquire.js      Scriptable task 2 — mutex lock check and acquire
+  ST-03_EnumeratevCenters.js         Scriptable task 3 — candidate collection across all vCenters
+  ST-04_CandidatesCheck.js           Scriptable task 4 — early exit gate if no candidates
+  ST-05_SortAndSplitLanes.js         Scriptable task 5 — chain-order sort and lane assignment
+  ST-06_ProcessPoweredOnVMs.js       Scriptable task 6 — throttled lane with governor
+  ST-07_ProcessPoweredOffVMs.js      Scriptable task 7 — fast lane with governor
+  ST-09_ReleaseMutexAndFinalise.js   Scriptable task 9 — lock release and result log entry
+  EH_ExceptionHandler.js             Exception handler — classification, lock release, error logging
 
 config/
-  configurationElements.xml     Reference for RuntimeState and Thresholds elements
+  configurationElements.xml    RuntimeState element only (one element, four attributes)
 
 docs/
   DEPLOYMENT_GUIDE.md           This file
   VARIABLE_BINDING_REFERENCE.md Workflow inputs, attributes, and per-task bindings
+  Adaptive_Snapshot_Cleanup_Technical_Design_v1.2.docx  Customer-facing design document
 ```

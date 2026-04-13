@@ -5,36 +5,57 @@
   VCF 9.0.2 / Embedded vRO 8.17.x
   ═══════════════════════════════════════════════════════════════════════════════
 
-  CREATE TWO configuration elements under category: SnapshotCleanup
+  CREATE ONE configuration element under category: SnapshotCleanup
 
     1. RuntimeState  — distributed mutex lock and run tracking
-    2. Thresholds    — persistent governor defaults for scheduled runs
 
-  NOTE: The FileLogging configuration element has been removed from this
-  solution. All audit output is written to the vRO workflow log, which is
-  ingested directly by VMware Aria Operations for Logs. No network share,
-  no NFS/SMB mount, and no file share credentials are required.
+  WHAT IS NOT HERE (and why):
+    Threshold values (latencyThresholdMs, vsanCongestionThresh, etc.) are
+    defined directly as workflow input parameters with default values set on
+    the workflow Inputs tab. Scheduled run defaults are set on the schedule
+    definition in the vRO scheduler. This keeps all configuration visible in
+    the workflow itself and eliminates a separate config element for values
+    that are already managed as workflow inputs.
 
-  HOW TO IMPORT:
-    vRO Client > Design > Configuration > right-click SnapshotCleanup category
-    > New Configuration Element > paste attributes from each section below.
-    Alternatively use the vRO REST API to POST to /vco/api/configurations.
+    The FileLogging configuration element has also been removed. All audit
+    output goes to the vRO workflow log, ingested by VMware Aria Operations
+    for Logs. No network share or credentials are required.
+
+  HOW TO CREATE:
+    vRO Client > Design > Configuration > right-click category SnapshotCleanup
+    > New Configuration Element > name it RuntimeState > add the four
+    attributes listed below with the types and default values shown.
 
   ═══════════════════════════════════════════════════════════════════════════════
 -->
 
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
-     1. SnapshotCleanup / RuntimeState
-     Purpose: Holds the distributed mutex lock that prevents concurrent runs.
+     SnapshotCleanup / RuntimeState
+     The ONLY configuration element required by this solution.
      ═══════════════════════════════════════════════════════════════════════════ -->
 
 <configuration-element name="RuntimeState" version="1.0">
   <description>
     Runtime state for the Adaptive Snapshot Cleanup workflow.
-    Holds the distributed mutex lock (runLock). If a workflow run terminates
-    abnormally without releasing this lock, clear it manually by setting
-    runLock to an empty string before triggering the next run.
+    Holds the distributed mutex lock (runLock) that prevents more than one
+    workflow instance from executing simultaneously.
+
+    This is the only configuration element required by this solution.
+    All threshold and policy values are managed as workflow input parameters
+    with defaults set on the workflow Inputs tab and on each schedule definition.
+
+    STUCK LOCK RECOVERY:
+      If the workflow exits abnormally without releasing the lock, all subsequent
+      scheduled runs will abort with MUTEX_ABORT. To recover:
+        1. Confirm no run is currently executing (check vRO Runs tab)
+        2. Set runLock attribute to empty string
+        3. Save — next run proceeds normally
+
+    INTENTIONAL DISABLE:
+      Set runLock to any non-empty non-run-ID value such as "MAINTENANCE".
+      All run attempts will abort at the mutex check and log MUTEX_ABORT.
+      Clear to empty string to re-enable.
   </description>
 
   <attributes>
@@ -42,19 +63,17 @@
     <attribute
       name="runLock"
       type="string"
-      description="Active run ID when a run is in progress (format: SCR-YYYY-MM-DDTHH-MM-SS).
+      description="Active run ID while a workflow run is in progress (format: SCR-YYYY-MM-DDTHH-MM-SS).
                    Empty string when no run is active.
-                   WARNING: Never edit this value while a run is confirmed to be active.
-                   To clear a stuck lock: set this to empty string and save.">
+                   Written by ST-02 on acquire. Cleared by ST-09 and EH on release.
+                   CRITICAL: initialise as empty string, never null.">
       <value><![CDATA[]]></value>
-      <!-- DEFAULT: empty string — do not change this default -->
     </attribute>
 
     <attribute
       name="lastRunId"
       type="string"
-      description="Run ID of the last completed or aborted run. Informational only.
-                   Updated automatically at the end of each run.">
+      description="Run ID of the most recently completed or aborted run. Informational only.">
       <value><![CDATA[]]></value>
     </attribute>
 
@@ -68,168 +87,9 @@
     <attribute
       name="lastRunOutcome"
       type="string"
-      description="Outcome of the last run: SUCCESS | DRY_RUN_COMPLETE |
-                   COMPLETED_WITH_ERRORS | COMPLETED_WITH_DEFERRALS |
-                   CLEAN_EXIT | MUTEX_ABORT | ERROR. Informational only.">
+      description="Outcome of the last run: SUCCESS | DRY_RUN_COMPLETE | COMPLETED_WITH_ERRORS |
+                   COMPLETED_WITH_DEFERRALS | CLEAN_EXIT | MUTEX_ABORT | ERROR. Informational only.">
       <value><![CDATA[]]></value>
-    </attribute>
-
-  </attributes>
-</configuration-element>
-
-
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     2. SnapshotCleanup / Thresholds
-     Purpose: Persistent default values for all governor and execution
-              parameters. These defaults are used by scheduled runs.
-              All values can be overridden at runtime via the workflow
-              input form when running on-demand.
-     ═══════════════════════════════════════════════════════════════════════════ -->
-
-<configuration-element name="Thresholds" version="1.0">
-  <description>
-    Default governor thresholds and execution parameters for the Adaptive
-    Snapshot Cleanup workflow. Used as defaults for scheduled runs.
-    All values are overridable via the workflow input form on on-demand runs.
-    Tune latencyThresholdMs and vsanCongestionThresh based on observed
-    baseline storage performance in your environment.
-  </description>
-
-  <attributes>
-
-    <!-- ── Age filter ─────────────────────────────────────────────────────── -->
-
-    <attribute
-      name="maxAgeMinutes"
-      type="number"
-      description="Snapshots older than this many minutes are candidates for deletion.
-                   TESTING : set to 5-60 minutes to catch recently created test snapshots.
-                   PRODUCTION: set to 10080 (7 days) or as required by policy.
-                   This value does NOT cause automatic deletion — the workflow
-                   must still be triggered manually or via schedule.">
-      <value>10080</value>
-      <!-- 10080 = 7 days. Adjust to match your snapshot retention policy. -->
-    </attribute>
-
-    <!-- ── Name and description filters ──────────────────────────────────── -->
-
-    <attribute
-      name="nameMatchString"
-      type="string"
-      description="Whitelist name filter. When non-empty, ONLY snapshots whose
-                   names contain this string (case-insensitive) are eligible.
-                   Leave empty to target all snapshots regardless of name.
-                   Example: 'pre-patch' — only deletes snapshots named 'pre-patch',
-                   'Pre-Patch-2026-04-10', 'PREPATCH', etc.">
-      <value><![CDATA[]]></value>
-      <!-- DEFAULT: empty — all snapshot names are eligible -->
-    </attribute>
-
-    <attribute
-      name="descIgnoreString"
-      type="string"
-      description="Description ignore filter. Snapshots whose description field
-                   contains this string (case-insensitive) are skipped individually.
-                   The rest of the VM's snapshots are still eligible.
-                   Example: 'do not delete' — protects snapshots tagged with that phrase.">
-      <value><![CDATA[]]></value>
-      <!-- DEFAULT: empty — no description filter applied -->
-    </attribute>
-
-    <!-- ── Execution safety ───────────────────────────────────────────────── -->
-
-    <attribute
-      name="dryRunDefault"
-      type="boolean"
-      description="Default dry-run state for scheduled runs. When true, no
-                   snapshots are deleted — all operations are simulated and
-                   logged. Set to false only after validating dry-run output.
-                   IMPORTANT: The workflow input form always shows this as a
-                   visible field so operators can override it per-run.">
-      <value>false</value>
-      <!-- Set to false for production schedules after dry-run validation. -->
-    </attribute>
-
-    <!-- ── VMFS / NFS I/O governor ────────────────────────────────────────── -->
-
-    <attribute
-      name="latencyThresholdMs"
-      type="number"
-      description="VMFS and NFS datastores: maximum projected total I/O latency
-                   in milliseconds before the governor holds the next consolidation.
-                   The governor projects: current_latency + observed_delta_from_last_task.
-                   If the projection exceeds this value, the task is held and the
-                   governor polls until conditions improve.
-                   TUNING: set to approximately 2x your observed idle latency during
-                   the cleanup window. If idle latency is 12ms, set this to 24-30ms.
-                   All-flash environments: 8-15ms. Spinning disk: 20-40ms.">
-      <value>30</value>
-    </attribute>
-
-    <!-- ── vSAN I/O governor ──────────────────────────────────────────────── -->
-
-    <attribute
-      name="vsanCongestionThresh"
-      type="number"
-      description="vSAN datastores: maximum projected vSAN congestion score (0-255).
-                   vSAN reports congestion as an integer; values above 128 indicate
-                   serious congestion affecting all VMs on the cluster.
-                   The governor projects: current_congestion + observed_delta.
-                   TUNING: 30-50 = conservative (fewer concurrent cleanups allowed).
-                           80-100 = moderate. Above 128 = permissive (not recommended).
-                   Default 50 provides a safe margin below the serious-congestion threshold.">
-      <value>50</value>
-    </attribute>
-
-    <attribute
-      name="vsanResyncThresholdGB"
-      type="number"
-      description="vSAN datastores: maximum projected resync queue depth in gigabytes.
-                   vSAN resync activity competes with guest I/O for storage bandwidth.
-                   A large resync queue (>10GB) indicates significant background
-                   rebalancing is in progress — adding consolidation I/O at this
-                   point risks guest performance degradation.
-                   TUNING: 5GB = conservative. 10GB = default. 20GB = permissive.">
-      <value>10</value>
-    </attribute>
-
-    <!-- ── Concurrency and timing ─────────────────────────────────────────── -->
-
-    <attribute
-      name="maxParallelPerVcenter"
-      type="number"
-      description="Maximum number of simultaneous snapshot consolidation tasks
-                   per vCenter for powered-on VMs. Powered-off VMs do not count
-                   against this limit but still count against the I/O governor.
-                   vCenter VPXD default task queue: 35 tasks.
-                   TUNING: 3 = conservative default. Raise to 5-8 only after
-                   validating that the governor correctly limits I/O impact.
-                   Do not exceed 10 without explicit vCenter task queue analysis.">
-      <value>3</value>
-    </attribute>
-
-    <attribute
-      name="governorPollIntervalSec"
-      type="number"
-      description="How often (in seconds) the adaptive I/O governor re-evaluates
-                   datastore metrics when a consolidation task is on hold.
-                   Lower values = more responsive but higher API call frequency.
-                   Higher values = less responsive but fewer performance manager queries.
-                   RECOMMENDED: 30 seconds for most environments.">
-      <value>30</value>
-    </attribute>
-
-    <attribute
-      name="taskTimeoutSeconds"
-      type="number"
-      description="Maximum time in seconds to wait for a single vCenter snapshot
-                   removal task to reach a success or error state before treating
-                   it as a timeout failure.
-                   Deep snapshot chains (10+ snapshots) can require longer consolidation.
-                   Thin-provisioned disks on heavily loaded storage may also be slow.
-                   RECOMMENDED: 1800 (30 minutes). Raise to 3600 for environments
-                   with known slow storage or very deep snapshot chains.">
-      <value>1800</value>
     </attribute>
 
   </attributes>
