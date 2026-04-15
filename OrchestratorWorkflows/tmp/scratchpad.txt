@@ -1,0 +1,1 @@
+sudo grep -iE 'cc_users|cc_users_groups|users-groups|sshuser|failed|error|traceback' /var/log/cloud-init.log
