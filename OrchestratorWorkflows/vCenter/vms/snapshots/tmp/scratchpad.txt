@@ -1,3 +1,56 @@
-sudo grep -iE 'cc_users|cc_users_groups|users-groups|sshuser|failed|error|traceback' /var/log/cloud-init.log
+formatVersion: 1
+inputs:
+  vmName:
+    type: string
+  vmFolder:
+    type: string
+  datastoreName:
+    type: string
+    enum:
+      - cvsdev-cl01-ds-vsan01
+      - ds1
+      - ds2
+      - ds3
+  sshKey:
+    type: string
+resources:
+  Cloud_vSphere_Machine_1:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: ${input.vmName}
+      folderName: ${input.vmFolder}
+      image: CentOS
+      cpuCount: 2
+      totalMemoryMB: 2048
+      remoteAccess:
+        authentication: publicPrivateKey
+        username: sshuser
+        sshKey: ${input.sshKey}
+      storage:
+        constraints:
+          - tag: dsName:${input.datastoreName}
+      networks:
+        - network: ${resource.Cloud_vSphere_Network_1.id}
+          assignment: static
+          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
+          dns: ${resource.Cloud_vSphere_Network_1.dns}
+  Cloud_vSphere_Network_1:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
+      name: cvsdev-cl01-vds01-pg-vm-mgmt
 
 
+
+#cloud-config
+ssh_authorized_keys:
+- ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKj0gkXP0BcQStTMfHOBBfF/7ZurbR0S1dpIYngR5WG/
+  centos sshuser key
+users:
+- default
+- name: sshuser
+  ssh_authorized_keys:
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKj0gkXP0BcQStTMfHOBBfF/7ZurbR0S1dpIYngR5WG/
+    centos sshuser key
+runcmd:
+- sudo service sshd restart
