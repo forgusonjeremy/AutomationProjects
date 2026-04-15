@@ -1,47 +1,10 @@
-formatVersion: 1
-inputs:
-  vmName:
-    type: string
-  vmFolder:
-    type: string
-  datastoreName:
-    type: string
-    enum:
-      - cvsdev-cl01-ds-vsan01
-      - ds1
-      - ds2
-      - ds3
-  sshKey:
-    type: string
-resources:
-  Cloud_vSphere_Machine_1:
-    type: Cloud.vSphere.Machine
-    properties:
-      name: ${input.vmName}
-      folderName: ${input.vmFolder}
-      image: CentOS
-      cpuCount: 2
-      totalMemoryMB: 2048
-      storage:
-        constraints:
-          - tag: dsName:${input.datastoreName}
-      networks:
-        - network: ${resource.Cloud_vSphere_Network_1.id}
-          assignment: static
-          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
-          dns: ${resource.Cloud_vSphere_Network_1.dns}
-      cloudConfig: |
-        #cloud-config
-        users:
-          - name: sshuser
-            shell: /bin/bash
-            groups: wheel
-            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-            lock_passwd: true
-            ssh_authorized_keys:
-              - ${input.sshKey}
-  Cloud_vSphere_Network_1:
-    type: Cloud.vSphere.Network
-    properties:
-      networkType: existing
-      name: cvsdev-cl01-vds01-pg-vm-mgmt
+cloudConfig: |
+  #cloud-config
+  users:
+    - name: sshuser
+      shell: /bin/bash
+      groups: wheel
+      sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+      lock_passwd: true
+      ssh_authorized_keys:
+        - ${input.sshKey}
