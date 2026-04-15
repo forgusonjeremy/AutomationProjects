@@ -22,10 +22,6 @@ resources:
       image: CentOS
       cpuCount: 2
       totalMemoryMB: 2048
-      remoteAccess:
-        authentication: publicPrivateKey
-        username: sshuser
-        sshKey: ${input.sshKey}
       storage:
         constraints:
           - tag: dsName:${input.datastoreName}
@@ -34,23 +30,18 @@ resources:
           assignment: static
           gateway: ${resource.Cloud_vSphere_Network_1.gateway}
           dns: ${resource.Cloud_vSphere_Network_1.dns}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: sshuser
+            shell: /bin/bash
+            groups: wheel
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            lock_passwd: true
+            ssh_authorized_keys:
+              - ${input.sshKey}
   Cloud_vSphere_Network_1:
     type: Cloud.vSphere.Network
     properties:
       networkType: existing
       name: cvsdev-cl01-vds01-pg-vm-mgmt
-
-
-
-#cloud-config
-ssh_authorized_keys:
-- ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKj0gkXP0BcQStTMfHOBBfF/7ZurbR0S1dpIYngR5WG/
-  centos sshuser key
-users:
-- default
-- name: sshuser
-  ssh_authorized_keys:
-  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKj0gkXP0BcQStTMfHOBBfF/7ZurbR0S1dpIYngR5WG/
-    centos sshuser key
-runcmd:
-- sudo service sshd restart
