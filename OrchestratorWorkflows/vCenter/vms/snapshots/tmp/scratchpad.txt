@@ -28,9 +28,6 @@ resources:
           - tag: dsName:${input.datastoreName}
       networks:
         - network: ${resource.Cloud_vSphere_Network_1.id}
-          assignment: static
-          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
-          dns: ${resource.Cloud_vSphere_Network_1.dns}
       cloudConfig: |
         #cloud-config
         hostname: ${input.vmName}
@@ -60,7 +57,7 @@ resources:
               [ipv4]
               method=manual
               address1=${resource.Cloud_vSphere_Machine_1.networks[0].address}/24,${resource.Cloud_vSphere_Network_1.gateway}
-              dns=${join(${resource.Cloud_vSphere_Network_1.dns, ";")}
+              dns=${join(resource.Cloud_vSphere_Network_1.dns, ";")}
               may-fail=false
 
               [ipv6]
@@ -74,3 +71,44 @@ resources:
     properties:
       networkType: existing
       name: cvsdev-cl01-vds01-pg-vm-mgmt
+
+
+
+
+#cloud-config
+hostname: snaptestvsan02
+create_hostname_file: true
+fqdn: snaptestvsan02
+prefer_fqdn_over_hostname: true
+users:
+  - name: sshuser
+    shell: /bin/bash
+    groups: wheel
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKj0gkXP0BcQStTMfHOBBfF/7ZurbR0S1dpIYngR5WG/ centos sshuser key
+      
+write_files:
+  - path: /etc/NetworkManager/system-connections/ens33.nmconnection
+    permissions: '0600'
+    owner: root:root
+    content: |
+      [connection]
+      id=ens33
+      type=ethernet
+      interface-name=ens33
+      autoconnect=true
+
+      [ipv4]
+      method=manual
+      address1=null/24,null
+      dns=null
+      may-fail=false
+
+      [ipv6]
+      method=ignore
+
+runcmd:
+  - nmcli connection reload
+  - nmcli connection up ens33 || nmcli connection up filename /etc/NetworkManager/system-connections/ens33.nmconnection
