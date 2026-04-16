@@ -1,79 +1,37 @@
-formatVersion: 1
-inputs:
-  vmName:
-    type: string
-  vmFolder:
-    type: string
-  datastoreName:
-    type: string
-    enum:
-      - cvsdev-cl01-ds-vsan01
-      - ds1
-      - ds2
-      - ds3
-  sshKey:
-    type: string
-  ipAddress:
-    type: string
-  prefixLength:
-    type: integer
-    default: 24
-  gateway:
-    type: string
-  dnsServers:
-    type: array
+#cloud-config
+hostname: snaptestvsan01
+create_hostname_file: true
+fqdn: snaptestvsan01
+prefer_fqdn_over_hostname: true
+users:
+  - name: sshuser
+    shell: /bin/bash
+    groups: wheel
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKj0gkXP0BcQStTMfHOBBfF/7ZurbR0S1dpIYngR5WG/ centos sshuser key
+      
+write_files:
+  - path: /etc/NetworkManager/system-connections/ens33.nmconnection
+    permissions: '0600'
+    owner: root:root
+    content: |
+      [connection]
+      id=ens33
+      type=ethernet
+      interface-name=ens33
+      autoconnect=true
 
-resources:
-  Cloud_vSphere_Machine_1:
-    type: Cloud.vSphere.Machine
-    properties:
-      name: ${input.vmName}
-      folderName: ${input.vmFolder}
-      image: CentOS
-      cpuCount: 2
-      totalMemoryMB: 2048
-      customizeGuestOs: false
-      storage:
-        constraints:
-          - tag: dsName:${input.datastoreName}
-      networks:
-        - network: ${resource.Cloud_vSphere_Network_1.id}
-      cloudConfig: |
-        #cloud-config
-        preserve_hostname: false
-        hostname: ${input.vmName}
-        create_hostname_file: true
-        manage_etc_hosts: localhost
+      [ipv4]
+      method=manual
+      address1=null/24,null
+      dns=${join(${resource.Cloud_vSphere_Network_1.dns, ";")}
+      may-fail=false
 
-        users:
-          - name: sshuser
-            shell: /bin/bash
-            groups: wheel
-            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-            lock_passwd: true
-            ssh_authorized_keys:
-              - "${input.sshKey}"
+      [ipv6]
+      method=ignore
 
-        write_files:
-          - path: /etc/NetworkManager/system-connections/ens33.nmconnection
-            permissions: '0600'
-            owner: root:root
-            content: |
-              [connection]
-              id=ens33
-              type=ethernet
-              interface-name=ens33
-              autoconnect=true
-
-              [ipv4]
-              method=manual
-              address1=${input.ipAddress}/${input.prefixLength},${input.gateway}
-              dns=${join(input.dnsServers, ";")}
-              may-fail=false
-
-              [ipv6]
-              method=ignore
-
-        runcmd:
-          - nmcli connection reload
-          - nmcli connection up ens33 || nmcli connection up filename /etc/NetworkManager/system-connections/ens33.nmconnection
+runcmd:
+  - nmcli connection reload
+  - nmcli connection up ens33 || nmcli connection up filename /etc/NetworkManager/system-connections/ens33.nmconnection
