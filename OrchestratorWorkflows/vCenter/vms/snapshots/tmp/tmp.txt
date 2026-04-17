@@ -178,3 +178,59 @@ pubkeyauthentication yes
 passwordauthentication yes
 pubkeyauthoptions none
 root@snaptestvsan01:~#
+
+
+formatVersion: 1
+inputs:
+  vmName:
+    type: string
+  vmFolder:
+    type: string
+  datastoreName:
+    type: string
+    enum:
+      - cvsdev-cl01-ds-vsan01
+      - ds1
+      - ds2
+      - ds3
+  sshKey:
+    type: string
+resources:
+  Cloud_vSphere_Machine_1:
+    type: Cloud.vSphere.Machine
+    properties:
+      customizationSpec: ''
+      name: ${input.vmName}
+      folderName: ${input.vmFolder}
+      image: CentOS
+      cpuCount: 2
+      totalMemoryMB: 2048
+      remoteAccess:
+        authentication: publicPrivateKey
+        username: sshuser
+        sshKey: ${input.sshKey}
+        password: VMw@re1!VMw@re1!
+      cloudConfig: |
+        #cloud-config
+          ssh_pwauth: true
+          write_files:
+            - path: /etc/ssh/sshd_config.d/50-cloud-init.conf
+              content: |
+                PasswordAuthentication yes
+                PubkeyAuthentication yes
+              permissions: '0600'
+              owner: root:root
+          runcmd:
+            - [systemctl, restart, sshd ]
+      storage:
+        constraints:
+          - tag: dsName:${input.datastoreName}
+      networks:
+        - network: ${resource.Cloud_vSphere_Network_1.id}
+          assignment: static
+          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
+          dns: ${resource.Cloud_vSphere_Network_1.dns}
+  Cloud_vSphere_Network_1:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
