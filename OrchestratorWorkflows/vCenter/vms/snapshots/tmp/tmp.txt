@@ -234,3 +234,6 @@ resources:
     type: Cloud.vSphere.Network
     properties:
       networkType: existing
+
+
+asdf
