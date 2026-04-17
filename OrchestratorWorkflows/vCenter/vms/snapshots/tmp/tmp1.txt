@@ -23,3 +23,69 @@ sudo touch /etc/machine-id
 sudo hostnamectl set-hostname localhost.localdomain
 history -c
 sudo shutdown -h now
+
+
+
+formatVersion: 1
+inputs:
+  vmName:
+    type: string
+  vmFolder:
+    type: string
+  datastoreName:
+    type: string
+    enum:
+      - cvsdev-cl01-ds-vsan01
+      - ds1
+      - ds2
+      - ds3
+  sshKey:
+    type: string
+resources:
+  Cloud_vSphere_Machine_1:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: ${input.vmName}
+      folderName: ${input.vmFolder}
+      image: CentOS
+      cpuCount: 2
+      totalMemoryMB: 2048
+      remoteAccess:
+        authentication: publicPrivateKey
+        username: sshuser
+        sshKey: ${input.sshKey}
+      cloudConfig: |
+        #cloud-config
+        hostname: ${input.vmName}
+        fqdn: ${input.vmName}
+        prefer_fqdn_over_hostname: false
+        network:
+          version: 2
+          ethernets:
+            ens33:
+              addresses:
+                - ${self.networks[0].address}/24
+              gateway4: ${self.networks[0].gateway}
+              nameservers:
+                addresses: [${self.networks[0].dns[0]}, ${self.networks[0].dns[1]}]
+        ssh_pwauth: true
+        runcmd:
+          - |
+            cat > /etc/ssh/sshd_config.d/50-cloud-init.conf <<EOF
+            PasswordAuthentication yes
+            PubkeyAuthentication yes
+            EOF
+          - chmod 600 /etc/ssh/sshd_config.d/50-cloud-init.conf
+          - systemctl restart sshd
+      storage:
+        constraints:
+          - tag: dsName:${input.datastoreName}
+      networks:
+        - network: ${resource.Cloud_vSphere_Network_1.id}
+          assignment: static
+          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
+          dns: ${resource.Cloud_vSphere_Network_1.dns}
+  Cloud_vSphere_Network_1:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
