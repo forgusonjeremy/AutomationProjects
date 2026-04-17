@@ -1,0 +1,76 @@
+# Which customization path ran?
+sudo cloud-init status --long
+sudo cat /var/log/vmware-imc/toolsDeployPkg.log
+sudo cat /var/log/vmware-imc/guestcust.log
+sudo ls /var/log/vmware-imc/
+
+# Did user-data arrive?
+sudo vmware-rpctool "info-get guestinfo.metadata" 2>/dev/null | base64 -d
+sudo vmware-rpctool "info-get guestinfo.userdata" 2>/dev/null | base64 -d
+
+# What did cloud-init see?
+sudo cloud-init query userdata
+sudo cat /var/log/cloud-init.log | grep -iE "error|fail|cc_users|deploypkg" | tail -30
+
+# What users exist?
+getent passwd | grep -v "/sbin/nologin\|/bin/false"
+
+# SSH config state
+ls -la /etc/ssh/sshd_config.d/
+sudo sshd -T | grep -iE "passwordauth|pubkeyauth"
+
+
+formatVersion: 1
+inputs:
+  vmName:
+    type: string
+  vmFolder:
+    type: string
+  datastoreName:
+    type: string
+    enum:
+      - cvsdev-cl01-ds-vsan01
+      - ds1
+      - ds2
+      - ds3
+  sshKey:
+    type: string
+resources:
+  Cloud_vSphere_Machine_1:
+    type: Cloud.vSphere.Machine
+    properties:
+      customizationSpec: ''
+      name: ${input.vmName}
+      folderName: ${input.vmFolder}
+      image: CentOS
+      cpuCount: 2
+      totalMemoryMB: 2048
+      remoteAccess:
+        authentication: publicPrivateKey
+        username: sshuser
+        sshKey: ${input.sshKey}
+        password: VMw@re1!VMw@re1!
+      cloudConfig: |
+        #cloud-config
+          ssh_pwauth: true
+          write_files:
+            - path: /etc/ssh/sshd_config.d/50-cloud-init.conf
+              content: |
+                PasswordAuthentication yes
+                PubkeyAuthentication yes
+              permissions: '0600'
+              owner: root:root
+          runcmd:
+            - [systemctl, restart, sshd ]
+      storage:
+        constraints:
+          - tag: dsName:${input.datastoreName}
+      networks:
+        - network: ${resource.Cloud_vSphere_Network_1.id}
+          assignment: static
+          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
+          dns: ${resource.Cloud_vSphere_Network_1.dns}
+  Cloud_vSphere_Network_1:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
