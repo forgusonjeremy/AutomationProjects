@@ -46,22 +46,21 @@ resources:
       cpuCount: 2
       totalMemoryMB: 2048
       remoteAccess:
-        authentication: publicPrivateKey
+        authentication: usernamePassword
         username: sshuser
-        sshKey: ${input.sshKey}
         password: VMw@re1!VMw@re1!
       cloudConfig: |
         #cloud-config
-          ssh_pwauth: true
-          write_files:
-            - path: /etc/ssh/sshd_config.d/50-cloud-init.conf
-              content: |
-                PasswordAuthentication yes
-                PubkeyAuthentication yes
-              permissions: '0600'
-              owner: root:root
-          runcmd:
-            - [systemctl, restart, sshd ]
+        ssh_pwauth: true
+        write_files:
+          - path: /etc/ssh/sshd_config.d/50-cloud-init.conf
+            content: |
+              PasswordAuthentication yes
+              PubkeyAuthentication yes
+            permissions: '0600'
+            owner: root:root
+        runcmd:
+          - [systemctl, restart, sshd]
       storage:
         constraints:
           - tag: dsName:${input.datastoreName}
