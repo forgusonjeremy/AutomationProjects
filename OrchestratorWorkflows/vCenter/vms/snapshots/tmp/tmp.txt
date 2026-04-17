@@ -1,49 +1,21 @@
-formatVersion: 1
-inputs:
-  vmName:
-    type: string
-  vmFolder:
-    type: string
-  datastoreName:
-    type: string
-    enum:
-      - cvsdev-cl01-ds-vsan01
-      - ds1
-      - ds2
-      - ds3
-  sshKey:
-    type: string
-resources:
-  Cloud_vSphere_Machine_1:
-    type: Cloud.vSphere.Machine
-    properties:
-      name: ${input.vmName}
-      folderName: ${input.vmFolder}
-      image: CentOS
-      cpuCount: 2
-      totalMemoryMB: 2048
-      storage:
-        constraints:
-          - tag: dsName:${input.datastoreName}
-      networks:
-        - network: ${resource.Cloud_vSphere_Network_1.id}
-          assignment: static
-          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
-          dns: ${resource.Cloud_vSphere_Network_1.dns}
-      cloudConfig: |
-        #cloud-config
-        create_hostname_file: true
-        fqdn: ${input.vmName}
-        prefer_fqdn_over_hostname: true
-        users:
-          - name: sshuser
-            shell: /bin/bash
-            groups: wheel
-            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-            lock_passwd: true
-            ssh_authorized_keys:
-              - ${input.sshKey}
-  Cloud_vSphere_Network_1:
-    type: Cloud.vSphere.Network
-    properties:
-      networkType: existing
+# 1. What connection profiles exist right now?
+sudo nmcli -f NAME,UUID,TIMESTAMP-REAL,AUTOCONNECT,AUTOCONNECT-PRIORITY,DEVICE connection show
+sudo ls -la /etc/NetworkManager/system-connections/
+
+# 2. Is cloud-init healthy and enabled?
+sudo cloud-init status --long
+sudo systemctl is-enabled cloud-init-local cloud-init cloud-config cloud-final
+
+# 3. What's in cloud-init state? (should be gone before sealing)
+sudo ls -la /var/lib/cloud/instances/ 2>/dev/null
+sudo cat /var/lib/cloud/data/instance-id 2>/dev/null
+
+# 4. Datasource config in place?
+sudo cat /etc/cloud/cloud.cfg.d/99-vmware-guestinfo.cfg 2>/dev/null
+sudo grep -r "datasource_list" /etc/cloud/ 2>/dev/null
+
+# 5. NM no-auto-default config?
+sudo cat /etc/NetworkManager/conf.d/10-no-auto-default.conf 2>/dev/null
+
+# 6. Disabled flag?
+sudo ls -la /etc/cloud/cloud-init.disabled 2>/dev/null
