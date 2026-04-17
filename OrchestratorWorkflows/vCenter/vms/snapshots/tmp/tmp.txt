@@ -1,21 +1,64 @@
 # 1. What connection profiles exist right now?
 sudo nmcli -f NAME,UUID,TIMESTAMP-REAL,AUTOCONNECT,AUTOCONNECT-PRIORITY,DEVICE connection show
-sudo ls -la /etc/NetworkManager/system-connections/
+root@localhost:~# sudo nmcli -f NAME,UUID,TIMESTAMP-REAL,AUTOCONNECT,AUTOCONNECT-PRIORITY,DEVICE connection show
+NAME              UUID                                  TIMESTAMP-REAL                   AUTOCONNECT  AUTOCONNECT-PRIOR>
+ens33             b8d55349-3382-3665-9da9-df6669972698  Fri 17 Apr 2026 09:06:30 AM EDT  yes          -999             >
+lo                044c5247-c0ac-43e4-b5d5-163ccc4e5a27  Fri 17 Apr 2026 09:02:59 AM EDT  yes          0                >
+cloud-init ens33  d2c9f616-cb0f-5b5a-9bb2-0f77bbf3e06a  Wed 15 Apr 2026 04:44:16 PM EDT  yes          120
+
+root@localhost:~# sudo ls -la /etc/NetworkManager/system-connections/
+total 8
+drwxr-xr-x. 2 root root  69 Apr 17 09:02 .
+drwxr-xr-x. 7 root root 134 Apr  9 15:43 ..
+-rw-------. 1 root root 332 Apr 17 09:04 cloud-init-ens33.nmconnection
+-rw-------. 1 root root 306 Apr 10 07:17 ens33.nmconnection
+root@localhost:~#
 
 # 2. Is cloud-init healthy and enabled?
-sudo cloud-init status --long
-sudo systemctl is-enabled cloud-init-local cloud-init cloud-config cloud-final
+root@localhost:~# sudo cloud-init status --long
+status: done
+extended_status: degraded done
+boot_status_code: enabled-by-generator
+last_update: Thu, 01 Jan 1970 00:02:36 +0000
+detail: DataSourceNone
+errors: []
+recoverable_errors:
+WARNING:
+        - Running interface command ['nmcli', 'connection', 'up', 'filename', '/etc/NetworkManager/system-connections/cloud-init-ens33.nmconnection'] failed
+        - Used fallback datasource
+root@localhost:~#
+
+
+root@localhost:~# sudo systemctl is-enabled cloud-init-local cloud-init cloud-config cloud-final
+enabled
+enabled
+enabled
+enabled
+root@localhost:~#
 
 # 3. What's in cloud-init state? (should be gone before sealing)
-sudo ls -la /var/lib/cloud/instances/ 2>/dev/null
-sudo cat /var/lib/cloud/data/instance-id 2>/dev/null
+root@localhost:~# sudo ls -la /var/lib/cloud/instances/ 2>/dev/null
+total 4
+drwxr-xr-x. 3 root root   33 Apr 17 09:04 .
+drwxr-xr-x. 8 root root  105 Apr 17 09:04 ..
+drwxr-xr-x. 5 root root 4096 Apr 17 09:05 iid-datasource-none
+root@localhost:~#
+
+root@localhost:~# sudo cat /var/lib/cloud/data/instance-id 2>/dev/null
+iid-datasource-none
+root@localhost:~#
 
 # 4. Datasource config in place?
-sudo cat /etc/cloud/cloud.cfg.d/99-vmware-guestinfo.cfg 2>/dev/null
-sudo grep -r "datasource_list" /etc/cloud/ 2>/dev/null
+root@localhost:~# sudo cat /etc/cloud/cloud.cfg.d/99-vmware-guestinfo.cfg 2>/dev/null
+root@localhost:~#
+root@localhost:~# sudo grep -r "datasource_list" /etc/cloud/ 2>/dev/null
+/etc/cloud/cloud.cfg:# If you use datasource_list array, keep array items in a single line.
+root@localhost:~#
 
 # 5. NM no-auto-default config?
-sudo cat /etc/NetworkManager/conf.d/10-no-auto-default.conf 2>/dev/null
+root@localhost:~# sudo cat /etc/NetworkManager/conf.d/10-no-auto-default.conf 2>/dev/null
+root@localhost:~#
 
 # 6. Disabled flag?
-sudo ls -la /etc/cloud/cloud-init.disabled 2>/dev/null
+root@localhost:~# sudo ls -la /etc/cloud/cloud-init.disabled 2>/dev/null
+root@localhost:~#
