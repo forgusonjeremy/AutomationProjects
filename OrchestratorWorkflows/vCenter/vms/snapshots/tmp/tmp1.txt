@@ -2,10 +2,12 @@
 sudo tee /etc/cloud/cloud.cfg.d/99-vmware-guestinfo.cfg <<'EOF'
 datasource_list: [ OVF, VMware, None ]
 datasource:
-  OVF:
-    allow_raw_data: true
   VMware:
     allow_raw_data: true
+  OVF:
+    allow_raw_data: true
+network:
+  config: disabled
 EOF
 
 # Verify it's saved
@@ -21,3 +23,133 @@ sudo touch /etc/machine-id
 sudo hostnamectl set-hostname localhost.localdomain
 history -c
 sudo shutdown -h now
+
+
+
+sudo cloud-init status --long
+sudo cloud-init query userdata | head -10
+
+
+
+root@localhost:~# sudo ls -la /var/log/vmware-imc
+total 16
+drwxr-xr-x.  2 root root   32 Apr 17 14:01 .
+drwxr-xr-x. 14 root root 4096 Apr 17 14:01 ..
+-rw-------.  1 root root 8287 Apr 17 14:01 toolsDeployPkg.log
+root@localhost:~# sudo cat /var/log/vmware-imc/toolsDeployPkg.log  2>/dev/null | tail -60
+[2026-04-17T18:01:05.072Z] [   debug] Command to exec : '/bin/cp'.
+[2026-04-17T18:01:05.072Z] [    info] sizeof ProcessInternal is 56
+[2026-04-17T18:01:05.074Z] [    info] Returning, pending output from stdout
+[2026-04-17T18:01:05.075Z] [    info] Returning, pending output from stderr
+[2026-04-17T18:01:05.175Z] [    info] Process exited normally after 0 seconds, returned 0
+[2026-04-17T18:01:05.175Z] [    info] No more output from stdout
+[2026-04-17T18:01:05.175Z] [    info] No more output from stderr
+[2026-04-17T18:01:05.175Z] [    info] Customization command output:
+''.
+[2026-04-17T18:01:05.175Z] [   debug] Command to exec : '/bin/mv'.
+[2026-04-17T18:01:05.175Z] [    info] sizeof ProcessInternal is 56
+[2026-04-17T18:01:05.175Z] [    info] Returning, pending output from stdout
+[2026-04-17T18:01:05.175Z] [    info] Returning, pending output from stderr
+[2026-04-17T18:01:05.275Z] [    info] Process exited normally after 0 seconds, returned 0
+[2026-04-17T18:01:05.275Z] [    info] No more output from stdout
+[2026-04-17T18:01:05.275Z] [    info] No more output from stderr
+[2026-04-17T18:01:05.275Z] [    info] Customization command output:
+''.
+[2026-04-17T18:01:05.275Z] [    info] Copy file /var/run/.vmware-imgcust-d8mrg7f/metadata to directory /var/run/vmware-imc, return if not exist.
+[2026-04-17T18:01:05.276Z] [    info] file metadata doesn't exist, skipped.
+[2026-04-17T18:01:05.276Z] [    info] Copy file /var/run/.vmware-imgcust-d8mrg7f/userdata to directory /var/run/vmware-imc, return if not exist.
+[2026-04-17T18:01:05.276Z] [    info] file userdata doesn't exist, skipped.
+[2026-04-17T18:01:05.276Z] [    info] Check if custom script(pre/post customization) exists.
+[2026-04-17T18:01:05.276Z] [    info] Copying main configuration file cust.cfg.
+[2026-04-17T18:01:05.276Z] [   debug] Command to exec : '/bin/cp'.
+[2026-04-17T18:01:05.276Z] [    info] sizeof ProcessInternal is 56
+[2026-04-17T18:01:05.277Z] [    info] Returning, pending output from stdout
+[2026-04-17T18:01:05.277Z] [    info] Returning, pending output from stderr
+[2026-04-17T18:01:05.377Z] [    info] Process exited normally after 0 seconds, returned 0
+[2026-04-17T18:01:05.377Z] [    info] No more output from stdout
+[2026-04-17T18:01:05.377Z] [    info] No more output from stderr
+[2026-04-17T18:01:05.377Z] [    info] Customization command output:
+''.
+[2026-04-17T18:01:05.377Z] [   debug] Command to exec : '/bin/mv'.
+[2026-04-17T18:01:05.377Z] [    info] sizeof ProcessInternal is 56
+[2026-04-17T18:01:05.378Z] [    info] Returning, pending output from stdout
+[2026-04-17T18:01:05.378Z] [    info] Returning, pending output from stderr
+[2026-04-17T18:01:05.478Z] [    info] Process exited normally after 0 seconds, returned 0
+[2026-04-17T18:01:05.479Z] [    info] No more output from stdout
+[2026-04-17T18:01:05.479Z] [    info] No more output from stderr
+[2026-04-17T18:01:05.479Z] [    info] Customization command output:
+''.
+[2026-04-17T18:01:05.479Z] [    info] Deployment for cloud-init succeeded.
+[2026-04-17T18:01:05.479Z] [    info] Transitioning from state 'INPROGRESS' to state 'Done'.
+[2026-04-17T18:01:05.479Z] [    info] ENTER STATE 'Done'.
+[2026-04-17T18:01:05.479Z] [    info] EXIT STATE 'INPROGRESS'.
+[2026-04-17T18:01:05.479Z] [    info] Launching cleanup.
+[2026-04-17T18:01:05.479Z] [   debug] Command to exec : '/bin/rm'.
+[2026-04-17T18:01:05.479Z] [    info] sizeof ProcessInternal is 56
+[2026-04-17T18:01:05.481Z] [    info] Returning, pending output from stdout
+[2026-04-17T18:01:05.481Z] [    info] Returning, pending output from stderr
+[2026-04-17T18:01:05.581Z] [    info] Process exited normally after 0 seconds, returned 0
+[2026-04-17T18:01:05.581Z] [    info] No more output from stdout
+[2026-04-17T18:01:05.581Z] [    info] No more output from stderr
+[2026-04-17T18:01:05.581Z] [    info] Customization command output:
+''.
+[2026-04-17T18:01:05.581Z] [    info] sSkipReboot: 'true', forceSkipReboot 'false'.
+[2026-04-17T18:01:05.581Z] [    info] Deployment delegated to Cloud-init. Returning success.
+[2026-04-17T18:01:05.581Z] [   debug] Ran DeployPkg_DeployPackageFromFile successfully
+[2026-04-17T18:01:05.581Z] [   debug] ## Closing log
+root@localhost:~# find /var/run -name "cust.cfg" -o -name "nics.txt" -o -name "*imgcust*" 2>/dev/null
+root@localhost:~# find /tmp -name "*vmware*" 2>/dev/null
+/tmp/vmware-root_1127-4013723388
+/tmp/vmware-root_1135-3980298482
+/tmp/vmware-root_1111-3980167380
+/tmp/vmware-root_1144-2697139515
+/tmp/vmware-root_1148-2688554174
+/tmp/vmware-root_1141-3988097390
+/tmp/vmware-root_1147-4021653351
+/tmp/vmware-root_1152-2697008573
+/tmp/vmware-root_1142-2730693426
+/tmp/vmware-root_1146-2688685241
+/tmp/vmware-root_1160-2730693555
+root@localhost:~# cloud-init status --long
+status: done
+extended_status: degraded done
+boot_status_code: enabled-by-generator
+last_update: Thu, 01 Jan 1970 00:00:14 +0000
+detail: DataSourceOVF [seed=iso]
+errors: []
+recoverable_errors:
+WARNING:
+        - vmtoolsd failed to get guestinfo.ovfEnv: Unexpected error while running command. Command: ['/usr/bin/vmtoolsd', '--cmd', 'info-get guestinfo.ovfEnv'] Exit code: 1 Reason: - Stdout:  Stderr: No value found
+        - vmtoolsd failed to get guestinfo.ovfEnv: Unexpected error while running command. Command: ['/usr/bin/vmtoolsd', '--cmd', 'info-get guestinfo.ovfEnv'] Exit code: 1 Reason: - Stdout:  Stderr: No value found
+        - vmtoolsd failed to get guestinfo.ovfEnv: Unexpected error while running command. Command: ['/usr/bin/vmtoolsd', '--cmd', 'info-get guestinfo.ovfEnv'] Exit code: 1 Reason: - Stdout:  Stderr: No value found
+        - vmtoolsd failed to get guestinfo.ovfEnv: Unexpected error while running command. Command: ['/usr/bin/vmtoolsd', '--cmd', 'info-get guestinfo.ovfEnv'] Exit code: 1 Reason: - Stdout:  Stderr: No value found
+root@localhost:~# grep -iE "network |hostname|disabled|imc" /var/log/cloud-init.log | tail -40
+2026-04-17 18:01:04,990 - sources[DEBUG]: Update datasource metadata and network config due to events: boot-new-instance
+2026-04-17 18:01:05,075 - stages.py[DEBUG]: network config disabled by system_cfg
+2026-04-17 18:01:05,075 - stages.py[INFO]: network config is disabled by system_cfg
+2026-04-17 18:01:05,076 - main.py[DEBUG]: Network connectivity determined unnecessary for cloud-init's network stage. Reason: user data: write_files without source uri found, vendor data: no configuration found, vendor data2: no configuration found
+2026-04-17 18:01:05,076 - util.py[DEBUG]: Writing to /run/cloud-init/.skip-network - wb: [644] 0 bytes
+2026-04-17 18:01:05,077 - util.py[DEBUG]: Restoring selinux mode for /run/cloud-init/.skip-network (recursive=False)
+2026-04-17 18:01:05,077 - util.py[DEBUG]: Restoring selinux mode for /run/cloud-init/.skip-network (recursive=False)
+2026-04-17 18:01:05,928 - stages.py[DEBUG]: network config disabled by system_cfg
+2026-04-17 18:01:05,928 - stages.py[INFO]: network config is disabled by system_cfg
+2026-04-17 18:01:05,995 - cc_growpart.py[DEBUG]: No 'growpart' entry in cfg.  Using default: {'mode': 'auto', 'devices': ['/'], 'ignore_growroot_disabled': False}
+2026-04-17 18:01:06,004 - modules.py[DEBUG]: Running module set_hostname (<module 'cloudinit.config.cc_set_hostname' from '/usr/lib/python3.12/site-packages/cloudinit/config/cc_set_hostname.py'>) with frequency once-per-instance
+2026-04-17 18:01:06,004 - handlers.py[DEBUG]: start: init-network/config-set_hostname: running config-set_hostname with frequency once-per-instance
+2026-04-17 18:01:06,005 - util.py[DEBUG]: Writing to /var/lib/cloud/instances/iid-dsovf/sem/config_set_hostname - wb: [644] 25 bytes
+2026-04-17 18:01:06,005 - util.py[DEBUG]: Restoring selinux mode for /var/lib/cloud/instances/iid-dsovf/sem/config_set_hostname (recursive=False)
+2026-04-17 18:01:06,005 - util.py[DEBUG]: Restoring selinux mode for /var/lib/cloud/instances/iid-dsovf/sem/config_set_hostname (recursive=False)
+2026-04-17 18:01:06,005 - helpers.py[DEBUG]: Running config-set_hostname using lock (<FileLock using file '/var/lib/cloud/instances/iid-dsovf/sem/config_set_hostname'>)
+2026-04-17 18:01:06,006 - cc_set_hostname.py[DEBUG]: Setting the hostname to localhost (localhost)
+2026-04-17 18:01:06,006 - subp.py[DEBUG]: Running command ['hostnamectl', 'set-hostname', 'localhost'] with allowed return codes [0] (shell=False, capture=True)
+2026-04-17 18:01:06,015 - distros[DEBUG]: Non-persistently setting the system hostname to localhost
+2026-04-17 18:01:06,015 - subp.py[DEBUG]: Running command ['hostname', 'localhost'] with allowed return codes [0] (shell=False, capture=True)
+2026-04-17 18:01:06,017 - atomic_helper.py[DEBUG]: Atomically writing to file /var/lib/cloud/data/set-hostname (via temporary file /var/lib/cloud/data/tmpifc5x6_t) - w: [644] 51 bytes/chars
+2026-04-17 18:01:06,018 - handlers.py[DEBUG]: finish: init-network/config-set_hostname: SUCCESS: config-set_hostname ran successfully and took 0.013 seconds
+2026-04-17 18:01:06,018 - modules.py[DEBUG]: Running module update_hostname (<module 'cloudinit.config.cc_update_hostname' from '/usr/lib/python3.12/site-packages/cloudinit/config/cc_update_hostname.py'>) with frequency always
+2026-04-17 18:01:06,018 - handlers.py[DEBUG]: start: init-network/config-update_hostname: running config-update_hostname with frequency always
+2026-04-17 18:01:06,018 - helpers.py[DEBUG]: Running config-update_hostname using lock (<cloudinit.helpers.DummyLock object at 0x7f7bf72cb6e0>)
+2026-04-17 18:01:06,018 - cc_update_hostname.py[DEBUG]: Hostname is localhost. Let other services handle this.
+2026-04-17 18:01:06,019 - handlers.py[DEBUG]: finish: init-network/config-update_hostname: SUCCESS: config-update_hostname ran successfully and took 0.001 seconds
+2026-04-17 18:01:06,465 - handlers.py[DEBUG]: finish: init-network: SUCCESS: searching for network datasources
+2026-04-17 18:01:10,2
