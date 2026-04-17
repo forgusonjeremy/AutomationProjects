@@ -1,24 +1,11 @@
-# Put the anti-auto-default NM config in place (persists across boots — this is RPM-safe)
-sudo tee /etc/NetworkManager/conf.d/10-no-auto-default.conf <<'EOF'
-[main]
-no-auto-default=*
-EOF
+sudo vmware-rpctool "info-get guestinfo.metadata" 2>/dev/null | base64 -d
+echo "---"
+sudo vmware-rpctool "info-get guestinfo.userdata" 2>/dev/null | base64 -d
+echo "---"
+sudo vmware-rpctool "info-get guestinfo.metadata.encoding"
+sudo vmware-rpctool "info-get guestinfo.userdata.encoding"
 
-# Put the VMware datasource config in place
-sudo tee /etc/cloud/cloud.cfg.d/99-vmware-guestinfo.cfg <<'EOF'
-datasource_list: [ VMware, OVF, None ]
-datasource:
-  VMware:
-    allow_raw_data: true
-EOF
-
-# Now the cleanup — do this LAST, immediately before shutdown
-sudo rm -f /etc/NetworkManager/system-connections/*.nmconnection
-sudo cloud-init clean --logs --seed
-sudo rm -rf /var/lib/cloud/*
-sudo rm -f /etc/machine-id /var/lib/dbus/machine-id
-sudo touch /etc/machine-id
-sudo hostnamectl set-hostname localhost.localdomain
-
-# Shutdown immediately
-sudo shutdown -h now
+sudo cloud-init status --long
+sudo cloud-init query userdata
+sudo cloud-init query --all 2>/dev/null | grep -iE "user|ssh_authorized" | head -20
+sudo grep -iE "user-data|userdata|cc_users|users-groups|cc_ssh" /var/log/cloud-init.log | tail -40
