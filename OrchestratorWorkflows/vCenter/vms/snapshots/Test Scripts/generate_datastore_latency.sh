@@ -5,10 +5,15 @@
 #           adaptergovernercheck action code in your VMware/storage stack.
 #           Uses fio (preferred) or falls back to dd for raw throughput stress.
 # Target  : CentOS 7/8/Stream
-# Usage   : sudo bash generate_datastore_latency.sh [options]
+# Usage:
+#   bash generate_datastore_latency.sh [options]
+#
+#   Copy to target VM and run as sshuser:
+#     scp generate_datastore_latency.sh sshuser@<vm-ip>:~
+#     ssh sshuser@<vm-ip> "bash ~/generate_datastore_latency.sh"
 #
 # Options:
-#   --dir        /path/to/datastore/mount   (default: /tmp/latency_test)
+#   --dir        Working directory          (default: ~/latency_test)
 #   --duration   <seconds>                  (default: 600)
 #   --workers    <N>                        (default: 8, use 16+ for high lat.)
 #   --mode       [fio|dd|mixed]             (default: auto-detect fio)
@@ -19,14 +24,14 @@
 set -euo pipefail
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-IO_DIR="/tmp/latency_test"
+IO_DIR="${HOME}/latency_test"
 DURATION=600
 WORKERS=8
 MODE="auto"
 IODEPTH=32
 AGGRESSIVE=false
-LOG_FILE="/tmp/latency_test.log"
-FIO_RESULTS="/tmp/latency_fio_results.json"
+LOG_FILE="${HOME}/latency_test.log"
+FIO_RESULTS="${HOME}/latency_fio_results.json"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -136,7 +141,7 @@ run_fio() {
     python - <<'PYEOF' 2>/dev/null || \
     log "  (Install python3 to parse fio JSON results)"
 import json, sys
-with open('/tmp/latency_fio_results.json') as f:
+with open('$FIO_RESULTS') as f:
     data = json.load(f)
 for job in data.get('jobs', []):
     rw = job.get('mixed', job.get('write', {}))

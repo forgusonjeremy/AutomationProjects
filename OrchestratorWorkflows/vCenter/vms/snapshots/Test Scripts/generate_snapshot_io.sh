@@ -20,10 +20,14 @@
 #   - Flushes to disk so changes are real and visible to the snapshot mechanism
 #
 # Usage:
-#   sudo bash generate_snapshot_io.sh [options]
+#   bash generate_snapshot_io.sh [options]
+#
+#   Copy to target VM and run as sshuser:
+#     scp generate_snapshot_io.sh sshuser@<vm-ip>:~
+#     ssh sshuser@<vm-ip> "bash ~/generate_snapshot_io.sh"
 #
 # Options:
-#   --dir         Working directory        (default: /tmp/snapshot_io_test)
+#   --dir         Working directory        (default: ~/snapshot_io_test)
 #   --working-set Size of fixed data in MB (default: 512)
 #   --duration    How long to run, seconds (default: 300)
 #   --threads     Parallel churn workers   (default: 4)
@@ -32,11 +36,11 @@
 set -euo pipefail
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-IO_DIR="/tmp/snapshot_io_test"
+IO_DIR="${HOME}/snapshot_io_test"
 WORKING_SET_MB=512    # Total disk space consumed — stays fixed after init
 DURATION=300
 THREADS=4
-LOG_FILE="/tmp/snapshot_io_test.log"
+LOG_FILE="${HOME}/snapshot_io_test.log"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
