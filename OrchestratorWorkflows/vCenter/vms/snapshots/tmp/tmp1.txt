@@ -1,192 +1,23 @@
-This is the file which gets attached to the VM via CD-ROM which contains the data I believe is to be used by cloud-init/cloudconfig.  I see a user data section.  I also don't see IP address information either
-root@snaptestvsan02:~# cat /mnt/cdrom/ovf-env.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<Environment
-     xmlns="http://schemas.dmtf.org/ovf/environment/1"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xmlns:oe="http://schemas.dmtf.org/ovf/environment/1"
-     xmlns:ve="http://www.vmware.com/schema/ovfenv"
-     oe:id=""
-     ve:vCenterId="vm-208">
-   <PlatformSection>
-      <Kind>VMware ESXi</Kind>
-      <Version>9.0.2</Version>
-      <Vendor>VMware, Inc.</Vendor>
-      <Locale>en</Locale>
-   </PlatformSection>
-   <PropertySection>
-         <Property oe:key="public-keys" oe:value="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKj0gkXP0BcQStTMfHOBBfF/7ZurbR0S1dpIYngR5WG/ centos sshuser key"/>
-         <Property oe:key="user-data" oe:value="I2Nsb3VkLWNvbmZpZwpzc2hfYXV0aG9yaXplZF9rZXlzOgotIHNzaC1lZDI1NTE5IEFBQUFDM056YUMxbFpESTFOVEU1QUFBQUlLajBna1hQMEJjUVN0VE1mSE9CQmZGLzdadXJiUjBTMWRwSVluZ1I1V0cvCiAgY2VudG9zIHNzaHVzZXIga2V5CndyaXRlX2ZpbGVzOgotIHBhdGg6IC9ldGMvc3NoL3NzaGRfY29uZmlnLmQvNTAtY2xvdWQtaW5pdC5jb25mCiAgY29udGVudDogfAogICAgUGFzc3dvcmRBdXRoZW50aWNhdGlvbiB5ZXMKICAgIFB1YmtleUF1dGhlbnRpY2F0aW9uIHllcwogIHBlcm1pc3Npb25zOiAiMDYwMCIKICBvd25lcjogcm9vdDpyb290CnJ1bmNtZDoKLSAtIHN5c3RlbWN0bAogIC0gcmVzdGFydAogIC0gc3NoZAotIHN1ZG8gc2VydmljZSBzc2hkIHJlc3RhcnQKdXNlcnM6Ci0gZGVmYXVsdAotIG5hbWU6IHNzaHVzZXIKICBzc2hfYXV0aG9yaXplZF9rZXlzOgogIC0gc3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUtqMGdrWFAwQmNRU3RUTWZIT0JCZkYvN1p1cmJSMFMxZHBJWW5nUjVXRy8KICAgIGNlbnRvcyBzc2h1c2VyIGtleQo="/>
-   </PropertySection>
-   <ve:EthernetAdapterSection>
-      <ve:Adapter ve:mac="00:50:56:b1:f0:52" ve:network="cvsdev-cl01-vds01-pg-vm-mgmt" ve:unitNumber="7"/>
-   </ve:EthernetAdapterSection>
-</Environment>
-root@snaptestvsan02:~#
+# Update datasource config - OVF first
+sudo tee /etc/cloud/cloud.cfg.d/99-vmware-guestinfo.cfg <<'EOF'
+datasource_list: [ OVF, VMware, None ]
+datasource:
+  OVF:
+    allow_raw_data: true
+  VMware:
+    allow_raw_data: true
+EOF
 
+# Verify it's saved
+sudo cat /etc/cloud/cloud.cfg.d/99-vmware-guestinfo.cfg
 
-
-BAD:
-formatVersion: 1
-inputs:
-  vmName:
-    type: string
-  vmFolder:
-    type: string
-  datastoreName:
-    type: string
-    enum:
-      - cvsdev-cl01-ds-vsan01
-      - ds1
-      - ds2
-      - ds3
-  sshKey:
-    type: string
-resources:
-  Cloud_vSphere_Machine_1:
-    type: Cloud.vSphere.Machine
-    properties:
-      customizationSpec: ''
-      name: ${input.vmName}
-      folderName: ${input.vmFolder}
-      image: CentOS
-      cpuCount: 2
-      totalMemoryMB: 2048
-      remoteAccess:
-        authentication: publicPrivateKey
-        username: sshuser
-        sshKey: ${input.sshKey}
-        password: VMw@re1!VMw@re1!
-      cloudConfig: |
-        #cloud-config
-        write_files:
-          - path: /etc/ssh/sshd_config.d/50-cloud-init.conf
-            content: |
-              PasswordAuthentication yes
-              PubkeyAuthentication yes
-            permissions: '0600'
-            owner: root:root
-        runcmd:
-          - [systemctl, restart, sshd ]
-      storage:
-        constraints:
-          - tag: dsName:${input.datastoreName}
-      networks:
-        - network: ${resource.Cloud_vSphere_Network_1.id}
-          assignment: static
-          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
-          dns: ${resource.Cloud_vSphere_Network_1.dns}
-  Cloud_vSphere_Network_1:
-    type: Cloud.vSphere.Network
-    properties:
-      networkType: existing
-
-
-BAD:
-formatVersion: 1
-inputs:
-  vmName:
-    type: string
-  vmFolder:
-    type: string
-  datastoreName:
-    type: string
-    enum:
-      - cvsdev-cl01-ds-vsan01
-      - ds1
-      - ds2
-      - ds3
-  sshKey:
-    type: string
-resources:
-  Cloud_vSphere_Machine_1:
-    type: Cloud.vSphere.Machine
-    properties:
-      name: ${input.vmName}
-      folderName: ${input.vmFolder}
-      image: CentOS
-      cpuCount: 2
-      totalMemoryMB: 2048
-      remoteAccess:
-        authentication: publicPrivateKey
-        username: sshuser
-        sshKey: ${input.sshKey}
-        password: VMw@re1!VMw@re1!
-      cloudConfig: |
-        #cloud-config
-        write_files:
-          - path: /etc/ssh/sshd_config.d/50-cloud-init.conf
-            content: |
-              PasswordAuthentication yes
-              PubkeyAuthentication yes
-            permissions: '0600'
-            owner: root:root
-        runcmd:
-          - [systemctl, restart, sshd ]
-      storage:
-        constraints:
-          - tag: dsName:${input.datastoreName}
-      networks:
-        - network: ${resource.Cloud_vSphere_Network_1.id}
-          assignment: static
-          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
-          dns: ${resource.Cloud_vSphere_Network_1.dns}
-  Cloud_vSphere_Network_1:
-    type: Cloud.vSphere.Network
-    properties:
-      networkType: existing
-
-BAD:
-formatVersion: 1
-inputs:
-  vmName:
-    type: string
-  vmFolder:
-    type: string
-  datastoreName:
-    type: string
-    enum:
-      - cvsdev-cl01-ds-vsan01
-      - ds1
-      - ds2
-      - ds3
-  sshKey:
-    type: string
-resources:
-  Cloud_vSphere_Machine_1:
-    type: Cloud.vSphere.Machine
-    properties:
-      name: ${input.vmName}
-      folderName: ${input.vmFolder}
-      image: CentOS
-      cpuCount: 2
-      totalMemoryMB: 2048
-      remoteAccess:
-        authentication: publicPrivateKey
-        username: sshuser
-        sshKey: ${input.sshKey}
-      cloudConfig: |
-        #cloud-config
-        ssh_pwauth: true
-        write_files:
-          - path: /etc/ssh/sshd_config.d/50-cloud-init.conf
-            content: |
-              PasswordAuthentication yes
-              PubkeyAuthentication yes
-            permissions: '0600'
-            owner: root:root
-        runcmd:
-          - [systemctl, restart, sshd ]
-      storage:
-        constraints:
-          - tag: dsName:${input.datastoreName}
-      networks:
-        - network: ${resource.Cloud_vSphere_Network_1.id}
-          assignment: static
-          gateway: ${resource.Cloud_vSphere_Network_1.gateway}
-          dns: ${resource.Cloud_vSphere_Network_1.dns}
-  Cloud_vSphere_Network_1:
-    type: Cloud.vSphere.Network
-    properties:
-      networkType: existing
-
+# Clean state
+sudo rm -f /etc/NetworkManager/system-connections/*.nmconnection
+sudo cloud-init clean --logs --seed
+sudo rm -rf /var/lib/cloud/*
+sudo rm -rf /var/log/vmware-imc/*
+sudo rm -f /etc/machine-id /var/lib/dbus/machine-id
+sudo touch /etc/machine-id
+sudo hostnamectl set-hostname localhost.localdomain
+history -c
+sudo shutdown -h now
