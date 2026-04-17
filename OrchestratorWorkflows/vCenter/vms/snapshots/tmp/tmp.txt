@@ -179,7 +179,6 @@ passwordauthentication yes
 pubkeyauthoptions none
 root@snaptestvsan01:~#
 
-
 formatVersion: 1
 inputs:
   vmName:
@@ -234,6 +233,3 @@ resources:
     type: Cloud.vSphere.Network
     properties:
       networkType: existing
-
-
-asdf
