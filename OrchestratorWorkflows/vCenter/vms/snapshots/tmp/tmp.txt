@@ -1,66 +1,20 @@
-root@snaptestvsan03:~# sudo vmware-rpctool "info-get guestinfo.metadata" 2>/dev/null | base64 -d
-echo "---"
+# Which customization path ran?
+sudo cloud-init status --long
+sudo cat /var/log/vmware-imc/toolsDeployPkg.log
+sudo cat /var/log/vmware-imc/guestcust.log
+sudo ls /var/log/vmware-imc/
+
+# Did user-data arrive?
+sudo vmware-rpctool "info-get guestinfo.metadata" 2>/dev/null | base64 -d
 sudo vmware-rpctool "info-get guestinfo.userdata" 2>/dev/null | base64 -d
-echo "---"
-sudo vmware-rpctool "info-get guestinfo.metadata.encoding"
-sudo vmware-rpctool "info-get guestinfo.userdata.encoding"
----
----
-No value found
-No value found
-root@snaptestvsan03:~#
 
-root@snaptestvsan03:~# sudo cloud-init status --long
-status: done
-extended_status: done
-boot_status_code: enabled-by-generator
-last_update: Thu, 01 Jan 1970 00:00:24 +0000
-detail: DataSourceVMware [seed=imc]
-errors: []
-recoverable_errors: {}
-root@snaptestvsan03:~#
+# What did cloud-init see?
+sudo cloud-init query userdata
+sudo cat /var/log/cloud-init.log | grep -iE "error|fail|cc_users|deploypkg" | tail -30
 
-root@snaptestvsan03:~# sudo cloud-init query userdata
+# What users exist?
+getent passwd | grep -v "/sbin/nologin\|/bin/false"
 
-root@snaptestvsan03:~#
-
-root@snaptestvsan03:~# sudo cloud-init query --all 2>/dev/null | grep -iE "user|ssh_authorized" | head -20
-  "_doc": "Aggregated cloud-config created by merging merged_system_cfg (/etc/cloud/cloud.cfg and /etc/cloud/cloud.cfg.d), metadata, vendordata and userdata. The combined_cloud_config represents the aggregated desired configuration acted upon by cloud-init.",
-   "[handler_cloudLogHandler]\nclass=handlers.SysLogHandler\nlevel=DEBUG\nformatter=simpleFormatter\nargs=(\"/dev/log\", handlers.SysLogHandler.LOG_USER)\n"
-   "scripts_user",
-   "users_groups",
-   "ERROR_ON_USER_DATA_FAILURE": true,
-   "EXPIRE_APPLIES_TO_HASHED_USERS": true,
-   "default_user": {
-    "gecos": "Cloud User",
-    "name": "cloud-user",
-  "users": [
-  "ERROR_ON_USER_DATA_FAILURE": true,
-  "EXPIRE_APPLIES_TO_HASHED_USERS": true,
-   "[handler_cloudLogHandler]\nclass=handlers.SysLogHandler\nlevel=DEBUG\nformatter=simpleFormatter\nargs=(\"/dev/log\", handlers.SysLogHandler.LOG_USER)\n"
-   "scripts_user",
-   "users_groups",
-  "users": [
-   "[handler_cloudLogHandler]\nclass=handlers.SysLogHandler\nlevel=DEBUG\nformatter=simpleFormatter\nargs=(\"/dev/log\", handlers.SysLogHandler.LOG_USER)\n"
-   "scripts_user",
-   "users_groups",
-  "users": [
-root@snaptestvsan03:~#
-
-root@snaptestvsan03:~# sudo grep -iE "user-data|userdata|cc_users|users-groups|cc_ssh" /var/log/cloud-init.log | tail -40
-2026-04-17 13:38:33,055 - DataSourceVMware.py[DEBUG]: Getting guestinfo value for key userdata
-2026-04-17 13:38:33,055 - subp.py[DEBUG]: Running command ['/usr/bin/vmware-rpctool', 'info-get guestinfo.userdata'] with allowed return codes [0] (shell=False, capture=True)
-2026-04-17 13:38:33,057 - DataSourceVMware.py[DEBUG]: No value found for key userdata
-2026-04-17 13:38:44,186 - util.py[DEBUG]: Writing to /var/lib/cloud/instances/5031426a-8e71-86d7-b408-73a19aac13a1/user-data.txt - wb: [600] 0 bytes
-2026-04-17 13:38:44,186 - util.py[DEBUG]: Restoring selinux mode for /var/lib/cloud/instances/5031426a-8e71-86d7-b408-73a19aac13a1/user-data.txt (recursive=False)
-2026-04-17 13:38:44,187 - util.py[DEBUG]: Restoring selinux mode for /var/lib/cloud/instances/5031426a-8e71-86d7-b408-73a19aac13a1/user-data.txt (recursive=False)
-2026-04-17 13:38:44,189 - util.py[DEBUG]: Writing to /var/lib/cloud/instances/5031426a-8e71-86d7-b408-73a19aac13a1/user-data.txt.i - wb: [600] 308 bytes
-2026-04-17 13:38:44,190 - util.py[DEBUG]: Restoring selinux mode for /var/lib/cloud/instances/5031426a-8e71-86d7-b408-73a19aac13a1/user-data.txt.i (recursive=False)
-2026-04-17 13:38:44,190 - util.py[DEBUG]: Restoring selinux mode for /var/lib/cloud/instances/5031426a-8e71-86d7-b408-73a19aac13a1/user-data.txt.i (recursive=False)
-2026-04-17 13:38:44,195 - handlers.py[DEBUG]: start: init-network/consume-user-data: reading and applying user-data
-2026-04-17 13:38:44,198 - handlers.py[DEBUG]: finish: init-network/consume-user-data: SUCCESS: reading and applying user-data
-2026-04-17 13:38:44,210 - main.py[DEBUG]: Skipping user-data validation. No user-data found.
-2026-04-17 13:38:44,247 - modules.py[DEBUG]: Running module users_groups (<module 'cloudinit.config.cc_users_groups' from '/usr/lib/python3.12/site-packages/cloudinit/config/cc_users_groups.py'>) with frequency once-per-instance
-2026-04-17 13:38:44,273 - modules.py[DEBUG]: Running module ssh (<module 'cloudinit.config.cc_ssh' from '/usr/lib/python3.12/site-packages/cloudinit/config/cc_ssh.py'>) with frequency once-per-instance
-2026-04-17 13:38:48,365 - modules.py[DEBUG]: Running module ssh_authkey_fingerprints (<module 'cloudinit.config.cc_ssh_authkey_fingerprints' from '/usr/lib/python3.12/site-packages/cloudinit/config/cc_ssh_authkey_fingerprints.py'>) with frequency once-per-instance
-root@snaptestvsan03:~#
+# SSH config state
+ls -la /etc/ssh/sshd_config.d/
+sudo sshd -T | grep -iE "passwordauth|pubkeyauth"
