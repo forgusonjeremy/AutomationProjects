@@ -1,3 +1,1 @@
-Last login: Mon Apr 20 16:44:46 2026 from 10.96.4.183
-sshuser@snaptestvsan02:~$ ps aux | grep generate_snapshot_io
-sshuser     3395  0.0  0.1 
+/tmp/generate_snapshot_io.sh: line 1: pop_var_context: head of shell_variables not a function context
