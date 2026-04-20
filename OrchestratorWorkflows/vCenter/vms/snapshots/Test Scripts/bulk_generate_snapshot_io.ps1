@@ -1,19 +1,20 @@
 # Invoke-SnapshotIO.ps1
-# Usage: .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/admin/generate_snapshot_io.sh"
+# Usage: .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh"
 #
 # Basic — 15 min minimum (default), script at a fixed path
-#.\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/admin/generate_snapshot_io.sh"
+#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh"
 #
 # Custom minimum runtime (e.g. 30 minutes)
-#.\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/admin/generate_snapshot_io.sh" -MinimumRuntimeMinutes 30
+#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh" -MinimumRuntimeMinutes 30
 #
-# With a specific SSH key and higher parallelism
-#.\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/opt/scripts/generate_snapshot_io.sh" -IdentityFile "C:\Users\you\.ssh\id_rsa" -MaxParallelJobs 20
-# Requires: OpenSSH client, key-based auth configured for all servers
+# With higher parallelism
+#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh" -MaxParallelJobs 20
 #
-# CSV format (same as SCP script):
+# Requires: OpenSSH client installed and in PATH, passwordless SSH configured for sshuser on all target servers
+#
+# CSV format:
 #   Server,Username,RemotePath,Port
-#   192.168.1.10,admin,/home/admin/,22
+#   192.168.1.10,sshuser,/home/sshuser/,22
 
 param(
     [Parameter(Mandatory=$true)]
@@ -21,8 +22,6 @@ param(
 
     [Parameter(Mandatory=$true)]
     [string]$ScriptRemotePath,         # Full remote path to the snapshot IO script
-
-    [string]$IdentityFile = "",        # Optional: path to SSH private key
 
     [int]$MinimumRuntimeMinutes = 15,  # Minimum runtime in minutes (default 15)
 
@@ -61,7 +60,7 @@ foreach ($col in $requiredCols) {
 
 # --- Helper: Build SSH args ---
 function Get-SshArgs {
-    param($username, $server, $port, $identityFile)
+    param($username, $server, $port)
 
     $args = @(
         "-o", "StrictHostKeyChecking=no",
@@ -69,9 +68,6 @@ function Get-SshArgs {
         "-o", "ConnectTimeout=10",
         "-p", $port
     )
-    if ($identityFile -ne "") {
-        $args += @("-i", $identityFile)
-    }
     $args += "${username}@${server}"
     return $args
 }
@@ -79,35 +75,34 @@ function Get-SshArgs {
 # --- Minimum runtime enforcement ---
 $minimumRuntimeSeconds = $MinimumRuntimeMinutes * 60
 
-# Remote command:
-#   1. chmod + execute the script
-#   2. Capture its PID
-#   3. Wait for it to finish (or at least MinimumRuntimeSeconds)
-#   4. If it exits early, sleep the remainder
-#   5. Report actual runtime
+# Remote command sent over SSH.
+# Bash variables are escaped with backtick (PowerShell's escape character) so
+# PowerShell does not try to expand them — they arrive on the remote shell intact.
+# $minimumRuntimeSeconds and $ScriptRemotePath are intentionally NOT escaped so
+# PowerShell substitutes their values before the string is sent.
 $remoteCommand = @"
 chmod +x '$ScriptRemotePath';
-START=\$(date +%s);
+START=`$(date +%s);
 '$ScriptRemotePath' &
-SCRIPT_PID=\$!;
-echo "[INFO] Script started with PID \$SCRIPT_PID";
-wait \$SCRIPT_PID;
-EXIT_CODE=\$?;
-END=\$(date +%s);
-ELAPSED=\$(( END - START ));
-echo "[INFO] Script exited with code \$EXIT_CODE after \${ELAPSED}s";
-if [ \$ELAPSED -lt $minimumRuntimeSeconds ]; then
-    REMAINING=\$(( $minimumRuntimeSeconds - ELAPSED ));
-    echo "[INFO] Runtime below minimum. Holding for \${REMAINING}s more...";
-    sleep \$REMAINING;
+SCRIPT_PID=`$!;
+echo '[INFO] Script started with PID '`$SCRIPT_PID;
+wait `$SCRIPT_PID;
+EXIT_CODE=`$?;
+END=`$(date +%s);
+ELAPSED=`$(( END - START ));
+echo '[INFO] Script exited with code '`$EXIT_CODE' after '`${ELAPSED}'s';
+if [ `$ELAPSED -lt $minimumRuntimeSeconds ]; then
+    REMAINING=`$(( $minimumRuntimeSeconds - ELAPSED ));
+    echo '[INFO] Runtime below minimum. Holding for '`${REMAINING}'s more...';
+    sleep `$REMAINING;
 fi;
-TOTAL=\$(( \$(date +%s) - START ));
-echo "[DONE] Total enforced runtime: \${TOTAL}s / exit code: \$EXIT_CODE";
-exit \$EXIT_CODE
+TOTAL=`$(( `$(date +%s) - START ));
+echo '[DONE] Total enforced runtime: '`${TOTAL}'s / exit code: '`$EXIT_CODE;
+exit `$EXIT_CODE
 "@
 
 # --- Launch jobs in parallel ---
-$jobs      = @{}   # jobName -> PSCustomObject with metadata
+$jobs      = @{}
 $results   = @()
 $startTime = Get-Date
 
@@ -125,7 +120,7 @@ foreach ($row in $servers) {
         Start-Sleep -Seconds 2
     }
 
-    $sshArgs = Get-SshArgs -username $username -server $server -port $port -identityFile $IdentityFile
+    $sshArgs = Get-SshArgs -username $username -server $server -port $port
 
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Launching job on $server..." -ForegroundColor Yellow
 
@@ -157,8 +152,8 @@ while ($jobs.Count -gt $completedServers.Count) {
     foreach ($jobName in $jobs.Keys) {
         if ($completedServers.ContainsKey($jobName)) { continue }
 
-        $meta = $jobs[$jobName]
-        $job  = $meta.Job
+        $meta    = $jobs[$jobName]
+        $job     = $meta.Job
         $elapsed = [int]((Get-Date) - $meta.StartTime).TotalSeconds
 
         if ($job.State -in @("Completed", "Failed", "Stopped")) {
@@ -176,15 +171,15 @@ while ($jobs.Count -gt $completedServers.Count) {
             }
 
             $results += [PSCustomObject]@{
-                Server        = $meta.Server
-                Username      = $meta.Username
-                Port          = $meta.Port
-                Status        = $status
-                ExitCode      = $result.ExitCode
-                DurationMin   = $duration
-                ScriptOutput  = $result.Output
-                StartTime     = $meta.StartTime.ToString("yyyy-MM-dd HH:mm:ss")
-                EndTime       = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+                Server       = $meta.Server
+                Username     = $meta.Username
+                Port         = $meta.Port
+                Status       = $status
+                ExitCode     = $result.ExitCode
+                DurationMin  = $duration
+                ScriptOutput = $result.Output
+                StartTime    = $meta.StartTime.ToString("yyyy-MM-dd HH:mm:ss")
+                EndTime      = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
             }
 
             $completedServers[$jobName] = $true
@@ -194,7 +189,7 @@ while ($jobs.Count -gt $completedServers.Count) {
             }
         }
         else {
-            # Still running — print a heartbeat every 60s
+            # Still running — heartbeat every 60s
             if ($elapsed % 60 -lt 3) {
                 $mins = [math]::Round($elapsed / 60, 1)
                 Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($meta.Server)] Still running... ${mins} min elapsed" -ForegroundColor DarkCyan
@@ -218,13 +213,11 @@ Write-Host "  Failed       : $failCount"    -ForegroundColor Red
 Write-Host "  Total VMs    : $($servers.Count)"
 Write-Host "  Total elapsed: ${totalDuration} min"
 
-# Save results log
 $logPath = "snapshot_io_results_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
 $results | Select-Object Server, Username, Port, Status, ExitCode, DurationMin, StartTime, EndTime |
     Export-Csv -Path $logPath -NoTypeInformation
 Write-Host "`nDetailed results saved to: $logPath`n" -ForegroundColor Cyan
 
-# Print any failures with their output
 $failures = $results | Where-Object { $_.Status -eq "FAILED" }
 if ($failures) {
     Write-Host "===== Failed Server Output =====" -ForegroundColor Red
