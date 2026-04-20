@@ -1,16 +1,6 @@
-var taskState = "";
-var maxWait = 300000; // 5 minute timeout per snapshot task
-var waited = 0;
-var pollInterval = 5000; // check every 5 seconds
-
-while (taskState !== "success" && taskState !== "error" && waited < maxWait) {
-    System.sleep(pollInterval);
-    waited += pollInterval;
-    taskState = task.info.state.value;
-}
-
-if (taskState === "error") {
-    throw new Error("Snapshot task failed: " + task.info.error.localizedMessage);
-} else if (waited >= maxWait) {
-    throw new Error("Snapshot task timed out after " + (maxWait/60000) + " minutes");
-}
+Pinging 11 server(s) from '.\servers.csv'...
+ForEach-Object: C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Testing Scripts\Powershell\Test-ServerPing.ps1:137:16
+Line |
+ 137 |      $targets | ForEach-Object -Parallel {
+     |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | A ForEach-Object -Parallel using variable cannot be a script block. Passed-in script block variables are not supported with ForEach-Object -Parallel, and can result in undefined behavior.
