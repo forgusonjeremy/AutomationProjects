@@ -1,6 +1,3 @@
-Pinging 11 server(s) from '.\servers.csv'...
-ForEach-Object: C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Testing Scripts\Powershell\Test-ServerPing.ps1:137:16
-Line |
- 137 |      $targets | ForEach-Object -Parallel {
-     |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-     | A ForEach-Object -Parallel using variable cannot be a script block. Passed-in script block variables are not supported with ForEach-Object -Parallel, and can result in undefined behavior.
+Last login: Mon Apr 20 16:44:46 2026 from 10.96.4.183
+sshuser@snaptestvsan02:~$ ps aux | grep generate_snapshot_io
+sshuser     3395  0.0  0.1 
