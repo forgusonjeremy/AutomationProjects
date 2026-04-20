@@ -10,6 +10,9 @@
 # With higher parallelism
 #   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh" -MaxParallelJobs 20
 #
+# With a custom job timeout (default is 45 min — set higher than MinimumRuntimeMinutes)
+#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -JobTimeoutMinutes 60
+#
 # Requires: OpenSSH client installed and in PATH, passwordless SSH configured for sshuser on all target servers
 #
 # CSV format:
@@ -26,6 +29,8 @@ param(
     [int]$MinimumRuntimeMinutes = 15,  # Minimum runtime in minutes (default 15)
 
     [int]$MaxParallelJobs = 10,        # Max concurrent SSH sessions
+
+    [int]$JobTimeoutMinutes = 45,      # Kill any job still running beyond this (default 45 min)
 
     [switch]$StopOnError               # Stop launching new jobs if one fails
 )
@@ -122,8 +127,19 @@ foreach ($row in $servers) {
     $username = $row.Username.Trim()
     $port     = if ($row.PSObject.Properties.Name -contains "Port" -and $row.Port) { $row.Port.Trim() } else { "22" }
 
-    # Throttle parallelism
+    # Throttle parallelism — also reap any jobs that have exceeded the timeout
+    # so a hung connection can never permanently block the launch queue.
     while ((Get-Job -State Running).Count -ge $MaxParallelJobs) {
+        Get-Job -State Running | ForEach-Object {
+            $runningMeta = $jobs[$_.Name]
+            if ($runningMeta) {
+                $runningElapsed = ((Get-Date) - $runningMeta.StartTime).TotalMinutes
+                if ($runningElapsed -gt $JobTimeoutMinutes) {
+                    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($runningMeta.Server)] TIMEOUT in throttle loop — stopping job after $([math]::Round($runningElapsed,1)) min" -ForegroundColor Magenta
+                    Stop-Job -Job $_
+                }
+            }
+        }
         Start-Sleep -Seconds 2
     }
 
@@ -199,10 +215,31 @@ while ($jobs.Count -gt $completedServers.Count) {
             }
         }
         else {
-            # Still running — heartbeat every 60s
-            if ($elapsed % 60 -lt 3) {
-                $mins = [math]::Round($elapsed / 60, 1)
-                Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($meta.Server)] Still running... ${mins} min elapsed" -ForegroundColor DarkCyan
+            $elapsedMins = [math]::Round($elapsed / 60, 1)
+
+            # Kill jobs that have exceeded the timeout
+            if ($elapsed -gt ($JobTimeoutMinutes * 60)) {
+                Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($meta.Server)] TIMEOUT — exceeded ${JobTimeoutMinutes} min limit. Stopping job." -ForegroundColor Magenta
+                Stop-Job -Job $job
+                $result = Receive-Job -Job $job
+                Remove-Job -Job $job
+
+                $results += [PSCustomObject]@{
+                    Server       = $meta.Server
+                    Username     = $meta.Username
+                    Port         = $meta.Port
+                    Status       = "TIMEOUT"
+                    ExitCode     = -1
+                    DurationMin  = $elapsedMins
+                    ScriptOutput = if ($result) { ($result.Output) } else { "(no output captured)" }
+                    StartTime    = $meta.StartTime.ToString("yyyy-MM-dd HH:mm:ss")
+                    EndTime      = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+                }
+                $completedServers[$jobName] = $true
+            }
+            # Heartbeat every 60s for jobs still within timeout
+            elseif ($elapsed % 60 -lt 3) {
+                Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($meta.Server)] Still running... ${elapsedMins} min elapsed (timeout at ${JobTimeoutMinutes} min)" -ForegroundColor DarkCyan
             }
         }
     }
@@ -216,10 +253,12 @@ while ($jobs.Count -gt $completedServers.Count) {
 $totalDuration = [math]::Round(((Get-Date) - $startTime).TotalMinutes, 1)
 $successCount  = ($results | Where-Object { $_.Status -eq "SUCCESS" }).Count
 $failCount     = ($results | Where-Object { $_.Status -eq "FAILED"  }).Count
+$timeoutCount  = ($results | Where-Object { $_.Status -eq "TIMEOUT" }).Count
 
 Write-Host "`n===== Run Summary =====" -ForegroundColor Cyan
 Write-Host "  Succeeded    : $successCount" -ForegroundColor Green
 Write-Host "  Failed       : $failCount"    -ForegroundColor Red
+Write-Host "  Timed out    : $timeoutCount"  -ForegroundColor Magenta
 Write-Host "  Total VMs    : $($servers.Count)"
 Write-Host "  Total elapsed: ${totalDuration} min"
 
@@ -228,7 +267,7 @@ $results | Select-Object Server, Username, Port, Status, ExitCode, DurationMin, 
     Export-Csv -Path $logPath -NoTypeInformation
 Write-Host "`nDetailed results saved to: $logPath`n" -ForegroundColor Cyan
 
-$failures = $results | Where-Object { $_.Status -eq "FAILED" }
+$failures = $results | Where-Object { $_.Status -in @("FAILED", "TIMEOUT") }
 if ($failures) {
     Write-Host "===== Failed Server Output =====" -ForegroundColor Red
     foreach ($f in $failures) {
@@ -237,4 +276,4 @@ if ($failures) {
     }
 }
 
-if ($failCount -gt 0) { exit 1 } else { exit 0 }
+if (($failCount + $timeoutCount) -gt 0) { exit 1 } else { exit 0 }
