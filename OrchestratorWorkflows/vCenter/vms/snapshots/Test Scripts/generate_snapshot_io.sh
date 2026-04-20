@@ -40,7 +40,12 @@
 #   --sync-mb      Flush to disk every N MB  (default: 512)
 # =============================================================================
 
-set -euo pipefail
+# Note: set -euo pipefail is intentionally avoided here.
+# When launched via nohup from a wrapper script, pipefail combined with
+# bash's subshell variable scoping corrupts the function context stack on
+# CentOS, producing "head of shell_variables not a function context" errors.
+# Individual protections are applied explicitly where needed instead.
+set -u   # treat unset variables as errors
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 IO_DIR="${HOME}/snapshot_io_test"
