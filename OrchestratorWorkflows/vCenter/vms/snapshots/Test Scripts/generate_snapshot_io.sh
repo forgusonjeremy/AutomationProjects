@@ -49,9 +49,8 @@ set -u   # treat unset variables as errors
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 IO_DIR="${HOME}/snapshot_io_test"
-WORKING_SET_MB=8192   # 8GB — each sequential pass takes several minutes at
-                      # typical VM disk speeds, ensuring each 3-min snapshot
-                      # interval captures hundreds of MB of new dirty blocks.
+WORKING_SET_MB=4096   # 4GB — fits comfortably on VMs with ~7GB free.
+                      # Increase if you have more disk and want larger deltas.
 DURATION=1800         # 30 minutes default — adjust to match your test window
 THREADS=4
 SYNC_EVERY_MB=512     # Flush periodically, not on every write
@@ -95,7 +94,7 @@ trap cleanup INT TERM EXIT
 
 # ── Disk space check ──────────────────────────────────────────────────────────
 AVAIL_MB=$(df -m "$IO_DIR" | awk 'NR==2{print $4}')
-NEEDED_MB=$(( WORKING_SET_MB + 512 ))
+NEEDED_MB=$(( WORKING_SET_MB + 256 ))
 if [[ $AVAIL_MB -lt $NEEDED_MB ]]; then
   log "ERROR: Need ~${NEEDED_MB}MB free but only ${AVAIL_MB}MB available."
   log "       Reduce --working-set or free up space. Exiting."
