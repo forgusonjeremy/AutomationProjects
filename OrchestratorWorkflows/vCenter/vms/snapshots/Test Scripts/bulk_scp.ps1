@@ -71,7 +71,7 @@ foreach ($row in $servers) {
     Write-Host "[$server] Transferring to $target (port $port)..." -ForegroundColor Yellow
 
     # Build scp arguments
-    $scpArgs = @("-P", $port, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes")
+    $scpArgs = @("-q","-P", $port, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes", "-o", "LogLevel=QUIET")
     if ($IdentityFile -ne "") {
         $scpArgs += @("-i", $IdentityFile)
     }
