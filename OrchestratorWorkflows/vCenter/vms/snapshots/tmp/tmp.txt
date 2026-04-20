@@ -1,1 +1,4 @@
-2026-04-20 17:03:14.993 -04:00error(a.com.broadcom.pso.testing/_takeSnapshotsInFolder) Error in (Dynamic Script Module name : _takeSnapshotsInFolder#42) TypeError: Cannot call property forName in object [JavaPackage java.lang.Class]. It is not a function, it is "object".
+function sleep(ms) {
+    var end = new Date().getTime() + ms;
+    while (new Date().getTime() < end) { /* spin */ }
+}
