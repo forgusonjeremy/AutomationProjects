@@ -1,1 +1,45 @@
-[18:58:57] Stopping — removing working set from /home/sshuser/snapshot_io_test ...
+sshuser@snaptestvsan02:~$ bash -x /tmp/generate_snapshot_io.sh --duration 60 2>&1 | head -50
++ set -u
++ IO_DIR=/home/sshuser/snapshot_io_test
++ WORKING_SET_MB=8192
++ DURATION=1800
++ THREADS=4
++ SYNC_EVERY_MB=512
++ LOG_FILE=/home/sshuser/snapshot_io_test.log
++ [[ 2 -gt 0 ]]
++ case "$1" in
++ DURATION=60
++ shift 2
++ [[ 0 -gt 0 ]]
++ PER_THREAD_MB=2048
++ [[ 2048 -lt 512 ]]
+++ date +%s
++ START_TIME=1776726045
++ END_TIME=1776726105
++ mkdir -p /home/sshuser/snapshot_io_test
++ echo ''
++ trap cleanup INT TERM EXIT
+++ df -m /home/sshuser/snapshot_io_test
+++ awk 'NR==2{print $4}'
++ AVAIL_MB=7448
++ NEEDED_MB=8704
++ [[ 7448 -lt 8704 ]]
++ log 'ERROR: Need ~8704MB free but only 7448MB available.'
++ tee -a /home/sshuser/snapshot_io_test.log
+++ date +%H:%M:%S
++ echo '[19:00:45] ERROR: Need ~8704MB free but only 7448MB available.'
+[19:00:45] ERROR: Need ~8704MB free but only 7448MB available.
++ log '       Reduce --working-set or free up space. Exiting.'
++ tee -a /home/sshuser/snapshot_io_test.log
+++ date +%H:%M:%S
++ echo '[19:00:45]        Reduce --working-set or free up space. Exiting.'
+[19:00:45]        Reduce --working-set or free up space. Exiting.
++ exit 1
++ cleanup
++ log 'Stopping — removing working set from /home/sshuser/snapshot_io_test ...'
++ tee -a /home/sshuser/snapshot_io_test.log
+++ date +%H:%M:%S
++ echo '[19:00:45] Stopping — removing working set from /home/sshuser/snapshot_io_test ...'
+[19:00:45] Stopping — removing working set from /home/sshuser/snapshot_io_test ...
++ kill 0
+Terminated
