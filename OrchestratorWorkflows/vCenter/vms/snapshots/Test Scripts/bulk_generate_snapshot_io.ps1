@@ -75,31 +75,38 @@ function Get-SshArgs {
 # --- Minimum runtime enforcement ---
 $minimumRuntimeSeconds = $MinimumRuntimeMinutes * 60
 
-# Remote command sent over SSH.
-# Bash variables are escaped with backtick (PowerShell's escape character) so
-# PowerShell does not try to expand them — they arrive on the remote shell intact.
-# $minimumRuntimeSeconds and $ScriptRemotePath are intentionally NOT escaped so
-# PowerShell substitutes their values before the string is sent.
+# Remote command piped to bash via stdin (avoids two problems):
+#   1. CRLF line endings — PowerShell here-strings on Windows use \r\n; bash
+#      treats the \r as part of each command, producing "command not found".
+#      The -replace below strips \r before the string leaves PowerShell.
+#   2. Shell quoting issues with if/fi blocks when passed as a -c argument.
+#
+# Bash variables use backtick escaping so PowerShell does not expand them.
+# $minimumRuntimeSeconds and $ScriptRemotePath are intentionally left unescaped
+# so PowerShell substitutes their values into the script before it is sent.
 $remoteCommand = @"
-chmod +x '$ScriptRemotePath';
-START=`$(date +%s);
+chmod +x '$ScriptRemotePath'
+START=`$(date +%s)
 '$ScriptRemotePath' &
-SCRIPT_PID=`$!;
-echo '[INFO] Script started with PID '`$SCRIPT_PID;
-wait `$SCRIPT_PID;
-EXIT_CODE=`$?;
-END=`$(date +%s);
-ELAPSED=`$(( END - START ));
-echo '[INFO] Script exited with code '`$EXIT_CODE' after '`${ELAPSED}'s';
+SCRIPT_PID=`$!
+echo '[INFO] Script started with PID '`$SCRIPT_PID
+wait `$SCRIPT_PID
+EXIT_CODE=`$?
+END=`$(date +%s)
+ELAPSED=`$(( END - START ))
+echo '[INFO] Script exited with code '`$EXIT_CODE' after '`${ELAPSED}'s'
 if [ `$ELAPSED -lt $minimumRuntimeSeconds ]; then
-    REMAINING=`$(( $minimumRuntimeSeconds - ELAPSED ));
-    echo '[INFO] Runtime below minimum. Holding for '`${REMAINING}'s more...';
-    sleep `$REMAINING;
-fi;
-TOTAL=`$(( `$(date +%s) - START ));
-echo '[DONE] Total enforced runtime: '`${TOTAL}'s / exit code: '`$EXIT_CODE;
+    REMAINING=`$(( $minimumRuntimeSeconds - ELAPSED ))
+    echo '[INFO] Runtime below minimum. Holding for '`${REMAINING}'s more...'
+    sleep `$REMAINING
+fi
+TOTAL=`$(( `$(date +%s) - START ))
+echo '[DONE] Total enforced runtime: '`${TOTAL}'s / exit code: '`$EXIT_CODE
 exit `$EXIT_CODE
 "@
+
+# Strip carriage returns introduced by Windows line endings
+$remoteCommand = $remoteCommand -replace "`r", ""
 
 # --- Launch jobs in parallel ---
 $jobs      = @{}
@@ -126,7 +133,10 @@ foreach ($row in $servers) {
 
     $job = Start-Job -ScriptBlock {
         param($sshExe, $sshArgList, $remoteCmd, $srv)
-        $output = & $sshExe @sshArgList $remoteCmd 2>&1
+        # Pipe the command to bash via stdin rather than passing as -c argument.
+        # This avoids shell quoting issues and ensures the already-sanitised LF
+        # line endings are preserved exactly as sent.
+        $output = $remoteCmd | & $sshExe @sshArgList "bash -s" 2>&1
         return [PSCustomObject]@{
             Server   = $srv
             Output   = $output -join "`n"
