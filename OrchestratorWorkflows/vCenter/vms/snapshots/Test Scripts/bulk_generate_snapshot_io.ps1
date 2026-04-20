@@ -80,37 +80,63 @@ function Get-SshArgs {
 # --- Minimum runtime enforcement ---
 $minimumRuntimeSeconds = $MinimumRuntimeMinutes * 60
 
-# Remote command piped to bash via stdin (avoids two problems):
-#   1. CRLF line endings — PowerShell here-strings on Windows use \r\n; bash
-#      treats the \r as part of each command, producing "command not found".
-#      The -replace below strips \r before the string leaves PowerShell.
-#   2. Shell quoting issues with if/fi blocks when passed as a -c argument.
+# Remote command strategy:
+#   Rather than piping a script to bash -s (which dies when SSH stdin closes),
+#   we write a wrapper script to the remote host and launch it under nohup so
+#   it survives SSH session termination. A PID file lets us poll for completion
+#   without keeping the SSH connection open.
 #
 # Bash variables use backtick escaping so PowerShell does not expand them.
 # $minimumRuntimeSeconds and $ScriptRemotePath are intentionally left unescaped
-# so PowerShell substitutes their values into the script before it is sent.
-$remoteCommand = @"
+# so PowerShell substitutes their values before the string is sent.
+$wrapperScript = @"
+#!/bin/bash
+PIDFILE=`${HOME}/.snapshot_io.pid
+DONEFILE=`${HOME}/.snapshot_io.done
+OUTFILE=`${HOME}/.snapshot_io.out
+
+rm -f "`$DONEFILE"
 chmod +x '$ScriptRemotePath'
+
 START=`$(date +%s)
-'$ScriptRemotePath' &
+'$ScriptRemotePath' > "`$OUTFILE" 2>&1 &
 SCRIPT_PID=`$!
-echo '[INFO] Script started with PID '`$SCRIPT_PID
+echo `$SCRIPT_PID > "`$PIDFILE"
+echo "[INFO] Script started with PID `$SCRIPT_PID"
+
 wait `$SCRIPT_PID
 EXIT_CODE=`$?
 END=`$(date +%s)
 ELAPSED=`$(( END - START ))
-echo '[INFO] Script exited with code '`$EXIT_CODE' after '`${ELAPSED}'s'
+echo "[INFO] Script exited with code `$EXIT_CODE after `${ELAPSED}s"
+
 if [ `$ELAPSED -lt $minimumRuntimeSeconds ]; then
     REMAINING=`$(( $minimumRuntimeSeconds - ELAPSED ))
-    echo '[INFO] Runtime below minimum. Holding for '`${REMAINING}'s more...'
+    echo "[INFO] Runtime below minimum. Holding for `${REMAINING}s more..."
     sleep `$REMAINING
 fi
+
 TOTAL=`$(( `$(date +%s) - START ))
-echo '[DONE] Total enforced runtime: '`${TOTAL}'s / exit code: '`$EXIT_CODE
-exit `$EXIT_CODE
+echo "[DONE] Total enforced runtime: `${TOTAL}s / exit code: `$EXIT_CODE"
+rm -f "`$PIDFILE"
+echo `$EXIT_CODE > "`$DONEFILE"
 "@
 
-# Strip carriage returns introduced by Windows line endings
+$wrapperScript = $wrapperScript -replace "`r", ""
+
+# Launch command: write the wrapper to the remote host and run it detached
+# under nohup so it is fully independent of the SSH session lifetime.
+$remoteCommand = @"
+cat > `${HOME}/.snapshot_io_wrapper.sh << 'WRAPPER'
+$($wrapperScript)
+WRAPPER
+chmod +x `${HOME}/.snapshot_io_wrapper.sh
+rm -f `${HOME}/.snapshot_io.done
+nohup `${HOME}/.snapshot_io_wrapper.sh > `${HOME}/.snapshot_io_nohup.out 2>&1 &
+echo `$! > `${HOME}/.snapshot_io_launcher.pid
+echo "[LAUNCHED] nohup PID `$!"
+"@
+
 $remoteCommand = $remoteCommand -replace "`r", ""
 
 # --- Launch jobs in parallel ---
@@ -148,17 +174,62 @@ foreach ($row in $servers) {
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Launching job on $server..." -ForegroundColor Yellow
 
     $job = Start-Job -ScriptBlock {
-        param($sshExe, $sshArgList, $remoteCmd, $srv)
-        # Pipe the command to bash via stdin rather than passing as -c argument.
-        # This avoids shell quoting issues and ensures the already-sanitised LF
-        # line endings are preserved exactly as sent.
-        $output = $remoteCmd | & $sshExe @sshArgList "bash -s" 2>&1
+        param($sshExe, $sshArgList, $launchCmd, $srv, $pollIntervalSec, $timeoutSec)
+
+        # Step 1: Send the launch command — writes the wrapper script and starts
+        # it under nohup. SSH returns immediately after launch; the IO script
+        # keeps running on the remote host independently of this connection.
+        $launchOutput = $launchCmd | & $sshExe @sshArgList "bash -s" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            return [PSCustomObject]@{
+                Server   = $srv
+                Output   = ($launchOutput -join "`n")
+                ExitCode = $LASTEXITCODE
+            }
+        }
+
+        Write-Output ($launchOutput -join "`n")
+
+        # Step 2: Poll the remote host for the done file every $pollIntervalSec
+        # seconds. The wrapper script writes the IO script's exit code to
+        # ~/.snapshot_io.done when it finishes (including any minimum runtime hold).
+        $pollCmd = "cat `${HOME}/.snapshot_io.done 2>/dev/null || echo RUNNING"
+        $waited  = 0
+        $exitCode = -1
+        $doneOutput = ""
+
+        while ($waited -lt $timeoutSec) {
+            Start-Sleep -Seconds $pollIntervalSec
+            $waited += $pollIntervalSec
+
+            $pollResult = & $sshExe @sshArgList $pollCmd 2>&1
+            $pollText   = ($pollResult -join "").Trim()
+
+            if ($pollText -ne "RUNNING" -and $pollText -ne "") {
+                # Done file exists — contains the exit code
+                try { $exitCode = [int]$pollText } catch { $exitCode = 1 }
+                $doneOutput = "[INFO] Remote script completed with exit code $exitCode after ${waited}s"
+                Write-Output $doneOutput
+                break
+            }
+
+            $mins = [math]::Round($waited / 60, 1)
+            Write-Output "[INFO] Still running on $srv — ${mins} min elapsed"
+        }
+
+        if ($exitCode -eq -1) {
+            Write-Output "[WARN] Timed out waiting for done file on $srv after ${waited}s"
+        }
+
+        # Retrieve any output the wrapper captured
+        $remoteLog = & $sshExe @sshArgList "cat `${HOME}/.snapshot_io.out 2>/dev/null | tail -20" 2>&1
+
         return [PSCustomObject]@{
             Server   = $srv
-            Output   = $output -join "`n"
-            ExitCode = $LASTEXITCODE
+            Output   = (($launchOutput + $remoteLog) -join "`n")
+            ExitCode = $exitCode
         }
-    } -ArgumentList "ssh", $sshArgs, $remoteCommand, $server
+    } -ArgumentList "ssh", $sshArgs, $remoteCommand, $server, 30, ($JobTimeoutMinutes * 60)
 
     $jobs[$job.Name] = [PSCustomObject]@{
         Job       = $job
