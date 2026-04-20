@@ -89,33 +89,35 @@ foreach ($row in $servers) {
     $fileContent | & ssh @sshArgs
     $exitCode = $LASTEXITCODE
 
-    # Verify the file landed without CRLF
+    # Always strip \r bytes unconditionally — no-op if already clean,
+    # safety net if anything in the transfer chain introduced CRLF.
     if ($exitCode -eq 0) {
-        $checkArgs = @(
+        $stripArgs = @(
             "-o", "StrictHostKeyChecking=no",
             "-o", "BatchMode=yes",
             "-o", "ConnectTimeout=10",
             "-p", $port,
             "${username}@${server}",
-            "file `"$remotePath`""
+            "sed -i 's/\r//' `"$remotePath`""
         )
-        $fileType = & ssh @checkArgs 2>&1
-        $hasCrlf  = $fileType -match "CRLF"
+        & ssh @stripArgs 2>&1 | Out-Null
 
-        if ($hasCrlf) {
-            Write-Host "[$server] WARNING: file reports CRLF line endings after transfer" -ForegroundColor Magenta
-            # Strip them remotely as a safety net
-            $fixArgs = @(
-                "-o", "StrictHostKeyChecking=no",
-                "-o", "BatchMode=yes",
-                "-p", $port,
-                "${username}@${server}",
-                "sed -i 's/\r//' `"$remotePath`""
-            )
-            & ssh @fixArgs 2>&1 | Out-Null
-            Write-Host "[$server] CRLF stripped remotely" -ForegroundColor Yellow
+        # Verify by counting actual \r bytes — more reliable than 'file' output
+        # which varies in wording across distros and versions.
+        $verifyArgs = @(
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=10",
+            "-p", $port,
+            "${username}@${server}",
+            "grep -cP '\r' `"$remotePath`" 2>/dev/null || echo 0"
+        )
+        $crlfCount = (& ssh @verifyArgs 2>&1).Trim()
+
+        if ($crlfCount -eq "0") {
+            Write-Host "[$server] Line endings OK (no CRLF bytes found)" -ForegroundColor DarkGray
         } else {
-            Write-Host "[$server] Line endings OK ($fileType)" -ForegroundColor DarkGray
+            Write-Host "[$server] WARNING: $crlfCount lines still contain CRLF after strip" -ForegroundColor Magenta
         }
     }
 
