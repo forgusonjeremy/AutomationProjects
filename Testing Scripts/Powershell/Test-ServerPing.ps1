@@ -77,70 +77,118 @@ if (-not $targets) {
 
 Write-Host "Pinging $($targets.Count) server(s) from '$InputCsv'..." -ForegroundColor Cyan
 
-# --- Define the ping worker --------------------------------------------------
-$pingScript = {
-    param($row, $count, $timeoutSeconds)
-
-    $server  = $row.Server
-    $ping    = New-Object System.Net.NetworkInformation.Ping
-    $replies = @()
-    $resolvedIp = $null
-
-    for ($i = 0; $i -lt $count; $i++) {
-        try {
-            $reply = $ping.Send($server, $timeoutSeconds * 1000)
-            $replies += $reply
-            if ($reply.Status -eq 'Success' -and -not $resolvedIp) {
-                $resolvedIp = $reply.Address.ToString()
-            }
-        } catch {
-            $replies += [pscustomobject]@{
-                Status         = 'Error'
-                RoundtripTime  = $null
-                ErrorMessage   = $_.Exception.InnerException?.Message ?? $_.Exception.Message
-            }
-        }
-        Start-Sleep -Milliseconds 200
-    }
-
-    $successes = @($replies | Where-Object { $_.Status -eq 'Success' })
-    $successCount = $successes.Count
-    $avgRtt = if ($successCount -gt 0) {
-        [math]::Round((($successes | Measure-Object -Property RoundtripTime -Average).Average), 2)
-    } else { $null }
-
-    $status = if ($successCount -eq $count) { 'Online' }
-              elseif ($successCount -gt 0)  { 'Partial' }
-              else                          { 'Offline' }
-
-    $lastError = ($replies | Where-Object { $_.Status -ne 'Success' } | Select-Object -Last 1).Status
-
-    # Build an output object that preserves every original column, then adds results.
-    $out = [ordered]@{}
-    foreach ($prop in $row.PSObject.Properties) {
-        $out[$prop.Name] = $prop.Value
-    }
-    $out['ResolvedIP']     = $resolvedIp
-    $out['Status']         = $status
-    $out['PacketsSent']    = $count
-    $out['PacketsReceived']= $successCount
-    $out['LossPercent']    = [math]::Round((($count - $successCount) / $count) * 100, 0)
-    $out['AvgRTTms']       = $avgRtt
-    $out['LastReplyStatus']= $lastError
-    $out['TestedAt']       = (Get-Date).ToString('s')
-
-    [pscustomobject]$out
-}
-
 # --- Run pings (parallel on PS7+, serial on 5.1) -----------------------------
+# Note: the ping logic is inlined (rather than passed as a $using: scriptblock)
+# because ForEach-Object -Parallel does not allow scriptblock variables across
+# the runspace boundary.
+
 $results = if ($PSVersionTable.PSVersion.Major -ge 7) {
     $targets | ForEach-Object -Parallel {
-        $script = [scriptblock]::Create($using:pingScript)
-        & $script $_ $using:Count $using:TimeoutSeconds
+        $row            = $_
+        $count          = $using:Count
+        $timeoutSeconds = $using:TimeoutSeconds
+
+        $server     = $row.Server
+        $ping       = New-Object System.Net.NetworkInformation.Ping
+        $replies    = @()
+        $resolvedIp = $null
+
+        for ($i = 0; $i -lt $count; $i++) {
+            try {
+                $reply = $ping.Send($server, $timeoutSeconds * 1000)
+                $replies += $reply
+                if ($reply.Status -eq 'Success' -and -not $resolvedIp) {
+                    $resolvedIp = $reply.Address.ToString()
+                }
+            } catch {
+                $inner = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
+                $replies += [pscustomobject]@{
+                    Status        = 'Error'
+                    RoundtripTime = $null
+                    ErrorMessage  = $inner
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        }
+
+        $successes    = @($replies | Where-Object { $_.Status -eq 'Success' })
+        $successCount = $successes.Count
+        $avgRtt = if ($successCount -gt 0) {
+            [math]::Round((($successes | Measure-Object -Property RoundtripTime -Average).Average), 2)
+        } else { $null }
+
+        $status = if ($successCount -eq $count) { 'Online' }
+                  elseif ($successCount -gt 0)  { 'Partial' }
+                  else                          { 'Offline' }
+
+        $lastError = ($replies | Where-Object { $_.Status -ne 'Success' } | Select-Object -Last 1).Status
+
+        $out = [ordered]@{}
+        foreach ($prop in $row.PSObject.Properties) { $out[$prop.Name] = $prop.Value }
+        $out['ResolvedIP']      = $resolvedIp
+        $out['Status']          = $status
+        $out['PacketsSent']     = $count
+        $out['PacketsReceived'] = $successCount
+        $out['LossPercent']     = [math]::Round((($count - $successCount) / $count) * 100, 0)
+        $out['AvgRTTms']        = $avgRtt
+        $out['LastReplyStatus'] = $lastError
+        $out['TestedAt']        = (Get-Date).ToString('s')
+
+        [pscustomobject]$out
     } -ThrottleLimit $ThrottleLimit
 } else {
     Write-Verbose "PowerShell 5.1 detected; running pings serially."
-    $targets | ForEach-Object { & $pingScript $_ $Count $TimeoutSeconds }
+    $targets | ForEach-Object {
+        $row = $_
+
+        $server     = $row.Server
+        $ping       = New-Object System.Net.NetworkInformation.Ping
+        $replies    = @()
+        $resolvedIp = $null
+
+        for ($i = 0; $i -lt $Count; $i++) {
+            try {
+                $reply = $ping.Send($server, $TimeoutSeconds * 1000)
+                $replies += $reply
+                if ($reply.Status -eq 'Success' -and -not $resolvedIp) {
+                    $resolvedIp = $reply.Address.ToString()
+                }
+            } catch {
+                $inner = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
+                $replies += [pscustomobject]@{
+                    Status        = 'Error'
+                    RoundtripTime = $null
+                    ErrorMessage  = $inner
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        }
+
+        $successes    = @($replies | Where-Object { $_.Status -eq 'Success' })
+        $successCount = $successes.Count
+        $avgRtt = if ($successCount -gt 0) {
+            [math]::Round((($successes | Measure-Object -Property RoundtripTime -Average).Average), 2)
+        } else { $null }
+
+        $status = if ($successCount -eq $Count) { 'Online' }
+                  elseif ($successCount -gt 0)  { 'Partial' }
+                  else                          { 'Offline' }
+
+        $lastError = ($replies | Where-Object { $_.Status -ne 'Success' } | Select-Object -Last 1).Status
+
+        $out = [ordered]@{}
+        foreach ($prop in $row.PSObject.Properties) { $out[$prop.Name] = $prop.Value }
+        $out['ResolvedIP']      = $resolvedIp
+        $out['Status']          = $status
+        $out['PacketsSent']     = $Count
+        $out['PacketsReceived'] = $successCount
+        $out['LossPercent']     = [math]::Round((($Count - $successCount) / $Count) * 100, 0)
+        $out['AvgRTTms']        = $avgRtt
+        $out['LastReplyStatus'] = $lastError
+        $out['TestedAt']        = (Get-Date).ToString('s')
+
+        [pscustomobject]$out
+    }
 }
 
 # --- Export + summarize ------------------------------------------------------
