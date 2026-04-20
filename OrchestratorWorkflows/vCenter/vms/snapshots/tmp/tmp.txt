@@ -1,4 +1,101 @@
-function sleep(ms) {
-    var end = new Date().getTime() + ms;
-    while (new Date().getTime() < end) { /* spin */ }
-}
+
+2 m
+Splitter collapsed
+
+
+General
+Variables
+Logs
+Performance
+ Loading...
+Actions
+Search in logs...
+
+
+Severity
+
+INFO
+
+Server
+
+System
+
+
+2026-04-20 17:05:29.437 -04:00info[2026-04-20T21:05:29.437Z] === takeSnapshotsInFolder started ===
+2026-04-20 17:05:29.439 -04:00info[2026-04-20T21:05:29.439Z] Folder      : snapshot-testing
+2026-04-20 17:05:29.440 -04:00info[2026-04-20T21:05:29.439Z] Duration    : 20 minutes
+2026-04-20 17:05:29.441 -04:00info[2026-04-20T21:05:29.440Z] Total rounds: 6 (one per 3-minute interval)
+2026-04-20 17:05:29.443 -04:00info[2026-04-20T21:05:29.442Z] VMs found   : 20
+2026-04-20 17:05:29.444 -04:00info[2026-04-20T21:05:29.443Z]   VM[0]: snaptestds303
+2026-04-20 17:05:29.445 -04:00info[2026-04-20T21:05:29.444Z]   VM[1]: snaptestds304
+2026-04-20 17:05:29.446 -04:00info[2026-04-20T21:05:29.445Z]   VM[2]: snaptestds305
+2026-04-20 17:05:29.447 -04:00info[2026-04-20T21:05:29.446Z]   VM[3]: snaptestds205
+2026-04-20 17:05:29.448 -04:00info[2026-04-20T21:05:29.447Z]   VM[4]: snaptestds302
+2026-04-20 17:05:29.449 -04:00info[2026-04-20T21:05:29.447Z]   VM[5]: snaptestds301
+2026-04-20 17:05:29.450 -04:00info[2026-04-20T21:05:29.449Z]   VM[6]: snaptestds204
+2026-04-20 17:05:29.451 -04:00info[2026-04-20T21:05:29.450Z]   VM[7]: snaptestvsan05
+2026-04-20 17:05:29.452 -04:00info[2026-04-20T21:05:29.451Z]   VM[8]: snaptestds203
+2026-04-20 17:05:29.453 -04:00info[2026-04-20T21:05:29.452Z]   VM[9]: snaptstvsan01
+2026-04-20 17:05:29.454 -04:00info[2026-04-20T21:05:29.453Z]   VM[10]: snaptestds202
+2026-04-20 17:05:29.455 -04:00info[2026-04-20T21:05:29.454Z]   VM[11]: snaptestds105
+2026-04-20 17:05:29.456 -04:00info[2026-04-20T21:05:29.455Z]   VM[12]: snaptestds201
+2026-04-20 17:05:29.457 -04:00info[2026-04-20T21:05:29.456Z]   VM[13]: snaptestds104
+2026-04-20 17:05:29.458 -04:00info[2026-04-20T21:05:29.457Z]   VM[14]: snaptestds103
+2026-04-20 17:05:29.459 -04:00info[2026-04-20T21:05:29.458Z]   VM[15]: snaptestds102
+2026-04-20 17:05:29.460 -04:00info[2026-04-20T21:05:29.459Z]   VM[16]: snaptestds101
+2026-04-20 17:05:29.461 -04:00info[2026-04-20T21:05:29.460Z]   VM[17]: snaptestvsan03
+2026-04-20 17:05:29.462 -04:00info[2026-04-20T21:05:29.461Z]   VM[18]: snaptestvsan02
+2026-04-20 17:05:29.463 -04:00info[2026-04-20T21:05:29.462Z]   VM[19]: snaptestvsan04
+2026-04-20 17:05:29.464 -04:00info[2026-04-20T21:05:29.464Z] Content Library snapshot assignments (round index per VM):
+2026-04-20 17:05:29.465 -04:00info[2026-04-20T21:05:29.465Z]   snaptestds303 -> snapshot-3
+2026-04-20 17:05:29.466 -04:00info[2026-04-20T21:05:29.466Z]   snaptestds304 -> snapshot-1
+2026-04-20 17:05:29.467 -04:00info[2026-04-20T21:05:29.467Z]   snaptestds305 -> snapshot-4
+2026-04-20 17:05:29.468 -04:00info[2026-04-20T21:05:29.468Z]   snaptestds205 -> snapshot-4
+2026-04-20 17:05:29.469 -04:00info[2026-04-20T21:05:29.469Z]   snaptestds302 -> snapshot-5
+2026-04-20 17:05:29.470 -04:00info[2026-04-20T21:05:29.469Z]   snaptestds301 -> snapshot-3
+2026-04-20 17:05:29.471 -04:00info[2026-04-20T21:05:29.470Z]   snaptestds204 -> snapshot-1
+2026-04-20 17:05:29.472 -04:00info[2026-04-20T21:05:29.471Z]   snaptestvsan05 -> snapshot-2
+2026-04-20 17:05:29.473 -04:00info[2026-04-20T21:05:29.472Z]   snaptestds203 -> snapshot-4
+2026-04-20 17:05:29.474 -04:00info[2026-04-20T21:05:29.474Z]   snaptstvsan01 -> snapshot-4
+2026-04-20 17:05:29.476 -04:00info[2026-04-20T21:05:29.475Z]   snaptestds202 -> snapshot-1
+2026-04-20 17:05:29.477 -04:00info[2026-04-20T21:05:29.476Z]   snaptestds105 -> snapshot-6
+2026-04-20 17:05:29.478 -04:00info[2026-04-20T21:05:29.477Z]   snaptestds201 -> snapshot-1
+2026-04-20 17:05:29.479 -04:00info[2026-04-20T21:05:29.478Z]   snaptestds104 -> snapshot-4
+2026-04-20 17:05:29.480 -04:00info[2026-04-20T21:05:29.479Z]   snaptestds103 -> snapshot-1
+2026-04-20 17:05:29.481 -04:00info[2026-04-20T21:05:29.480Z]   snaptestds102 -> snapshot-5
+2026-04-20 17:05:29.482 -04:00info[2026-04-20T21:05:29.481Z]   snaptestds101 -> snapshot-3
+2026-04-20 17:05:29.483 -04:00info[2026-04-20T21:05:29.482Z]   snaptestvsan03 -> snapshot-6
+2026-04-20 17:05:29.484 -04:00info[2026-04-20T21:05:29.483Z]   snaptestvsan02 -> snapshot-6
+2026-04-20 17:05:29.485 -04:00info[2026-04-20T21:05:29.483Z]   snaptestvsan04 -> snapshot-5
+2026-04-20 17:05:29.486 -04:00info[2026-04-20T21:05:29.484Z] --- Round 1 of 6 ---
+2026-04-20 17:05:29.487 -04:00info[2026-04-20T21:05:29.485Z]   Snapshotting VM 'snaptestds303': name='snapshot-1', desc=''
+2026-04-20 17:05:29.501 -04:00info[2026-04-20T21:05:29.500Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds303': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.502 -04:00info[2026-04-20T21:05:29.502Z]   Snapshotting VM 'snaptestds304': name='snapshot-1' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-20 17:05:29.511 -04:00info[2026-04-20T21:05:29.510Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds304': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.512 -04:00info[2026-04-20T21:05:29.511Z]   Snapshotting VM 'snaptestds305': name='snapshot-1', desc=''
+2026-04-20 17:05:29.519 -04:00info[2026-04-20T21:05:29.518Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds305': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.520 -04:00info[2026-04-20T21:05:29.519Z]   Snapshotting VM 'snaptestds205': name='snapshot-1', desc=''
+2026-04-20 17:05:29.529 -04:00info[2026-04-20T21:05:29.527Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds205': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.530 -04:00info[2026-04-20T21:05:29.529Z]   Snapshotting VM 'snaptestds302': name='snapshot-1', desc=''
+2026-04-20 17:05:29.538 -04:00info[2026-04-20T21:05:29.537Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds302': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.540 -04:00info[2026-04-20T21:05:29.539Z]   Snapshotting VM 'snaptestds301': name='snapshot-1', desc=''
+2026-04-20 17:05:29.549 -04:00info[2026-04-20T21:05:29.548Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds301': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.551 -04:00info[2026-04-20T21:05:29.550Z]   Snapshotting VM 'snaptestds204': name='snapshot-1' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-20 17:05:29.559 -04:00info[2026-04-20T21:05:29.558Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds204': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.561 -04:00info[2026-04-20T21:05:29.560Z]   Snapshotting VM 'snaptestvsan05': name='snapshot-1', desc=''
+2026-04-20 17:05:29.568 -04:00info[2026-04-20T21:05:29.567Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestvsan05': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.569 -04:00info[2026-04-20T21:05:29.568Z]   Snapshotting VM 'snaptestds203': name='snapshot-1', desc=''
+2026-04-20 17:05:29.579 -04:00info[2026-04-20T21:05:29.577Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds203': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.580 -04:00info[2026-04-20T21:05:29.579Z]   Snapshotting VM 'snaptstvsan01': name='snapshot-1', desc=''
+2026-04-20 17:05:29.588 -04:00info[2026-04-20T21:05:29.587Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptstvsan01': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.590 -04:00info[2026-04-20T21:05:29.589Z]   Snapshotting VM 'snaptestds202': name='snapshot-1' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-20 17:05:29.599 -04:00info[2026-04-20T21:05:29.598Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds202': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.600 -04:00info[2026-04-20T21:05:29.599Z]   Snapshotting VM 'snaptestds105': name='snapshot-1', desc=''
+2026-04-20 17:05:29.609 -04:00info[2026-04-20T21:05:29.607Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds105': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.610 -04:00info[2026-04-20T21:05:29.609Z]   Snapshotting VM 'snaptestds201': name='snapshot-1' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-20 17:05:29.695 -04:00info[2026-04-20T21:05:29.694Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds201': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.697 -04:00info[2026-04-20T21:05:29.696Z]   Snapshotting VM 'snaptestds104': name='snapshot-1', desc=''
+2026-04-20 17:05:29.795 -04:00info[2026-04-20T21:05:29.794Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds104': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.797 -04:00info[2026-04-20T21:05:29.797Z]   Snapshotting VM 'snaptestds103': name='snapshot-1' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-20 17:05:29.896 -04:00info[2026-04-20T21:05:29.895Z]   ERROR: Failed to create snapshot 'snapshot-1' on VM 'snaptestds103': Cannot find function waitForTask in object Module:com.vmware.library.vc.vm.snapshot.
+2026-04-20 17:05:29.898 -04:00info[2026-04-20T21:05:29.897Z]   Snapshotting VM 'snaptestds102': name='snapshot-1', desc=''
