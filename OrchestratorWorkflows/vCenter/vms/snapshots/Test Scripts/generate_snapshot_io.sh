@@ -7,16 +7,22 @@
 #           growth, so this drives meaningful snapshot divergence without
 #           filling the disk.
 #
+# Why snapshot deltas stay small with a small working set:
+#   A snapshot delta only grows when a block is written for the FIRST TIME
+#   since that snapshot was taken. Re-writing the same block does not grow
+#   the delta further. So a small working set gets fully covered quickly and
+#   then stops contributing to delta growth. The fix is a large working set
+#   so each snapshot interval sees a fresh region of blocks being dirtied.
+#
 # What this does NOT do:
 #   - It does not grow the disk indefinitely
 #   - It does not fill free space
-#   - Files deleted inside the guest do NOT reclaim space from a snapshot delta
-#     (VMFS doesn't punch holes), so the "create + delete" pattern is avoided
 #
 # What it DOES do:
 #   - Pre-allocates a fixed working set (bounded disk usage)
-#   - Continuously overwrites random regions of those files (dirty blocks)
-#   - Simulates metadata churn (renames, appends, truncates) on small files
+#   - Sweeps sequentially through the working set so every snapshot interval
+#     dirties a NEW region of blocks (maximises delta growth per interval)
+#   - Also does random writes across the full working set for realism
 #   - Flushes to disk so changes are real and visible to the snapshot mechanism
 #
 # Usage:
@@ -28,7 +34,7 @@
 #
 # Options:
 #   --dir         Working directory        (default: ~/snapshot_io_test)
-#   --working-set Size of fixed data in MB (default: 512)
+#   --working-set Size of fixed data in MB (default: 4096)
 #   --duration    How long to run, seconds (default: 300)
 #   --threads     Parallel churn workers   (default: 4)
 # =============================================================================
@@ -37,7 +43,9 @@ set -euo pipefail
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 IO_DIR="${HOME}/snapshot_io_test"
-WORKING_SET_MB=512    # Total disk space consumed — stays fixed after init
+WORKING_SET_MB=4096   # 4GB working set — large enough that a 3-min snapshot
+                      # interval can't cover it all, so deltas keep growing.
+                      # Reduce if disk space is tight, but stay above 1GB.
 DURATION=300
 THREADS=4
 LOG_FILE="${HOME}/snapshot_io_test.log"
@@ -58,7 +66,7 @@ done
 
 # ── Per-thread working set ────────────────────────────────────────────────────
 PER_THREAD_MB=$(( WORKING_SET_MB / THREADS ))
-[[ $PER_THREAD_MB -lt 32 ]] && PER_THREAD_MB=32
+[[ $PER_THREAD_MB -lt 256 ]] && PER_THREAD_MB=256
 
 START_TIME=$(date +%s)
 END_TIME=$(( START_TIME + DURATION ))
@@ -83,72 +91,120 @@ log " Snapshot Churn Generator"
 log "====================================================="
 log " Working dir   : $IO_DIR"
 log " Working set   : ${WORKING_SET_MB} MB total (fixed — will not grow)"
+log " Per thread    : ${PER_THREAD_MB} MB"
 log " Duration      : ${DURATION}s"
-log " Threads       : $THREADS x ${PER_THREAD_MB} MB each"
+log " Threads       : $THREADS"
 log "====================================================="
 log " Disk usage before: $(df -h "$IO_DIR" | awk 'NR==2{print $3 " used, " $4 " free"}')"
 log ""
 
-# ── Worker: large-file overwrite churn ───────────────────────────────────────
-# Simulates: database page writes, VM guest disk activity, log rotation
-# Pattern:   pre-allocate once, then overwrite random offsets indefinitely
+# ── Check available disk space ───────────────────────────────────────────────
+AVAIL_MB=$(df -m "$IO_DIR" | awk 'NR==2{print $4}')
+NEEDED_MB=$(( WORKING_SET_MB + 256 ))  # working set + headroom
+if [[ $AVAIL_MB -lt $NEEDED_MB ]]; then
+  log "ERROR: Need ~${NEEDED_MB}MB free but only ${AVAIL_MB}MB available."
+  log "       Reduce --working-set or free up disk space."
+  exit 1
+fi
+log " Available disk: ${AVAIL_MB}MB — OK (need ${NEEDED_MB}MB)"
+log ""
+
+# ── Worker: sequential sweep + random overwrite ──────────────────────────────
+# KEY INSIGHT: Sequential sweep ensures every snapshot interval covers a fresh
+# region of blocks. A random-only strategy tends to re-hit the same blocks,
+# which doesn't grow the delta after the first hit.
+#
+# Strategy:
+#   Phase 1 — Sequential sweep: write through the entire file start-to-end
+#              using large blocks. This maximises new blocks dirtied per second.
+#   Phase 2 — Random overwrite: scatter writes across the full address space
+#              to simulate realistic mixed workload between sweeps.
+#   Repeat until duration expires.
 large_file_worker() {
   local id="$1"
   local dir="$IO_DIR/worker_${id}"
   mkdir -p "$dir"
 
-  # Pre-allocate the working file ONCE — this is the fixed disk cost
   local file="$dir/workingset.dat"
   local size_mb="$PER_THREAD_MB"
+  local total_bytes=$(( size_mb * 1024 * 1024 ))
+
+  # Pre-allocate with zeros (fast, uses fallocate if available)
   log "  [Worker $id] Allocating ${size_mb}MB working file..."
-  dd if=/dev/zero of="$file" bs=1M count="$size_mb" conv=fsync status=none 2>/dev/null
-  log "  [Worker $id] Ready — starting overwrite churn"
+  if command -v fallocate &>/dev/null; then
+    fallocate -l "${size_mb}M" "$file" 2>/dev/null || \
+      dd if=/dev/zero of="$file" bs=1M count="$size_mb" conv=fsync status=none 2>/dev/null
+  else
+    dd if=/dev/zero of="$file" bs=1M count="$size_mb" conv=fsync status=none 2>/dev/null
+  fi
+  log "  [Worker $id] Ready — starting sweep/churn loop"
 
-  local total_size_bytes=$(( size_mb * 1024 * 1024 ))
-  local chunk_size=$(( 64 * 1024 ))  # 64k writes — realistic block churn
-  local iteration=0
+  # Block sizes: large for sequential sweep, medium for random
+  local sweep_bs=$(( 1024 * 1024 ))      # 1MB blocks for sequential sweep
+  local random_bs=$(( 256 * 1024 ))      # 256k blocks for random writes
+  local sweep_blocks=$(( total_bytes / sweep_bs ))
+  local random_blocks=$(( total_bytes / random_bs ))
 
+  local pass=0
   while [[ $(date +%s) -lt $END_TIME ]]; do
-    iteration=$(( iteration + 1 ))
+    pass=$(( pass + 1 ))
 
-    # Pick a random offset within the file (aligned to chunk_size)
-    local max_offset=$(( total_size_bytes - chunk_size ))
-    local offset=$(( (RANDOM * RANDOM) % max_offset ))
-    offset=$(( offset - (offset % chunk_size) ))  # align
+    # ── Phase 1: Sequential sweep through entire file ──
+    # This is the primary delta-growth driver — every block in the file
+    # gets dirtied once per sweep, guaranteeing maximum delta growth.
+    log "  [Worker $id] Pass $pass — sequential sweep (${size_mb}MB)..."
+    local block=0
+    while [[ $block -lt $sweep_blocks ]] && [[ $(date +%s) -lt $END_TIME ]]; do
+      # Write 64MB at a time to keep syscall overhead low
+      local batch=$(( sweep_blocks - block ))
+      [[ $batch -gt 64 ]] && batch=64
+      dd if=/dev/urandom of="$file" bs="$sweep_bs" count="$batch" \
+         seek="$block" conv=notrunc status=none 2>/dev/null
+      block=$(( block + batch ))
+    done
+    # Flush after sweep
+    sync "$file" 2>/dev/null || true
 
-    # Overwrite that region — this dirties blocks for the snapshot delta
-    dd if=/dev/urandom of="$file" bs="$chunk_size" count=1 \
-       seek=$(( offset / chunk_size )) conv=notrunc,fsync status=none 2>/dev/null
+    [[ $(date +%s) -ge $END_TIME ]] && break
 
-    # Every 100 iterations, do a full sequential pass (simulates heavy write burst)
-    if (( iteration % 100 == 0 )); then
-      dd if=/dev/urandom of="$file" bs=1M count="$size_mb" \
-         conv=notrunc,fsync status=none 2>/dev/null
-      log "  [Worker $id] Full pass #$(( iteration / 100 )) complete"
-    fi
+    # ── Phase 2: Random scatter writes across full address space ──
+    # Simulates realistic mixed workload (db page writes, app I/O).
+    # Duration: ~20% of a sweep pass worth of I/O.
+    local random_ops=$(( random_blocks / 5 ))
+    local rand_done=0
+    while [[ $rand_done -lt $random_ops ]] && [[ $(date +%s) -lt $END_TIME ]]; do
+      local max_seek=$(( random_blocks - 1 ))
+      local seek_pos=$(( (RANDOM * RANDOM) % max_seek ))
+      # Write 4 blocks at a time
+      local wcnt=4
+      [[ $(( seek_pos + wcnt )) -gt $random_blocks ]] && wcnt=1
+      dd if=/dev/urandom of="$file" bs="$random_bs" count="$wcnt" \
+         seek="$seek_pos" conv=notrunc,fsync status=none 2>/dev/null
+      rand_done=$(( rand_done + wcnt ))
+    done
+
+    log "  [Worker $id] Pass $pass complete"
   done
 
-  log "  [Worker $id] Done — $iteration overwrite operations"
+  log "  [Worker $id] Done — $pass full passes"
 }
 
 # ── Worker: small-file metadata churn ────────────────────────────────────────
-# Simulates: application logs, temp files, config changes
-# Pattern:   fixed pool of small files, continuously appended/truncated/renamed
-# Disk cost: fixed at ~16 MB regardless of duration
+# Fixed pool of small files — bounded disk cost regardless of duration.
+# Generates inode/metadata changes which contribute to snapshot delta on VMFS.
 metadata_worker() {
   local dir="$IO_DIR/metadata"
   mkdir -p "$dir"
 
-  local pool_size=32          # number of files in the pool
-  local file_size_kb=512      # each file capped at 512KB
+  local pool_size=64          # larger pool = more unique blocks touched
+  local file_size_kb=512
 
-  # Pre-create the pool
-  log "  [Metadata worker] Creating ${pool_size}-file pool (fixed ~$(( pool_size * file_size_kb / 1024 ))MB)..."
+  log "  [Metadata worker] Creating ${pool_size}-file pool..."
   for i in $(seq 1 "$pool_size"); do
     dd if=/dev/zero of="$dir/pool_${i}.dat" bs=1k count="$file_size_kb" \
        conv=fsync status=none 2>/dev/null
   done
-  log "  [Metadata worker] Ready — starting metadata churn"
+  log "  [Metadata worker] Ready"
 
   local op=0
   while [[ $(date +%s) -lt $END_TIME ]]; do
@@ -158,30 +214,26 @@ metadata_worker() {
     local pattern=$(( op % 4 ))
 
     case $pattern in
-      0)  # Append a line then truncate back to original size (simulates log rotation)
-          echo "churn_op_${op}_$(date +%N)" >> "$file"
+      0)  echo "churn_op_${op}_$(date +%N)" >> "$file"
           truncate -s "${file_size_kb}k" "$file"
           sync "$file" 2>/dev/null || true
           ;;
-      1)  # Overwrite random 4K block within file (simulates record update)
-          local fsize=$(( file_size_kb * 1024 ))
+      1)  local fsize=$(( file_size_kb * 1024 ))
           local offset=$(( (RANDOM % (fsize / 4096)) * 4096 ))
           dd if=/dev/urandom of="$file" bs=4096 count=1 \
              seek=$(( offset / 4096 )) conv=notrunc,fsync status=none 2>/dev/null
           ;;
-      2)  # Rename (simulates atomic log/config file replacement)
-          local tmp="$dir/pool_${idx}.tmp"
+      2)  local tmp="$dir/pool_${idx}.tmp"
           cp "$file" "$tmp"
           mv "$tmp" "$file"
           ;;
-      3)  # Overwrite entire file (simulates full config rewrite)
-          dd if=/dev/urandom of="$file" bs=1k count="$file_size_kb" \
+      3)  dd if=/dev/urandom of="$file" bs=1k count="$file_size_kb" \
              conv=notrunc,fsync status=none 2>/dev/null
           ;;
     esac
   done
 
-  log "  [Metadata worker] Done — $op metadata operations"
+  log "  [Metadata worker] Done — $op operations"
 }
 
 # ── Progress monitor ──────────────────────────────────────────────────────────
@@ -202,17 +254,14 @@ log "Starting workers..."
 
 PIDS=()
 
-# Large-file overwrite workers (main churn)
 for i in $(seq 1 "$THREADS"); do
   large_file_worker "$i" &
   PIDS+=($!)
 done
 
-# Metadata churn worker (one is enough)
 metadata_worker &
 PIDS+=($!)
 
-# Monitor
 monitor &
 PIDS+=($!)
 
