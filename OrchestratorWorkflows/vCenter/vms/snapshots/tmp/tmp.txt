@@ -1,5 +1,635 @@
-ParserError: C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\OrchestratorWorkflows\vCenter\vms\snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:100:43
-Line |
- 100 |      REMAINING=\$(( $minimumRuntimeSeconds "- ELAPSED "));
-     |                                            ~~~~~~~~~~~~
-     | Unexpected token '"- ELAPSED "' in expression or statement.
+All jobs launched. Waiting for completion (minimum 15 min per server)...
+
+[16:41:59] [10.111.101.106] Still running... 0 min elapsed
+[16:41:59] [10.111.101.90] FAILED — 0.2 min
+    [INFO] Script started with PID 3217
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.102] FAILED — 0.1 min
+    [INFO] Script started with PID 3207
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.103] FAILED — 0.1 min
+    [INFO] Script started with PID 3201
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.98] FAILED — 0.1 min
+    [INFO] Script started with PID 3208
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.94] FAILED — 0.2 min
+    [INFO] Script started with PID 3204
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.104] FAILED — 0.1 min
+    [INFO] Script started with PID 3247
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.101] FAILED — 0.1 min
+    [INFO] Script started with PID 3270
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.91] FAILED — 0.2 min
+    [INFO] Script started with PID 3322
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.88] FAILED — 0.3 min
+    [INFO] Script started with PID 3389
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.105] FAILED — 0 min
+    [INFO] Script started with PID 3216
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.89] FAILED — 0.2 min
+    [INFO] Script started with PID 3223
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.107] Still running... 0 min elapsed
+[16:42:00] [10.111.101.96] FAILED — 0.2 min
+    [INFO] Script started with PID 3207
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.99] FAILED — 0.1 min
+    [INFO] Script started with PID 3192
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.92] FAILED — 0.2 min
+    [INFO] Script started with PID 3202
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.100] FAILED — 0.1 min
+    [INFO] Script started with PID 3345
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.97] FAILED — 0.2 min
+    [INFO] Script started with PID 3226
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.95] FAILED — 0.2 min
+    [INFO] Script started with PID 3240
+    [INFO] Script exited with code 127 after 0s
+[16:42:00] [10.111.101.93] FAILED — 0.2 min
+    [INFO] Script started with PID 3210
+    [INFO] Script exited with code 127 after 0s
+[16:42:03] [10.111.101.106] FAILED — 0.1 min
+    [INFO] Script started with PID 3203
+    [INFO] Script exited with code 127 after 0s
+[16:42:03] [10.111.101.107] FAILED — 0.1 min
+    [INFO] Script started with PID 3144
+    [INFO] Script exited with code 127 after 0s
+
+===== Run Summary =====
+  Succeeded    : 0
+  Failed       : 20
+  Total VMs    : 20
+  Total elapsed: 0.3 min
+
+Detailed results saved to: snapshot_io_results_20260420_164203.csv
+
+===== Failed Server Output =====
+
+[10.111.101.90]
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script started with PID 3217
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.102]
+bash: 
+: command not found
+[INFO] Script started with PID 3207
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.103]
+bash:
+: command not found
+[INFO] Script started with PID 3201
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.98]
+[INFO] Script started with PID 3208
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.94]
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+[INFO] Script started with PID 3204
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.104]
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+[INFO] Script started with PID 3247
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.101]
+bash:
+: command not found
+[INFO] Script started with PID 3270
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.91]
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+[INFO] Script started with PID 3322
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.88]
+bash:
+: command not found
+[INFO] Script started with PID 3389
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.105]
+bash:
+: command not found
+[INFO] Script started with PID 3216
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.89]
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+[INFO] Script started with PID 3223
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.96]
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script started with PID 3207
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.99]
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+[INFO] Script started with PID 3192
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.92]
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script started with PID 3202
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.100]
+bash:
+: command not found
+[INFO] Script started with PID 3345
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.97]
+bash:
+: command not found
+[INFO] Script started with PID 3226
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.95]
+bash: 
+: command not found
+[INFO] Script started with PID 3240
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.93]
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+[INFO] Script started with PID 3210
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.106]
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+[INFO] Script started with PID 3203
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+
+[10.111.101.107]
+bash:
+: command not found
+bash:
+: command not found
+bash: line 3: /tmp/generate_snapshot_io.sh: cannot execute: required file not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script started with PID 3144
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+bash:
+: command not found
+[INFO] Script exited with code 127 after 0s
+bash:
+: command not found
+bash:
+: command not found
+bash: -c: line 15: syntax error near unexpected token `fi'
+bash: -c: line 15: `fi;
+'
+PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\OrchestratorWorkflows\vCenter\vms\snapshots\Test Scripts> 
