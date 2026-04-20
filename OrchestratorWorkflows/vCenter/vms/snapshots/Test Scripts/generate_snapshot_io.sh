@@ -1,53 +1,55 @@
 #!/bin/bash
 # =============================================================================
 # generate_snapshot_io.sh
-# Purpose : Generate realistic block-level churn for snapshot cleanup testing.
-#           Works by repeatedly OVERWRITING a fixed working set rather than
-#           growing files — snapshot deltas track changed blocks, not file
-#           growth, so this drives meaningful snapshot divergence without
-#           filling the disk.
+# Purpose : Generate GB-scale block-level churn per snapshot interval so that
+#           snapshot deltas are large enough to stress cleanup testing and
+#           affect datastore performance metrics.
 #
-# Why snapshot deltas stay small with a small working set:
-#   A snapshot delta only grows when a block is written for the FIRST TIME
-#   since that snapshot was taken. Re-writing the same block does not grow
-#   the delta further. So a small working set gets fully covered quickly and
-#   then stops contributing to delta growth. The fix is a large working set
-#   so each snapshot interval sees a fresh region of blocks being dirtied.
+# Why previous versions produced small deltas:
+#   - dd from /dev/urandom is CPU-bound — entropy generation caps throughput
+#     well below disk speed, so writes were slow and covered few blocks.
+#   - conv=fsync on every dd call serialized writes, killing throughput further.
+#   - A small working set got fully covered in seconds, after which no new
+#     blocks were being dirtied (re-writes don't grow the delta).
 #
-# What this does NOT do:
-#   - It does not grow the disk indefinitely
-#   - It does not fill free space
+# How this version fixes it:
+#   - Uses fio (preferred) with libaio for async high-queue-depth sequential
+#     writes — this is what actually saturates disk throughput.
+#   - Falls back to dd using /dev/zero (compressible but fast) if fio is absent.
+#   - Syncs periodically (every 512MB written) rather than after every write.
+#   - Uses a large enough working set that a full sequential sweep takes longer
+#     than one snapshot interval, so each snapshot sees fresh dirty blocks.
+#   - Each thread writes to its own file so there is no lock contention.
 #
-# What it DOES do:
-#   - Pre-allocates a fixed working set (bounded disk usage)
-#   - Sweeps sequentially through the working set so every snapshot interval
-#     dirties a NEW region of blocks (maximises delta growth per interval)
-#   - Also does random writes across the full working set for realism
-#   - Flushes to disk so changes are real and visible to the snapshot mechanism
+# Disk usage:
+#   Fixed at --working-set MB. Files are pre-allocated once and overwritten
+#   in place — disk usage does not grow beyond the initial allocation.
 #
 # Usage:
 #   bash generate_snapshot_io.sh [options]
 #
 #   Copy to target VM and run as sshuser:
-#     scp generate_snapshot_io.sh sshuser@<vm-ip>:~
-#     ssh sshuser@<vm-ip> "bash ~/generate_snapshot_io.sh"
+#     scp generate_snapshot_io.sh sshuser@<vm-ip>:/tmp/
+#     ssh sshuser@<vm-ip> "bash /tmp/generate_snapshot_io.sh"
 #
 # Options:
-#   --dir         Working directory        (default: ~/snapshot_io_test)
-#   --working-set Size of fixed data in MB (default: 4096)
-#   --duration    How long to run, seconds (default: 300)
-#   --threads     Parallel churn workers   (default: 4)
+#   --dir          Working directory         (default: ~/snapshot_io_test)
+#   --working-set  Total fixed data, MB      (default: 8192  — 8GB)
+#   --duration     How long to run, seconds  (default: 1800  — 30 min)
+#   --threads      Parallel writer threads   (default: 4)
+#   --sync-mb      Flush to disk every N MB  (default: 512)
 # =============================================================================
 
 set -euo pipefail
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 IO_DIR="${HOME}/snapshot_io_test"
-WORKING_SET_MB=4096   # 4GB working set — large enough that a 3-min snapshot
-                      # interval can't cover it all, so deltas keep growing.
-                      # Reduce if disk space is tight, but stay above 1GB.
-DURATION=300
+WORKING_SET_MB=8192   # 8GB — each sequential pass takes several minutes at
+                      # typical VM disk speeds, ensuring each 3-min snapshot
+                      # interval captures hundreds of MB of new dirty blocks.
+DURATION=1800         # 30 minutes default — adjust to match your test window
 THREADS=4
+SYNC_EVERY_MB=512     # Flush periodically, not on every write
 LOG_FILE="${HOME}/snapshot_io_test.log"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
@@ -57,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --working-set)  WORKING_SET_MB="$2";   shift 2 ;;
     --duration)     DURATION="$2";         shift 2 ;;
     --threads)      THREADS="$2";          shift 2 ;;
+    --sync-mb)      SYNC_EVERY_MB="$2";    shift 2 ;;
     --help|-h)
       grep '^# Usage\|^#   --' "$0" | sed 's/^# //'
       exit 0 ;;
@@ -64,14 +67,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ── Per-thread working set ────────────────────────────────────────────────────
 PER_THREAD_MB=$(( WORKING_SET_MB / THREADS ))
-[[ $PER_THREAD_MB -lt 256 ]] && PER_THREAD_MB=256
+[[ $PER_THREAD_MB -lt 512 ]] && PER_THREAD_MB=512
 
 START_TIME=$(date +%s)
 END_TIME=$(( START_TIME + DURATION ))
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Setup ─────────────────────────────────────────────────────────────────────
 mkdir -p "$IO_DIR"
 echo "" > "$LOG_FILE"
 
@@ -86,158 +88,137 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT
 
-log "====================================================="
-log " Snapshot Churn Generator"
-log "====================================================="
-log " Working dir   : $IO_DIR"
-log " Working set   : ${WORKING_SET_MB} MB total (fixed — will not grow)"
-log " Per thread    : ${PER_THREAD_MB} MB"
-log " Duration      : ${DURATION}s"
-log " Threads       : $THREADS"
-log "====================================================="
-log " Disk usage before: $(df -h "$IO_DIR" | awk 'NR==2{print $3 " used, " $4 " free"}')"
-log ""
-
-# ── Check available disk space ───────────────────────────────────────────────
+# ── Disk space check ──────────────────────────────────────────────────────────
 AVAIL_MB=$(df -m "$IO_DIR" | awk 'NR==2{print $4}')
-NEEDED_MB=$(( WORKING_SET_MB + 256 ))  # working set + headroom
+NEEDED_MB=$(( WORKING_SET_MB + 512 ))
 if [[ $AVAIL_MB -lt $NEEDED_MB ]]; then
   log "ERROR: Need ~${NEEDED_MB}MB free but only ${AVAIL_MB}MB available."
-  log "       Reduce --working-set or free up disk space."
+  log "       Reduce --working-set or free up space. Exiting."
   exit 1
 fi
-log " Available disk: ${AVAIL_MB}MB — OK (need ${NEEDED_MB}MB)"
-log ""
 
-# ── Worker: sequential sweep + random overwrite ──────────────────────────────
-# KEY INSIGHT: Sequential sweep ensures every snapshot interval covers a fresh
-# region of blocks. A random-only strategy tends to re-hit the same blocks,
-# which doesn't grow the delta after the first hit.
+log "====================================================="
+log " Snapshot Churn Generator (high-throughput mode)"
+log "====================================================="
+log " Working dir   : $IO_DIR"
+log " Working set   : ${WORKING_SET_MB} MB total (${PER_THREAD_MB} MB x ${THREADS} threads)"
+log " Duration      : ${DURATION}s ($(( DURATION / 60 )) min)"
+log " Sync interval : every ${SYNC_EVERY_MB}MB written"
+log " Disk avail    : ${AVAIL_MB}MB"
+log "====================================================="
+
+# ── fio mode (preferred) ──────────────────────────────────────────────────────
+# fio with libaio saturates disk write throughput far better than dd.
+# Each thread gets its own file and does sequential writes with periodic rewind,
+# ensuring a continuous stream of new dirty blocks throughout the run.
+run_fio() {
+  log "fio detected — using async libaio mode"
+
+  local jobs_args=""
+  for i in $(seq 1 "$THREADS"); do
+    local file="$IO_DIR/worker_${i}.dat"
+    # Pre-allocate
+    log "  Pre-allocating worker $i file (${PER_THREAD_MB}MB)..."
+    fallocate -l "${PER_THREAD_MB}M" "$file" 2>/dev/null || \
+      dd if=/dev/zero of="$file" bs=1M count="$PER_THREAD_MB" status=none 2>/dev/null
+  done
+
+  log "  Launching fio — sequential writes, iodepth=16, bs=1M..."
+
+  # Build a fio job file dynamically
+  local jobfile="$IO_DIR/fio_jobs.ini"
+  cat > "$jobfile" <<FIOEOF
+[global]
+ioengine=libaio
+iodepth=16
+rw=write
+bs=1M
+direct=0
+buffered=1
+fsync_on_close=0
+end_fsync=1
+runtime=${DURATION}
+time_based=1
+group_reporting=1
+randrepeat=0
+
+FIOEOF
+
+  for i in $(seq 1 "$THREADS"); do
+    cat >> "$jobfile" <<FIOEOF
+[worker_${i}]
+filename=$IO_DIR/worker_${i}.dat
+size=${PER_THREAD_MB}M
+
+FIOEOF
+  done
+
+  fio "$jobfile" 2>&1 | tee -a "$LOG_FILE"
+}
+
+# ── dd fallback mode ──────────────────────────────────────────────────────────
+# Uses /dev/zero (not /dev/urandom) — entropy generation was the bottleneck
+# that capped throughput in the previous version. /dev/zero is effectively
+# unlimited speed. VMFS does not deduplicate unless you have vSAN dedup enabled,
+# so zero-filled blocks still register as dirty and grow the snapshot delta.
 #
-# Strategy:
-#   Phase 1 — Sequential sweep: write through the entire file start-to-end
-#              using large blocks. This maximises new blocks dirtied per second.
-#   Phase 2 — Random overwrite: scatter writes across the full address space
-#              to simulate realistic mixed workload between sweeps.
-#   Repeat until duration expires.
-large_file_worker() {
-  local id="$1"
-  local dir="$IO_DIR/worker_${id}"
-  mkdir -p "$dir"
+# Syncs every SYNC_EVERY_MB rather than after every write — this allows the
+# OS page cache to coalesce writes and hand them to the storage stack in large
+# sequential bursts, which is what drives high MB/s on iSCSI/NFS datastores.
+run_dd() {
+  log "fio not found — using dd fallback (install fio for better throughput)"
+  log "  Run: sudo yum install -y fio"
 
-  local file="$dir/workingset.dat"
-  local size_mb="$PER_THREAD_MB"
-  local total_bytes=$(( size_mb * 1024 * 1024 ))
+  dd_worker() {
+    local id="$1"
+    local file="$IO_DIR/worker_${id}.dat"
+    local size_mb="$PER_THREAD_MB"
+    local sync_counter=0
+    local total_written_mb=0
+    local pass=0
 
-  # Pre-allocate with zeros (fast, uses fallocate if available)
-  log "  [Worker $id] Allocating ${size_mb}MB working file..."
-  if command -v fallocate &>/dev/null; then
+    log "  [Worker $id] Allocating ${size_mb}MB..."
     fallocate -l "${size_mb}M" "$file" 2>/dev/null || \
-      dd if=/dev/zero of="$file" bs=1M count="$size_mb" conv=fsync status=none 2>/dev/null
-  else
-    dd if=/dev/zero of="$file" bs=1M count="$size_mb" conv=fsync status=none 2>/dev/null
-  fi
-  log "  [Worker $id] Ready — starting sweep/churn loop"
+      dd if=/dev/zero of="$file" bs=1M count="$size_mb" status=none 2>/dev/null
+    log "  [Worker $id] Ready"
 
-  # Block sizes: large for sequential sweep, medium for random
-  local sweep_bs=$(( 1024 * 1024 ))      # 1MB blocks for sequential sweep
-  local random_bs=$(( 256 * 1024 ))      # 256k blocks for random writes
-  local sweep_blocks=$(( total_bytes / sweep_bs ))
-  local random_blocks=$(( total_bytes / random_bs ))
+    # Sequential sweep loop — write through the entire file start to end,
+    # then rewind and repeat. Each sweep dirties every block in the file.
+    # Write in 64MB batches to keep dd overhead low.
+    local batch_mb=64
+    local blocks_per_file=$(( size_mb / batch_mb ))
 
-  local pass=0
-  while [[ $(date +%s) -lt $END_TIME ]]; do
-    pass=$(( pass + 1 ))
+    while [[ $(date +%s) -lt $END_TIME ]]; do
+      pass=$(( pass + 1 ))
+      local block=0
 
-    # ── Phase 1: Sequential sweep through entire file ──
-    # This is the primary delta-growth driver — every block in the file
-    # gets dirtied once per sweep, guaranteeing maximum delta growth.
-    log "  [Worker $id] Pass $pass — sequential sweep (${size_mb}MB)..."
-    local block=0
-    while [[ $block -lt $sweep_blocks ]] && [[ $(date +%s) -lt $END_TIME ]]; do
-      # Write 64MB at a time to keep syscall overhead low
-      local batch=$(( sweep_blocks - block ))
-      [[ $batch -gt 64 ]] && batch=64
-      dd if=/dev/urandom of="$file" bs="$sweep_bs" count="$batch" \
-         seek="$block" conv=notrunc status=none 2>/dev/null
-      block=$(( block + batch ))
-    done
-    # Flush after sweep
-    sync "$file" 2>/dev/null || true
+      while [[ $block -lt $blocks_per_file ]] && [[ $(date +%s) -lt $END_TIME ]]; do
+        dd if=/dev/zero of="$file" bs="${batch_mb}M" count=1 \
+           seek="$block" conv=notrunc status=none 2>/dev/null
+        block=$(( block + 1 ))
+        total_written_mb=$(( total_written_mb + batch_mb ))
+        sync_counter=$(( sync_counter + batch_mb ))
 
-    [[ $(date +%s) -ge $END_TIME ]] && break
+        # Periodic sync — flush to disk every SYNC_EVERY_MB
+        if [[ $sync_counter -ge $SYNC_EVERY_MB ]]; then
+          sync
+          sync_counter=0
+        fi
+      done
 
-    # ── Phase 2: Random scatter writes across full address space ──
-    # Simulates realistic mixed workload (db page writes, app I/O).
-    # Duration: ~20% of a sweep pass worth of I/O.
-    local random_ops=$(( random_blocks / 5 ))
-    local rand_done=0
-    while [[ $rand_done -lt $random_ops ]] && [[ $(date +%s) -lt $END_TIME ]]; do
-      local max_seek=$(( random_blocks - 1 ))
-      local seek_pos=$(( (RANDOM * RANDOM) % max_seek ))
-      # Write 4 blocks at a time
-      local wcnt=4
-      [[ $(( seek_pos + wcnt )) -gt $random_blocks ]] && wcnt=1
-      dd if=/dev/urandom of="$file" bs="$random_bs" count="$wcnt" \
-         seek="$seek_pos" conv=notrunc,fsync status=none 2>/dev/null
-      rand_done=$(( rand_done + wcnt ))
+      log "  [Worker $id] Pass $pass complete — ~${total_written_mb}MB written total"
     done
 
-    log "  [Worker $id] Pass $pass complete"
+    log "  [Worker $id] Done — $pass passes, ~${total_written_mb}MB written"
+  }
+
+  PIDS=()
+  for i in $(seq 1 "$THREADS"); do
+    dd_worker "$i" &
+    PIDS+=($!)
   done
 
-  log "  [Worker $id] Done — $pass full passes"
-}
-
-# ── Worker: small-file metadata churn ────────────────────────────────────────
-# Fixed pool of small files — bounded disk cost regardless of duration.
-# Generates inode/metadata changes which contribute to snapshot delta on VMFS.
-metadata_worker() {
-  local dir="$IO_DIR/metadata"
-  mkdir -p "$dir"
-
-  local pool_size=64          # larger pool = more unique blocks touched
-  local file_size_kb=512
-
-  log "  [Metadata worker] Creating ${pool_size}-file pool..."
-  for i in $(seq 1 "$pool_size"); do
-    dd if=/dev/zero of="$dir/pool_${i}.dat" bs=1k count="$file_size_kb" \
-       conv=fsync status=none 2>/dev/null
-  done
-  log "  [Metadata worker] Ready"
-
-  local op=0
-  while [[ $(date +%s) -lt $END_TIME ]]; do
-    op=$(( op + 1 ))
-    local idx=$(( (RANDOM % pool_size) + 1 ))
-    local file="$dir/pool_${idx}.dat"
-    local pattern=$(( op % 4 ))
-
-    case $pattern in
-      0)  echo "churn_op_${op}_$(date +%N)" >> "$file"
-          truncate -s "${file_size_kb}k" "$file"
-          sync "$file" 2>/dev/null || true
-          ;;
-      1)  local fsize=$(( file_size_kb * 1024 ))
-          local offset=$(( (RANDOM % (fsize / 4096)) * 4096 ))
-          dd if=/dev/urandom of="$file" bs=4096 count=1 \
-             seek=$(( offset / 4096 )) conv=notrunc,fsync status=none 2>/dev/null
-          ;;
-      2)  local tmp="$dir/pool_${idx}.tmp"
-          cp "$file" "$tmp"
-          mv "$tmp" "$file"
-          ;;
-      3)  dd if=/dev/urandom of="$file" bs=1k count="$file_size_kb" \
-             conv=notrunc,fsync status=none 2>/dev/null
-          ;;
-    esac
-  done
-
-  log "  [Metadata worker] Done — $op operations"
-}
-
-# ── Progress monitor ──────────────────────────────────────────────────────────
-monitor() {
+  # Progress monitor
   while [[ $(date +%s) -lt $END_TIME ]]; do
     sleep 30
     [[ $(date +%s) -ge $END_TIME ]] && break
@@ -247,28 +228,18 @@ monitor() {
     remaining=$(( END_TIME - $(date +%s) ))
     log "  [Monitor] Disk: ${used} used / ${free} free | ${remaining}s remaining"
   done
+
+  for pid in "${PIDS[@]}"; do
+    wait "$pid" 2>/dev/null || true
+  done
 }
 
-# ── Launch ────────────────────────────────────────────────────────────────────
-log "Starting workers..."
-
-PIDS=()
-
-for i in $(seq 1 "$THREADS"); do
-  large_file_worker "$i" &
-  PIDS+=($!)
-done
-
-metadata_worker &
-PIDS+=($!)
-
-monitor &
-PIDS+=($!)
-
-# ── Wait ──────────────────────────────────────────────────────────────────────
-for pid in "${PIDS[@]}"; do
-  wait "$pid" 2>/dev/null || true
-done
+# ── Run ───────────────────────────────────────────────────────────────────────
+if command -v fio &>/dev/null; then
+  run_fio
+else
+  run_dd
+fi
 
 log ""
 log "Disk usage after : $(df -h "$IO_DIR" | awk 'NR==2{print $3 " used, " $4 " free"}')"
