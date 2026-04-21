@@ -136,22 +136,21 @@ run_fio() {
   # Print key latency results
   if [[ -f "$FIO_RESULTS" ]]; then
     log ""
-    log "── fio Results Summary ──────────────────────────────"
-    python3 - <<'PYEOF' 2>/dev/null || \
-    python - <<'PYEOF' 2>/dev/null || \
-    log "  (Install python3 to parse fio JSON results)"
-import json, sys
-with open('$FIO_RESULTS') as f:
-    data = json.load(f)
+    log "── fio Results Summary ────────────────────────────"
+    # python -c avoids heredoc delimiters which break under CRLF or nohup wrappers
+    python3 -c "
+import json
+with open('$FIO_RESULTS') as fh:
+    data = json.load(fh)
 for job in data.get('jobs', []):
     rw = job.get('mixed', job.get('write', {}))
     rd = job.get('read', {})
-    print(f"  Write IOPS   : {rw.get('iops', 0):.0f}")
-    print(f"  Write lat avg: {rw.get('lat_ns', {}).get('mean', 0)/1000:.1f} µs")
-    print(f"  Write lat p99: {rw.get('clat_ns', {}).get('percentile', {}).get('99.000000', 0)/1000:.1f} µs")
-    print(f"  Read  IOPS   : {rd.get('iops', 0):.0f}")
-    print(f"  Read  lat avg: {rd.get('lat_ns', {}).get('mean', 0)/1000:.1f} µs")
-PYEOF
+    print('  Write IOPS   : ' + str(int(rw.get('iops', 0))))
+    print('  Write lat avg: ' + str(round(rw.get('lat_ns', {}).get('mean', 0)/1000, 1)) + ' us')
+    print('  Write lat p99: ' + str(round(rw.get('clat_ns', {}).get('percentile', {}).get('99.000000', 0)/1000, 1)) + ' us')
+    print('  Read  IOPS   : ' + str(int(rd.get('iops', 0))))
+    print('  Read  lat avg: ' + str(round(rd.get('lat_ns', {}).get('mean', 0)/1000, 1)) + ' us')
+" 2>/dev/null || log "  (Install python3 to parse fio JSON results)"
     log "  Full results: $FIO_RESULTS"
   fi
 }
