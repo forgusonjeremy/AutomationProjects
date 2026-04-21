@@ -1,13 +1,64 @@
-2026-04-21 16:37:20.517 -04:00INFOTop-level keys: on-esx-collect-duration
-2026-04-21 16:37:20.518 -04:00INFO=== All hosts contribution ===
-2026-04-21 16:37:20.532 -04:00INFOHost sfo01-m01-r01-esx02.connect.lab: 0 DOM objects
-2026-04-21 16:37:20.620 -04:00INFOHost sfo01-m01-r01-esx05.connect.lab: 0 DOM objects
-2026-04-21 16:37:20.713 -04:00INFOHost sfo01-m01-r01-esx03.connect.lab: 0 DOM objects
-2026-04-21 16:37:20.798 -04:00INFOHost sfo01-m01-r01-esx04.connect.lab: 0 DOM objects
-2026-04-21 16:37:20.799 -04:00INFOTotal unique DOM objects across all hosts: 0
-2026-04-21 16:37:20.800 -04:00INFO=== Aggregated metrics ===
-2026-04-21 16:37:20.801 -04:00INFOTotal read ops:  0
-2026-04-21 16:37:20.802 -04:00INFOTotal write ops: 0
-2026-04-21 16:37:20.803 -04:00INFOAvg read latency:  n/a ms
-2026-04-21 16:37:20.804 -04:00INFOAvg write latency: n/a ms
-2026-04-21 16:37:20.805 -04:00INFOMax congestion seen: 0
+// Bind vcenterSdkConnection (VC:SdkConnection)
+
+var cluster = vcenterSdkConnection.rootFolder.childEntity[0]
+                .hostFolder.childEntity[0];
+var host    = cluster.host[0];
+var vis     = host.configManager.vsanInternalSystem;
+
+// The previous run returned dom.owners.stats with real data.
+// That must have come from a different label. Try all known vSAN stat labels.
+var candidates = [
+    "dom-owners",
+    "dom-clients", 
+    "dom",
+    "lsom",
+    "lsom-world-md",
+    "vsan-disk-stats",
+    "vsan-pnic-stats",
+    "rdtAssoc",
+    "rdtTransport",
+    "plog",
+    "plog-lsom-worlds",
+    "dom-proxy-owners",
+    "clom-disk-stats",
+    "clom-host-stats",
+    "sos",
+    "mem-stats",
+    "vsan-mgmt-lwd",
+    "version",
+    "system-mem-stats"
+];
+
+for (var li = 0; li < candidates.length; li++) {
+    var label = candidates[li];
+    try {
+        var result = vis.queryVsanStatistics([label]);
+        var parsed = JSON.parse(result);
+        var keys   = Object.keys(parsed);
+        // Filter out boring single-key results that are just timing info
+        var interesting = keys.filter(function(k) {
+            return k !== "on-esx-collect-duration";
+        });
+        if (interesting.length > 0) {
+            System.log("LABEL '" + label + "' -> keys: " + interesting.join(", "));
+            // If it has dom stats, show a sample
+            for (var ki = 0; ki < interesting.length; ki++) {
+                var val = parsed[interesting[ki]];
+                if (typeof val === "object" && val !== null) {
+                    var subKeys = Object.keys(val);
+                    System.log("  " + interesting[ki] + " -> " +
+                        subKeys.length + " entries, sample keys: " +
+                        (subKeys.length > 0
+                            ? Object.keys(val[subKeys[0]]).slice(0,8).join(", ")
+                            : "(empty)"));
+                } else {
+                    System.log("  " + interesting[ki] + " = " + val);
+                }
+            }
+        } else {
+            System.log("LABEL '" + label + "' -> no interesting data");
+        }
+    } catch (e) {
+        System.log("LABEL '" + label + "' -> ERROR: " + e.message);
+    }
+}
