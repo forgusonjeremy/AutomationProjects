@@ -21,7 +21,7 @@
 #   --aggressive                            (enable extra pressure: fsync loops)
 # =============================================================================
 
-set -euo pipefail
+set -u
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 IO_DIR="${HOME}/latency_test"
