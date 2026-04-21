@@ -1,4 +1,15 @@
 .\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\OrchestratorWorkflows\vCenter\vms\snapshots\Test Scripts\generate_snapshot_io.sh' -CsvPath ./servers.csv  //copies gen io script to VMs
 
-./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" --target-gb "1" --duration 1800 -MaxParallelJobs 30  //runs the gen io script inside each VM, target delta disk size 1GB, for 30 minutes
+./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 1 -ScriptDurationMinutes 20 -MaxParallelJobs 30  //runs the gen io script inside each VM, target delta disk size 1GB, for 20 minutes
 
+./Stop-SnapshotIO.ps1 -CsvPath .\servers.csv -MaxParallelJobs 30  //stops existing generate_snapshot_io.sh processes
+
+
+
+$servers = Import-Csv "servers.csv"
+foreach ($row in $servers) {
+    $result = ssh -o StrictHostKeyChecking=no -o BatchMode=yes `
+        "$($row.Username)@$($row.Server)" `
+        "rm -rf ~/snapshot_io_test && echo OK"
+    Write-Host "$($row.Server): $result"
+}

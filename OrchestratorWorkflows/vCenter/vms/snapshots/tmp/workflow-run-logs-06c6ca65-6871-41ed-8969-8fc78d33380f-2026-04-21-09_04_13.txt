@@ -1,0 +1,302 @@
+2026-04-21 12:23:23.311 +0000 INFO [2026-04-21T12:23:23.311Z] === takeSnapshotsInFolder started ===
+2026-04-21 12:23:23.313 +0000 INFO [2026-04-21T12:23:23.313Z] Folder      : snapshot-testing
+2026-04-21 12:23:23.314 +0000 INFO [2026-04-21T12:23:23.314Z] Duration    : 20 minutes
+2026-04-21 12:23:23.315 +0000 INFO [2026-04-21T12:23:23.314Z] Total rounds: 6 (one per 3-minute interval)
+2026-04-21 12:23:23.323 +0000 INFO [2026-04-21T12:23:23.322Z] VMs found   : 20
+2026-04-21 12:23:23.328 +0000 INFO [2026-04-21T12:23:23.327Z]   VM[0]: snaptestds303
+2026-04-21 12:23:23.333 +0000 INFO [2026-04-21T12:23:23.332Z]   VM[1]: snaptestds304
+2026-04-21 12:23:23.337 +0000 INFO [2026-04-21T12:23:23.336Z]   VM[2]: snaptestds305
+2026-04-21 12:23:23.341 +0000 INFO [2026-04-21T12:23:23.340Z]   VM[3]: snaptestds205
+2026-04-21 12:23:23.346 +0000 INFO [2026-04-21T12:23:23.345Z]   VM[4]: snaptestds302
+2026-04-21 12:23:23.351 +0000 INFO [2026-04-21T12:23:23.350Z]   VM[5]: snaptestds301
+2026-04-21 12:23:23.355 +0000 INFO [2026-04-21T12:23:23.355Z]   VM[6]: snaptestds204
+2026-04-21 12:23:23.359 +0000 INFO [2026-04-21T12:23:23.359Z]   VM[7]: snaptestvsan05
+2026-04-21 12:23:23.364 +0000 INFO [2026-04-21T12:23:23.363Z]   VM[8]: snaptestds203
+2026-04-21 12:23:23.367 +0000 INFO [2026-04-21T12:23:23.367Z]   VM[9]: snaptstvsan01
+2026-04-21 12:23:23.372 +0000 INFO [2026-04-21T12:23:23.371Z]   VM[10]: snaptestds202
+2026-04-21 12:23:23.375 +0000 INFO [2026-04-21T12:23:23.375Z]   VM[11]: snaptestds105
+2026-04-21 12:23:23.379 +0000 INFO [2026-04-21T12:23:23.379Z]   VM[12]: snaptestds201
+2026-04-21 12:23:23.383 +0000 INFO [2026-04-21T12:23:23.382Z]   VM[13]: snaptestds104
+2026-04-21 12:23:23.388 +0000 INFO [2026-04-21T12:23:23.387Z]   VM[14]: snaptestds103
+2026-04-21 12:23:23.392 +0000 INFO [2026-04-21T12:23:23.391Z]   VM[15]: snaptestds102
+2026-04-21 12:23:23.398 +0000 INFO [2026-04-21T12:23:23.397Z]   VM[16]: snaptestds101
+2026-04-21 12:23:23.402 +0000 INFO [2026-04-21T12:23:23.402Z]   VM[17]: snaptestvsan03
+2026-04-21 12:23:23.407 +0000 INFO [2026-04-21T12:23:23.406Z]   VM[18]: snaptestvsan02
+2026-04-21 12:23:23.412 +0000 INFO [2026-04-21T12:23:23.411Z]   VM[19]: snaptestvsan04
+2026-04-21 12:23:23.413 +0000 INFO [2026-04-21T12:23:23.412Z] Content Library snapshot assignments (round index per VM):
+2026-04-21 12:23:23.414 +0000 INFO [2026-04-21T12:23:23.413Z]   snaptestds303 -> snapshot-4
+2026-04-21 12:23:23.415 +0000 INFO [2026-04-21T12:23:23.414Z]   snaptestds304 -> snapshot-5
+2026-04-21 12:23:23.416 +0000 INFO [2026-04-21T12:23:23.415Z]   snaptestds305 -> snapshot-2
+2026-04-21 12:23:23.417 +0000 INFO [2026-04-21T12:23:23.415Z]   snaptestds205 -> snapshot-2
+2026-04-21 12:23:23.418 +0000 INFO [2026-04-21T12:23:23.416Z]   snaptestds302 -> snapshot-1
+2026-04-21 12:23:23.419 +0000 INFO [2026-04-21T12:23:23.417Z]   snaptestds301 -> snapshot-1
+2026-04-21 12:23:23.420 +0000 INFO [2026-04-21T12:23:23.418Z]   snaptestds204 -> snapshot-6
+2026-04-21 12:23:23.421 +0000 INFO [2026-04-21T12:23:23.419Z]   snaptestvsan05 -> snapshot-5
+2026-04-21 12:23:23.422 +0000 INFO [2026-04-21T12:23:23.419Z]   snaptestds203 -> snapshot-2
+2026-04-21 12:23:23.423 +0000 INFO [2026-04-21T12:23:23.420Z]   snaptstvsan01 -> snapshot-6
+2026-04-21 12:23:23.424 +0000 INFO [2026-04-21T12:23:23.421Z]   snaptestds202 -> snapshot-5
+2026-04-21 12:23:23.425 +0000 INFO [2026-04-21T12:23:23.423Z]   snaptestds105 -> snapshot-4
+2026-04-21 12:23:23.426 +0000 INFO [2026-04-21T12:23:23.423Z]   snaptestds201 -> snapshot-6
+2026-04-21 12:23:23.427 +0000 INFO [2026-04-21T12:23:23.424Z]   snaptestds104 -> snapshot-2
+2026-04-21 12:23:23.428 +0000 INFO [2026-04-21T12:23:23.425Z]   snaptestds103 -> snapshot-2
+2026-04-21 12:23:23.429 +0000 INFO [2026-04-21T12:23:23.425Z]   snaptestds102 -> snapshot-4
+2026-04-21 12:23:23.430 +0000 INFO [2026-04-21T12:23:23.426Z]   snaptestds101 -> snapshot-3
+2026-04-21 12:23:23.431 +0000 INFO [2026-04-21T12:23:23.427Z]   snaptestvsan03 -> snapshot-3
+2026-04-21 12:23:23.432 +0000 INFO [2026-04-21T12:23:23.428Z]   snaptestvsan02 -> snapshot-4
+2026-04-21 12:23:23.433 +0000 INFO [2026-04-21T12:23:23.428Z]   snaptestvsan04 -> snapshot-1
+2026-04-21 12:23:23.434 +0000 INFO [2026-04-21T12:23:23.429Z] --- Round 1 of 6 ---
+2026-04-21 12:23:23.435 +0000 INFO [2026-04-21T12:23:23.430Z]   Snapshotting VM 'snaptestds303': name='snapshot-1', desc=''
+2026-04-21 12:23:28.446 +0000 INFO [2026-04-21T12:23:28.445Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds303'
+2026-04-21 12:23:28.447 +0000 INFO [2026-04-21T12:23:28.446Z]   Snapshotting VM 'snaptestds304': name='snapshot-1', desc=''
+2026-04-21 12:23:33.465 +0000 INFO [2026-04-21T12:23:33.464Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds304'
+2026-04-21 12:23:33.466 +0000 INFO [2026-04-21T12:23:33.465Z]   Snapshotting VM 'snaptestds305': name='snapshot-1', desc=''
+2026-04-21 12:23:38.482 +0000 INFO [2026-04-21T12:23:38.481Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds305'
+2026-04-21 12:23:38.484 +0000 INFO [2026-04-21T12:23:38.483Z]   Snapshotting VM 'snaptestds205': name='snapshot-1', desc=''
+2026-04-21 12:23:43.497 +0000 INFO [2026-04-21T12:23:43.496Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds205'
+2026-04-21 12:23:43.498 +0000 INFO [2026-04-21T12:23:43.497Z]   Snapshotting VM 'snaptestds302': name='snapshot-1' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:23:48.512 +0000 INFO [2026-04-21T12:23:48.511Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds302'
+2026-04-21 12:23:48.513 +0000 INFO [2026-04-21T12:23:48.513Z]   Snapshotting VM 'snaptestds301': name='snapshot-1' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:23:53.528 +0000 INFO [2026-04-21T12:23:53.527Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds301'
+2026-04-21 12:23:53.529 +0000 INFO [2026-04-21T12:23:53.529Z]   Snapshotting VM 'snaptestds204': name='snapshot-1', desc=''
+2026-04-21 12:23:58.546 +0000 INFO [2026-04-21T12:23:58.544Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds204'
+2026-04-21 12:23:58.547 +0000 INFO [2026-04-21T12:23:58.546Z]   Snapshotting VM 'snaptestvsan05': name='snapshot-1', desc=''
+2026-04-21 12:24:03.562 +0000 INFO [2026-04-21T12:24:03.561Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestvsan05'
+2026-04-21 12:24:03.563 +0000 INFO [2026-04-21T12:24:03.563Z]   Snapshotting VM 'snaptestds203': name='snapshot-1', desc=''
+2026-04-21 12:24:08.581 +0000 INFO [2026-04-21T12:24:08.580Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds203'
+2026-04-21 12:24:08.582 +0000 INFO [2026-04-21T12:24:08.582Z]   Snapshotting VM 'snaptstvsan01': name='snapshot-1', desc=''
+2026-04-21 12:24:13.596 +0000 INFO [2026-04-21T12:24:13.595Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptstvsan01'
+2026-04-21 12:24:13.598 +0000 INFO [2026-04-21T12:24:13.597Z]   Snapshotting VM 'snaptestds202': name='snapshot-1', desc=''
+2026-04-21 12:24:18.613 +0000 INFO [2026-04-21T12:24:18.612Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds202'
+2026-04-21 12:24:18.614 +0000 INFO [2026-04-21T12:24:18.613Z]   Snapshotting VM 'snaptestds105': name='snapshot-1', desc=''
+2026-04-21 12:24:23.630 +0000 INFO [2026-04-21T12:24:23.629Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds105'
+2026-04-21 12:24:23.631 +0000 INFO [2026-04-21T12:24:23.630Z]   Snapshotting VM 'snaptestds201': name='snapshot-1', desc=''
+2026-04-21 12:24:28.647 +0000 INFO [2026-04-21T12:24:28.645Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds201'
+2026-04-21 12:24:28.649 +0000 INFO [2026-04-21T12:24:28.648Z]   Snapshotting VM 'snaptestds104': name='snapshot-1', desc=''
+2026-04-21 12:24:33.664 +0000 INFO [2026-04-21T12:24:33.663Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds104'
+2026-04-21 12:24:33.665 +0000 INFO [2026-04-21T12:24:33.664Z]   Snapshotting VM 'snaptestds103': name='snapshot-1', desc=''
+2026-04-21 12:24:38.681 +0000 INFO [2026-04-21T12:24:38.679Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds103'
+2026-04-21 12:24:38.682 +0000 INFO [2026-04-21T12:24:38.681Z]   Snapshotting VM 'snaptestds102': name='snapshot-1', desc=''
+2026-04-21 12:24:43.696 +0000 INFO [2026-04-21T12:24:43.695Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds102'
+2026-04-21 12:24:43.697 +0000 INFO [2026-04-21T12:24:43.696Z]   Snapshotting VM 'snaptestds101': name='snapshot-1', desc=''
+2026-04-21 12:24:48.712 +0000 INFO [2026-04-21T12:24:48.710Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestds101'
+2026-04-21 12:24:48.713 +0000 INFO [2026-04-21T12:24:48.712Z]   Snapshotting VM 'snaptestvsan03': name='snapshot-1', desc=''
+2026-04-21 12:24:53.730 +0000 INFO [2026-04-21T12:24:53.729Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestvsan03'
+2026-04-21 12:24:53.732 +0000 INFO [2026-04-21T12:24:53.731Z]   Snapshotting VM 'snaptestvsan02': name='snapshot-1', desc=''
+2026-04-21 12:24:58.747 +0000 INFO [2026-04-21T12:24:58.746Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestvsan02'
+2026-04-21 12:24:58.749 +0000 INFO [2026-04-21T12:24:58.748Z]   Snapshotting VM 'snaptestvsan04': name='snapshot-1' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:25:03.767 +0000 INFO [2026-04-21T12:25:03.766Z]   SUCCESS: Snapshot 'snapshot-1' created on 'snaptestvsan04'
+2026-04-21 12:25:03.768 +0000 INFO [2026-04-21T12:25:03.767Z] Round 1 complete. Sleeping 3 minutes before next round...
+2026-04-21 12:28:03.769 +0000 INFO [2026-04-21T12:28:03.768Z] --- Round 2 of 6 ---
+2026-04-21 12:28:03.770 +0000 INFO [2026-04-21T12:28:03.769Z]   Snapshotting VM 'snaptestds303': name='snapshot-2', desc=''
+2026-04-21 12:28:08.786 +0000 INFO [2026-04-21T12:28:08.784Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds303'
+2026-04-21 12:28:08.787 +0000 INFO [2026-04-21T12:28:08.786Z]   Snapshotting VM 'snaptestds304': name='snapshot-2', desc=''
+2026-04-21 12:28:13.802 +0000 INFO [2026-04-21T12:28:13.801Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds304'
+2026-04-21 12:28:13.803 +0000 INFO [2026-04-21T12:28:13.803Z]   Snapshotting VM 'snaptestds305': name='snapshot-2' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:28:18.831 +0000 INFO [2026-04-21T12:28:18.830Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds305'
+2026-04-21 12:28:18.833 +0000 INFO [2026-04-21T12:28:18.832Z]   Snapshotting VM 'snaptestds205': name='snapshot-2' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:28:23.849 +0000 INFO [2026-04-21T12:28:23.848Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds205'
+2026-04-21 12:28:23.850 +0000 INFO [2026-04-21T12:28:23.850Z]   Snapshotting VM 'snaptestds302': name='snapshot-2', desc=''
+2026-04-21 12:28:28.867 +0000 INFO [2026-04-21T12:28:28.866Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds302'
+2026-04-21 12:28:28.868 +0000 INFO [2026-04-21T12:28:28.868Z]   Snapshotting VM 'snaptestds301': name='snapshot-2', desc=''
+2026-04-21 12:28:33.884 +0000 INFO [2026-04-21T12:28:33.883Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds301'
+2026-04-21 12:28:33.886 +0000 INFO [2026-04-21T12:28:33.885Z]   Snapshotting VM 'snaptestds204': name='snapshot-2', desc=''
+2026-04-21 12:28:38.901 +0000 INFO [2026-04-21T12:28:38.900Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds204'
+2026-04-21 12:28:38.902 +0000 INFO [2026-04-21T12:28:38.902Z]   Snapshotting VM 'snaptestvsan05': name='snapshot-2', desc=''
+2026-04-21 12:28:43.917 +0000 INFO [2026-04-21T12:28:43.916Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestvsan05'
+2026-04-21 12:28:43.918 +0000 INFO [2026-04-21T12:28:43.918Z]   Snapshotting VM 'snaptestds203': name='snapshot-2' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:28:48.934 +0000 INFO [2026-04-21T12:28:48.933Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds203'
+2026-04-21 12:28:48.936 +0000 INFO [2026-04-21T12:28:48.935Z]   Snapshotting VM 'snaptstvsan01': name='snapshot-2', desc=''
+2026-04-21 12:28:53.956 +0000 INFO [2026-04-21T12:28:53.955Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptstvsan01'
+2026-04-21 12:28:53.957 +0000 INFO [2026-04-21T12:28:53.956Z]   Snapshotting VM 'snaptestds202': name='snapshot-2', desc=''
+2026-04-21 12:28:58.972 +0000 INFO [2026-04-21T12:28:58.971Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds202'
+2026-04-21 12:28:58.973 +0000 INFO [2026-04-21T12:28:58.972Z]   Snapshotting VM 'snaptestds105': name='snapshot-2', desc=''
+2026-04-21 12:29:03.989 +0000 INFO [2026-04-21T12:29:03.988Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds105'
+2026-04-21 12:29:03.990 +0000 INFO [2026-04-21T12:29:03.989Z]   Snapshotting VM 'snaptestds201': name='snapshot-2', desc=''
+2026-04-21 12:29:09.006 +0000 INFO [2026-04-21T12:29:09.005Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds201'
+2026-04-21 12:29:09.007 +0000 INFO [2026-04-21T12:29:09.006Z]   Snapshotting VM 'snaptestds104': name='snapshot-2' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:29:14.029 +0000 INFO [2026-04-21T12:29:14.028Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds104'
+2026-04-21 12:29:14.030 +0000 INFO [2026-04-21T12:29:14.030Z]   Snapshotting VM 'snaptestds103': name='snapshot-2' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:29:19.045 +0000 INFO [2026-04-21T12:29:19.044Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds103'
+2026-04-21 12:29:19.047 +0000 INFO [2026-04-21T12:29:19.046Z]   Snapshotting VM 'snaptestds102': name='snapshot-2', desc=''
+2026-04-21 12:29:24.061 +0000 INFO [2026-04-21T12:29:24.060Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds102'
+2026-04-21 12:29:24.062 +0000 INFO [2026-04-21T12:29:24.062Z]   Snapshotting VM 'snaptestds101': name='snapshot-2', desc=''
+2026-04-21 12:29:29.080 +0000 INFO [2026-04-21T12:29:29.079Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestds101'
+2026-04-21 12:29:29.081 +0000 INFO [2026-04-21T12:29:29.080Z]   Snapshotting VM 'snaptestvsan03': name='snapshot-2', desc=''
+2026-04-21 12:29:34.097 +0000 INFO [2026-04-21T12:29:34.096Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestvsan03'
+2026-04-21 12:29:34.099 +0000 INFO [2026-04-21T12:29:34.098Z]   Snapshotting VM 'snaptestvsan02': name='snapshot-2', desc=''
+2026-04-21 12:29:39.117 +0000 INFO [2026-04-21T12:29:39.116Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestvsan02'
+2026-04-21 12:29:39.118 +0000 INFO [2026-04-21T12:29:39.117Z]   Snapshotting VM 'snaptestvsan04': name='snapshot-2', desc=''
+2026-04-21 12:29:44.134 +0000 INFO [2026-04-21T12:29:44.133Z]   SUCCESS: Snapshot 'snapshot-2' created on 'snaptestvsan04'
+2026-04-21 12:29:44.135 +0000 INFO [2026-04-21T12:29:44.135Z] Round 2 complete. Sleeping 3 minutes before next round...
+2026-04-21 12:32:44.137 +0000 INFO [2026-04-21T12:32:44.136Z] --- Round 3 of 6 ---
+2026-04-21 12:32:44.138 +0000 INFO [2026-04-21T12:32:44.138Z]   Snapshotting VM 'snaptestds303': name='snapshot-3', desc=''
+2026-04-21 12:32:49.164 +0000 INFO [2026-04-21T12:32:49.163Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds303'
+2026-04-21 12:32:49.166 +0000 INFO [2026-04-21T12:32:49.165Z]   Snapshotting VM 'snaptestds304': name='snapshot-3', desc=''
+2026-04-21 12:32:54.182 +0000 INFO [2026-04-21T12:32:54.181Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds304'
+2026-04-21 12:32:54.183 +0000 INFO [2026-04-21T12:32:54.183Z]   Snapshotting VM 'snaptestds305': name='snapshot-3', desc=''
+2026-04-21 12:32:59.198 +0000 INFO [2026-04-21T12:32:59.197Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds305'
+2026-04-21 12:32:59.199 +0000 INFO [2026-04-21T12:32:59.199Z]   Snapshotting VM 'snaptestds205': name='snapshot-3', desc=''
+2026-04-21 12:33:04.213 +0000 INFO [2026-04-21T12:33:04.212Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds205'
+2026-04-21 12:33:04.214 +0000 INFO [2026-04-21T12:33:04.214Z]   Snapshotting VM 'snaptestds302': name='snapshot-3', desc=''
+2026-04-21 12:33:09.230 +0000 INFO [2026-04-21T12:33:09.229Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds302'
+2026-04-21 12:33:09.231 +0000 INFO [2026-04-21T12:33:09.231Z]   Snapshotting VM 'snaptestds301': name='snapshot-3', desc=''
+2026-04-21 12:33:14.248 +0000 INFO [2026-04-21T12:33:14.247Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds301'
+2026-04-21 12:33:14.249 +0000 INFO [2026-04-21T12:33:14.249Z]   Snapshotting VM 'snaptestds204': name='snapshot-3', desc=''
+2026-04-21 12:33:19.272 +0000 INFO [2026-04-21T12:33:19.271Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds204'
+2026-04-21 12:33:19.274 +0000 INFO [2026-04-21T12:33:19.273Z]   Snapshotting VM 'snaptestvsan05': name='snapshot-3', desc=''
+2026-04-21 12:33:24.290 +0000 INFO [2026-04-21T12:33:24.289Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestvsan05'
+2026-04-21 12:33:24.295 +0000 INFO [2026-04-21T12:33:24.294Z]   Snapshotting VM 'snaptestds203': name='snapshot-3', desc=''
+2026-04-21 12:33:29.313 +0000 INFO [2026-04-21T12:33:29.312Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds203'
+2026-04-21 12:33:29.318 +0000 INFO [2026-04-21T12:33:29.317Z]   Snapshotting VM 'snaptstvsan01': name='snapshot-3', desc=''
+2026-04-21 12:33:34.334 +0000 INFO [2026-04-21T12:33:34.333Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptstvsan01'
+2026-04-21 12:33:34.338 +0000 INFO [2026-04-21T12:33:34.338Z]   Snapshotting VM 'snaptestds202': name='snapshot-3', desc=''
+2026-04-21 12:33:39.353 +0000 INFO [2026-04-21T12:33:39.352Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds202'
+2026-04-21 12:33:39.358 +0000 INFO [2026-04-21T12:33:39.357Z]   Snapshotting VM 'snaptestds105': name='snapshot-3', desc=''
+2026-04-21 12:33:44.373 +0000 INFO [2026-04-21T12:33:44.372Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds105'
+2026-04-21 12:33:44.378 +0000 INFO [2026-04-21T12:33:44.377Z]   Snapshotting VM 'snaptestds201': name='snapshot-3', desc=''
+2026-04-21 12:33:49.392 +0000 INFO [2026-04-21T12:33:49.391Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds201'
+2026-04-21 12:33:49.397 +0000 INFO [2026-04-21T12:33:49.396Z]   Snapshotting VM 'snaptestds104': name='snapshot-3', desc=''
+2026-04-21 12:33:54.414 +0000 INFO [2026-04-21T12:33:54.412Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds104'
+2026-04-21 12:33:54.419 +0000 INFO [2026-04-21T12:33:54.418Z]   Snapshotting VM 'snaptestds103': name='snapshot-3', desc=''
+2026-04-21 12:33:59.436 +0000 INFO [2026-04-21T12:33:59.434Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds103'
+2026-04-21 12:33:59.440 +0000 INFO [2026-04-21T12:33:59.440Z]   Snapshotting VM 'snaptestds102': name='snapshot-3', desc=''
+2026-04-21 12:34:04.457 +0000 INFO [2026-04-21T12:34:04.456Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds102'
+2026-04-21 12:34:04.462 +0000 INFO [2026-04-21T12:34:04.461Z]   Snapshotting VM 'snaptestds101': name='snapshot-3' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:34:09.476 +0000 INFO [2026-04-21T12:34:09.475Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestds101'
+2026-04-21 12:34:09.481 +0000 INFO [2026-04-21T12:34:09.480Z]   Snapshotting VM 'snaptestvsan03': name='snapshot-3' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:34:14.497 +0000 INFO [2026-04-21T12:34:14.496Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestvsan03'
+2026-04-21 12:34:14.503 +0000 INFO [2026-04-21T12:34:14.502Z]   Snapshotting VM 'snaptestvsan02': name='snapshot-3', desc=''
+2026-04-21 12:34:19.522 +0000 INFO [2026-04-21T12:34:19.521Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestvsan02'
+2026-04-21 12:34:19.529 +0000 INFO [2026-04-21T12:34:19.528Z]   Snapshotting VM 'snaptestvsan04': name='snapshot-3', desc=''
+2026-04-21 12:34:24.544 +0000 INFO [2026-04-21T12:34:24.543Z]   SUCCESS: Snapshot 'snapshot-3' created on 'snaptestvsan04'
+2026-04-21 12:34:24.545 +0000 INFO [2026-04-21T12:34:24.544Z] Round 3 complete. Sleeping 3 minutes before next round...
+2026-04-21 12:37:24.546 +0000 INFO [2026-04-21T12:37:24.545Z] --- Round 4 of 6 ---
+2026-04-21 12:37:24.552 +0000 INFO [2026-04-21T12:37:24.551Z]   Snapshotting VM 'snaptestds303': name='snapshot-4' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:37:29.574 +0000 INFO [2026-04-21T12:37:29.573Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds303'
+2026-04-21 12:37:29.580 +0000 INFO [2026-04-21T12:37:29.579Z]   Snapshotting VM 'snaptestds304': name='snapshot-4', desc=''
+2026-04-21 12:37:34.596 +0000 INFO [2026-04-21T12:37:34.595Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds304'
+2026-04-21 12:37:34.600 +0000 INFO [2026-04-21T12:37:34.599Z]   Snapshotting VM 'snaptestds305': name='snapshot-4', desc=''
+2026-04-21 12:37:39.614 +0000 INFO [2026-04-21T12:37:39.613Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds305'
+2026-04-21 12:37:39.618 +0000 INFO [2026-04-21T12:37:39.617Z]   Snapshotting VM 'snaptestds205': name='snapshot-4', desc=''
+2026-04-21 12:37:44.633 +0000 INFO [2026-04-21T12:37:44.632Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds205'
+2026-04-21 12:37:44.639 +0000 INFO [2026-04-21T12:37:44.638Z]   Snapshotting VM 'snaptestds302': name='snapshot-4', desc=''
+2026-04-21 12:37:49.657 +0000 INFO [2026-04-21T12:37:49.656Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds302'
+2026-04-21 12:37:49.662 +0000 INFO [2026-04-21T12:37:49.661Z]   Snapshotting VM 'snaptestds301': name='snapshot-4', desc=''
+2026-04-21 12:37:54.679 +0000 INFO [2026-04-21T12:37:54.678Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds301'
+2026-04-21 12:37:54.684 +0000 INFO [2026-04-21T12:37:54.683Z]   Snapshotting VM 'snaptestds204': name='snapshot-4', desc=''
+2026-04-21 12:37:59.698 +0000 INFO [2026-04-21T12:37:59.697Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds204'
+2026-04-21 12:37:59.702 +0000 INFO [2026-04-21T12:37:59.702Z]   Snapshotting VM 'snaptestvsan05': name='snapshot-4', desc=''
+2026-04-21 12:38:04.717 +0000 INFO [2026-04-21T12:38:04.716Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestvsan05'
+2026-04-21 12:38:04.718 +0000 INFO [2026-04-21T12:38:04.718Z]   Snapshotting VM 'snaptestds203': name='snapshot-4', desc=''
+2026-04-21 12:38:09.736 +0000 INFO [2026-04-21T12:38:09.735Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds203'
+2026-04-21 12:38:09.738 +0000 INFO [2026-04-21T12:38:09.737Z]   Snapshotting VM 'snaptstvsan01': name='snapshot-4', desc=''
+2026-04-21 12:38:14.752 +0000 INFO [2026-04-21T12:38:14.751Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptstvsan01'
+2026-04-21 12:38:14.753 +0000 INFO [2026-04-21T12:38:14.752Z]   Snapshotting VM 'snaptestds202': name='snapshot-4', desc=''
+2026-04-21 12:38:19.769 +0000 INFO [2026-04-21T12:38:19.768Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds202'
+2026-04-21 12:38:19.770 +0000 INFO [2026-04-21T12:38:19.770Z]   Snapshotting VM 'snaptestds105': name='snapshot-4' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:38:24.785 +0000 INFO [2026-04-21T12:38:24.784Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds105'
+2026-04-21 12:38:24.786 +0000 INFO [2026-04-21T12:38:24.786Z]   Snapshotting VM 'snaptestds201': name='snapshot-4', desc=''
+2026-04-21 12:38:29.799 +0000 INFO [2026-04-21T12:38:29.799Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds201'
+2026-04-21 12:38:29.800 +0000 INFO [2026-04-21T12:38:29.800Z]   Snapshotting VM 'snaptestds104': name='snapshot-4', desc=''
+2026-04-21 12:38:34.817 +0000 INFO [2026-04-21T12:38:34.816Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds104'
+2026-04-21 12:38:34.818 +0000 INFO [2026-04-21T12:38:34.818Z]   Snapshotting VM 'snaptestds103': name='snapshot-4', desc=''
+2026-04-21 12:38:39.835 +0000 INFO [2026-04-21T12:38:39.834Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds103'
+2026-04-21 12:38:39.836 +0000 INFO [2026-04-21T12:38:39.836Z]   Snapshotting VM 'snaptestds102': name='snapshot-4' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:38:44.851 +0000 INFO [2026-04-21T12:38:44.850Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds102'
+2026-04-21 12:38:44.853 +0000 INFO [2026-04-21T12:38:44.852Z]   Snapshotting VM 'snaptestds101': name='snapshot-4', desc=''
+2026-04-21 12:38:49.871 +0000 INFO [2026-04-21T12:38:49.870Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestds101'
+2026-04-21 12:38:49.873 +0000 INFO [2026-04-21T12:38:49.872Z]   Snapshotting VM 'snaptestvsan03': name='snapshot-4', desc=''
+2026-04-21 12:38:54.889 +0000 INFO [2026-04-21T12:38:54.888Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestvsan03'
+2026-04-21 12:38:54.890 +0000 INFO [2026-04-21T12:38:54.889Z]   Snapshotting VM 'snaptestvsan02': name='snapshot-4' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:38:59.906 +0000 INFO [2026-04-21T12:38:59.905Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestvsan02'
+2026-04-21 12:38:59.908 +0000 INFO [2026-04-21T12:38:59.907Z]   Snapshotting VM 'snaptestvsan04': name='snapshot-4', desc=''
+2026-04-21 12:39:04.923 +0000 INFO [2026-04-21T12:39:04.922Z]   SUCCESS: Snapshot 'snapshot-4' created on 'snaptestvsan04'
+2026-04-21 12:39:04.924 +0000 INFO [2026-04-21T12:39:04.924Z] Round 4 complete. Sleeping 3 minutes before next round...
+2026-04-21 12:42:04.926 +0000 INFO [2026-04-21T12:42:04.925Z] --- Round 5 of 6 ---
+2026-04-21 12:42:04.927 +0000 INFO [2026-04-21T12:42:04.927Z]   Snapshotting VM 'snaptestds303': name='snapshot-5', desc=''
+2026-04-21 12:42:09.945 +0000 INFO [2026-04-21T12:42:09.944Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds303'
+2026-04-21 12:42:09.948 +0000 INFO [2026-04-21T12:42:09.946Z]   Snapshotting VM 'snaptestds304': name='snapshot-5' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:42:14.963 +0000 INFO [2026-04-21T12:42:14.961Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds304'
+2026-04-21 12:42:14.964 +0000 INFO [2026-04-21T12:42:14.963Z]   Snapshotting VM 'snaptestds305': name='snapshot-5', desc=''
+2026-04-21 12:42:19.992 +0000 INFO [2026-04-21T12:42:19.987Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds305'
+2026-04-21 12:42:19.994 +0000 INFO [2026-04-21T12:42:19.993Z]   Snapshotting VM 'snaptestds205': name='snapshot-5', desc=''
+2026-04-21 12:42:25.010 +0000 INFO [2026-04-21T12:42:25.009Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds205'
+2026-04-21 12:42:25.012 +0000 INFO [2026-04-21T12:42:25.011Z]   Snapshotting VM 'snaptestds302': name='snapshot-5', desc=''
+2026-04-21 12:42:30.029 +0000 INFO [2026-04-21T12:42:30.028Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds302'
+2026-04-21 12:42:30.030 +0000 INFO [2026-04-21T12:42:30.029Z]   Snapshotting VM 'snaptestds301': name='snapshot-5', desc=''
+2026-04-21 12:42:35.045 +0000 INFO [2026-04-21T12:42:35.044Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds301'
+2026-04-21 12:42:35.046 +0000 INFO [2026-04-21T12:42:35.045Z]   Snapshotting VM 'snaptestds204': name='snapshot-5', desc=''
+2026-04-21 12:42:40.062 +0000 INFO [2026-04-21T12:42:40.061Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds204'
+2026-04-21 12:42:40.063 +0000 INFO [2026-04-21T12:42:40.062Z]   Snapshotting VM 'snaptestvsan05': name='snapshot-5' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:42:45.078 +0000 INFO [2026-04-21T12:42:45.077Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestvsan05'
+2026-04-21 12:42:45.079 +0000 INFO [2026-04-21T12:42:45.078Z]   Snapshotting VM 'snaptestds203': name='snapshot-5', desc=''
+2026-04-21 12:42:50.095 +0000 INFO [2026-04-21T12:42:50.094Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds203'
+2026-04-21 12:42:50.096 +0000 INFO [2026-04-21T12:42:50.095Z]   Snapshotting VM 'snaptstvsan01': name='snapshot-5', desc=''
+2026-04-21 12:42:55.112 +0000 INFO [2026-04-21T12:42:55.111Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptstvsan01'
+2026-04-21 12:42:55.113 +0000 INFO [2026-04-21T12:42:55.113Z]   Snapshotting VM 'snaptestds202': name='snapshot-5' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:43:00.130 +0000 INFO [2026-04-21T12:43:00.128Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds202'
+2026-04-21 12:43:00.131 +0000 INFO [2026-04-21T12:43:00.130Z]   Snapshotting VM 'snaptestds105': name='snapshot-5', desc=''
+2026-04-21 12:43:05.146 +0000 INFO [2026-04-21T12:43:05.145Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds105'
+2026-04-21 12:43:05.147 +0000 INFO [2026-04-21T12:43:05.147Z]   Snapshotting VM 'snaptestds201': name='snapshot-5', desc=''
+2026-04-21 12:43:10.163 +0000 INFO [2026-04-21T12:43:10.162Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds201'
+2026-04-21 12:43:10.164 +0000 INFO [2026-04-21T12:43:10.163Z]   Snapshotting VM 'snaptestds104': name='snapshot-5', desc=''
+2026-04-21 12:43:15.177 +0000 INFO [2026-04-21T12:43:15.176Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds104'
+2026-04-21 12:43:15.179 +0000 INFO [2026-04-21T12:43:15.178Z]   Snapshotting VM 'snaptestds103': name='snapshot-5', desc=''
+2026-04-21 12:43:20.196 +0000 INFO [2026-04-21T12:43:20.195Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds103'
+2026-04-21 12:43:20.197 +0000 INFO [2026-04-21T12:43:20.196Z]   Snapshotting VM 'snaptestds102': name='snapshot-5', desc=''
+2026-04-21 12:43:25.212 +0000 INFO [2026-04-21T12:43:25.211Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds102'
+2026-04-21 12:43:25.214 +0000 INFO [2026-04-21T12:43:25.213Z]   Snapshotting VM 'snaptestds101': name='snapshot-5', desc=''
+2026-04-21 12:43:30.227 +0000 INFO [2026-04-21T12:43:30.226Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestds101'
+2026-04-21 12:43:30.228 +0000 INFO [2026-04-21T12:43:30.228Z]   Snapshotting VM 'snaptestvsan03': name='snapshot-5', desc=''
+2026-04-21 12:43:35.244 +0000 INFO [2026-04-21T12:43:35.243Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestvsan03'
+2026-04-21 12:43:35.246 +0000 INFO [2026-04-21T12:43:35.245Z]   Snapshotting VM 'snaptestvsan02': name='snapshot-5', desc=''
+2026-04-21 12:43:40.262 +0000 INFO [2026-04-21T12:43:40.261Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestvsan02'
+2026-04-21 12:43:40.263 +0000 INFO [2026-04-21T12:43:40.262Z]   Snapshotting VM 'snaptestvsan04': name='snapshot-5', desc=''
+2026-04-21 12:43:45.276 +0000 INFO [2026-04-21T12:43:45.275Z]   SUCCESS: Snapshot 'snapshot-5' created on 'snaptestvsan04'
+2026-04-21 12:43:45.277 +0000 INFO [2026-04-21T12:43:45.277Z] Round 5 complete. Sleeping 3 minutes before next round...
+2026-04-21 12:46:45.278 +0000 INFO [2026-04-21T12:46:45.277Z] --- Round 6 of 6 ---
+2026-04-21 12:46:45.279 +0000 INFO [2026-04-21T12:46:45.278Z]   Snapshotting VM 'snaptestds303': name='snapshot-6', desc=''
+2026-04-21 12:46:50.298 +0000 INFO [2026-04-21T12:46:50.296Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds303'
+2026-04-21 12:46:50.299 +0000 INFO [2026-04-21T12:46:50.298Z]   Snapshotting VM 'snaptestds304': name='snapshot-6', desc=''
+2026-04-21 12:46:55.315 +0000 INFO [2026-04-21T12:46:55.314Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds304'
+2026-04-21 12:46:55.317 +0000 INFO [2026-04-21T12:46:55.316Z]   Snapshotting VM 'snaptestds305': name='snapshot-6', desc=''
+2026-04-21 12:47:00.333 +0000 INFO [2026-04-21T12:47:00.332Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds305'
+2026-04-21 12:47:00.334 +0000 INFO [2026-04-21T12:47:00.333Z]   Snapshotting VM 'snaptestds205': name='snapshot-6', desc=''
+2026-04-21 12:47:05.349 +0000 INFO [2026-04-21T12:47:05.348Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds205'
+2026-04-21 12:47:05.350 +0000 INFO [2026-04-21T12:47:05.349Z]   Snapshotting VM 'snaptestds302': name='snapshot-6', desc=''
+2026-04-21 12:47:10.365 +0000 INFO [2026-04-21T12:47:10.364Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds302'
+2026-04-21 12:47:10.366 +0000 INFO [2026-04-21T12:47:10.365Z]   Snapshotting VM 'snaptestds301': name='snapshot-6', desc=''
+2026-04-21 12:47:15.382 +0000 INFO [2026-04-21T12:47:15.381Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds301'
+2026-04-21 12:47:15.383 +0000 INFO [2026-04-21T12:47:15.383Z]   Snapshotting VM 'snaptestds204': name='snapshot-6' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:47:20.400 +0000 INFO [2026-04-21T12:47:20.399Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds204'
+2026-04-21 12:47:20.401 +0000 INFO [2026-04-21T12:47:20.401Z]   Snapshotting VM 'snaptestvsan05': name='snapshot-6', desc=''
+2026-04-21 12:47:25.415 +0000 INFO [2026-04-21T12:47:25.414Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestvsan05'
+2026-04-21 12:47:25.421 +0000 INFO [2026-04-21T12:47:25.420Z]   Snapshotting VM 'snaptestds203': name='snapshot-6', desc=''
+2026-04-21 12:47:30.439 +0000 INFO [2026-04-21T12:47:30.437Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds203'
+2026-04-21 12:47:30.444 +0000 INFO [2026-04-21T12:47:30.443Z]   Snapshotting VM 'snaptstvsan01': name='snapshot-6' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:47:35.458 +0000 INFO [2026-04-21T12:47:35.457Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptstvsan01'
+2026-04-21 12:47:35.463 +0000 INFO [2026-04-21T12:47:35.463Z]   Snapshotting VM 'snaptestds202': name='snapshot-6', desc=''
+2026-04-21 12:47:40.479 +0000 INFO [2026-04-21T12:47:40.478Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds202'
+2026-04-21 12:47:40.483 +0000 INFO [2026-04-21T12:47:40.483Z]   Snapshotting VM 'snaptestds105': name='snapshot-6', desc=''
+2026-04-21 12:47:45.496 +0000 INFO [2026-04-21T12:47:45.495Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds105'
+2026-04-21 12:47:45.501 +0000 INFO [2026-04-21T12:47:45.500Z]   Snapshotting VM 'snaptestds201': name='snapshot-6' [CONTENT LIBRARY], desc='Snapshot used by Content Library'
+2026-04-21 12:47:50.514 +0000 INFO [2026-04-21T12:47:50.513Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds201'
+2026-04-21 12:47:50.519 +0000 INFO [2026-04-21T12:47:50.518Z]   Snapshotting VM 'snaptestds104': name='snapshot-6', desc=''
+2026-04-21 12:47:55.548 +0000 INFO [2026-04-21T12:47:55.543Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds104'
+2026-04-21 12:47:55.554 +0000 INFO [2026-04-21T12:47:55.553Z]   Snapshotting VM 'snaptestds103': name='snapshot-6', desc=''
+2026-04-21 12:48:00.571 +0000 INFO [2026-04-21T12:48:00.570Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds103'
+2026-04-21 12:48:00.575 +0000 INFO [2026-04-21T12:48:00.575Z]   Snapshotting VM 'snaptestds102': name='snapshot-6', desc=''
+2026-04-21 12:48:05.590 +0000 INFO [2026-04-21T12:48:05.589Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds102'
+2026-04-21 12:48:05.595 +0000 INFO [2026-04-21T12:48:05.594Z]   Snapshotting VM 'snaptestds101': name='snapshot-6', desc=''
+2026-04-21 12:48:10.612 +0000 INFO [2026-04-21T12:48:10.610Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestds101'
+2026-04-21 12:48:10.616 +0000 INFO [2026-04-21T12:48:10.616Z]   Snapshotting VM 'snaptestvsan03': name='snapshot-6', desc=''
+2026-04-21 12:48:15.629 +0000 INFO [2026-04-21T12:48:15.628Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestvsan03'
+2026-04-21 12:48:15.635 +0000 INFO [2026-04-21T12:48:15.634Z]   Snapshotting VM 'snaptestvsan02': name='snapshot-6', desc=''
+2026-04-21 12:48:20.649 +0000 INFO [2026-04-21T12:48:20.648Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestvsan02'
+2026-04-21 12:48:20.655 +0000 INFO [2026-04-21T12:48:20.654Z]   Snapshotting VM 'snaptestvsan04': name='snapshot-6', desc=''
+2026-04-21 12:48:25.671 +0000 INFO [2026-04-21T12:48:25.670Z]   SUCCESS: Snapshot 'snapshot-6' created on 'snaptestvsan04'
+2026-04-21 12:48:25.704 +0000 INFO [2026-04-21T12:48:25.703Z] === takeSnapshotsInFolder complete ===
+2026-04-21 12:48:25.705 +0000 INFO [2026-04-21T12:48:25.705Z] Total rounds executed : 6
+2026-04-21 12:48:25.706 +0000 INFO [2026-04-21T12:48:25.705Z] Total VMs processed   : 20
+2026-04-21 12:48:25.707 +0000 INFO [2026-04-21T12:48:25.706Z] Total snapshots taken : 120 (minus any errors above)
+2026-04-21 12:48:25.708 +0000 INFO [2026-04-21T12:48:25.707Z] Elapsed time          : 25.0 minutes
