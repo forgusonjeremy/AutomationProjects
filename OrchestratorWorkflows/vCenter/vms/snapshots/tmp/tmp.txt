@@ -1,1 +1,6 @@
-2026-04-21 13:16:13.925 -04:00warning(com.broadcom.pso.vc.storage/_getDatastoreMetrics) getDatastoreMetrics error for datastore-97: java.lang.reflect.InvocationTargetException (com.broadcom.pso.vc.storage/_getDatastoreMetrics#141
+ST-06 update
+
+var g = JSON.parse(System.getModule(STORAGEMODULE)._adaptiveGovernorCheck(
+    JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(post),
+    latencyThresholdMs || 30, vsanCongestionThresh || 50,
+    vsanResyncThresholdBytes || 10737418240));

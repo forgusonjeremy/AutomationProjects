@@ -6,28 +6,22 @@
  * Detects vSAN vs VMFS/NFS at runtime and applies the appropriate
  * performance counter set.
  *
+ * If the 20-second real-time interval is unavailable (requires Statistics
+ * Level 2+ on the datastore entity), automatically falls back to the
+ * 5-minute (300-second) rollup interval. If all sampling fails, returns
+ * a metrics object with null values so the governor treats this datastore
+ * as uncalibrated and skips the check rather than blocking the run.
+ *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
  *   Name                  Type              Description
  *   ──────────────────────────────────────────────────────────────────────────
  *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to query
- *   datastoreMoRef        string            Datastore managed object reference
- *                                           value (e.g. "datastore-97")
+ *   datastoreMoRef        string            Datastore MoRef (e.g. "datastore-97")
  *
  * ── RETURN TYPE ──────────────────────────────────────────────────────────────
- *   string  JSON object with sampled metrics
- *
- * ── RETURN SCHEMA ────────────────────────────────────────────────────────────
- *   {
- *     datastoreMoRef        : string,
- *     datastoreType         : string,   // "vsan" | "vmfs" | "nfs" | "unknown"
- *     readLatencyMs         : number | null,
- *     writeLatencyMs        : number | null,
- *     iopsRead              : number | null,
- *     iopsWrite             : number | null,
- *     vsanCongestion        : number | null,
- *     vsanResyncQueueDepth  : number | null,
- *     sampledAtMs           : number
- *   }
+ *   string  JSON object with sampled metrics. All metric fields are null if
+ *           sampling failed -- the governor treats null as uncalibrated and
+ *           skips the check for that datastore rather than blocking the run.
  */
 
 var metrics = {
@@ -43,10 +37,8 @@ var metrics = {
 };
 
 try {
-    // ── Locate the datastore via the SDK connection's finder ──────────────────
-    // VcPlugin.findAllForType scoped to the SDK connection is the correct
-    // approach in vRO 8.x Polyglot runtime. findEntityById does not exist.
-    var datastores = vcenterSdkConnection.getAllDatastores()
+    // ── Locate the datastore ──────────────────────────────────────────────────
+    var datastores = vcenterSdkConnection.getAllDatastores();
     var ds = null;
     for (var i = 0; i < datastores.length; i++) {
         if (datastores[i].id === datastoreMoRef) {
@@ -67,89 +59,116 @@ try {
     }
     metrics.datastoreType = dsType;
 
-    // ── Sample performance metrics ────────────────────────────────────────────
-    var perfMgr = vcenterSdkConnection.performanceManager;
-    var now     = new Date();
-    var start   = new Date(now.getTime() - 60000);
-
-    // Build counter key -> counter ID lookup map
+    // ── Build counter lookup map ──────────────────────────────────────────────
+    var perfMgr    = vcenterSdkConnection.performanceManager;
     var counterMap = {};
     var allCounters = perfMgr.perfCounter;
     for (var ci = 0; ci < allCounters.length; ci++) {
-        var c = allCounters[ci];
+        var c   = allCounters[ci];
         var key = c.groupInfo.key + ":" + c.nameInfo.key + ":" + c.rollupType.value;
         counterMap[key] = c.key;
     }
 
+    // ── Determine which counter keys and interval to use ──────────────────────
+    var metricIds  = [];
+    var keyMap     = {};   // counterId (number) -> metric field name
+
     if (dsType === "vsan") {
-        // vSAN counters
-        var congKey   = counterMap["vsanDomClient:congestion:average"];
-        var resyncKey = counterMap["vsanResync:bytesToSync:latest"];
-        var rLatKey   = counterMap["vsanDomClient:readLatency:average"];
-        var wLatKey   = counterMap["vsanDomClient:writeLatency:average"];
+        var keys = {
+            "vsanDomClient:congestion:average":   "vsanCongestion",
+            "vsanResync:bytesToSync:latest":      "vsanResyncQueueDepth",
+            "vsanDomClient:readLatency:average":  "readLatencyMs",
+            "vsanDomClient:writeLatency:average": "writeLatencyMs"
+        };
+        for (var k in keys) {
+            if (counterMap[k] !== undefined) {
+                var mid = new VcPerfMetricId();
+                mid.counterId = counterMap[k];
+                mid.instance  = "";
+                metricIds.push(mid);
+                keyMap[counterMap[k]] = keys[k];
+            }
+        }
+    } else {
+        var keys2 = {
+            "datastore:totalReadLatency:average":   "readLatencyMs",
+            "datastore:totalWriteLatency:average":  "writeLatencyMs",
+            "datastore:numberReadAveraged:average":  "iopsRead",
+            "datastore:numberWriteAveraged:average": "iopsWrite"
+        };
+        for (var k2 in keys2) {
+            if (counterMap[k2] !== undefined) {
+                var mid2 = new VcPerfMetricId();
+                mid2.counterId = counterMap[k2];
+                mid2.instance  = "";
+                metricIds.push(mid2);
+                keyMap[counterMap[k2]] = keys2[k2];
+            }
+        }
+    }
 
-        var metricIds = [];
-        if (congKey)   metricIds.push(makeMetricId(congKey,   ""));
-        if (resyncKey) metricIds.push(makeMetricId(resyncKey, ""));
-        if (rLatKey)   metricIds.push(makeMetricId(rLatKey,   ""));
-        if (wLatKey)   metricIds.push(makeMetricId(wLatKey,   ""));
+    if (metricIds.length === 0) {
+        System.warn("getDatastoreMetrics: no matching performance counters found for " +
+                    dsType + " datastore " + datastoreMoRef + " -- returning null metrics");
+        return JSON.stringify(metrics);
+    }
 
-        if (metricIds.length > 0) {
-            var qs = new VcPerfQuerySpec();
-            qs.entity      = ds;
-            qs.startTime   = start;
-            qs.endTime     = now;
-            qs.intervalId  = 20;
-            qs.metricId    = metricIds;
-            qs.maxSample   = 3;
+    // ── Query performance -- try 20s real-time first, fall back to 300s ───────
+    var now    = new Date();
+    var start  = new Date(now.getTime() - 300000);  // 5 min window covers both intervals
+    var values = null;
+
+    var intervals = [20, 300];
+    for (var ii = 0; ii < intervals.length; ii++) {
+        try {
+            var qs       = new VcPerfQuerySpec();
+            qs.entity    = ds;
+            qs.startTime = start;
+            qs.endTime   = now;
+            qs.intervalId= intervals[ii];
+            qs.metricId  = metricIds;
+            qs.maxSample = 3;
 
             var results = perfMgr.queryPerf([qs]);
-            if (results && results.length > 0 && results[0].value) {
-                for (var ri = 0; ri < results[0].value.length; ri++) {
-                    var s   = results[0].value[ri];
-                    var avg = arrayAvg(s.value);
-                    if (congKey   && s.id.counterId === congKey)   metrics.vsanCongestion       = avg;
-                    if (resyncKey && s.id.counterId === resyncKey) metrics.vsanResyncQueueDepth = avg;
-                    if (rLatKey   && s.id.counterId === rLatKey)   metrics.readLatencyMs        = avg / 1000;
-                    if (wLatKey   && s.id.counterId === wLatKey)   metrics.writeLatencyMs       = avg / 1000;
-                }
+            if (results && results.length > 0 && results[0].value &&
+                results[0].value.length > 0) {
+                values = results[0].value;
+                break;  // got data -- stop trying intervals
             }
+        } catch (qe) {
+            System.warn("getDatastoreMetrics: queryPerf failed with intervalId=" +
+                        intervals[ii] + " for " + datastoreMoRef +
+                        " -- " + qe.message +
+                        (ii < intervals.length - 1 ? " -- trying next interval" : ""));
         }
+    }
 
+    // ── Parse returned values ─────────────────────────────────────────────────
+    if (values) {
+        for (var vi = 0; vi < values.length; vi++) {
+            var s      = values[vi];
+            var cid    = s.id.counterId;
+            var field  = keyMap[cid];
+            if (!field) continue;
+
+            var avg = 0;
+            if (s.value && s.value.length > 0) {
+                var sum = 0;
+                for (var si = 0; si < s.value.length; si++) sum += s.value[si];
+                avg = sum / s.value.length;
+            }
+
+            // vSAN latency counters are in microseconds -- convert to ms
+            if (field === "readLatencyMs" || field === "writeLatencyMs") {
+                avg = dsType === "vsan" ? avg / 1000 : avg;
+            }
+
+            metrics[field] = avg;
+        }
     } else {
-        // VMFS / NFS counters
-        var rLatKey2  = counterMap["datastore:totalReadLatency:average"];
-        var wLatKey2  = counterMap["datastore:totalWriteLatency:average"];
-        var rIopsKey  = counterMap["datastore:numberReadAveraged:average"];
-        var wIopsKey  = counterMap["datastore:numberWriteAveraged:average"];
-
-        var metricIds2 = [];
-        if (rLatKey2)  metricIds2.push(makeMetricId(rLatKey2,  ""));
-        if (wLatKey2)  metricIds2.push(makeMetricId(wLatKey2,  ""));
-        if (rIopsKey)  metricIds2.push(makeMetricId(rIopsKey,  ""));
-        if (wIopsKey)  metricIds2.push(makeMetricId(wIopsKey,  ""));
-
-        if (metricIds2.length > 0) {
-            var qs2 = new VcPerfQuerySpec();
-            qs2.entity     = ds;
-            qs2.startTime  = start;
-            qs2.endTime    = now;
-            qs2.intervalId = 20;
-            qs2.metricId   = metricIds2;
-            qs2.maxSample  = 3;
-
-            var results2 = perfMgr.queryPerf([qs2]);
-            if (results2 && results2.length > 0 && results2[0].value) {
-                for (var ri2 = 0; ri2 < results2[0].value.length; ri2++) {
-                    var s2   = results2[0].value[ri2];
-                    var avg2 = arrayAvg(s2.value);
-                    if (rLatKey2  && s2.id.counterId === rLatKey2)  metrics.readLatencyMs  = avg2;
-                    if (wLatKey2  && s2.id.counterId === wLatKey2)  metrics.writeLatencyMs = avg2;
-                    if (rIopsKey  && s2.id.counterId === rIopsKey)  metrics.iopsRead       = avg2;
-                    if (wIopsKey  && s2.id.counterId === wIopsKey)  metrics.iopsWrite      = avg2;
-                }
-            }
-        }
+        System.warn("getDatastoreMetrics: no performance data returned for " +
+                    datastoreMoRef + " on any interval -- returning null metrics. " +
+                    "The I/O governor will skip this datastore for this task.");
     }
 
 } catch (e) {
@@ -157,18 +176,3 @@ try {
 }
 
 return JSON.stringify(metrics);
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function makeMetricId(counterId, instance) {
-    var mid = new VcPerfMetricId();
-    mid.counterId = counterId;
-    mid.instance  = instance;
-    return mid;
-}
-
-function arrayAvg(arr) {
-    if (!arr || arr.length === 0) return 0;
-    var sum = 0;
-    for (var i = 0; i < arr.length; i++) sum += arr[i];
-    return sum / arr.length;
-}
