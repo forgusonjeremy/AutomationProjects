@@ -1,26 +1,82 @@
-2026-04-21 16:38:32.608 -04:00INFOLABEL 'dom-owners' -> no interesting data
-2026-04-21 16:38:32.626 -04:00INFOLABEL 'dom-clients' -> no interesting data
-2026-04-21 16:38:32.753 -04:00INFOLABEL 'dom' -> keys: dom.client.stats-taken, dom.client.stats, dom.owner.stats-taken, dom.owner.stats, dom.compmgr.stats-taken, dom.compmgr.stats, dom.compmgr.schedStats, dom.clients, dom.owner.stats-0-taken, dom.owner.stats-0, dom.owner.stats-1-taken, dom.owner.stats-1, dom.owner.stats-2-taken, dom.owner.stats-2, dom.owner.stats-3-taken, dom.owner.stats-3, dom.owner.stats-4-taken, dom.owner.stats-4, dom.owner.stats-5-taken, dom.owner.stats-5, dom.owner.stats-6-taken, dom.owner.stats-6, dom.owner.stats-7-taken, dom.owner.stats-7, dom.owner.stats-8-taken, dom.owner.stats-8, dom.owner.stats-9-taken, dom.owner.stats-9
-2026-04-21 16:38:32.755 -04:00INFOdom.client.stats-taken = 1776803912.6497378
-2026-04-21 16:38:32.756 -04:00INFOLABEL 'dom' -> ERROR: Expected argument of type object, but instead had type number
-2026-04-21 16:38:32.977 -04:00INFOLABEL 'lsom' -> keys: lsom.disks-taken, lsom.disks, virstoEnabled
-2026-04-21 16:38:32.978 -04:00INFOlsom.disks-taken = 1776803912.7976856
-2026-04-21 16:38:32.979 -04:00INFOlsom.disks -> 5 entries, sample keys: info, rcWriteQStats, rcReadQStats, WBQStats, blkattrInfo
-2026-04-21 16:38:32.980 -04:00INFOvirstoEnabled = true
-2026-04-21 16:38:32.999 -04:00INFOLABEL 'lsom-world-md' -> no interesting data
-2026-04-21 16:38:33.017 -04:00INFOLABEL 'vsan-disk-stats' -> no interesting data
-2026-04-21 16:38:33.031 -04:00INFOLABEL 'vsan-pnic-stats' -> no interesting data
-2026-04-21 16:38:33.043 -04:00INFOLABEL 'rdtAssoc' -> no interesting data
-2026-04-21 16:38:33.054 -04:00INFOLABEL 'rdtTransport' -> no interesting data
-2026-04-21 16:38:33.128 -04:00INFOLABEL 'plog' -> keys: plog.devices-taken, plog.devices
-2026-04-21 16:38:33.129 -04:00INFOplog.devices-taken = 1776803913.0619435
-2026-04-21 16:38:33.130 -04:00INFOplog.devices -> 5 entries, sample keys: info, elevStats, stats, dedupStats, health/latencyStats, health/SMART/reportedUncorrectableErrorsCount, health/SMART/commandTimeoutsCount, health/SMART/uncorrectableSectorsCount
-2026-04-21 16:38:33.141 -04:00INFOLABEL 'plog-lsom-worlds' -> no interesting data
-2026-04-21 16:38:33.151 -04:00INFOLABEL 'dom-proxy-owners' -> no interesting data
-2026-04-21 16:38:33.163 -04:00INFOLABEL 'clom-disk-stats' -> no interesting data
-2026-04-21 16:38:33.174 -04:00INFOLABEL 'clom-host-stats' -> no interesting data
-2026-04-21 16:38:33.185 -04:00INFOLABEL 'sos' -> no interesting data
-2026-04-21 16:38:33.195 -04:00INFOLABEL 'mem-stats' -> no interesting data
-2026-04-21 16:38:33.205 -04:00INFOLABEL 'vsan-mgmt-lwd' -> no interesting data
-2026-04-21 16:38:33.215 -04:00INFOLABEL 'version' -> no interesting data
-2026-04-21 16:38:33.225 -04:00INFOLABEL 'system-mem-stats' -> no interesting data
+// Bind vcenterSdkConnection (VC:SdkConnection)
+
+var cluster = vcenterSdkConnection.rootFolder.childEntity[0]
+                .hostFolder.childEntity[0];
+
+// Query dom label across all hosts and aggregate
+System.log("=== DOM stats across all hosts ===");
+
+for (var hi = 0; hi < cluster.host.length; hi++) {
+    var host = cluster.host[hi];
+    var vis  = host.configManager.vsanInternalSystem;
+
+    try {
+        var raw    = vis.queryVsanStatistics(["dom"]);
+        var parsed = JSON.parse(raw);
+
+        System.log("\nHost: " + host.name);
+
+        // dom.owner.stats -- aggregate owner-level latency/congestion
+        var ownerStats = parsed["dom.owner.stats"];
+        if (ownerStats && typeof ownerStats === "object") {
+            var uuids = Object.keys(ownerStats);
+            System.log("  dom.owner.stats: " + uuids.length + " objects");
+            if (uuids.length > 0) {
+                var sample = ownerStats[uuids[0]];
+                System.log("  Sample object UUID: " + uuids[0]);
+                System.log("  Sample fields: " + Object.keys(sample).join(", "));
+                System.log("  Sample values: " + JSON.stringify(sample).substring(0, 600));
+            }
+        } else {
+            System.log("  dom.owner.stats type: " + typeof ownerStats);
+        }
+
+        // dom.client.stats -- client-side latency seen by VMs
+        var clientStats = parsed["dom.client.stats"];
+        if (clientStats && typeof clientStats === "object") {
+            var cUuids = Object.keys(clientStats);
+            System.log("  dom.client.stats: " + cUuids.length + " objects");
+            if (cUuids.length > 0) {
+                var cSample = clientStats[cUuids[0]];
+                System.log("  Client sample fields: " + Object.keys(cSample).join(", "));
+                System.log("  Client sample values: " + JSON.stringify(cSample).substring(0, 600));
+            }
+        }
+
+    } catch (e) {
+        System.log("Host " + host.name + " error: " + e.message);
+    }
+}
+
+// Also drill into lsom.disks for latency stats
+System.log("\n=== LSOM disk stats (first host) ===");
+try {
+    var host0  = cluster.host[0];
+    var vis0   = host0.configManager.vsanInternalSystem;
+    var lraw   = vis0.queryVsanStatistics(["lsom"]);
+    var lp     = JSON.parse(lraw);
+    var disks  = lp["lsom.disks"];
+    if (disks) {
+        var diskIds = Object.keys(disks);
+        System.log("Disk count: " + diskIds.length);
+        if (diskIds.length > 0) {
+            var d = disks[diskIds[0]];
+            System.log("Disk id: " + diskIds[0]);
+            System.log("Disk top-level keys: " + Object.keys(d).join(", "));
+            // stats sub-object
+            if (d.stats) {
+                System.log("d.stats keys: " + Object.keys(d.stats).join(", "));
+                System.log("d.stats values: " + JSON.stringify(d.stats).substring(0, 600));
+            }
+            // rcReadQStats
+            if (d.rcReadQStats) {
+                System.log("rcReadQStats: " + JSON.stringify(d.rcReadQStats));
+            }
+            if (d.rcWriteQStats) {
+                System.log("rcWriteQStats: " + JSON.stringify(d.rcWriteQStats));
+            }
+        }
+    }
+} catch (e2) {
+    System.log("lsom error: " + e2.message);
+}
