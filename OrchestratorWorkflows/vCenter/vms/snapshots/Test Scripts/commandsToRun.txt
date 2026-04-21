@@ -16,6 +16,12 @@ foreach ($row in $servers) {
 
 .\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\OrchestratorWorkflows\vCenter\vms\snapshots\Test Scripts\generate_datastore_latency.sh' -CsvPath ./servers.csv     
 
-./bulk_generate_DatastoreLatency.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_datastore_latency.sh"
+//vSAN
+./bulk_generate_DatastoreLatency.ps1 -CsvPath ./vsanservers.csv -ScriptRemotePath "/tmp/generate_datastore_latency.sh" -DurationSeconds 1200 -Workers 8 -IoDepth 16
 
-./Stop-DatastoreLatency.ps1 -CsvPath servers.csv
+//iSCSI
+./bulk_generate_DatastoreLatency.ps1 -CsvPath ./iscsiservers.csv -ScriptRemotePath "/tmp/generate_datastore_latency.sh" -DurationSeconds 1200 -Workers 1 -IoDepth 1
+
+
+./Stop-DatastoreLatency.ps1 -CsvPath vsanservers.csv
+./Stop-DatastoreLatency.ps1 -CsvPath iscsiservers.csv

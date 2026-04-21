@@ -19,6 +19,12 @@
  *                      runLock field to identify which run holds the lock, making it
  *                      easy to correlate a stuck lock with the vRO execution that caused it.
  *
+ *  *   lockEl   ConfigurationElement    Live reference to the SnapshotCleanup/RuntimeState
+ *                                    configuration element. Passed directly to ST-04, ST-09,
+ *                                    and the Exception Handler so they can call
+ *                                    setAttributeWithKey("runLock", "") to release the lock
+ *                                    without resolving the element again.
+ * 
  * ── OUTPUTS (bind to Workflow Attributes tab) ──────────────────────────────────
  *   Name     vRO Type                Description
  *   ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -39,20 +45,6 @@ var LOG = {
     warn: function(p,m){ System.warn( "[SNAPSHOT-CLEANUP] ["+p+"] [WARN]    "+m); },
     fail: function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); }
 };
-
-// Resolve config element
-var cat = Server.getConfigurationElementCategoryWithPath("SnapshotCleanup");
-if (!cat) throw new Error(
-    "Configuration category 'SnapshotCleanup' not found. "
-  + "Create it and the RuntimeState element before running this workflow.");
-
-lockEl = null;
-for each (var el in cat.configurationElements) {
-    if (el.name === "RuntimeState") { lockEl = el; break; }
-}
-if (!lockEl) throw new Error(
-    "Configuration element 'SnapshotCleanup/RuntimeState' not found. "
-  + "Create it with a 'runLock' string attribute set to empty string.");
 
 // Check lock
 var held = lockEl.getAttributeWithKey("runLock").value || "";

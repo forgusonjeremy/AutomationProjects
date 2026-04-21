@@ -1,6 +1,6 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * ST-03  ENUMERATE vCENTERS & COLLECT CANDIDATES
+ * ST-03 ENUMERATE vCENTERS & COLLECT CANDIDATES
  * ─────────────────────────────────────────────────────────────────────────────
  * Iterates over every vCenter SDK connection registered in the embedded vRO
  * appliance and calls getSnapshotCandidates for each one. Results are merged
@@ -49,7 +49,7 @@ var LOG = {
     fail: function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); }
 };
 
-var MODULE    = "com.company.snapshotcleanup";
+var MODULE    = "com.broadcom.pso.vc.vm.snapshots";
 var logArr    = JSON.parse(runLog || "[]");
 var allCands  = [];
 
@@ -66,7 +66,7 @@ if (!allVCs || allVCs.length === 0) {
         var vcName = vc.name || vc.url;
         LOG.ok("INVENTORY","  Connecting to: " + vcName);
         try {
-            var raw   = System.getModule(MODULE).getSnapshotCandidates(
+            var raw   = System.getModule(MODULE)._getSnapshotCandidatesgetSnapshotCandidates(
                             vc, maxAgeMinutes || 60,
                             nameMatchString  || "",
                             descIgnoreString || "");

@@ -57,6 +57,7 @@ update Default Value > Save.
 | descIgnoreString        | string  | (empty) | Skip snaps whose description contains this. Empty = no filter. |
 | dryRun                  | boolean | true    | Default MUST be true. Operators set false explicitly for live runs. |
 | latencyThresholdMs      | number  | 30      | VMFS/NFS governor ceiling in ms. Tune to ~2x observed idle latency. |
+| lockEl                  | configurationElement| SnapshotCleanup | Configuration Element which holds the snapshot cleanup process runtime lock state to prevent multiple workflow runs from executing at the same time
 | vsanCongestionThresh    | number  | 50      | vSAN governor ceiling (0-255). Values >128 = serious congestion. |
 | vsanResyncThresholdGB   | number  | 10      | vSAN resync queue ceiling in GB. |
 | maxParallelPerVcenter   | number  | 3       | Max concurrent consolidation tasks per vCenter (powered-on VMs). |

@@ -1,0 +1,7 @@
+Server,Username,RemotePath,Port
+10.111.101.92,sshuser,/tmp/,22
+10.111.101.93,sshuser,/tmp/,22
+10.111.101.97,sshuser,/tmp/,22
+10.111.101.98,sshuser,/tmp/,22
+10.111.101.101,sshuser,/tmp/,22
+10.111.101.102,sshuser,/tmp/,22
