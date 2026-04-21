@@ -1,90 +1,87 @@
-// Bind vcenterSdkConnection (VC:SdkConnection)
-
-var cluster = vcenterSdkConnection.rootFolder.childEntity[0]
-                .hostFolder.childEntity[0];
-var vis     = cluster.host[0].configManager.vsanInternalSystem;
-
-// ── DOM owner stats -- explore the flat structure ─────────────────────────
-System.log("=== dom.owner.stats structure ===");
-var domRaw    = vis.queryVsanStatistics(["dom"]);
-var domParsed = JSON.parse(domRaw);
-var ownerStats = domParsed["dom.owner.stats"];
-
-// It's a flat object -- log all its keys and value types
-var keys = Object.keys(ownerStats);
-System.log("Total keys: " + keys.length);
-System.log("First 30 keys and values:");
-for (var i = 0; i < Math.min(30, keys.length); i++) {
-    var k = keys[i];
-    var v = ownerStats[k];
-    System.log("  [" + i + "] " + k + " = " + 
-        (typeof v === "object" ? JSON.stringify(v).substring(0, 100) : v) +
-        "  (type=" + typeof v + ")");
-}
-
-// ── LSOM disks -- confirm the latency/outstanding fields ─────────────────
-System.log("\n=== lsom.disks latency fields ===");
-var lsomRaw    = vis.queryVsanStatistics(["lsom"]);
-var lsomParsed = JSON.parse(lsomRaw);
-var disks      = lsomParsed["lsom.disks"];
-var diskIds    = Object.keys(disks);
-
-var totalReadOutstanding  = 0;
-var totalWriteOutstanding = 0;
-var totalReadLatMean      = 0;
-var totalWriteLatMean     = 0;
-var diskCount             = 0;
-
-for (var di = 0; di < diskIds.length; di++) {
-    var dk = diskIds[di];
-    var d  = disks[dk];
-
-    var rOut  = d.rcReadQStats  && d.rcReadQStats.qStats  ? d.rcReadQStats.qStats.totalOutstanding   : 0;
-    var wOut  = d.rcWriteQStats && d.rcWriteQStats.qStats ? d.rcWriteQStats.qStats.totalOutstanding  : 0;
-    var rLat  = d.rcReadQStats  && d.rcReadQStats.rcIOStats && d.rcReadQStats.rcIOStats.latencyHisto
-                ? d.rcReadQStats.rcIOStats.latencyHisto.mean : 0;
-    var wLat  = d.rcWriteQStats && d.rcWriteQStats.rcIOStats && d.rcWriteQStats.rcIOStats.latencyHisto
-                ? d.rcWriteQStats.rcIOStats.latencyHisto.mean : 0;
-
-    System.log("Disk " + dk + ":");
-    System.log("  rcReadQStats.qStats.totalOutstanding  = " + rOut);
-    System.log("  rcWriteQStats.qStats.totalOutstanding = " + wOut);
-    System.log("  rcReadQStats.rcIOStats.latencyHisto.mean  = " + rLat + " us");
-    System.log("  rcWriteQStats.rcIOStats.latencyHisto.mean = " + wLat + " us");
-
-    // Also check stats sub-object if present
-    if (d.stats) {
-        System.log("  stats keys: " + Object.keys(d.stats).join(", "));
-        System.log("  stats sample: " + JSON.stringify(d.stats).substring(0, 300));
-    }
-
-    totalReadOutstanding  += rOut;
-    totalWriteOutstanding += wOut;
-    totalReadLatMean      += rLat;
-    totalWriteLatMean     += wLat;
-    diskCount++;
-}
-
-System.log("\n=== Aggregated across " + diskCount + " disks ===");
-System.log("Total read outstanding:  " + totalReadOutstanding);
-System.log("Total write outstanding: " + totalWriteOutstanding);
-System.log("Avg read latency (mean of disk means):  " + 
-    (diskCount > 0 ? (totalReadLatMean  / diskCount / 1000).toFixed(3) : "n/a") + " ms");
-System.log("Avg write latency (mean of disk means): " + 
-    (diskCount > 0 ? (totalWriteLatMean / diskCount / 1000).toFixed(3) : "n/a") + " ms");
-
-// ── Also check dom.client.stats for VM-facing latency ────────────────────
-System.log("\n=== dom.client.stats ===");
-var clientStats = domParsed["dom.client.stats"];
-if (clientStats && typeof clientStats === "object") {
-    var cKeys = Object.keys(clientStats);
-    System.log("Total keys: " + cKeys.length);
-    System.log("First 20 keys:");
-    for (var ci = 0; ci < Math.min(20, cKeys.length); ci++) {
-        var ck = cKeys[ci];
-        var cv = clientStats[ck];
-        System.log("  " + ck + " = " +
-            (typeof cv === "object" ? JSON.stringify(cv).substring(0, 150) : cv) +
-            "  (type=" + typeof cv + ")");
-    }
-}
+2026-04-21 16:42:24.871 -04:00INFO=== dom.owner.stats structure ===
+2026-04-21 16:42:24.967 -04:00INFOTotal keys: 589
+2026-04-21 16:42:24.968 -04:00INFOFirst 30 keys and values:
+2026-04-21 16:42:24.969 -04:00INFO[0] trackTimeMsPerfSvc = 4163168981  (type=number)
+2026-04-21 16:42:24.970 -04:00INFO[1] readSkippedOnDelta = 0  (type=number)
+2026-04-21 16:42:24.971 -04:00INFO[2] readHighDepthCount = 112473  (type=number)
+2026-04-21 16:42:24.972 -04:00INFO[3] readHighDepthOIOSum = 7253161  (type=number)
+2026-04-21 16:42:24.973 -04:00INFO[4] readHighDepthNumTimes = 519  (type=number)
+2026-04-21 16:42:24.974 -04:00INFO[5] readHighDepthDurationMs = 10130  (type=number)
+2026-04-21 16:42:24.975 -04:00INFO[6] readHighDepthBytes = 7011831808  (type=number)
+2026-04-21 16:42:24.976 -04:00INFO[7] readCachedCount = 0  (type=number)
+2026-04-21 16:42:24.977 -04:00INFO[8] readCachedBytes = 0  (type=number)
+2026-04-21 16:42:24.978 -04:00INFO[9] readCachedLatencySumUs = 0  (type=number)
+2026-04-21 16:42:24.979 -04:00INFO[10] readCachedLatencySqSumUs = 0  (type=number)
+2026-04-21 16:42:24.980 -04:00INFO[11] readCachedLatencyMaxUs = 0  (type=number)
+2026-04-21 16:42:24.981 -04:00INFO[12] readCachedCongestionSum = 0  (type=number)
+2026-04-21 16:42:24.982 -04:00INFO[13] writeHighDepthCount = 52628699  (type=number)
+2026-04-21 16:42:24.983 -04:00INFO[14] writeHighDepthOIOSum = 59305022893  (type=number)
+2026-04-21 16:42:24.984 -04:00INFO[15] writeHighDepthNumTimes = 46379  (type=number)
+2026-04-21 16:42:24.985 -04:00INFO[16] writeHighDepthDurationMs = 9679993  (type=number)
+2026-04-21 16:42:24.986 -04:00INFO[17] writeHighDepthBytes = 3198252194304  (type=number)
+2026-04-21 16:42:24.987 -04:00INFO[18] proxyWriteCount = 0  (type=number)
+2026-04-21 16:42:24.988 -04:00INFO[19] proxyWriteBytes = 0  (type=number)
+2026-04-21 16:42:24.989 -04:00INFO[20] proxyWriteLatencySumUs = 0  (type=number)
+2026-04-21 16:42:24.990 -04:00INFO[21] proxyWriteLatencySqSumUs = 0  (type=number)
+2026-04-21 16:42:24.991 -04:00INFO[22] proxyWriteLatencyMaxUs = 0  (type=number)
+2026-04-21 16:42:24.992 -04:00INFO[23] proxyWriteCongestionSum = 0  (type=number)
+2026-04-21 16:42:24.993 -04:00INFO[24] proxyReadCount = 0  (type=number)
+2026-04-21 16:42:24.994 -04:00INFO[25] proxyReadBytes = 0  (type=number)
+2026-04-21 16:42:24.995 -04:00INFO[26] proxyReadLatencySumUs = 0  (type=number)
+2026-04-21 16:42:24.996 -04:00INFO[27] proxyReadLatencySqSumUs = 0  (type=number)
+2026-04-21 16:42:24.997 -04:00INFO[28] proxyReadLatencyMaxUs = 0  (type=number)
+2026-04-21 16:42:24.998 -04:00INFO[29] proxyReadCongestionSum = 0  (type=number)
+2026-04-21 16:42:24.999 -04:00INFO=== lsom.disks latency fields ===
+2026-04-21 16:42:25.065 -04:00INFODisk 52c5d6bb-fe6e-83be-c562-e5b94fc5565a:
+2026-04-21 16:42:25.067 -04:00INFOrcReadQStats.qStats.totalOutstanding  = 1
+2026-04-21 16:42:25.068 -04:00INFOrcWriteQStats.qStats.totalOutstanding = 0
+2026-04-21 16:42:25.069 -04:00INFOrcReadQStats.rcIOStats.latencyHisto.mean  = 0 us
+2026-04-21 16:42:25.070 -04:00INFOrcWriteQStats.rcIOStats.latencyHisto.mean = 0 us
+2026-04-21 16:42:25.071 -04:00INFODisk 5241e4a5-b3cd-5585-20ee-ade683cf633d:
+2026-04-21 16:42:25.072 -04:00INFOrcReadQStats.qStats.totalOutstanding  = 1
+2026-04-21 16:42:25.073 -04:00INFOrcWriteQStats.qStats.totalOutstanding = 0
+2026-04-21 16:42:25.074 -04:00INFOrcReadQStats.rcIOStats.latencyHisto.mean  = 0 us
+2026-04-21 16:42:25.075 -04:00INFOrcWriteQStats.rcIOStats.latencyHisto.mean = 0 us
+2026-04-21 16:42:25.076 -04:00INFODisk 5206f957-427e-6cc4-ec1b-5991439ba79d:
+2026-04-21 16:42:25.077 -04:00INFOrcReadQStats.qStats.totalOutstanding  = 1
+2026-04-21 16:42:25.078 -04:00INFOrcWriteQStats.qStats.totalOutstanding = 0
+2026-04-21 16:42:25.079 -04:00INFOrcReadQStats.rcIOStats.latencyHisto.mean  = 0 us
+2026-04-21 16:42:25.080 -04:00INFOrcWriteQStats.rcIOStats.latencyHisto.mean = 0 us
+2026-04-21 16:42:25.081 -04:00INFODisk 52780e0b-4b9d-4582-1af3-bf3814ddbd61:
+2026-04-21 16:42:25.082 -04:00INFOrcReadQStats.qStats.totalOutstanding  = 1
+2026-04-21 16:42:25.083 -04:00INFOrcWriteQStats.qStats.totalOutstanding = 0
+2026-04-21 16:42:25.084 -04:00INFOrcReadQStats.rcIOStats.latencyHisto.mean  = 0 us
+2026-04-21 16:42:25.085 -04:00INFOrcWriteQStats.rcIOStats.latencyHisto.mean = 0 us
+2026-04-21 16:42:25.086 -04:00INFODisk 524d0839-a459-ae06-adc5-837a4cc0edd8:
+2026-04-21 16:42:25.087 -04:00INFOrcReadQStats.qStats.totalOutstanding  = 1
+2026-04-21 16:42:25.088 -04:00INFOrcWriteQStats.qStats.totalOutstanding = 0
+2026-04-21 16:42:25.089 -04:00INFOrcReadQStats.rcIOStats.latencyHisto.mean  = 0 us
+2026-04-21 16:42:25.090 -04:00INFOrcWriteQStats.rcIOStats.latencyHisto.mean = 0 us
+2026-04-21 16:42:25.091 -04:00INFO=== Aggregated across 5 disks ===
+2026-04-21 16:42:25.092 -04:00INFOTotal read outstanding:  5
+2026-04-21 16:42:25.093 -04:00INFOTotal write outstanding: 0
+2026-04-21 16:42:25.094 -04:00INFOAvg read latency (mean of disk means):  0.000 ms
+2026-04-21 16:42:25.095 -04:00INFOAvg write latency (mean of disk means): 0.000 ms
+2026-04-21 16:42:25.096 -04:00INFO=== dom.client.stats ===
+2026-04-21 16:42:25.097 -04:00INFOTotal keys: 589
+2026-04-21 16:42:25.098 -04:00INFOFirst 20 keys:
+2026-04-21 16:42:25.099 -04:00INFOtrackTimeMsPerfSvc = 4163168976  (type=number)
+2026-04-21 16:42:25.100 -04:00INFOreadSkippedOnDelta = 0  (type=number)
+2026-04-21 16:42:25.101 -04:00INFOreadHighDepthCount = 17012  (type=number)
+2026-04-21 16:42:25.102 -04:00INFOreadHighDepthOIOSum = 1340224  (type=number)
+2026-04-21 16:42:25.103 -04:00INFOreadHighDepthNumTimes = 1372  (type=number)
+2026-04-21 16:42:25.104 -04:00INFOreadHighDepthDurationMs = 86422  (type=number)
+2026-04-21 16:42:25.105 -04:00INFOreadHighDepthBytes = 26847387648  (type=number)
+2026-04-21 16:42:25.106 -04:00INFOreadCachedCount = 0  (type=number)
+2026-04-21 16:42:25.107 -04:00INFOreadCachedBytes = 0  (type=number)
+2026-04-21 16:42:25.108 -04:00INFOreadCachedLatencySumUs = 0  (type=number)
+2026-04-21 16:42:25.109 -04:00INFOreadCachedLatencySqSumUs = 0  (type=number)
+2026-04-21 16:42:25.110 -04:00INFOreadCachedLatencyMaxUs = 0  (type=number)
+2026-04-21 16:42:25.111 -04:00INFOreadCachedCongestionSum = 0  (type=number)
+2026-04-21 16:42:25.112 -04:00INFOwriteHighDepthCount = 4734150  (type=number)
+2026-04-21 16:42:25.113 -04:00INFOwriteHighDepthOIOSum = 3051337415  (type=number)
+2026-04-21 16:42:25.114 -04:00INFOwriteHighDepthNumTimes = 45921  (type=number)
+2026-04-21 16:42:25.115 -04:00INFOwriteHighDepthDurationMs = 11473870  (type=number)
+2026-04-21 16:42:25.116 -04:00INFOwriteHighDepthBytes = 3240689796096  (type=number)
+2026-04-21 16:42:25.117 -04:00INFOproxyWriteCount = 0  (type=number)
+2026-04-21 16:42:25.118 -04:00INFOproxyWriteBytes = 0  (type=number)
