@@ -1,67 +1,56 @@
 /**
- * ACTION: deleteSnapshot
- * Module : com.company.snapshotcleanup
+ * ACTION: _deleteSnapshot
+ * Module : com.broadcom.pso.vc.vm.snapshots
  *
- * Executes a single snapshot deletion (removeChildren=false) with full
- * pre-deletion safety checks and pre/post I/O metric capture for governor
- * calibration.
+ * Executes a single snapshot deletion with full pre-deletion safety checks
+ * and pre/post I/O metric capture for governor calibration.
+ *
+ * VM lookup uses the vRO inventory object model exclusively. The vmMoRef
+ * value stored by _getSnapshotCandidates is vm.id exactly as vRO returns it.
+ * This action locates the VM by traversing the same inventory tree and
+ * matching on .id -- the same property, the same value, guaranteed to match.
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
  *   Name                  Type              Description
  *   ──────────────────────────────────────────────────────────────────────────
  *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to use
- *   vmMoRef               string            VM managed object reference value
- *   snapshotMoRef         string            Snapshot managed object ref value
+ *   vmMoRef               string            vm.id as stored by getSnapshotCandidates
+ *   snapshotMoRef         string            snapshot.snapshot.value
  *   snapshotName          string            For log messages
  *   vmName                string            For log messages
- *   datastoreMoRefsJson   string            JSON array of datastore MoRef strings
+ *   datastoreMoRefsJson   string            JSON array of datastore.id strings
  *   dryRun                boolean           When true, skip actual deletion
- *   taskTimeoutSeconds    number            Max wait for vCenter task completion
+ *   taskTimeoutSeconds    number            Max seconds to wait for vCenter task
  *
  * ── RETURN TYPE ──────────────────────────────────────────────────────────────
- *   string  JSON object
- *   {
- *     success         : boolean,
- *     skipped         : boolean,
- *     skipReason      : string | null,
- *     preMetricsJson  : string,
- *     postMetricsJson : string,
- *     durationMs      : number,
- *     error           : string | null
- *   }
+ *   string  JSON result object
  */
 
-var MODULE  = "com.company.snapshotcleanup";
-var startMs = new Date().getTime();
-var timeout = taskTimeoutSeconds || 1800;
-var dsRefs  = JSON.parse(datastoreMoRefsJson || "[]");
+var STORAGEMODULE = "com.broadcom.pso.vc.storage";
+var startMs       = new Date().getTime();
+var timeout       = taskTimeoutSeconds || 1800;
+var dsRefs        = JSON.parse(datastoreMoRefsJson || "[]");
 
 var result = {
-    success:        false,
-    skipped:        false,
-    skipReason:     null,
-    preMetricsJson: "[]",
-    postMetricsJson:"[]",
-    durationMs:     0,
-    error:          null
+    success:         false,
+    skipped:         false,
+    skipReason:      null,
+    preMetricsJson:  "[]",
+    postMetricsJson: "[]",
+    durationMs:      0,
+    error:           null
 };
 
 try {
-    // ── Locate the VM ─────────────────────────────────────────────────────────
-    // VcPlugin.findEntityById does not exist in vRO 8.x Polyglot runtime.
-    // Use VcPlugin.findAllForType scoped to the SDK connection instead.
-    var allVms = VcPlugin.getAllVirtualMachines(null, vcenterSdkConnection);
-    var vm = null;
-    for (var vi = 0; vi < allVms.length; vi++) {
-        if (allVms[vi].id === vmMoRef) {
-            vm = allVms[vi];
-            break;
-        }
-    }
+    // ── Locate VM by traversing vRO inventory tree ────────────────────────────
+    // vmMoRef is vm.id exactly as stored by _getSnapshotCandidates.
+    // We traverse the same inventory path and match on .id directly.
+    var vm = findVmById(vcenterSdkConnection.rootFolder, vmMoRef);
 
     if (!vm) {
-        result.skipped   = true;
-        result.skipReason = "VM not found (may have been deleted or is no longer visible): " + vmMoRef;
+        result.skipped    = true;
+        result.skipReason = "VM with id '" + vmMoRef + "' not found in inventory. " +
+                            "The VM may have been deleted or moved since the scan ran.";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
@@ -69,18 +58,17 @@ try {
     // ── Safety: template check ────────────────────────────────────────────────
     if (vm.config && vm.config.template) {
         result.skipped    = true;
-        result.skipReason = "VM is a template — templates are never modified";
+        result.skipReason = "VM is a template -- templates are never modified";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
 
     // ── Safety: active conflicting task check ─────────────────────────────────
-    var activeTasks = vm.recentTask;
-    if (activeTasks) {
-        for (var ti = 0; ti < activeTasks.length; ti++) {
-            var task = activeTasks[ti];
-            var ts   = task.info.state.value;
-            var td   = task.info.descriptionId || "";
+    if (vm.recentTask) {
+        for (var ti = 0; ti < vm.recentTask.length; ti++) {
+            var t  = vm.recentTask[ti];
+            var ts = t.info.state.value;
+            var td = t.info.descriptionId || "";
             if (ts === "running" &&
                 (td.indexOf("snapshot") !== -1 || td.indexOf("backup")   !== -1 ||
                  td.indexOf("clone")    !== -1 || td.indexOf("migrate")  !== -1 ||
@@ -94,15 +82,17 @@ try {
     }
 
     // ── Safety: host connectivity check ──────────────────────────────────────
-    var host = vm.runtime && vm.runtime.host;
-    if (host && host.runtime && host.runtime.connectionState) {
-        var cs = host.runtime.connectionState.value;
-        if (cs === "disconnected" || cs === "notResponding") {
-            result.skipped    = true;
-            result.skipReason = "Host " + host.name + " is " + cs +
-                                " — possible HA event, skipping to be safe";
-            result.durationMs = new Date().getTime() - startMs;
-            return JSON.stringify(result);
+    if (vm.runtime && vm.runtime.host) {
+        var host = vm.runtime.host;
+        if (host.runtime && host.runtime.connectionState) {
+            var cs = host.runtime.connectionState.value;
+            if (cs === "disconnected" || cs === "notResponding") {
+                result.skipped    = true;
+                result.skipReason = "Host " + host.name + " is " + cs +
+                                    " -- skipping to avoid data loss during possible HA event";
+                result.durationMs = new Date().getTime() - startMs;
+                return JSON.stringify(result);
+            }
         }
     }
 
@@ -113,7 +103,7 @@ try {
     }
     if (!snapObj) {
         result.skipped    = true;
-        result.skipReason = "Snapshot no longer exists (already deleted or consolidated by another process)";
+        result.skipReason = "Snapshot no longer exists -- already deleted or consolidated";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
@@ -125,56 +115,56 @@ try {
         return JSON.stringify(result);
     }
 
-    // ── Sample pre-deletion metrics ───────────────────────────────────────────
+    // ── Sample pre-deletion I/O metrics ──────────────────────────────────────
     var preMetrics = [];
     for (var pi = 0; pi < dsRefs.length; pi++) {
         try {
-            var pm = JSON.parse(System.getModule(MODULE)
-                       .getDatastoreMetrics(vcenterSdkConnection, dsRefs[pi]));
-            preMetrics.push(pm);
+            preMetrics.push(JSON.parse(
+                System.getModule(STORAGEMODULE)
+                    ._getDatastoreMetrics(vcenterSdkConnection, dsRefs[pi])));
         } catch (me) {
-            System.warn("deleteSnapshot: could not sample pre-metrics for " +
+            System.warn("deleteSnapshot: pre-metrics failed for " +
                         dsRefs[pi] + ": " + me.message);
         }
     }
     result.preMetricsJson = JSON.stringify(preMetrics);
 
     // ── Execute deletion ──────────────────────────────────────────────────────
-    System.log("Deleting snapshot: VM=" + vmName + " snap=" + snapshotName);
-    var task = snapObj.snapshot.removeSnapshot_Task(false);
+    System.log("Deleting: VM=" + vmName + " snap=" + snapshotName);
+    var delTask = snapObj.snapshot.removeSnapshot_Task(false);
 
     var waited = 0;
     while (waited < timeout * 1000) {
         System.sleep(5000);
         waited += 5000;
-        task.update();
-        var state = task.info.state.value;
+        delTask.update();
+        var state = delTask.info.state.value;
         if (state === "success") break;
         if (state === "error") {
-            result.error      = task.info.error
-                ? task.info.error.localizedMessage
+            result.error      = delTask.info.error
+                ? delTask.info.error.localizedMessage
                 : "vCenter task returned error state";
             result.durationMs = new Date().getTime() - startMs;
             return JSON.stringify(result);
         }
     }
 
-    if (task.info.state.value !== "success") {
-        result.error      = "Task timed out after " + timeout + " seconds";
+    if (delTask.info.state.value !== "success") {
+        result.error      = "Task timed out after " + timeout + "s";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
 
-    // ── Sample post-deletion metrics (after brief settle) ────────────────────
+    // ── Sample post-deletion I/O metrics ─────────────────────────────────────
     System.sleep(10000);
     var postMetrics = [];
     for (var poi = 0; poi < dsRefs.length; poi++) {
         try {
-            var pm2 = JSON.parse(System.getModule(MODULE)
-                        .getDatastoreMetrics(vcenterSdkConnection, dsRefs[poi]));
-            postMetrics.push(pm2);
+            postMetrics.push(JSON.parse(
+                System.getModule(STORAGEMODULE)
+                    ._getDatastoreMetrics(vcenterSdkConnection, dsRefs[poi])));
         } catch (me2) {
-            System.warn("deleteSnapshot: could not sample post-metrics for " +
+            System.warn("deleteSnapshot: post-metrics failed for " +
                         dsRefs[poi] + ": " + me2.message);
         }
     }
@@ -194,7 +184,34 @@ try {
 
 return JSON.stringify(result);
 
-// ── Snapshot tree finder ──────────────────────────────────────────────────────
+// ── Find VM by .id in the vRO inventory tree ──────────────────────────────────
+// Mirrors the traversal in _getSnapshotCandidates so the same vm.id value
+// that was stored during enumeration is used here for the lookup.
+function findVmById(folder, targetId) {
+    if (!folder || !folder.childEntity) return null;
+    for (var i = 0; i < folder.childEntity.length; i++) {
+        var child = folder.childEntity[i];
+        if (!child) continue;
+
+        // Check if this child is the VM we want
+        if (child.id === targetId) return child;
+
+        // Recurse based on inventory type
+        var type = child.vimType || child.sdkType || "";
+        if (type === "Datacenter" || child.vmFolder !== undefined) {
+            if (child.vmFolder) {
+                var found = findVmById(child.vmFolder, targetId);
+                if (found) return found;
+            }
+        } else if (child.childEntity !== undefined) {
+            var found2 = findVmById(child, targetId);
+            if (found2) return found2;
+        }
+    }
+    return null;
+}
+
+// ── Find snapshot by MoRef value in snapshot tree ────────────────────────────
 function findSnapshot(snapList, moRefValue) {
     for (var i = 0; i < snapList.length; i++) {
         var s = snapList[i];

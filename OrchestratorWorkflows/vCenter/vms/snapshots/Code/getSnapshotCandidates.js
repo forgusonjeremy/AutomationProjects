@@ -1,109 +1,176 @@
 /**
- * ACTION: getSnapshotCandidates
- * Module : com.company.snapshotcleanup
+ * ACTION: _getSnapshotCandidates
+ * Module : com.broadcom.pso.vc.vm.snapshots
  *
- * Enumerates all VMs on a single vCenter SDK connection, walks each VM's
- * snapshot tree recursively, and returns all snapshots that pass the
- * age / name / description filters.
+ * Enumerates all VMs reachable from a vCenter SDK connection by traversing
+ * the vRO inventory tree (SdkConnection -> rootFolder -> datacenters -> vm
+ * folders -> VirtualMachine objects). Uses native vRO inventory objects
+ * throughout -- no VcPlugin static calls, no REST, no MoRef construction.
  *
- * INPUT PARAMETERS (define in vRO Action Inputs tab):
- *   vcenterSdkConnection : VC:SdkConnection  — the vCenter to enumerate
- *   maxAgeMinutes        : number            — delete snapshots older than this
- *   nameMatchString      : string            — whitelist (empty = all names pass)
- *   descIgnoreString     : string            — skip snap if description contains this
+ * ── INPUTS ───────────────────────────────────────────────────────────────────
+ *   Name                  Type              Description
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to enumerate
+ *   maxAgeMinutes         number            Candidates older than this (minutes)
+ *   nameMatchString       string            Whitelist filter (empty = all names)
+ *   descIgnoreString      string            Skip filter  (empty = no filter)
  *
- * RETURN TYPE: string (JSON array of candidate objects)
- *
- * CANDIDATE OBJECT SCHEMA:
+ * ── RETURN TYPE ──────────────────────────────────────────────────────────────
+ *   string  JSON array of candidate snapshot objects. Each object contains:
  *   {
- *     vmMoRef             : string,
+ *     vmMoRef             : string,   // vm.id as returned by vRO inventory
  *     vmName              : string,
  *     vmPowerState        : string,   // "poweredOn" | "poweredOff" | "suspended"
- *     snapshotMoRef       : string,
+ *     snapshotMoRef       : string,   // snapshot.snapshot.value
  *     snapshotName        : string,
  *     snapshotDesc        : string,
  *     snapshotCreatedMs   : number,
  *     snapshotAgeMinutes  : number,
- *     datastoreMoRefs     : string[],
+ *     datastoreMoRefs     : string[], // datastore.id for each attached datastore
  *     parentSnapshotMoRef : string | null
  *   }
  */
 
-var result      = [];
-var now         = new Date();
-var cutoffMs    = (maxAgeMinutes || 60) * 60 * 1000;
-var nameFilter  = (nameMatchString  || "").toLowerCase().trim();
-var descIgnore  = (descIgnoreString || "").toLowerCase().trim();
+var result     = [];
+var now        = new Date();
+var cutoffMs   = (maxAgeMinutes || 60) * 60 * 1000;
+var nameFilter = (nameMatchString  || "").toLowerCase().trim();
+var descIgnore = (descIgnoreString || "").toLowerCase().trim();
 
-var vms = vcenterSdkConnection.getAllVirtualMachines()
+// ── Collect all VMs by traversing the vRO inventory tree ─────────────────────
+// Path: sdkConnection.rootFolder
+//         -> datacenters[] (VC:Datacenter)
+//           -> vmFolder (VC:Folder)
+//             -> recurse folders and collect VC:VirtualMachine objects
+//
+// vm.id is the vRO inventory identifier for the VM object. It is stored as
+// vmMoRef so deleteSnapshot can locate the same object by matching .id.
 
-for each (var vm in vms) {
-    if (vm.config && vm.config.template) continue;
+var allVms = [];
+collectVmsFromFolder(vcenterSdkConnection.rootFolder);
+
+System.log("_getSnapshotCandidates: found " + allVms.length +
+           " VMs on " + vcenterSdkConnection.name);
+
+// Log the id format of the first VM found so we can confirm the format
+// used in this environment (used by deleteSnapshot for matching)
+if (allVms.length > 0) {
+    System.log("_getSnapshotCandidates: sample vm.id='" + allVms[0].id +
+               "'  vm.name='" + allVms[0].name + "'");
+}
+
+// ── Evaluate each VM's snapshot tree ─────────────────────────────────────────
+for (var vi = 0; vi < allVms.length; vi++) {
+    var vm = allVms[vi];
+
+    if (!vm || !vm.config) continue;
+    if (vm.config.template) continue;
     if (!vm.snapshot || !vm.snapshot.rootSnapshotList ||
         vm.snapshot.rootSnapshotList.length === 0) continue;
 
-    var vmName      = vm.name;
-    var vmMoRef     = vm.id;
-    var powerState  = vm.runtime.powerState.value;
-
-    var datastoreMoRefs = [];
+    var dsMoRefs = [];
     if (vm.datastore) {
-        for each (var ds in vm.datastore) {
-            datastoreMoRefs.push(ds.id);
+        for (var di = 0; di < vm.datastore.length; di++) {
+            dsMoRefs.push(vm.datastore[di].id);
         }
     }
 
-    walkSnapshots(vm.snapshot.rootSnapshotList, null,
-                  vmMoRef, vmName, powerState, datastoreMoRefs);
+    walkSnapshots(
+        vm.snapshot.rootSnapshotList,
+        null,
+        vm.id,          // store exactly as vRO returns it
+        vm.name,
+        vm.runtime.powerState.value,
+        dsMoRefs
+    );
 }
 
 return JSON.stringify(result);
 
-function walkSnapshots(snapList, parentMoRef, vmMoRef, vmName, powerState, datastoreMoRefs) {
-    for each (var snap in snapList) {
-        var snapName  = snap.name        || "";
-        var snapDesc  = snap.description || "";
-        var snapMoRef = snap.snapshot.value;
-        var created   = snap.createTime;
-        var ageMs     = now.getTime() - created.getTime();
+// ── Recursive VM collector ────────────────────────────────────────────────────
+// Handles the vCenter inventory hierarchy:
+//   rootFolder -> Datacenter -> vmFolder -> (Folder | VirtualMachine)*
+// Recurses into sub-folders. Skips non-VM, non-Folder child types silently.
+function collectVmsFromFolder(folder) {
+    if (!folder || !folder.childEntity) return;
+    for (var i = 0; i < folder.childEntity.length; i++) {
+        var child = folder.childEntity[i];
+        if (!child) continue;
+        var type = child.vimType || child.sdkType || "";
+        if (type === "VirtualMachine" || child.snapshot !== undefined) {
+            // It's a VM object
+            allVms.push(child);
+        } else if (type === "Datacenter") {
+            // Recurse into the datacenter's vm folder
+            if (child.vmFolder) collectVmsFromFolder(child.vmFolder);
+        } else if (type === "Folder") {
+            // Recurse into sub-folders (resource pools, clusters, etc.)
+            collectVmsFromFolder(child);
+        } else if (child.vmFolder !== undefined) {
+            // Datacenter-like object -- try its vmFolder
+            collectVmsFromFolder(child.vmFolder);
+        } else if (child.childEntity !== undefined) {
+            // Generic folder-like container -- recurse
+            collectVmsFromFolder(child);
+        }
+    }
+}
 
+// ── Recursive snapshot tree walker ────────────────────────────────────────────
+function walkSnapshots(snapList, parentMoRef, vmId, vmName, pwrState, dsMoRefs) {
+    for (var si = 0; si < snapList.length; si++) {
+        var snap     = snapList[si];
+        var snapName = snap.name        || "";
+        var snapDesc = snap.description || "";
+        var snapMoRef= snap.snapshot.value;
+        var ageMs    = now.getTime() - snap.createTime.getTime();
+
+        // Age filter -- still walk children even if this snap is too young
         if (ageMs < cutoffMs) {
-            if (snap.childSnapshotList && snap.childSnapshotList.length > 0)
-                walkSnapshots(snap.childSnapshotList, snapMoRef, vmMoRef,
-                              vmName, powerState, datastoreMoRefs);
+            if (snap.childSnapshotList && snap.childSnapshotList.length > 0) {
+                walkSnapshots(snap.childSnapshotList, snapMoRef,
+                              vmId, vmName, pwrState, dsMoRefs);
+            }
             continue;
         }
 
-        if (descIgnore !== "" && snapDesc.toLowerCase().indexOf(descIgnore) !== -1) {
+        // Description ignore filter -- skip this snap, still walk children
+        if (descIgnore !== "" &&
+            snapDesc.toLowerCase().indexOf(descIgnore) !== -1) {
             System.log("SKIP (desc match): VM=" + vmName + " snap=" + snapName);
-            if (snap.childSnapshotList && snap.childSnapshotList.length > 0)
-                walkSnapshots(snap.childSnapshotList, snapMoRef, vmMoRef,
-                              vmName, powerState, datastoreMoRefs);
+            if (snap.childSnapshotList && snap.childSnapshotList.length > 0) {
+                walkSnapshots(snap.childSnapshotList, snapMoRef,
+                              vmId, vmName, pwrState, dsMoRefs);
+            }
             continue;
         }
 
-        if (nameFilter !== "" && snapName.toLowerCase().indexOf(nameFilter) === -1) {
-            if (snap.childSnapshotList && snap.childSnapshotList.length > 0)
-                walkSnapshots(snap.childSnapshotList, snapMoRef, vmMoRef,
-                              vmName, powerState, datastoreMoRefs);
+        // Name whitelist filter -- skip this snap, still walk children
+        if (nameFilter !== "" &&
+            snapName.toLowerCase().indexOf(nameFilter) === -1) {
+            if (snap.childSnapshotList && snap.childSnapshotList.length > 0) {
+                walkSnapshots(snap.childSnapshotList, snapMoRef,
+                              vmId, vmName, pwrState, dsMoRefs);
+            }
             continue;
         }
 
         result.push({
-            vmMoRef:             vmMoRef,
+            vmMoRef:             vmId,
             vmName:              vmName,
-            vmPowerState:        powerState,
+            vmPowerState:        pwrState,
             snapshotMoRef:       snapMoRef,
             snapshotName:        snapName,
             snapshotDesc:        snapDesc,
-            snapshotCreatedMs:   created.getTime(),
+            snapshotCreatedMs:   snap.createTime.getTime(),
             snapshotAgeMinutes:  Math.floor(ageMs / 60000),
-            datastoreMoRefs:     datastoreMoRefs,
+            datastoreMoRefs:     dsMoRefs,
             parentSnapshotMoRef: parentMoRef
         });
 
-        if (snap.childSnapshotList && snap.childSnapshotList.length > 0)
-            walkSnapshots(snap.childSnapshotList, snapMoRef, vmMoRef,
-                          vmName, powerState, datastoreMoRefs);
+        if (snap.childSnapshotList && snap.childSnapshotList.length > 0) {
+            walkSnapshots(snap.childSnapshotList, snapMoRef,
+                          vmId, vmName, pwrState, dsMoRefs);
+        }
     }
 }
