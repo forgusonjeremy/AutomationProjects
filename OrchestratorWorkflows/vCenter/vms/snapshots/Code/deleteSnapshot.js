@@ -50,7 +50,7 @@ try {
     // ── Locate the VM ─────────────────────────────────────────────────────────
     // VcPlugin.findEntityById does not exist in vRO 8.x Polyglot runtime.
     // Use VcPlugin.findAllForType scoped to the SDK connection instead.
-    var allVms = VcPlugin.findAllForType("VirtualMachine", vcenterSdkConnection);
+    var allVms = VcPlugin.getAllVirtualMachines(null, vcenterSdkConnection);
     var vm = null;
     for (var vi = 0; vi < allVms.length; vi++) {
         if (allVms[vi].id === vmMoRef) {
