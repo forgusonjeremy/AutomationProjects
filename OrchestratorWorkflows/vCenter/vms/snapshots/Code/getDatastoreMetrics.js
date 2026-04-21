@@ -83,15 +83,28 @@ try {
         // vCenter 9 vSAN counter keys.
         // Also includes vCenter 7/8 variants as fallback in case of
         // mixed-version environments or future key name changes.
+        // Counter group names observed across vCenter versions:
+        //   vsanDomObj  -- confirmed in vCenter 9 (this environment)
+        //   vsan        -- vCenter 8.x variant
+        //   vsanDomClient / vsanResync -- vCenter 7.x
+        // All variants listed so this works across versions.
+        // First match per field wins (earlier entries take priority).
         var vsanKeys = [
-            // vCenter 9 / 8.x
-            { k: "vsan:latencyRead:average",    f: "readLatencyMs",        m: true  },
-            { k: "vsan:latencyWrite:average",   f: "writeLatencyMs",       m: true  },
-            { k: "vsan:congestion:average",     f: "vsanCongestion",       m: false },
-            { k: "vsan:bytesToSync:latest",     f: "vsanResyncQueueDepth", m: false },
-            { k: "vsan:iopsRead:average",       f: "iopsRead",             m: false },
-            { k: "vsan:iopsWrite:average",      f: "iopsWrite",            m: false },
-            // vCenter 7.x fallbacks
+            // vCenter 9 -- vsanDomObj group (confirmed in this environment)
+            { k: "vsanDomObj:readLatency:average",    f: "readLatencyMs",        m: true  },
+            { k: "vsanDomObj:writeLatency:average",   f: "writeLatencyMs",       m: true  },
+            { k: "vsanDomObj:congestion:average",     f: "vsanCongestion",       m: false },
+            { k: "vsanDomObj:bytesToSync:latest",     f: "vsanResyncQueueDepth", m: false },
+            { k: "vsanDomObj:iopsRead:average",       f: "iopsRead",             m: false },
+            { k: "vsanDomObj:iopsWrite:average",      f: "iopsWrite",            m: false },
+            // vCenter 8.x -- vsan group
+            { k: "vsan:latencyRead:average",          f: "readLatencyMs",        m: true  },
+            { k: "vsan:latencyWrite:average",         f: "writeLatencyMs",       m: true  },
+            { k: "vsan:congestion:average",           f: "vsanCongestion",       m: false },
+            { k: "vsan:bytesToSync:latest",           f: "vsanResyncQueueDepth", m: false },
+            { k: "vsan:iopsRead:average",             f: "iopsRead",             m: false },
+            { k: "vsan:iopsWrite:average",            f: "iopsWrite",            m: false },
+            // vCenter 7.x -- vsanDomClient / vsanResync groups
             { k: "vsanDomClient:readLatency:average",  f: "readLatencyMs",        m: true  },
             { k: "vsanDomClient:writeLatency:average", f: "writeLatencyMs",       m: true  },
             { k: "vsanDomClient:congestion:average",   f: "vsanCongestion",       m: false },

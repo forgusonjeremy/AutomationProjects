@@ -102,8 +102,24 @@ try {
         snapObj = findSnapshot(vm.snapshot.rootSnapshotList, snapshotMoRef);
     }
     if (!snapObj) {
+        // Diagnostic: log the first snapshot's .value to check format vs snapshotMoRef
+        if (vm.snapshot && vm.snapshot.rootSnapshotList &&
+            vm.snapshot.rootSnapshotList.length > 0) {
+            var firstSnap = vm.snapshot.rootSnapshotList[0];
+            System.warn("deleteSnapshot: snapshot not found. " +
+                "Looking for snapshotMoRef='" + snapshotMoRef + "' " +
+                "(type=" + typeof snapshotMoRef + "). " +
+                "First snap in tree: snap.snapshot=" + firstSnap.snapshot +
+                " .value='" + firstSnap.snapshot.value + "' " +
+                " .type='" + firstSnap.snapshot.type + "' " +
+                "name='" + firstSnap.name + "'");
+        } else {
+            System.warn("deleteSnapshot: snapshot not found and VM has no snapshots. " +
+                "snapshotMoRef='" + snapshotMoRef + "' VM=" + vmName);
+        }
         result.skipped    = true;
-        result.skipReason = "Snapshot no longer exists -- already deleted or consolidated";
+        result.skipReason = "Snapshot not found: snapshotMoRef='" + snapshotMoRef +
+                            "' -- check diagnostic log for format details";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
@@ -213,9 +229,23 @@ function findVmById(folder, targetId) {
 
 // ── Find snapshot by MoRef value in snapshot tree ────────────────────────────
 function findSnapshot(snapList, moRefValue) {
+    var targetStr = String(moRefValue);
     for (var i = 0; i < snapList.length; i++) {
         var s = snapList[i];
-        if (s.snapshot && s.snapshot.value === moRefValue) return s;
+        if (s.snapshot) {
+            // Try direct value comparison first
+            if (s.snapshot.value === moRefValue) return s;
+            // Try string coercion -- Polyglot runtime may return MoRef object
+            // whose .value property serialises differently than a plain string
+            if (String(s.snapshot.value) === targetStr) return s;
+            // Try matching on the full MoRef string representation
+            // e.g. "snapshot-2" vs "2" -- strip the type prefix if present
+            var rawVal = String(s.snapshot.value);
+            var dashIdx = rawVal.lastIndexOf("-");
+            if (dashIdx !== -1 && rawVal.substring(dashIdx + 1) === targetStr) return s;
+            if (dashIdx !== -1 && targetStr.lastIndexOf("-") !== -1 &&
+                targetStr.substring(targetStr.lastIndexOf("-") + 1) === rawVal.substring(dashIdx + 1)) return s;
+        }
         if (s.childSnapshotList && s.childSnapshotList.length > 0) {
             var found = findSnapshot(s.childSnapshotList, moRefValue);
             if (found) return found;
