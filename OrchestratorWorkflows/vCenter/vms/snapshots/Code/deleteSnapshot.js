@@ -149,24 +149,52 @@ try {
     System.log("Deleting: VM=" + vmName + " snap=" + snapshotName);
     var delTask = snapObj.snapshot.removeSnapshot_Task(false);
 
-    var waited = 0;
+    // Poll by re-fetching the task state via the task MoRef through the
+    // vRO task manager. VcTask.update() does not exist in vRO 8.17 Polyglot.
+    // Instead we poll Server.getTask() which re-fetches the task from vCenter.
+    var taskMoRef  = delTask.id;
+    var waited     = 0;
+    var finalState = "running";
+
     while (waited < timeout * 1000) {
         System.sleep(5000);
         waited += 5000;
-        delTask.update();
-        var state = delTask.info.state.value;
-        if (state === "success") break;
-        if (state === "error") {
-            result.error      = delTask.info.error
-                ? delTask.info.error.localizedMessage
-                : "vCenter task returned error state";
-            result.durationMs = new Date().getTime() - startMs;
-            return JSON.stringify(result);
+        try {
+            var refreshedTask = Server.getTask(taskMoRef);
+            if (refreshedTask && refreshedTask.info) {
+                finalState = refreshedTask.info.state.value;
+                if (finalState === "success") break;
+                if (finalState === "error") {
+                    result.error      = refreshedTask.info.error
+                        ? refreshedTask.info.error.localizedMessage
+                        : "vCenter task returned error state";
+                    result.durationMs = new Date().getTime() - startMs;
+                    return JSON.stringify(result);
+                }
+            }
+        } catch (pe) {
+            // Task may have completed and been garbage collected -- try
+            // confirming by checking VM snapshot list directly
+            System.warn("deleteSnapshot: task poll error: " + pe.message +
+                        " -- checking VM snapshot list to confirm");
+            var vmRefreshed = findVmById(vcenterSdkConnection.rootFolder, vmMoRef);
+            if (vmRefreshed) {
+                var stillExists = false;
+                if (vmRefreshed.snapshot && vmRefreshed.snapshot.rootSnapshotList) {
+                    stillExists = !!findSnapshot(
+                        vmRefreshed.snapshot.rootSnapshotList, snapshotMoRef);
+                }
+                if (!stillExists) {
+                    finalState = "success";
+                    break;
+                }
+            }
         }
     }
 
-    if (delTask.info.state.value !== "success") {
-        result.error      = "Task timed out after " + timeout + "s";
+    if (finalState !== "success") {
+        result.error      = "Task timed out or did not complete after " +
+                            timeout + "s (last state: " + finalState + ")";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
