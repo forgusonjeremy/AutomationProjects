@@ -1,11 +1,16 @@
-var vc = // bind your vcenterSdkConnection here
-var perfMgr = vc.performanceManager;
-var found = [];
-for (var i = 0; i < perfMgr.perfCounter.length; i++) {
-    var c = perfMgr.perfCounter[i];
-    if (c.groupInfo.key.indexOf("vsanDomObj") !== -1 ||
-        c.groupInfo.key.indexOf("vsan") !== -1) {
-        found.push(c.groupInfo.key + ":" + c.nameInfo.key + ":" + c.rollupType.value);
-    }
-}
-System.log("vSAN counters found: " + found.sort().join("\n"));
+2026-04-21 16:03:27.612 -04:00INFOvSAN counters found: vsanDomObj:readAvgLatency:average
+vsanDomObj:readCacheHitRate:latest
+vsanDomObj:readCongestion:average
+vsanDomObj:readIops:average
+vsanDomObj:readMaxLatency:latest
+vsanDomObj:readThroughput:average
+vsanDomObj:recoveryWriteAvgLatency:average
+vsanDomObj:recoveryWriteCongestion:average
+vsanDomObj:recoveryWriteIops:average
+vsanDomObj:recoveryWriteMaxLatency:latest
+vsanDomObj:recoveryWriteThroughput:average
+vsanDomObj:writeAvgLatency:average
+vsanDomObj:writeCongestion:average
+vsanDomObj:writeIops:average
+vsanDomObj:writeMaxLatency:latest
+vsanDomObj:writeThroughput:average
