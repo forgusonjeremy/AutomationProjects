@@ -1,1 +1,6 @@
-da78d857}} getDatastoreMetrics: vSAN sample complete for datastore-18 readLatMs=null writeLatMs=null
+System.log("getDatastoreMetrics: vSAN raw delta: " +
+    "dReadCount=" + dReadCount + " dReadMs=" + dReadMs +
+    " dWriteCount=" + dWriteCount + " dWriteMs=" + dWriteMs +
+    " dReadCong=" + dReadCong + " dWriteCong=" + dWriteCong +
+    " congestion=" + metrics.vsanCongestion +
+    " iopsR=" + metrics.iopsRead + " iopsW=" + metrics.iopsWrite);
