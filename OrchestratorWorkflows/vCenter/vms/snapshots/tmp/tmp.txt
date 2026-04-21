@@ -1,19 +1,73 @@
-2026-04-21 16:32:48.836 -04:00INFOCluster: cvsdev-cl01
-2026-04-21 16:32:48.837 -04:00INFOHost: sfo01-m01-r01-esx02.connect.lab
-2026-04-21 16:32:48.839 -04:00INFOvsanInternalSystem: present
-2026-04-21 16:32:48.841 -04:00INFOvsanSystem: present
-2026-04-21 16:32:48.842 -04:00INFOvsanInternalSystem.vimType: HostVsanInternalSystem
-2026-04-21 16:32:48.878 -04:00INFOqueryCmmds failed: Cannot convert [{"type":"DOM_OBJECT","fields":["read_congestion","write_congestion","read_count","write_count"]}] to java.lang.Object[] (Workflow:#Test / Scriptable task (item1)#22)
-2026-04-21 16:32:49.207 -04:00INFOqueryVsanStatistics result: {"dom.owners.stats-taken": 1776803568.899379, "dom.owners.stats": {"0f72e769-a83f-e12d-c64e-e4434b941780": {"trackTimeMsPerfSvc": 0, "readSkippedOnDelta": 0, "readHighDepthCount": 0, "readHighDepthOIOSum": 0, "readHighDepthNumTimes": 0, "readHighDepthDurationMs": 0, "readHighDepthBytes": 0, "readCachedCount": 0, "readCachedBytes": 0, "readCachedLatencySumUs": 0, "readCachedLatencySqSumUs": 0, "readCachedLatencyMaxUs": 0, "readCachedCongestionSum": 0, "writeHighDepthCount": 4038944, "writeHighDep
-2026-04-21 16:32:49.208 -04:00INFOvsanSystem.vimType: HostVsanSystem
-2026-04-21 16:32:49.216 -04:00INFOvsanSystem.config: undefined
-2026-04-21 16:32:49.217 -04:00INFO--- serviceContent vSAN properties ---
-2026-04-21 16:32:49.218 -04:00ERRORError in (Workflow:#Test / Scriptable task (item1)#49) TypeError: Cannot read property "vsanPerformanceManager" from undefined
-2026-04-21 16:32:49.229 -04:00ERRORWorkflow execution stack:
-***
-item: '#Test/item1', state: 'failed', business state: 'null', exception: 'TypeError: Cannot read property "vsanPerformanceManager" from undefined (Workflow:#Test / Scriptable task (item1)#49)'
-workflow: '#Test' (0f5229ed-a695-49b9-afaa-c3fe078a5239) 
-|  'attribute': name=vcenterSdkConnection type=VC:SdkConnection value=dunes://service.dunes.ch/CustomSDKObject?id='cvsd26vcfvc001.connect.lab'&dunesName='VC:SdkConnection'
-|  'no inputs'
-|  'no outputs'
-*** End of execution stack.
+// Bind vcenterSdkConnection (VC:SdkConnection)
+
+var cluster = vcenterSdkConnection.rootFolder.childEntity[0]
+                .hostFolder.childEntity[0];
+var host    = cluster.host[0];
+var vis     = host.configManager.vsanInternalSystem;
+
+// Get full stats -- look at all available labels
+var labels  = ["dom-owners"];
+var result  = vis.queryVsanStatistics(labels);
+
+// Parse and explore the structure
+var parsed = JSON.parse(result);
+
+System.log("Top-level keys: " + Object.keys(parsed).join(", "));
+
+// dom.owners.stats contains per-object stats keyed by DOM object UUID
+var ownerStats = parsed["dom.owners.stats"];
+if (ownerStats) {
+    var uuids = Object.keys(ownerStats);
+    System.log("DOM object count: " + uuids.length);
+    
+    if (uuids.length > 0) {
+        // Print the full key set from the first object
+        var firstObj = ownerStats[uuids[0]];
+        System.log("\nFirst DOM object UUID: " + uuids[0]);
+        System.log("Available fields: " + Object.keys(firstObj).join(", "));
+        System.log("\nFull first object: " + JSON.stringify(firstObj, null, 2).substring(0, 2000));
+    }
+}
+
+// Also try querying all hosts to see if we get different/more objects
+System.log("\n=== All hosts contribution ===");
+var allHostStats = {};
+for (var hi = 0; hi < cluster.host.length; hi++) {
+    var h   = cluster.host[hi];
+    var hv  = h.configManager.vsanInternalSystem;
+    try {
+        var hr     = JSON.parse(hv.queryVsanStatistics(["dom-owners"]));
+        var hStats = hr["dom.owners.stats"] || {};
+        var hUuids = Object.keys(hStats);
+        System.log("Host " + h.name + ": " + hUuids.length + " DOM objects");
+        for (var ui = 0; ui < hUuids.length; ui++) {
+            allHostStats[hUuids[ui]] = hStats[hUuids[ui]];
+        }
+    } catch (e) {
+        System.log("Host " + h.name + " failed: " + e.message);
+    }
+}
+System.log("Total unique DOM objects across all hosts: " +
+    Object.keys(allHostStats).length);
+
+// Print aggregated latency/congestion fields from all objects
+var totalReadLatUs  = 0, totalReadCount  = 0;
+var totalWriteLatUs = 0, totalWriteCount = 0;
+var maxCongestion   = 0;
+var allUuids = Object.keys(allHostStats);
+for (var ai = 0; ai < allUuids.length; ai++) {
+    var obj = allHostStats[allUuids[ai]];
+    if (obj.readCount)          totalReadCount  += obj.readCount;
+    if (obj.readLatencySumUs)   totalReadLatUs  += obj.readLatencySumUs;
+    if (obj.writeCount)         totalWriteCount += obj.writeCount;
+    if (obj.writeLatencySumUs)  totalWriteLatUs += obj.writeLatencySumUs;
+    if (obj.readCongestionSum)  maxCongestion = Math.max(maxCongestion, obj.readCongestionSum);
+    if (obj.writeCongestionSum) maxCongestion = Math.max(maxCongestion, obj.writeCongestionSum);
+}
+
+System.log("\n=== Aggregated metrics ===");
+System.log("Total read ops:  " + totalReadCount);
+System.log("Total write ops: " + totalWriteCount);
+System.log("Avg read latency:  " + (totalReadCount  > 0 ? (totalReadLatUs  / totalReadCount  / 1000).toFixed(2) : "n/a") + " ms");
+System.log("Avg write latency: " + (totalWriteCount > 0 ? (totalWriteLatUs / totalWriteCount / 1000).toFixed(2) : "n/a") + " ms");
+System.log("Max congestion seen: " + maxCongestion);
