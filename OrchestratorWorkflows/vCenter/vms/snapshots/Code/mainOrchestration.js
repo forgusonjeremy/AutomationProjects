@@ -225,6 +225,10 @@ function processQueue(queue, defaultVcConn, fastLane, maxConcurrent) {
                 pollAttempts++;
                 governorApproved = checkGovernor(vc, dsRefs, candidate.vmName);
             }
+            if (governorApproved) {
+                System.log("Governor CLEARED for VM=" + candidate.vmName +
+               " after " + pollAttempts + " poll attempt(s)");
+            }
             if (!governorApproved) {
                 System.warn("Governor: max wait exceeded for VM=" + candidate.vmName + " snap=" +
                             candidate.snapshotName + " — deferring this run");
@@ -314,7 +318,8 @@ function checkGovernor(vcConn, dsRefs, vmName) {
     ));
 
     if (!govResult.approved) {
-        System.log("Governor DENY for VM=" + vmName + ": " + govResult.reason);
+    System.log("Governor DENY for VM=" + vmName + ": " + govResult.reason +
+               " | projectedDeltas=" + JSON.stringify(govResult.projectedDeltas));
     }
     return govResult.approved;
 }
