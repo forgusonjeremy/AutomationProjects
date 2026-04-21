@@ -1,93 +1,19 @@
-var cluster = vcenterSdkConnection.rootFolder.childEntity[0]
-                .hostFolder.childEntity[0];
-
-System.log("Cluster: " + cluster.name);
-
-var hosts = cluster.host;
-var host  = hosts[0];
-System.log("Host: " + host.name);
-
-var cfg = host.configManager;
-
-// Access specific configManager properties directly -- no Object.keys()
-System.log("vsanInternalSystem: " + (cfg.vsanInternalSystem ? "present" : "null"));
-System.log("vsanSystem: "         + (cfg.vsanSystem         ? "present" : "null"));
-
-if (cfg.vsanInternalSystem) {
-    var vis = cfg.vsanInternalSystem;
-    System.log("vsanInternalSystem.vimType: " + vis.vimType);
-    
-    // Try queryCmmds -- returns raw vSAN stats including performance data
-    try {
-        var queries = '[{"type":"DOM_OBJECT","fields":["read_congestion","write_congestion","read_count","write_count"]}]';
-        var result  = vis.queryCmmds(queries);
-        System.log("queryCmmds result length: " + (result ? result.length : "null"));
-        System.log("queryCmmds sample: " + String(result).substring(0, 500));
-    } catch (e1) {
-        System.log("queryCmmds failed: " + e1.message);
-    }
-    
-    // Try queryVsanStatistics
-    try {
-        var labels = ["dom-objects"];
-        var stats  = vis.queryVsanStatistics(labels);
-        System.log("queryVsanStatistics result: " + String(stats).substring(0, 500));
-    } catch (e2) {
-        System.log("queryVsanStatistics failed: " + e2.message);
-    }
-}
-
-if (cfg.vsanSystem) {
-    var vs = cfg.vsanSystem;
-    System.log("vsanSystem.vimType: " + vs.vimType);
-    System.log("vsanSystem.config: " + JSON.stringify(vs.config));
-}
-
-// serviceContent -- access specific known vSAN properties
-System.log("\n--- serviceContent vSAN properties ---");
-var sc = vcenterSdkConnection.serviceContent;
-System.log("vsanPerformanceManager: " +
-    (sc.vsanPerformanceManager ? "present" : "null"));
-System.log("vsanClusterHealthSystem: " +
-    (sc.vsanClusterHealthSystem ? "present" : "null"));
-
-// queryAvailablePerfMetric on vSAN datastore
-System.log("\n--- queryAvailablePerfMetric on vSAN datastore ---");
-var perfMgr    = vcenterSdkConnection.performanceManager;
-var datastores = vcenterSdkConnection.getAllDatastores();
-for (var di = 0; di < datastores.length; di++) {
-    var ds = datastores[di];
-    if (ds.summary && ds.summary.type &&
-        ds.summary.type.toLowerCase() === "vsan") {
-        System.log("vSAN datastore: " + ds.name + " id=" + ds.id);
-        
-        try {
-            var avail20 = perfMgr.queryAvailablePerfMetric(ds, null, null, 20);
-            System.log("availableMetrics intervalId=20: " +
-                (avail20 ? avail20.length : 0));
-            if (avail20 && avail20.length > 0) {
-                for (var ai = 0; ai < Math.min(5, avail20.length); ai++) {
-                    System.log("  counterId=" + avail20[ai].counterId +
-                               " instance='" + avail20[ai].instance + "'");
-                }
-            }
-        } catch (e3) {
-            System.log("queryAvailablePerfMetric(20) error: " + e3.message);
-        }
-
-        try {
-            var avail300 = perfMgr.queryAvailablePerfMetric(ds, null, null, 300);
-            System.log("availableMetrics intervalId=300: " +
-                (avail300 ? avail300.length : 0));
-            if (avail300 && avail300.length > 0) {
-                for (var bi = 0; bi < Math.min(5, avail300.length); bi++) {
-                    System.log("  counterId=" + avail300[bi].counterId +
-                               " instance='" + avail300[bi].instance + "'");
-                }
-            }
-        } catch (e4) {
-            System.log("queryAvailablePerfMetric(300) error: " + e4.message);
-        }
-        break;
-    }
-}
+2026-04-21 16:32:48.836 -04:00INFOCluster: cvsdev-cl01
+2026-04-21 16:32:48.837 -04:00INFOHost: sfo01-m01-r01-esx02.connect.lab
+2026-04-21 16:32:48.839 -04:00INFOvsanInternalSystem: present
+2026-04-21 16:32:48.841 -04:00INFOvsanSystem: present
+2026-04-21 16:32:48.842 -04:00INFOvsanInternalSystem.vimType: HostVsanInternalSystem
+2026-04-21 16:32:48.878 -04:00INFOqueryCmmds failed: Cannot convert [{"type":"DOM_OBJECT","fields":["read_congestion","write_congestion","read_count","write_count"]}] to java.lang.Object[] (Workflow:#Test / Scriptable task (item1)#22)
+2026-04-21 16:32:49.207 -04:00INFOqueryVsanStatistics result: {"dom.owners.stats-taken": 1776803568.899379, "dom.owners.stats": {"0f72e769-a83f-e12d-c64e-e4434b941780": {"trackTimeMsPerfSvc": 0, "readSkippedOnDelta": 0, "readHighDepthCount": 0, "readHighDepthOIOSum": 0, "readHighDepthNumTimes": 0, "readHighDepthDurationMs": 0, "readHighDepthBytes": 0, "readCachedCount": 0, "readCachedBytes": 0, "readCachedLatencySumUs": 0, "readCachedLatencySqSumUs": 0, "readCachedLatencyMaxUs": 0, "readCachedCongestionSum": 0, "writeHighDepthCount": 4038944, "writeHighDep
+2026-04-21 16:32:49.208 -04:00INFOvsanSystem.vimType: HostVsanSystem
+2026-04-21 16:32:49.216 -04:00INFOvsanSystem.config: undefined
+2026-04-21 16:32:49.217 -04:00INFO--- serviceContent vSAN properties ---
+2026-04-21 16:32:49.218 -04:00ERRORError in (Workflow:#Test / Scriptable task (item1)#49) TypeError: Cannot read property "vsanPerformanceManager" from undefined
+2026-04-21 16:32:49.229 -04:00ERRORWorkflow execution stack:
+***
+item: '#Test/item1', state: 'failed', business state: 'null', exception: 'TypeError: Cannot read property "vsanPerformanceManager" from undefined (Workflow:#Test / Scriptable task (item1)#49)'
+workflow: '#Test' (0f5229ed-a695-49b9-afaa-c3fe078a5239) 
+|  'attribute': name=vcenterSdkConnection type=VC:SdkConnection value=dunes://service.dunes.ch/CustomSDKObject?id='cvsd26vcfvc001.connect.lab'&dunesName='VC:SdkConnection'
+|  'no inputs'
+|  'no outputs'
+*** End of execution stack.
