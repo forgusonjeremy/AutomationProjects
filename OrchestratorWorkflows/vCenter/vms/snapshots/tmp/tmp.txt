@@ -1,96 +1,17 @@
-var cluster = vcenterSdkConnection.rootFolder.childEntity[0]
-                .hostFolder.childEntity[0];
-
-System.log("=== Cluster: " + cluster.name + " ===");
-System.log("cluster.vimType: " + cluster.vimType);
-
-// 1. ConfigurationEx -- vSAN config lives here
-var cfgEx = cluster.configurationEx;
-System.log("\n--- configurationEx ---");
-System.log("vsanConfigInfo: " + (cfgEx.vsanConfigInfo ? "present" : "null"));
-if (cfgEx.vsanConfigInfo) {
-    System.log("  enabled: " + cfgEx.vsanConfigInfo.enabled);
-    System.log("  defaultConfig: " + JSON.stringify(cfgEx.vsanConfigInfo.defaultConfig));
-}
-
-// 2. Look for VsanInternalSystem and VsanSystem on each host
-System.log("\n--- Host VsanInternalSystem ---");
-var hosts = cluster.host;
-for (var hi = 0; hi < Math.min(1, hosts.length); hi++) {
-    var host = hosts[hi];
-    System.log("Host: " + host.name);
-
-    var cfg = host.configManager;
-    System.log("  configManager keys: " + Object.keys(cfg).join(", "));
-    System.log("  vsanInternalSystem: " + (cfg.vsanInternalSystem ? "present" : "null"));
-    System.log("  vsanSystem: " + (cfg.vsanSystem ? "present" : "null"));
-
-    if (cfg.vsanSystem) {
-        var vs = cfg.vsanSystem;
-        System.log("  vsanSystem.vimType: " + vs.vimType);
-        System.log("  vsanSystem.config: " + JSON.stringify(vs.config));
-    }
-
-    if (cfg.vsanInternalSystem) {
-        var vis = cfg.vsanInternalSystem;
-        System.log("  vsanInternalSystem.vimType: " + vis.vimType);
-        // Log all callable methods
-        var methods = [];
-        for (var m in vis) {
-            if (typeof vis[m] === "function") methods.push(m);
-        }
-        System.log("  vsanInternalSystem methods: " + methods.join(", "));
-    }
-}
-
-// 3. serviceContent exploration
-System.log("\n--- serviceContent ---");
-var sc = vcenterSdkConnection.serviceContent;
-var scKeys = [];
-for (var k in sc) scKeys.push(k);
-System.log("All keys: " + scKeys.join(", "));
-System.log("vsanPerformanceManager: " +
-    (sc.vsanPerformanceManager ? "present" : "not present"));
-
-// 4. perfManager methods
-System.log("\n--- performanceManager methods ---");
-var perfMgr = vcenterSdkConnection.performanceManager;
-var pmMethods = [];
-for (var pm in perfMgr) {
-    if (typeof perfMgr[pm] === "function") pmMethods.push(pm);
-}
-System.log("Methods: " + pmMethods.join(", "));
-
-// 5. Try queryAvailableMetric on the vSAN datastore directly
-System.log("\n--- queryAvailableMetric on vSAN datastore ---");
-var datastores = vcenterSdkConnection.getAllDatastores();
-for (var di = 0; di < datastores.length; di++) {
-    var ds = datastores[di];
-    if (ds.summary && ds.summary.type &&
-        ds.summary.type.toLowerCase() === "vsan") {
-        System.log("vSAN datastore: " + ds.name + " id=" + ds.id);
-        try {
-            var available = perfMgr.queryAvailablePerfMetric(ds, null, null, 20);
-            System.log("  availableMetrics at interval=20: " +
-                (available ? available.length : 0));
-            if (available && available.length > 0) {
-                for (var ai = 0; ai < Math.min(5, available.length); ai++) {
-                    System.log("    counterId=" + available[ai].counterId +
-                               " instance='" + available[ai].instance + "'");
-                }
-            }
-        } catch (e) {
-            System.log("  queryAvailablePerfMetric error: " + e.message);
-        }
-
-        // Also try queryAvailablePerfMetric with interval=300
-        try {
-            var available300 = perfMgr.queryAvailablePerfMetric(ds, null, null, 300);
-            System.log("  availableMetrics at interval=300: " +
-                (available300 ? available300.length : 0));
-        } catch (e2) {
-            System.log("  queryAvailablePerfMetric(300) error: " + e2.message);
-        }
-        break;
-    }
-}
+2026-04-21 16:31:13.565 -04:00INFO=== Cluster: cvsdev-cl01 ===
+2026-04-21 16:31:13.566 -04:00INFOcluster.vimType: ClusterComputeResource
+2026-04-21 16:31:13.584 -04:00INFO--- configurationEx ---
+2026-04-21 16:31:13.586 -04:00INFOvsanConfigInfo: present
+2026-04-21 16:31:13.587 -04:00INFOenabled: true
+2026-04-21 16:31:13.588 -04:00INFOdefaultConfig: undefined
+2026-04-21 16:31:13.589 -04:00INFO--- Host VsanInternalSystem ---
+2026-04-21 16:31:13.590 -04:00INFOHost: sfo01-m01-r01-esx02.connect.lab
+2026-04-21 16:31:13.599 -04:00ERRORWorkflow:#Test / Scriptable task (item1) : java.lang.IllegalArgumentException
+2026-04-21 16:31:13.609 -04:00ERRORWorkflow execution stack:
+***
+item: '#Test/item1', state: 'failed', business state: 'null', exception: 'null'
+workflow: '#Test' (0f5229ed-a695-49b9-afaa-c3fe078a5239) 
+|  'attribute': name=vcenterSdkConnection type=VC:SdkConnection value=dunes://service.dunes.ch/CustomSDKObject?id='cvsd26vcfvc001.connect.lab'&dunesName='VC:SdkConnection'
+|  'no inputs'
+|  'no outputs'
+*** End of execution stack.
