@@ -1,23 +1,23 @@
 # Invoke-SnapshotIO.ps1
-# Usage: .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh"
+# Usage: .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_snapshot_io.sh"
 #
-# Basic — 15 min minimum (default), script at a fixed path
-#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh"
+# Basic — 15 min minimum runtime (default), 2GB target delta (default)
+#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_snapshot_io.sh"
 #
-# Custom minimum runtime (e.g. 30 minutes)
-#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh" -MinimumRuntimeMinutes 30
+# Custom delta size (1GB per snapshot interval) and script runtime (30 min)
+#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_snapshot_io.sh" `
+#       -TargetDeltaGB 1 -ScriptDurationMinutes 30
 #
-# With higher parallelism
-#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/home/sshuser/generate_snapshot_io.sh" -MaxParallelJobs 20
-#
-# With a custom job timeout (default is 45 min — set higher than MinimumRuntimeMinutes)
-#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -JobTimeoutMinutes 60
+# Full example with all options
+#   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_snapshot_io.sh" `
+#       -TargetDeltaGB 2 -ScriptDurationMinutes 30 `
+#       -MinimumRuntimeMinutes 30 -MaxParallelJobs 25 -JobTimeoutMinutes 60
 #
 # Requires: OpenSSH client installed and in PATH, passwordless SSH configured for sshuser on all target servers
 #
 # CSV format:
 #   Server,Username,RemotePath,Port
-#   192.168.1.10,sshuser,/home/sshuser/,22
+#   192.168.1.10,sshuser,/tmp/,22
 
 param(
     [Parameter(Mandatory=$true)]
@@ -26,11 +26,15 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$ScriptRemotePath,         # Full remote path to the snapshot IO script
 
-    [int]$MinimumRuntimeMinutes = 15,  # Minimum runtime in minutes (default 15)
+    [int]$TargetDeltaGB = 2,           # Target snapshot delta size in GB (passed to --target-gb)
 
-    [int]$MaxParallelJobs = 10,        # Max concurrent SSH sessions
+    [int]$ScriptDurationMinutes = 30,  # How long the IO script runs in minutes (passed to --duration)
 
-    [int]$JobTimeoutMinutes = 45,      # Kill any job still running beyond this (default 45 min)
+    [int]$MinimumRuntimeMinutes = 15,  # Minimum runtime enforced by wrapper before declaring done
+
+    [int]$MaxParallelJobs = 10,        # Max concurrent SSH launch jobs
+
+    [int]$JobTimeoutMinutes = 45,      # Kill any server still running beyond this (default 45 min)
 
     [switch]$StopOnError               # Stop launching new jobs if one fails
 )
@@ -79,6 +83,12 @@ function Get-SshArgs {
 
 # --- Minimum runtime enforcement ---
 $minimumRuntimeSeconds = $MinimumRuntimeMinutes * 60
+$scriptDurationSeconds = $ScriptDurationMinutes * 60
+
+# Arguments passed through to generate_snapshot_io.sh on the remote host
+$scriptArgs = "--target-gb $TargetDeltaGB --duration $scriptDurationSeconds"
+
+Write-Host "Script arguments  : $scriptArgs" -ForegroundColor Cyan
 
 # Remote command strategy:
 #   Rather than piping a script to bash -s (which dies when SSH stdin closes),
@@ -99,7 +109,7 @@ rm -f "`$DONEFILE"
 chmod +x '$ScriptRemotePath'
 
 START=`$(date +%s)
-'$ScriptRemotePath' > "`$OUTFILE" 2>&1 &
+'$ScriptRemotePath' $scriptArgs > "`$OUTFILE" 2>&1 &
 SCRIPT_PID=`$!
 echo `$SCRIPT_PID > "`$PIDFILE"
 echo "[INFO] Script started with PID `$SCRIPT_PID"
@@ -151,8 +161,10 @@ $results    = @()
 $startTime  = Get-Date
 
 Write-Host "`nLaunching snapshot IO script on $($servers.Count) server(s)" -ForegroundColor Cyan
-Write-Host "Minimum runtime enforced: ${MinimumRuntimeMinutes} minutes ($minimumRuntimeSeconds seconds)" -ForegroundColor Cyan
-Write-Host "Max parallel jobs: $MaxParallelJobs`n" -ForegroundColor Cyan
+Write-Host "Target delta size : ${TargetDeltaGB}GB per snapshot interval" -ForegroundColor Cyan
+Write-Host "Script duration   : ${ScriptDurationMinutes} minutes" -ForegroundColor Cyan
+Write-Host "Minimum runtime   : ${MinimumRuntimeMinutes} minutes" -ForegroundColor Cyan
+Write-Host "Max parallel jobs : $MaxParallelJobs`n" -ForegroundColor Cyan
 
 foreach ($row in $servers) {
     $server   = $row.Server.Trim()
