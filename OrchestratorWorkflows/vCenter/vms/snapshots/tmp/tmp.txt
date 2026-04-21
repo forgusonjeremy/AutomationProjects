@@ -1,23 +1,90 @@
-2026-04-21 16:40:11.922 -04:00INFO=== DOM stats across all hosts ===
-2026-04-21 16:40:12.017 -04:00INFOHost: sfo01-m01-r01-esx02.connect.lab
-2026-04-21 16:40:12.018 -04:00INFOdom.owner.stats: 589 objects
-2026-04-21 16:40:12.019 -04:00INFOSample object UUID: trackTimeMsPerfSvc
-2026-04-21 16:40:12.020 -04:00INFOHost sfo01-m01-r01-esx02.connect.lab error: Expected argument of type object, but instead had type number
-2026-04-21 16:40:12.124 -04:00INFOHost: sfo01-m01-r01-esx05.connect.lab
-2026-04-21 16:40:12.125 -04:00INFOdom.owner.stats: 589 objects
-2026-04-21 16:40:12.126 -04:00INFOSample object UUID: trackTimeMsPerfSvc
-2026-04-21 16:40:12.127 -04:00INFOHost sfo01-m01-r01-esx05.connect.lab error: Expected argument of type object, but instead had type number
-2026-04-21 16:40:12.220 -04:00INFOHost: sfo01-m01-r01-esx03.connect.lab
-2026-04-21 16:40:12.221 -04:00INFOdom.owner.stats: 589 objects
-2026-04-21 16:40:12.222 -04:00INFOSample object UUID: trackTimeMsPerfSvc
-2026-04-21 16:40:12.223 -04:00INFOHost sfo01-m01-r01-esx03.connect.lab error: Expected argument of type object, but instead had type number
-2026-04-21 16:40:12.317 -04:00INFOHost: sfo01-m01-r01-esx04.connect.lab
-2026-04-21 16:40:12.318 -04:00INFOdom.owner.stats: 589 objects
-2026-04-21 16:40:12.319 -04:00INFOSample object UUID: trackTimeMsPerfSvc
-2026-04-21 16:40:12.320 -04:00INFOHost sfo01-m01-r01-esx04.connect.lab error: Expected argument of type object, but instead had type number
-2026-04-21 16:40:12.321 -04:00INFO=== LSOM disk stats (first host) ===
-2026-04-21 16:40:12.395 -04:00INFODisk count: 5
-2026-04-21 16:40:12.396 -04:00INFODisk id: 52c5d6bb-fe6e-83be-c562-e5b94fc5565a
-2026-04-21 16:40:12.399 -04:00INFODisk top-level keys: info, rcWriteQStats, rcReadQStats, WBQStats, blkattrInfo
-2026-04-21 16:40:12.401 -04:00INFOrcReadQStats: {"rcIOStats":{"nrIOs":0,"totalLatency":0,"totalQTimeOrdered":0,"totalQTimeUnordered":0,"latencyHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":500},{"count":0,"limit":1000},{"count":0,"limit":1500},{"count":0,"limit":2000},{"count":0,"limit":2500},{"count":0,"limit":3000},{"count":0,"limit":3500},{"count":0,"limit":4000},{"count":0,"limit":4500},{"count":0,"limit":5000},{"count":0,"limit":6000},{"count":0,"limit":7000},{"count":0,"limit":8000},{"count":0,"limit":9000},{"count":0,"limit":10000},{"count":0,"limit":20000},{"count":0,"limit":50000},{"count":0,"limit":100000},{"count":0,"limit":500000},{"count":0,"limit":1000000},{"count":0,"limit":9223372036854776000}]},"ioSizeHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":512},{"count":0,"limit":1024},{"count":0,"limit":2048},{"count":0,"limit":4096},{"count":0,"limit":8192},{"count":0,"limit":16384},{"count":0,"limit":32768},{"count":0,"limit":65536},{"count":0,"limit":131072},{"count":0,"limit":262144},{"count":0,"limit":524288},{"count":0,"limit":1048576},{"count":0,"limit":9223372036854776000}]},"qTimeOrderedHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":150},{"count":0,"limit":200},{"count":0,"limit":250},{"count":0,"limit":300},{"count":0,"limit":350},{"count":0,"limit":400},{"count":0,"limit":450},{"count":0,"limit":500},{"count":0,"limit":550},{"count":0,"limit":600},{"count":0,"limit":650},{"count":0,"limit":700},{"count":0,"limit":750},{"count":0,"limit":800},{"count":0,"limit":850},{"count":0,"limit":900},{"count":0,"limit":950},{"count":0,"limit":1000},{"count":0,"limit":2000},{"count":0,"limit":3000},{"count":0,"limit":4000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":100000},{"count":0,"limit":9223372036854776000}]},"qTimeUnOrderedHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":150},{"count":0,"limit":200},{"count":0,"limit":250},{"count":0,"limit":300},{"count":0,"limit":350},{"count":0,"limit":400},{"count":0,"limit":450},{"count":0,"limit":500},{"count":0,"limit":550},{"count":0,"limit":600},{"count":0,"limit":650},{"count":0,"limit":700},{"count":0,"limit":750},{"count":0,"limit":800},{"count":0,"limit":850},{"count":0,"limit":900},{"count":0,"limit":950},{"count":0,"limit":1000},{"count":0,"limit":2000},{"count":0,"limit":3000},{"count":0,"limit":4000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":100000},{"count":0,"limit":9223372036854776000}]},"helperQueuingTime":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":150},{"count":0,"limit":200},{"count":0,"limit":250},{"count":0,"limit":300},{"count":0,"limit":350},{"count":0,"limit":400},{"count":0,"limit":450},{"count":0,"limit":500},{"count":0,"limit":550},{"count":0,"limit":600},{"count":0,"limit":650},{"count":0,"limit":700},{"count":0,"limit":750},{"count":0,"limit":800},{"count":0,"limit":850},{"count":0,"limit":900},{"count":0,"limit":950},{"count":0,"limit":1000},{"count":0,"limit":2000},{"count":0,"limit":3000},{"count":0,"limit":4000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":100000},{"count":0,"limit":9223372036854776000}]},"helperQueueItems":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":5},{"count":0,"limit":10},{"count":0,"limit":15},{"count":0,"limit":20},{"count":0,"limit":25},{"count":0,"limit":30},{"count":0,"limit":40},{"count":0,"limit":50},{"count":0,"limit":60},{"count":0,"limit":70},{"count":0,"limit":80},{"count":0,"limit":90},{"count":0,"limit":100},{"count":0,"limit":120},{"count":0,"limit":140},{"count":0,"limit":160},{"count":0,"limit":180},{"count":0,"limit":200},{"count":0,"limit":250},{"count":0,"limit":500},{"count":0,"limit":1000}]}},"qStats":{"maxQDepth":0,"nrOrderedIOs":18446744069414584000,"nrUnOrderedIOs":2147483647,"nrQueued":0,"nrOutstanding":0,"retryReadFailures":0,"iosQueuedHisto":{"min":0,"max":0,"mean":0,"count":89056043,"buckets":[{"count":89057158,"limit":5},{"count":0,"limit":10},{"count":0,"limit":20},{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":200},{"count":0,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"iosOutstandingHisto":{"min":0,"max":0,"mean":0,"count":89051423,"buckets":[{"count":89053588,"limit":5},{"count":0,"limit":10},{"count":0,"limit":20},{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":200},{"count":0,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"totalQueued":0,"totalOutstanding":1,"totalOutstandingOrdered":0,"totalIOsQueuedHisto":{"min":0,"max":0,"mean":0,"count":7976547835,"buckets":[{"count":7976625250,"limit":5},{"count":0,"limit":10},{"count":0,"limit":20},{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":200},{"count":0,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"totalIOsOutstandingHisto":{"min":1,"max":387,"mean":3,"count":7976479764,"buckets":[{"count":7479869666,"limit":5},{"count":205011747,"limit":10},{"count":101797312,"limit":20},{"count":92960844,"limit":50},{"count":76861744,"limit":100},{"count":20047371,"limit":200},{"count":24058,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"totalIOsOutstandingOrderedHisto":{"min":0,"max":11,"mean":0,"count":7976360473,"buckets":[{"count":7976353671,"limit":5},{"count":66075,"limit":10},{"count":13,"limit":20},{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":200},{"count":0,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"plogAllocHisto":{"min":0,"max":0,"mean":0,"count":0,"buckets":[{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0}]},"llogAllocHisto":{"min":0,"max":0,"mean":0,"count":0,"buckets":[{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0}]}}}
-2026-04-21 16:40:12.402 -04:00INFOrcWriteQStats: {"rcIOStats":{"nrIOs":0,"totalLatency":0,"totalQTimeOrdered":0,"totalQTimeUnordered":0,"latencyHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":500},{"count":0,"limit":1000},{"count":0,"limit":1500},{"count":0,"limit":2000},{"count":0,"limit":2500},{"count":0,"limit":3000},{"count":0,"limit":3500},{"count":0,"limit":4000},{"count":0,"limit":4500},{"count":0,"limit":5000},{"count":0,"limit":6000},{"count":0,"limit":7000},{"count":0,"limit":8000},{"count":0,"limit":9000},{"count":0,"limit":10000},{"count":0,"limit":20000},{"count":0,"limit":50000},{"count":0,"limit":100000},{"count":0,"limit":500000},{"count":0,"limit":1000000},{"count":0,"limit":9223372036854776000}]},"ioSizeHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":512},{"count":0,"limit":1024},{"count":0,"limit":2048},{"count":0,"limit":4096},{"count":0,"limit":8192},{"count":0,"limit":16384},{"count":0,"limit":32768},{"count":0,"limit":65536},{"count":0,"limit":131072},{"count":0,"limit":262144},{"count":0,"limit":524288},{"count":0,"limit":1048576},{"count":0,"limit":9223372036854776000}]},"qTimeOrderedHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":150},{"count":0,"limit":200},{"count":0,"limit":250},{"count":0,"limit":300},{"count":0,"limit":350},{"count":0,"limit":400},{"count":0,"limit":450},{"count":0,"limit":500},{"count":0,"limit":550},{"count":0,"limit":600},{"count":0,"limit":650},{"count":0,"limit":700},{"count":0,"limit":750},{"count":0,"limit":800},{"count":0,"limit":850},{"count":0,"limit":900},{"count":0,"limit":950},{"count":0,"limit":1000},{"count":0,"limit":2000},{"count":0,"limit":3000},{"count":0,"limit":4000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":100000},{"count":0,"limit":9223372036854776000}]},"qTimeUnOrderedHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":150},{"count":0,"limit":200},{"count":0,"limit":250},{"count":0,"limit":300},{"count":0,"limit":350},{"count":0,"limit":400},{"count":0,"limit":450},{"count":0,"limit":500},{"count":0,"limit":550},{"count":0,"limit":600},{"count":0,"limit":650},{"count":0,"limit":700},{"count":0,"limit":750},{"count":0,"limit":800},{"count":0,"limit":850},{"count":0,"limit":900},{"count":0,"limit":950},{"count":0,"limit":1000},{"count":0,"limit":2000},{"count":0,"limit":3000},{"count":0,"limit":4000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":100000},{"count":0,"limit":9223372036854776000}]},"helperQueuingTime":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":150},{"count":0,"limit":200},{"count":0,"limit":250},{"count":0,"limit":300},{"count":0,"limit":350},{"count":0,"limit":400},{"count":0,"limit":450},{"count":0,"limit":500},{"count":0,"limit":550},{"count":0,"limit":600},{"count":0,"limit":650},{"count":0,"limit":700},{"count":0,"limit":750},{"count":0,"limit":800},{"count":0,"limit":850},{"count":0,"limit":900},{"count":0,"limit":950},{"count":0,"limit":1000},{"count":0,"limit":2000},{"count":0,"limit":3000},{"count":0,"limit":4000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":100000},{"count":0,"limit":9223372036854776000}]},"helperQueueItems":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":5},{"count":0,"limit":10},{"count":0,"limit":15},{"count":0,"limit":20},{"count":0,"limit":25},{"count":0,"limit":30},{"count":0,"limit":40},{"count":0,"limit":50},{"count":0,"limit":60},{"count":0,"limit":70},{"count":0,"limit":80},{"count":0,"limit":90},{"count":0,"limit":100},{"count":0,"limit":120},{"count":0,"limit":140},{"count":0,"limit":160},{"count":0,"limit":180},{"count":0,"limit":200},{"count":0,"limit":250},{"count":0,"limit":500},{"count":0,"limit":1000}]}},"qStats":{"maxQDepth":0,"nrOrderedIOs":18446744069414584000,"nrUnOrderedIOs":2147483647,"nrQueued":0,"nrOutstanding":0,"retryReadFailures":0,"iosQueuedHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":5},{"count":0,"limit":10},{"count":0,"limit":20},{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":200},{"count":0,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"iosOutstandingHisto":{"min":9223372036854776000,"max":-9223372036854776000,"mean":0,"count":0,"buckets":[{"count":0,"limit":5},{"count":0,"limit":10},{"count":0,"limit":20},{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":200},{"count":0,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"totalQueued":0,"totalOutstanding":0,"totalOutstandingOrdered":0,"totalIOsQueuedHisto":{"min":0,"max":0,"mean":0,"count":7976547835,"buckets":[{"count":7976625250,"limit":5},{"count":0,"limit":10},{"count":0,"limit":20},{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":200},{"count":0,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"totalIOsOutstandingHisto":{"min":1,"max":387,"mean":3,"count":7976479764,"buckets":[{"count":7479869666,"limit":5},{"count":205011747,"limit":10},{"count":101797312,"limit":20},{"count":92960844,"limit":50},{"count":76861744,"limit":100},{"count":20047371,"limit":200},{"count":24058,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"totalIOsOutstandingOrderedHisto":{"min":0,"max":11,"mean":0,"count":7976360473,"buckets":[{"count":7976353671,"limit":5},{"count":66075,"limit":10},{"count":13,"limit":20},{"count":0,"limit":50},{"count":0,"limit":100},{"count":0,"limit":200},{"count":0,"limit":400},{"count":0,"limit":600},{"count":0,"limit":800},{"count":0,"limit":1000},{"count":0,"limit":5000},{"count":0,"limit":10000},{"count":0,"limit":9223372036854776000}]},"plogAllocHisto":{"min":0,"max":0,"mean":0,"count":0,"buckets":[{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0}]},"llogAllocHisto":{"min":0,"max":0,"mean":0,"count":0,"buckets":[{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0},{"count":0,"limit":0}]}}}
+// Bind vcenterSdkConnection (VC:SdkConnection)
+
+var cluster = vcenterSdkConnection.rootFolder.childEntity[0]
+                .hostFolder.childEntity[0];
+var vis     = cluster.host[0].configManager.vsanInternalSystem;
+
+// ── DOM owner stats -- explore the flat structure ─────────────────────────
+System.log("=== dom.owner.stats structure ===");
+var domRaw    = vis.queryVsanStatistics(["dom"]);
+var domParsed = JSON.parse(domRaw);
+var ownerStats = domParsed["dom.owner.stats"];
+
+// It's a flat object -- log all its keys and value types
+var keys = Object.keys(ownerStats);
+System.log("Total keys: " + keys.length);
+System.log("First 30 keys and values:");
+for (var i = 0; i < Math.min(30, keys.length); i++) {
+    var k = keys[i];
+    var v = ownerStats[k];
+    System.log("  [" + i + "] " + k + " = " + 
+        (typeof v === "object" ? JSON.stringify(v).substring(0, 100) : v) +
+        "  (type=" + typeof v + ")");
+}
+
+// ── LSOM disks -- confirm the latency/outstanding fields ─────────────────
+System.log("\n=== lsom.disks latency fields ===");
+var lsomRaw    = vis.queryVsanStatistics(["lsom"]);
+var lsomParsed = JSON.parse(lsomRaw);
+var disks      = lsomParsed["lsom.disks"];
+var diskIds    = Object.keys(disks);
+
+var totalReadOutstanding  = 0;
+var totalWriteOutstanding = 0;
+var totalReadLatMean      = 0;
+var totalWriteLatMean     = 0;
+var diskCount             = 0;
+
+for (var di = 0; di < diskIds.length; di++) {
+    var dk = diskIds[di];
+    var d  = disks[dk];
+
+    var rOut  = d.rcReadQStats  && d.rcReadQStats.qStats  ? d.rcReadQStats.qStats.totalOutstanding   : 0;
+    var wOut  = d.rcWriteQStats && d.rcWriteQStats.qStats ? d.rcWriteQStats.qStats.totalOutstanding  : 0;
+    var rLat  = d.rcReadQStats  && d.rcReadQStats.rcIOStats && d.rcReadQStats.rcIOStats.latencyHisto
+                ? d.rcReadQStats.rcIOStats.latencyHisto.mean : 0;
+    var wLat  = d.rcWriteQStats && d.rcWriteQStats.rcIOStats && d.rcWriteQStats.rcIOStats.latencyHisto
+                ? d.rcWriteQStats.rcIOStats.latencyHisto.mean : 0;
+
+    System.log("Disk " + dk + ":");
+    System.log("  rcReadQStats.qStats.totalOutstanding  = " + rOut);
+    System.log("  rcWriteQStats.qStats.totalOutstanding = " + wOut);
+    System.log("  rcReadQStats.rcIOStats.latencyHisto.mean  = " + rLat + " us");
+    System.log("  rcWriteQStats.rcIOStats.latencyHisto.mean = " + wLat + " us");
+
+    // Also check stats sub-object if present
+    if (d.stats) {
+        System.log("  stats keys: " + Object.keys(d.stats).join(", "));
+        System.log("  stats sample: " + JSON.stringify(d.stats).substring(0, 300));
+    }
+
+    totalReadOutstanding  += rOut;
+    totalWriteOutstanding += wOut;
+    totalReadLatMean      += rLat;
+    totalWriteLatMean     += wLat;
+    diskCount++;
+}
+
+System.log("\n=== Aggregated across " + diskCount + " disks ===");
+System.log("Total read outstanding:  " + totalReadOutstanding);
+System.log("Total write outstanding: " + totalWriteOutstanding);
+System.log("Avg read latency (mean of disk means):  " + 
+    (diskCount > 0 ? (totalReadLatMean  / diskCount / 1000).toFixed(3) : "n/a") + " ms");
+System.log("Avg write latency (mean of disk means): " + 
+    (diskCount > 0 ? (totalWriteLatMean / diskCount / 1000).toFixed(3) : "n/a") + " ms");
+
+// ── Also check dom.client.stats for VM-facing latency ────────────────────
+System.log("\n=== dom.client.stats ===");
+var clientStats = domParsed["dom.client.stats"];
+if (clientStats && typeof clientStats === "object") {
+    var cKeys = Object.keys(clientStats);
+    System.log("Total keys: " + cKeys.length);
+    System.log("First 20 keys:");
+    for (var ci = 0; ci < Math.min(20, cKeys.length); ci++) {
+        var ck = cKeys[ci];
+        var cv = clientStats[ck];
+        System.log("  " + ck + " = " +
+            (typeof cv === "object" ? JSON.stringify(cv).substring(0, 150) : cv) +
+            "  (type=" + typeof cv + ")");
+    }
+}
