@@ -1,6 +1,1 @@
-ST-06 update
-
-var g = JSON.parse(System.getModule(STORAGEMODULE)._adaptiveGovernorCheck(
-    JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(post),
-    latencyThresholdMs || 30, vsanCongestionThresh || 50,
-    vsanResyncThresholdBytes || 10737418240));
+2026-04-21 13:59:05.952 -04:00error{{WorkflowName:#Adaptive Snapshot Cleanup -- Multi-vCenter - WorkflowRun:ac1cb6ce-ca94-4df7-b833-326cfc999611}} deleteSnapshot error: VM=snaptestds302 snap=snapshot-2 err=Cannot find function findAllForType in object DynamicWrapper (Instance) : [_VcPlugin]-[class com.vmware.o11n.plugin.vsphere_gen.VcPlugin_Wrapper] -- VALUE : com.vmware.o11n.plugin.vsphere.VcPlugin@499ce6c.

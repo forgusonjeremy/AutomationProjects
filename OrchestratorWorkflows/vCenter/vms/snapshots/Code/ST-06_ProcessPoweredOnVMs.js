@@ -177,7 +177,7 @@ function checkGovernor(vcConn, dsRefs, vmName) {
         if (st) { if (st.lastPre) pre.push(st.lastPre); if (st.lastPost) post.push(st.lastPost); }
     }
     var g = JSON.parse(System.getModule(STORAGEMODULE)._adaptiveGovernorCheck(
-        JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(pre), JSON.stringify(post),
+        JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(post),
         latencyThresholdMs || 30, vsanCongestionThresh || 50,
         vsanResyncThresholdBytes || 10737418240));
     if (!g.approved)
