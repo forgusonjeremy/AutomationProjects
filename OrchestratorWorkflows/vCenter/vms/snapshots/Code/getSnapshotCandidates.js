@@ -35,7 +35,7 @@ var cutoffMs    = (maxAgeMinutes || 60) * 60 * 1000;
 var nameFilter  = (nameMatchString  || "").toLowerCase().trim();
 var descIgnore  = (descIgnoreString || "").toLowerCase().trim();
 
-var vms = VcPlugin.getAllVirtualMachines(vcenterSdkConnection);
+var vms = vcenterSdkConnection.getAllVirtualMachines()
 
 for each (var vm in vms) {
     if (vm.config && vm.config.template) continue;

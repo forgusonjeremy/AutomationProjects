@@ -1,6 +1,6 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * ST-07  PROCESS POWERED-OFF VMs  (FAST LANE)
+ * ST-07 PROCESS POWERED-OFF VMs  (FAST LANE)
  * ─────────────────────────────────────────────────────────────────────────────
  * Processes snapshots on powered-off VMs. Because powered-off VMs have no
  * running guest workload there is no stun lock risk, so no per-VM concurrency
@@ -105,7 +105,7 @@ if (offCands.length === 0) {
             LOG.ok("PROCESSING","Storage I/O settled -- proceeding:  " + label);
         }
 
-        var res = JSON.parse(System.getModule(MODULE).deleteSnapshot(
+        var res = JSON.parse(System.getModule(MODULE)._deleteSnapshot(
             vcConn, cand.vmMoRef, cand.snapshotMoRef,
             cand.snapshotName, cand.vmName,
             JSON.stringify(dsRefs), dryRun, taskTimeoutSeconds || 1800));
