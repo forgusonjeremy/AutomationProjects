@@ -1,8 +1,106 @@
-2026-04-21 16:26:21.691 -04:00infovsanDomObj counter count: 16
-2026-04-21 16:26:21.705 -04:00inforootFolder provider summary: currentSupported=false summarySupported=true refreshRate=-1
-2026-04-21 16:26:21.717 -04:00infoHost count in first datacenter: 1
-2026-04-21 16:26:21.718 -04:00infoFirst cluster/host type: ClusterComputeResource
-2026-04-21 16:26:21.730 -04:00infoTesting with host: sfo01-m01-r01-esx02.connect.lab
-2026-04-21 16:26:21.735 -04:00infoHost provider summary: currentSupported=true summarySupported=true refreshRate=20
-2026-04-21 16:26:21.749 -04:00infoqueryPerf result count against host: 0
-2026-04-21 16:26:21.750 -04:00infoNo data returned for host entity
+// Bind vcenterSdkConnection as input (VC:SdkConnection)
+
+var perfMgr = vcenterSdkConnection.performanceManager;
+
+// Get vsanDomObj counter IDs
+var vsanCounterIds = {};
+for (var i = 0; i < perfMgr.perfCounter.length; i++) {
+    var c = perfMgr.perfCounter[i];
+    if (c.groupInfo.key === "vsanDomObj") {
+        var k = c.groupInfo.key + ":" + c.nameInfo.key + ":" + c.rollupType.value;
+        vsanCounterIds[k] = c.key;
+    }
+}
+
+// Get the cluster and all its hosts
+var cluster = vcenterSdkConnection.rootFolder.childEntity[0].hostFolder.childEntity[0];
+System.log("Cluster: " + cluster.name);
+
+var hosts = cluster.host;
+System.log("Host count: " + hosts.length);
+
+var now   = new Date();
+var start = new Date(now.getTime() - 300000);
+
+// Build metric IDs for readAvgLatency and readCongestion using both instance variants
+var metricIds = [];
+var readLatKey  = vsanCounterIds["vsanDomObj:readAvgLatency:average"];
+var congKey     = vsanCounterIds["vsanDomObj:readCongestion:average"];
+
+if (readLatKey) {
+    var m1 = new VcPerfMetricId(); m1.counterId = readLatKey; m1.instance = "*";
+    var m2 = new VcPerfMetricId(); m2.counterId = readLatKey; m2.instance = "";
+    metricIds.push(m1, m2);
+}
+if (congKey) {
+    var m3 = new VcPerfMetricId(); m3.counterId = congKey; m3.instance = "*";
+    metricIds.push(m3);
+}
+
+// Try each host with intervalId=20 and intervalId=300
+for (var hi = 0; hi < hosts.length; hi++) {
+    var host = hosts[hi];
+    System.log("\n--- Host: " + host.name + " ---");
+    
+    for each (var interval in [20, 300]) {
+        var qs       = new VcPerfQuerySpec();
+        qs.entity    = host;
+        qs.startTime = start;
+        qs.endTime   = now;
+        qs.intervalId= interval;
+        qs.metricId  = metricIds;
+        qs.maxSample = 3;
+        
+        try {
+            var results = perfMgr.queryPerf([qs]);
+            if (results && results.length > 0 && results[0].value &&
+                results[0].value.length > 0) {
+                System.log("  intervalId=" + interval + " -> GOT DATA: " +
+                           results[0].value.length + " series");
+                for (var ri = 0; ri < Math.min(5, results[0].value.length); ri++) {
+                    var s = results[0].value[ri];
+                    System.log("    counterId=" + s.id.counterId +
+                               " instance='" + s.id.instance + "'" +
+                               " values=" + JSON.stringify(s.value));
+                }
+            } else {
+                System.log("  intervalId=" + interval + " -> no data");
+            }
+        } catch (e) {
+            System.log("  intervalId=" + interval + " -> ERROR: " + e.message);
+        }
+    }
+}
+
+// Also try the cluster entity itself
+System.log("\n--- Cluster entity ---");
+var clusterSummary = perfMgr.queryPerfProviderSummary(cluster);
+System.log("Cluster provider: currentSupported=" + clusterSummary.currentSupported +
+           " refreshRate=" + clusterSummary.refreshRate);
+
+if (clusterSummary.currentSupported) {
+    var qs2       = new VcPerfQuerySpec();
+    qs2.entity    = cluster;
+    qs2.startTime = start;
+    qs2.endTime   = now;
+    qs2.intervalId= 20;
+    qs2.metricId  = metricIds;
+    qs2.maxSample = 3;
+    
+    try {
+        var r2 = perfMgr.queryPerf([qs2]);
+        if (r2 && r2.length > 0 && r2[0].value && r2[0].value.length > 0) {
+            System.log("Cluster -> GOT DATA: " + r2[0].value.length + " series");
+            for (var ri2 = 0; ri2 < Math.min(5, r2[0].value.length); ri2++) {
+                var s2 = r2[0].value[ri2];
+                System.log("  counterId=" + s2.id.counterId +
+                           " instance='" + s2.id.instance + "'" +
+                           " values=" + JSON.stringify(s2.value));
+            }
+        } else {
+            System.log("Cluster -> no data");
+        }
+    } catch (e) {
+        System.log("Cluster -> ERROR: " + e.message);
+    }
+}
