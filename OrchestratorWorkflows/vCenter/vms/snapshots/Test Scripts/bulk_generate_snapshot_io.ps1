@@ -139,10 +139,16 @@ echo "[LAUNCHED] nohup PID `$!"
 
 $remoteCommand = $remoteCommand -replace "`r", ""
 
-# --- Launch jobs in parallel ---
-$jobs      = @{}
-$results   = @()
-$startTime = Get-Date
+# --- Phase 1: Launch all servers in parallel via short-lived SSH jobs ---
+# Each job only does the nohup launch and returns immediately.
+# No polling happens inside jobs — that was causing the lockup at 12 jobs
+# because each job's sleep loop was saturating the PowerShell runspace pool.
+# All polling is done in the main thread after all launches complete.
+
+$serverMeta = @{}   # server key -> metadata + launch result
+$launchJobs = @{}   # jobName -> server key
+$results    = @()
+$startTime  = Get-Date
 
 Write-Host "`nLaunching snapshot IO script on $($servers.Count) server(s)" -ForegroundColor Cyan
 Write-Host "Minimum runtime enforced: ${MinimumRuntimeMinutes} minutes ($minimumRuntimeSeconds seconds)" -ForegroundColor Cyan
@@ -152,171 +158,141 @@ foreach ($row in $servers) {
     $server   = $row.Server.Trim()
     $username = $row.Username.Trim()
     $port     = if ($row.PSObject.Properties.Name -contains "Port" -and $row.Port) { $row.Port.Trim() } else { "22" }
+    $srvKey   = $server
 
-    # Throttle parallelism — also reap any jobs that have exceeded the timeout
-    # so a hung connection can never permanently block the launch queue.
+    # Throttle launch parallelism
     while ((Get-Job -State Running).Count -ge $MaxParallelJobs) {
-        Get-Job -State Running | ForEach-Object {
-            $runningMeta = $jobs[$_.Name]
-            if ($runningMeta) {
-                $runningElapsed = ((Get-Date) - $runningMeta.StartTime).TotalMinutes
-                if ($runningElapsed -gt $JobTimeoutMinutes) {
-                    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($runningMeta.Server)] TIMEOUT in throttle loop — stopping job after $([math]::Round($runningElapsed,1)) min" -ForegroundColor Magenta
-                    Stop-Job -Job $_
-                }
-            }
-        }
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 1
     }
 
     $sshArgs = Get-SshArgs -username $username -server $server -port $port
 
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Launching job on $server..." -ForegroundColor Yellow
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Launching on $server..." -ForegroundColor Yellow
 
     $job = Start-Job -ScriptBlock {
-        param($sshExe, $sshArgList, $launchCmd, $srv, $pollIntervalSec, $timeoutSec)
-
-        # Step 1: Send the launch command — writes the wrapper script and starts
-        # it under nohup. SSH returns immediately after launch; the IO script
-        # keeps running on the remote host independently of this connection.
-        $launchOutput = $launchCmd | & $sshExe @sshArgList "bash -s" 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            return [PSCustomObject]@{
-                Server   = $srv
-                Output   = ($launchOutput -join "`n")
-                ExitCode = $LASTEXITCODE
-            }
-        }
-
-        Write-Output ($launchOutput -join "`n")
-
-        # Step 2: Poll the remote host for the done file every $pollIntervalSec
-        # seconds. The wrapper script writes the IO script's exit code to
-        # ~/.snapshot_io.done when it finishes (including any minimum runtime hold).
-        $pollCmd = "cat `${HOME}/.snapshot_io.done 2>/dev/null || echo RUNNING"
-        $waited  = 0
-        $exitCode = -1
-        $doneOutput = ""
-
-        while ($waited -lt $timeoutSec) {
-            Start-Sleep -Seconds $pollIntervalSec
-            $waited += $pollIntervalSec
-
-            $pollResult = & $sshExe @sshArgList $pollCmd 2>&1
-            $pollText   = ($pollResult -join "").Trim()
-
-            if ($pollText -ne "RUNNING" -and $pollText -ne "") {
-                # Done file exists — contains the exit code
-                try { $exitCode = [int]$pollText } catch { $exitCode = 1 }
-                $doneOutput = "[INFO] Remote script completed with exit code $exitCode after ${waited}s"
-                Write-Output $doneOutput
-                break
-            }
-
-            $mins = [math]::Round($waited / 60, 1)
-            Write-Output "[INFO] Still running on $srv — ${mins} min elapsed"
-        }
-
-        if ($exitCode -eq -1) {
-            Write-Output "[WARN] Timed out waiting for done file on $srv after ${waited}s"
-        }
-
-        # Retrieve any output the wrapper captured
-        $remoteLog = & $sshExe @sshArgList "cat `${HOME}/.snapshot_io.out 2>/dev/null | tail -20" 2>&1
-
+        param($sshExe, $sshArgList, $launchCmd, $srv)
+        $output = $launchCmd | & $sshExe @sshArgList "bash -s" 2>&1
         return [PSCustomObject]@{
             Server   = $srv
-            Output   = (($launchOutput + $remoteLog) -join "`n")
-            ExitCode = $exitCode
+            Output   = ($output -join "`n")
+            ExitCode = $LASTEXITCODE
         }
-    } -ArgumentList "ssh", $sshArgs, $remoteCommand, $server, 30, ($JobTimeoutMinutes * 60)
+    } -ArgumentList "ssh", $sshArgs, $remoteCommand, $server
 
-    $jobs[$job.Name] = [PSCustomObject]@{
-        Job       = $job
+    $launchJobs[$job.Name] = $srvKey
+    $serverMeta[$srvKey] = [PSCustomObject]@{
         Server    = $server
         Username  = $username
         Port      = $port
+        SshArgs   = $sshArgs
         StartTime = Get-Date
+        Launched  = $false
+        Done      = $false
+        ExitCode  = -1
+        Output    = ""
     }
 }
 
-Write-Host "`nAll jobs launched. Waiting for completion (minimum ${MinimumRuntimeMinutes} min per server)...`n" -ForegroundColor Cyan
+# Wait for all launch jobs to complete
+Write-Host "`nWaiting for all launch SSH connections to return..." -ForegroundColor Cyan
+while (Get-Job -State Running) { Start-Sleep -Seconds 1 }
 
-# --- Progress monitoring loop ---
-$completedServers = @{}
+foreach ($jobName in $launchJobs.Keys) {
+    $srvKey = $launchJobs[$jobName]
+    $job    = Get-Job -Name $jobName -ErrorAction SilentlyContinue
+    if (-not $job) { continue }
 
-while ($jobs.Count -gt $completedServers.Count) {
-    foreach ($jobName in $jobs.Keys) {
-        if ($completedServers.ContainsKey($jobName)) { continue }
+    $result = Receive-Job -Job $job
+    Remove-Job -Job $job
 
-        $meta    = $jobs[$jobName]
-        $job     = $meta.Job
-        $elapsed = [int]((Get-Date) - $meta.StartTime).TotalSeconds
+    $meta = $serverMeta[$srvKey]
+    $meta.Output   = $result.Output
+    $meta.Launched = ($result.ExitCode -eq 0)
 
-        if ($job.State -in @("Completed", "Failed", "Stopped")) {
-            $result = Receive-Job -Job $job
-            Remove-Job -Job $job
+    if ($result.ExitCode -eq 0) {
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Launched OK" -ForegroundColor Green
+    } else {
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Launch FAILED (exit $($result.ExitCode))" -ForegroundColor Red
+        $meta.Done     = $true
+        $meta.ExitCode = $result.ExitCode
+    }
+}
 
-            $status   = if ($result.ExitCode -eq 0) { "SUCCESS" } else { "FAILED" }
-            $color    = if ($result.ExitCode -eq 0) { "Green" }   else { "Red" }
-            $duration = [math]::Round(((Get-Date) - $meta.StartTime).TotalMinutes, 1)
+# --- Phase 2: Poll all servers from the main thread ---
+# One SSH call per server per poll cycle. No background jobs, no sleep loops
+# competing for runspace slots. Simple and scales to any number of servers.
 
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($meta.Server)] $status — ${duration} min" -ForegroundColor $color
-            if ($result.Output) {
-                $result.Output -split "`n" | Where-Object { $_ -match "\[INFO\]|\[DONE\]|\[ERROR\]" } |
-                    ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
-            }
+$pollInterval  = 30  # seconds between poll rounds
+$timeoutSec    = $JobTimeoutMinutes * 60
+$pendingCount  = ($serverMeta.Values | Where-Object { -not $_.Done }).Count
 
-            $results += [PSCustomObject]@{
-                Server       = $meta.Server
-                Username     = $meta.Username
-                Port         = $meta.Port
-                Status       = $status
-                ExitCode     = $result.ExitCode
-                DurationMin  = $duration
-                ScriptOutput = $result.Output
-                StartTime    = $meta.StartTime.ToString("yyyy-MM-dd HH:mm:ss")
-                EndTime      = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-            }
+Write-Host "`nAll launches complete. Polling $pendingCount server(s) every ${pollInterval}s for completion...`n" -ForegroundColor Cyan
 
-            $completedServers[$jobName] = $true
+while ($pendingCount -gt 0) {
+    Start-Sleep -Seconds $pollInterval
 
-            if ($StopOnError -and $result.ExitCode -ne 0) {
-                Write-Warning "-StopOnError set. No new jobs will be launched (existing ones continue)."
-            }
+    foreach ($srvKey in $serverMeta.Keys) {
+        $meta = $serverMeta[$srvKey]
+        if ($meta.Done -or -not $meta.Launched) { continue }
+
+        $elapsed     = [int]((Get-Date) - $meta.StartTime).TotalSeconds
+        $elapsedMins = [math]::Round($elapsed / 60, 1)
+
+        # Check timeout
+        if ($elapsed -gt $timeoutSec) {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] TIMEOUT after ${elapsedMins} min — killing remote wrapper" -ForegroundColor Magenta
+            # Best-effort kill of remote wrapper and IO script
+            & ssh @($meta.SshArgs) "pkill -f snapshot_io_wrapper; pkill -f generate_snapshot_io" 2>&1 | Out-Null
+            $meta.Done     = $true
+            $meta.ExitCode = -1
+            $meta.Output  += "`n[TIMEOUT] Exceeded ${JobTimeoutMinutes} min limit"
+            $pendingCount--
+            continue
         }
-        else {
-            $elapsedMins = [math]::Round($elapsed / 60, 1)
 
-            # Kill jobs that have exceeded the timeout
-            if ($elapsed -gt ($JobTimeoutMinutes * 60)) {
-                Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($meta.Server)] TIMEOUT — exceeded ${JobTimeoutMinutes} min limit. Stopping job." -ForegroundColor Magenta
-                Stop-Job -Job $job
-                $result = Receive-Job -Job $job
-                Remove-Job -Job $job
+        # Poll for done file
+        $pollResult = & ssh @($meta.SshArgs) "cat `${HOME}/.snapshot_io.done 2>/dev/null || echo RUNNING" 2>&1
+        $pollText   = ($pollResult -join "").Trim()
 
-                $results += [PSCustomObject]@{
-                    Server       = $meta.Server
-                    Username     = $meta.Username
-                    Port         = $meta.Port
-                    Status       = "TIMEOUT"
-                    ExitCode     = -1
-                    DurationMin  = $elapsedMins
-                    ScriptOutput = if ($result) { ($result.Output) } else { "(no output captured)" }
-                    StartTime    = $meta.StartTime.ToString("yyyy-MM-dd HH:mm:ss")
-                    EndTime      = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-                }
-                $completedServers[$jobName] = $true
-            }
-            # Heartbeat every 60s for jobs still within timeout
-            elseif ($elapsed % 60 -lt 3) {
-                Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$($meta.Server)] Still running... ${elapsedMins} min elapsed (timeout at ${JobTimeoutMinutes} min)" -ForegroundColor DarkCyan
-            }
+        if ($pollText -ne "RUNNING" -and $pollText -ne "") {
+            try { $meta.ExitCode = [int]$pollText } catch { $meta.ExitCode = 1 }
+            # Grab tail of script output
+            $remoteLog = & ssh @($meta.SshArgs) "cat `${HOME}/.snapshot_io.out 2>/dev/null | tail -20" 2>&1
+            $meta.Output  += "`n" + ($remoteLog -join "`n")
+            $meta.Done     = $true
+            $pendingCount--
+
+            $status = if ($meta.ExitCode -eq 0) { "SUCCESS" } else { "FAILED" }
+            $color  = if ($meta.ExitCode -eq 0) { "Green" }   else { "Red" }
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] $status after ${elapsedMins} min" -ForegroundColor $color
+        } else {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Still running — ${elapsedMins} min elapsed" -ForegroundColor DarkCyan
         }
     }
 
-    if ($jobs.Count -gt $completedServers.Count) {
-        Start-Sleep -Seconds 3
+    $pendingCount = ($serverMeta.Values | Where-Object { -not $_.Done }).Count
+}
+
+# --- Collect final results ---
+foreach ($srvKey in $serverMeta.Keys) {
+    $meta   = $serverMeta[$srvKey]
+    $status = switch ($meta.ExitCode) {
+        0  { "SUCCESS" }
+        -1 { "TIMEOUT" }
+        default { "FAILED" }
+    }
+    $duration = [math]::Round(((Get-Date) - $meta.StartTime).TotalMinutes, 1)
+
+    $results += [PSCustomObject]@{
+        Server       = $meta.Server
+        Username     = $meta.Username
+        Port         = $meta.Port
+        Status       = $status
+        ExitCode     = $meta.ExitCode
+        DurationMin  = $duration
+        ScriptOutput = $meta.Output
+        StartTime    = $meta.StartTime.ToString("yyyy-MM-dd HH:mm:ss")
+        EndTime      = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     }
 }
 
