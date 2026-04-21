@@ -1,73 +1,13 @@
-// Bind vcenterSdkConnection (VC:SdkConnection)
-
-var cluster = vcenterSdkConnection.rootFolder.childEntity[0]
-                .hostFolder.childEntity[0];
-var host    = cluster.host[0];
-var vis     = host.configManager.vsanInternalSystem;
-
-// Get full stats -- look at all available labels
-var labels  = ["dom-owners"];
-var result  = vis.queryVsanStatistics(labels);
-
-// Parse and explore the structure
-var parsed = JSON.parse(result);
-
-System.log("Top-level keys: " + Object.keys(parsed).join(", "));
-
-// dom.owners.stats contains per-object stats keyed by DOM object UUID
-var ownerStats = parsed["dom.owners.stats"];
-if (ownerStats) {
-    var uuids = Object.keys(ownerStats);
-    System.log("DOM object count: " + uuids.length);
-    
-    if (uuids.length > 0) {
-        // Print the full key set from the first object
-        var firstObj = ownerStats[uuids[0]];
-        System.log("\nFirst DOM object UUID: " + uuids[0]);
-        System.log("Available fields: " + Object.keys(firstObj).join(", "));
-        System.log("\nFull first object: " + JSON.stringify(firstObj, null, 2).substring(0, 2000));
-    }
-}
-
-// Also try querying all hosts to see if we get different/more objects
-System.log("\n=== All hosts contribution ===");
-var allHostStats = {};
-for (var hi = 0; hi < cluster.host.length; hi++) {
-    var h   = cluster.host[hi];
-    var hv  = h.configManager.vsanInternalSystem;
-    try {
-        var hr     = JSON.parse(hv.queryVsanStatistics(["dom-owners"]));
-        var hStats = hr["dom.owners.stats"] || {};
-        var hUuids = Object.keys(hStats);
-        System.log("Host " + h.name + ": " + hUuids.length + " DOM objects");
-        for (var ui = 0; ui < hUuids.length; ui++) {
-            allHostStats[hUuids[ui]] = hStats[hUuids[ui]];
-        }
-    } catch (e) {
-        System.log("Host " + h.name + " failed: " + e.message);
-    }
-}
-System.log("Total unique DOM objects across all hosts: " +
-    Object.keys(allHostStats).length);
-
-// Print aggregated latency/congestion fields from all objects
-var totalReadLatUs  = 0, totalReadCount  = 0;
-var totalWriteLatUs = 0, totalWriteCount = 0;
-var maxCongestion   = 0;
-var allUuids = Object.keys(allHostStats);
-for (var ai = 0; ai < allUuids.length; ai++) {
-    var obj = allHostStats[allUuids[ai]];
-    if (obj.readCount)          totalReadCount  += obj.readCount;
-    if (obj.readLatencySumUs)   totalReadLatUs  += obj.readLatencySumUs;
-    if (obj.writeCount)         totalWriteCount += obj.writeCount;
-    if (obj.writeLatencySumUs)  totalWriteLatUs += obj.writeLatencySumUs;
-    if (obj.readCongestionSum)  maxCongestion = Math.max(maxCongestion, obj.readCongestionSum);
-    if (obj.writeCongestionSum) maxCongestion = Math.max(maxCongestion, obj.writeCongestionSum);
-}
-
-System.log("\n=== Aggregated metrics ===");
-System.log("Total read ops:  " + totalReadCount);
-System.log("Total write ops: " + totalWriteCount);
-System.log("Avg read latency:  " + (totalReadCount  > 0 ? (totalReadLatUs  / totalReadCount  / 1000).toFixed(2) : "n/a") + " ms");
-System.log("Avg write latency: " + (totalWriteCount > 0 ? (totalWriteLatUs / totalWriteCount / 1000).toFixed(2) : "n/a") + " ms");
-System.log("Max congestion seen: " + maxCongestion);
+2026-04-21 16:37:20.517 -04:00INFOTop-level keys: on-esx-collect-duration
+2026-04-21 16:37:20.518 -04:00INFO=== All hosts contribution ===
+2026-04-21 16:37:20.532 -04:00INFOHost sfo01-m01-r01-esx02.connect.lab: 0 DOM objects
+2026-04-21 16:37:20.620 -04:00INFOHost sfo01-m01-r01-esx05.connect.lab: 0 DOM objects
+2026-04-21 16:37:20.713 -04:00INFOHost sfo01-m01-r01-esx03.connect.lab: 0 DOM objects
+2026-04-21 16:37:20.798 -04:00INFOHost sfo01-m01-r01-esx04.connect.lab: 0 DOM objects
+2026-04-21 16:37:20.799 -04:00INFOTotal unique DOM objects across all hosts: 0
+2026-04-21 16:37:20.800 -04:00INFO=== Aggregated metrics ===
+2026-04-21 16:37:20.801 -04:00INFOTotal read ops:  0
+2026-04-21 16:37:20.802 -04:00INFOTotal write ops: 0
+2026-04-21 16:37:20.803 -04:00INFOAvg read latency:  n/a ms
+2026-04-21 16:37:20.804 -04:00INFOAvg write latency: n/a ms
+2026-04-21 16:37:20.805 -04:00INFOMax congestion seen: 0
