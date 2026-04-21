@@ -68,7 +68,8 @@ var LOG = {
     fail:   function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); }
 };
 
-var MODULE        = "com.broadcom.pso.vc.storage";
+var STORAGEMODULE        = "com.broadcom.pso.vc.storage";
+var SNAPSHOTMODULE      = "com.broadcom.pso.vc.vm.snapshots"
 var onCands       = JSON.parse(onCandidatesJson || "[]");
 var logArr        = JSON.parse(runLog || "[]");
 var dsState       = {};
@@ -132,7 +133,7 @@ if (onCands.length === 0) {
 
             // Execute
             inFlight++;
-            var res = JSON.parse(System.getModule(MODULE)._deleteSnapshot(
+            var res = JSON.parse(System.getModule(SNAPSHOTMODULE)._deleteSnapshot(
                 vcConn, cand.vmMoRef, cand.snapshotMoRef,
                 cand.snapshotName, cand.vmName,
                 JSON.stringify(dsRefs), dryRun, taskTimeoutSeconds || 1800));
@@ -170,12 +171,12 @@ function checkGovernor(vcConn, dsRefs, vmName) {
     if (!dsRefs || dsRefs.length === 0) return true;
     var curr = [], pre = [], post = [];
     for each (var r in dsRefs) {
-        try { curr.push(JSON.parse(System.getModule(MODULE)._getDatastoreMetrics(vcConn, r))); }
+        try { curr.push(JSON.parse(System.getModule(STORAGEMODULE)._getDatastoreMetrics(vcConn, r))); }
         catch (e) { LOG.warn("PROCESSING","Could not read storage metrics for datastore " + r + ": " + e.message); }
         var st = dsState[r];
         if (st) { if (st.lastPre) pre.push(st.lastPre); if (st.lastPost) post.push(st.lastPost); }
     }
-    var g = JSON.parse(System.getModule(MODULE)._adaptiveGovernorCheck(
+    var g = JSON.parse(System.getModule(STORAGEMODULE)._adaptiveGovernorCheck(
         JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(pre), JSON.stringify(post),
         latencyThresholdMs || 30, vsanCongestionThresh || 50,
         vsanResyncThresholdBytes || 10737418240));

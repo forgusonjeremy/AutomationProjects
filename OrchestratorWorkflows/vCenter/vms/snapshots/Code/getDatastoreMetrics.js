@@ -1,6 +1,6 @@
 /**
- * ACTION: getDatastoreMetrics
- * Module : com.company.snapshotcleanup
+ * ACTION: _getDatastoreMetrics
+ * Module : com.broadcom.pso.vc.storage
  *
  * Samples current I/O performance for a single datastore.
  * Detects vSAN vs VMFS/NFS at runtime and applies the appropriate
@@ -46,7 +46,7 @@ try {
     // ── Locate the datastore via the SDK connection's finder ──────────────────
     // VcPlugin.findAllForType scoped to the SDK connection is the correct
     // approach in vRO 8.x Polyglot runtime. findEntityById does not exist.
-    var datastores = VcPlugin.findAllForType("Datastore", vcenterSdkConnection);
+    var datastores = vcenterSdkConnection.getAllDatastores()
     var ds = null;
     for (var i = 0; i < datastores.length; i++) {
         if (datastores[i].id === datastoreMoRef) {
