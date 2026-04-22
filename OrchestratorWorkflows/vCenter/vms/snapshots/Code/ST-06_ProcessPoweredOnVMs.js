@@ -68,7 +68,8 @@ var LOG = {
     fail:   function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); }
 };
 
-var MODULE        = "com.company.snapshotcleanup";
+var MODULE        = "com.broadcom.pso.vc.vm.snapshots";
+var STORAGEMODULE = "com.broadcom.pso.vc.storage";
 var onCands       = JSON.parse(onCandidatesJson || "[]");
 var logArr        = JSON.parse(runLog || "[]");
 var dsState       = {};
@@ -109,13 +110,19 @@ if (onCands.length === 0) {
         // The dispatch loop fills slots up to maxParallel, then polls all
         // active tokens, harvests completed ones, and continues.
 
+        var WRAPPER_WF_NAME = "Adaptive Snapshot Delete Task";
+
+        // Locate the single-task wrapper workflow by name
+        var wfList    = Server.getWorkflows(WRAPPER_WF_NAME);
+        var wrapperWf = (wfList && wfList.length > 0) ? wfList[0] : null;
+
         if (!wrapperWf) {
-            // Fallback: synchronous execution if wrapper workflow not found.
-            // This preserves correctness at the cost of parallelism.
+            // Fallback: synchronous execution if wrapper workflow variable is
+            // not bound. Bind the wrapper workflow via the workflow attribute
+            // picker in the vRO designer to enable parallel dispatch.
             LOG.warn("PROCESSING",
-                "Wrapper workflow '" + WRAPPER_WF_NAME + "' not found -- " +
-                "falling back to sequential execution. " +
-                "Create the wrapper workflow to enable parallel dispatch.");
+                "Wrapper workflow attribute is not bound -- " +
+                "falling back to sequential execution.");
         }
 
         var inFlightSlots = [];  // { token, cand, label, startMs }
@@ -280,13 +287,13 @@ function checkGovernor(vcConn, dsRefs, vmName) {
     if (!dsRefs || dsRefs.length === 0) return true;
     var curr = [], pre = [], post = [];
     for each (var r in dsRefs) {
-        try { curr.push(JSON.parse(System.getModule(MODULE)._getDatastoreMetrics(vcConn, r))); }
+        try { curr.push(JSON.parse(System.getModule(STORAGEMODULE)._getDatastoreMetrics(vcConn, r))); }
         catch (e) { LOG.warn("PROCESSING","Could not read storage metrics for datastore " + r + ": " + e.message); }
         var st = dsState[r];
         if (st) { if (st.lastPre) pre.push(st.lastPre); if (st.lastPost) post.push(st.lastPost); }
     }
-    var g = JSON.parse(System.getModule(MODULE)._adaptiveGovernorCheck(
-        JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(pre), JSON.stringify(post),
+    var g = JSON.parse(System.getModule(STORAGEMODULE)._adaptiveGovernorCheck(
+        JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(post),
         latencyThresholdMs || 30, vsanCongestionThresh || 50,
         vsanResyncThresholdBytes || 10737418240));
     if (!g.approved)
