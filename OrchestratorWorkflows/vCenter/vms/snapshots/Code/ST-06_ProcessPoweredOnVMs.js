@@ -109,12 +109,6 @@ if (onCands.length === 0) {
         // The dispatch loop fills slots up to maxParallel, then polls all
         // active tokens, harvests completed ones, and continues.
 
-        var WRAPPER_WF_NAME = "Adaptive Snapshot Delete Task";
-
-        // Locate the single-task wrapper workflow by name
-        var wfList    = Server.getWorkflows(WRAPPER_WF_NAME);
-        var wrapperWf = (wfList && wfList.length > 0) ? wfList[0] : null;
-
         if (!wrapperWf) {
             // Fallback: synchronous execution if wrapper workflow not found.
             // This preserves correctness at the cost of parallelism.
@@ -239,7 +233,7 @@ if (onCands.length === 0) {
                     LOG.ok("PROCESSING","Dispatched (async):  " + label);
                 } else {
                     // Synchronous fallback
-                    var res2 = JSON.parse(System.getModule(MODULE).deleteSnapshot(
+                    var res2 = JSON.parse(System.getModule(MODULE)._deleteSnapshot(
                         vcConn, cand.vmMoRef, cand.snapshotMoRef,
                         cand.snapshotName, cand.vmName,
                         JSON.stringify(dsRefs), dryRun, taskTimeoutSeconds || 1800));
@@ -286,12 +280,12 @@ function checkGovernor(vcConn, dsRefs, vmName) {
     if (!dsRefs || dsRefs.length === 0) return true;
     var curr = [], pre = [], post = [];
     for each (var r in dsRefs) {
-        try { curr.push(JSON.parse(System.getModule(MODULE).getDatastoreMetrics(vcConn, r))); }
+        try { curr.push(JSON.parse(System.getModule(MODULE)._getDatastoreMetrics(vcConn, r))); }
         catch (e) { LOG.warn("PROCESSING","Could not read storage metrics for datastore " + r + ": " + e.message); }
         var st = dsState[r];
         if (st) { if (st.lastPre) pre.push(st.lastPre); if (st.lastPost) post.push(st.lastPost); }
     }
-    var g = JSON.parse(System.getModule(MODULE).adaptiveGovernorCheck(
+    var g = JSON.parse(System.getModule(MODULE)._adaptiveGovernorCheck(
         JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(pre), JSON.stringify(post),
         latencyThresholdMs || 30, vsanCongestionThresh || 50,
         vsanResyncThresholdBytes || 10737418240));
