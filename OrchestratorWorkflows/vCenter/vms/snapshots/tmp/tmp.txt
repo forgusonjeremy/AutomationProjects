@@ -1,5 +1,0 @@
-1) I need to rename all of the nodes fqdns do remove an old standard and add connect to the fqdn.  Is this supported? 
-2) I need to enable to Integrate Load Balancer.  If I currently have endpoints sends logs to the node IPs and then I enable the ILB, can log insight still receive logs at both targets?  If  an ESX host were configured to send to the node IP and IRL (both Ips), would log insight keep duplicate logs?  If I enable to ILB must i immediately switch all my device to point from one IP to the other, etc
-3) We are currently projecting 60TB++ of logs on our index going back 18 months.  will all logs be searchable/indexed?
-4) What kind of performance can we expect when searching for logs against 60TB?
-5) Should we scale these out?  currently we have 3 nodes.
