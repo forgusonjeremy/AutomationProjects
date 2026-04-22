@@ -100,30 +100,17 @@ if (onCands.length === 0) {
 
         // ── Async parallel dispatch ───────────────────────────────────────────
         // System.getModule().action() calls are fully blocking in vRO Polyglot.
-        // True parallelism requires launching the deleteSnapshot action inside
-        // a child workflow asynchronously using Server.getWorkflow() and
-        // workflow.execute() which returns immediately with a token that can
-        // be polled via Server.getWorkflowToken().
+        // True parallelism is achieved by launching _deleteSnapshot inside a
+        // child workflow (wrapperWf) asynchronously. wrapperWf is bound as a
+        // Workflow-type attribute on the parent workflow at design time via the
+        // vRO designer picker -- no runtime lookup needed.
         //
-        // Each in-flight task is tracked as an object in the inFlightSlots
-        // array:  { token, cand, label, startMs }
-        // The dispatch loop fills slots up to maxParallel, then polls all
-        // active tokens, harvests completed ones, and continues.
+        // wrapperWf.execute(props) returns immediately with a token.
+        // Each slot tracks: { token, cand, label, startMs }
+        // The loop fills slots to maxParallel, polls active tokens, harvests
+        // completed ones, and dispatches more until the queue is empty.
 
-        var WRAPPER_WF_NAME = "Adaptive Snapshot Delete Task";
 
-        // Locate the single-task wrapper workflow by name
-        var wfList    = Server.getWorkflows(WRAPPER_WF_NAME);
-        var wrapperWf = (wfList && wfList.length > 0) ? wfList[0] : null;
-
-        if (!wrapperWf) {
-            // Fallback: synchronous execution if wrapper workflow variable is
-            // not bound. Bind the wrapper workflow via the workflow attribute
-            // picker in the vRO designer to enable parallel dispatch.
-            LOG.warn("PROCESSING",
-                "Wrapper workflow attribute is not bound -- " +
-                "falling back to sequential execution.");
-        }
 
         var inFlightSlots = [];  // { token, cand, label, startMs }
         var qi = 0;
@@ -141,19 +128,30 @@ if (onCands.length === 0) {
                     continue;
                 }
 
-                // Slot finished -- extract result
+                // Slot finished -- extract result.
+                // token.outputParameters is a vRO SDK object, not a plain JS
+                // array. Use the named getter instead of iterating by index.
                 var res = null;
                 try {
-                    var outAttrs = slot.token.outputParameters;
-                    for (var oi = 0; oi < outAttrs.length; oi++) {
-                        if (outAttrs[oi].name === "resultJson") {
-                            res = JSON.parse(outAttrs[oi].value);
-                            break;
-                        }
+                    var rawJson = slot.token.getOutputParameters()
+                                      .get("resultJson");
+                    if (rawJson) {
+                        res = JSON.parse(rawJson);
                     }
                 } catch (te) {
-                    System.warn("ST-06: could not read output from slot for " +
-                                slot.label + ": " + te.message);
+                    // Fallback: try direct property access pattern
+                    try {
+                        var outParams = slot.token.outputParameters;
+                        if (outParams) {
+                            var rawJson2 = outParams.get
+                                ? outParams.get("resultJson")
+                                : null;
+                            if (rawJson2) res = JSON.parse(rawJson2);
+                        }
+                    } catch (te2) {
+                        System.warn("ST-06: could not read output from slot for " +
+                                    slot.label + ": " + te.message);
+                    }
                 }
 
                 if (!res) {
@@ -218,55 +216,26 @@ if (onCands.length === 0) {
                     LOG.ok("PROCESSING","Storage settled -- proceeding:  " + label);
                 }
 
-                if (wrapperWf) {
-                    // Async dispatch via wrapper workflow
-                    var props = new Properties();
-                    props.put("vcenterSdkConnection", vcConn);
-                    props.put("vmMoRef",              cand.vmMoRef);
-                    props.put("snapshotMoRef",        cand.snapshotMoRef);
-                    props.put("snapshotName",         cand.snapshotName);
-                    props.put("vmName",               cand.vmName);
-                    props.put("datastoreMoRefsJson",  JSON.stringify(dsRefs));
-                    props.put("dryRun",               dryRun);
-                    props.put("taskTimeoutSeconds",   taskTimeoutSeconds || 1800);
+                // Async dispatch via wrapper workflow
+                var props = new Properties();
+                props.put("vcenterSdkConnection", vcConn);
+                props.put("vmMoRef",              cand.vmMoRef);
+                props.put("snapshotMoRef",        cand.snapshotMoRef);
+                props.put("snapshotName",         cand.snapshotName);
+                props.put("vmName",               cand.vmName);
+                props.put("datastoreMoRefsJson",  JSON.stringify(dsRefs));
+                props.put("dryRun",               dryRun);
+                props.put("taskTimeoutSeconds",   taskTimeoutSeconds || 1800);
 
-                    var token = wrapperWf.execute(props);
-                    inFlightSlots.push({
-                        token:   token,
-                        cand:    cand,
-                        label:   label,
-                        startMs: new Date().getTime()
-                    });
-                    LOG.ok("PROCESSING","Dispatched (async):  " + label);
-                } else {
-                    // Synchronous fallback
-                    var res2 = JSON.parse(System.getModule(MODULE)._deleteSnapshot(
-                        vcConn, cand.vmMoRef, cand.snapshotMoRef,
-                        cand.snapshotName, cand.vmName,
-                        JSON.stringify(dsRefs), dryRun, taskTimeoutSeconds || 1800));
+                var token = wrapperWf.execute(props);
+                inFlightSlots.push({
+                    token:   token,
+                    cand:    cand,
+                    label:   label,
+                    startMs: new Date().getTime()
+                });
+                LOG.ok("PROCESSING","Dispatched (async):  " + label);
 
-                    if (!dryRun && res2.success && !res2.skipped)
-                        updateState(JSON.parse(res2.preMetricsJson  || "[]"),
-                                    JSON.parse(res2.postMetricsJson || "[]"));
-
-                    if (dryRun && !res2.skipped) {
-                        LOG.dryrun("PROCESSING","Would delete:  " + label);
-                        logArr.push(makeEntry(cand,"dry_run",true,null,null,res2.durationMs));
-                    } else if (res2.skipped) {
-                        LOG.skip("PROCESSING","Skipped:  " + label +
-                                 "  --  Reason: " + res2.skipReason);
-                        logArr.push(makeEntry(cand,"skipped",false,
-                                    res2.skipReason,null,res2.durationMs));
-                    } else if (res2.success) {
-                        LOG.done("PROCESSING","Deleted:  " + label +
-                                 "  (took " + Math.round(res2.durationMs/1000) + "s)");
-                        logArr.push(makeEntry(cand,"deleted",true,null,null,res2.durationMs));
-                    } else {
-                        LOG.fail("PROCESSING","Failed to delete:  " + label +
-                                 "  --  " + res2.error);
-                        logArr.push(makeEntry(cand,"error",false,null,res2.error,res2.durationMs));
-                    }
-                }
             }
 
             // ── Sleep before next harvest/dispatch cycle ──────────────────────
