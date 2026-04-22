@@ -149,42 +149,48 @@ try {
     System.log("Deleting: VM=" + vmName + " snap=" + snapshotName);
     var delTask = snapObj.snapshot.removeSnapshot_Task(false);
 
-    // Poll by re-fetching the task state via the task MoRef through the
-    // vRO task manager. VcTask.update() does not exist in vRO 8.17 Polyglot.
-    // Instead we poll Server.getTask() which re-fetches the task from vCenter.
-    var taskMoRef  = delTask.id;
+    // Poll task completion by re-reading the snapshot list on the VM.
+    // VcTask.update() does not exist in vRO 8.17 Polyglot, and Server.getTask()
+    // is also not available. The most reliable approach is to confirm completion
+    // by checking whether the snapshot still exists on the VM -- if it's gone,
+    // the task succeeded.
     var waited     = 0;
     var finalState = "running";
+    var pollSleep  = 5000;
 
     while (waited < timeout * 1000) {
-        System.sleep(5000);
-        waited += 5000;
+        System.sleep(pollSleep);
+        waited += pollSleep;
+
+        // Check task state via the delTask object directly.
+        // In Polyglot, accessing delTask.info re-fetches from vCenter on each
+        // property access -- no explicit update() call needed.
         try {
-            var refreshedTask = Server.getTask(taskMoRef);
-            if (refreshedTask && refreshedTask.info) {
-                finalState = refreshedTask.info.state.value;
-                if (finalState === "success") break;
-                if (finalState === "error") {
-                    result.error      = refreshedTask.info.error
-                        ? refreshedTask.info.error.localizedMessage
-                        : "vCenter task returned error state";
-                    result.durationMs = new Date().getTime() - startMs;
-                    return JSON.stringify(result);
-                }
+            var taskState = delTask.info.state.value;
+            if (taskState === "success") {
+                finalState = "success";
+                break;
             }
+            if (taskState === "error") {
+                result.error      = delTask.info.error
+                    ? delTask.info.error.localizedMessage
+                    : "vCenter task returned error state";
+                result.durationMs = new Date().getTime() - startMs;
+                return JSON.stringify(result);
+            }
+            // Still running -- continue polling
         } catch (pe) {
-            // Task may have completed and been garbage collected -- try
-            // confirming by checking VM snapshot list directly
-            System.warn("deleteSnapshot: task poll error: " + pe.message +
-                        " -- checking VM snapshot list to confirm");
-            var vmRefreshed = findVmById(vcenterSdkConnection.rootFolder, vmMoRef);
-            if (vmRefreshed) {
-                var stillExists = false;
-                if (vmRefreshed.snapshot && vmRefreshed.snapshot.rootSnapshotList) {
-                    stillExists = !!findSnapshot(
-                        vmRefreshed.snapshot.rootSnapshotList, snapshotMoRef);
+            // delTask.info access failed -- confirm by checking snapshot list
+            System.warn("deleteSnapshot: task state poll failed: " + pe.message +
+                        " -- confirming via VM snapshot list");
+            var vmCheck = findVmById(vcenterSdkConnection.rootFolder, vmMoRef);
+            if (vmCheck) {
+                var stillThere = false;
+                if (vmCheck.snapshot && vmCheck.snapshot.rootSnapshotList) {
+                    stillThere = !!findSnapshot(
+                        vmCheck.snapshot.rootSnapshotList, snapshotMoRef);
                 }
-                if (!stillExists) {
+                if (!stillThere) {
                     finalState = "success";
                     break;
                 }
@@ -193,8 +199,7 @@ try {
     }
 
     if (finalState !== "success") {
-        result.error      = "Task timed out or did not complete after " +
-                            timeout + "s (last state: " + finalState + ")";
+        result.error      = "Task timed out after " + timeout + "s";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
