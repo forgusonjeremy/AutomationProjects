@@ -98,58 +98,55 @@ if (onCands.length === 0) {
         }
         LOG.ok("PROCESSING","Processing " + queue.length + " powered-on snapshot(s) on " + vcKey);
 
-        // ── Async parallel dispatch ───────────────────────────────────────────
-        // System.getModule().action() calls are fully blocking in vRO Polyglot.
-        // True parallelism is achieved by launching _deleteSnapshot inside a
-        // child workflow (wrapperWf) asynchronously. wrapperWf is bound as a
-        // Workflow-type attribute on the parent workflow at design time via the
-        // vRO designer picker -- no runtime lookup needed.
+        // ── Adaptive concurrency dispatch ────────────────────────────────────
+        // Starts at 1 concurrent task per vCenter. After each task completes,
+        // re-evaluates storage metrics. If performance is within threshold,
+        // ramps up by 1 (up to maxParallel). If storage is busy, holds at
+        // the current concurrency level until it settles. This gives the
+        // governor real feedback from actual consolidation I/O rather than
+        // pre-dispatch estimates.
         //
-        // wrapperWf.execute(props) returns immediately with a token.
-        // Each slot tracks: { token, cand, label, startMs }
-        // The loop fills slots to maxParallel, polls active tokens, harvests
-        // completed ones, and dispatches more until the queue is empty.
+        // currentConcurrency: how many tasks we are currently allowing at once
+        // inFlightSlots:      active workflow tokens { token, cand, label, startMs }
 
+        var currentConcurrency = 1;   // start conservative
+        var inFlightSlots      = [];
+        var qi                 = 0;
 
-
-        var inFlightSlots = [];  // { token, cand, label, startMs }
-        var qi = 0;
+        LOG.ok("PROCESSING", "Starting adaptive dispatch -- initial concurrency: 1 of " +
+               maxParallel + " max");
 
         while (qi < queue.length || inFlightSlots.length > 0) {
 
             // ── Harvest completed slots ───────────────────────────────────────
-            var stillActive = [];
+            var stillActive    = [];
+            var completedCount = 0;
+
             for (var si = 0; si < inFlightSlots.length; si++) {
                 var slot  = inFlightSlots[si];
-                var state = slot.token.state;  // "running","completed","failed","canceled"
+                var state = slot.token.state;
 
                 if (state === "running") {
                     stillActive.push(slot);
                     continue;
                 }
 
-                // Slot finished -- extract result.
-                // token.outputParameters is a vRO SDK object, not a plain JS
-                // array. Use the named getter instead of iterating by index.
+                completedCount++;
+
+                // Extract result via named getter
                 var res = null;
                 try {
-                    var rawJson = slot.token.getOutputParameters()
-                                      .get("resultJson");
-                    if (rawJson) {
-                        res = JSON.parse(rawJson);
-                    }
+                    var rawJson = slot.token.getOutputParameters().get("resultJson");
+                    if (rawJson) res = JSON.parse(rawJson);
                 } catch (te) {
-                    // Fallback: try direct property access pattern
                     try {
                         var outParams = slot.token.outputParameters;
-                        if (outParams) {
-                            var rawJson2 = outParams.get
-                                ? outParams.get("resultJson")
-                                : null;
+                        if (outParams && outParams.get) {
+                            var rawJson2 = outParams.get("resultJson");
                             if (rawJson2) res = JSON.parse(rawJson2);
                         }
                     } catch (te2) {
-                        System.warn("ST-06: could not read output from slot for " +
+                        System.warn("ST-06: could not read output for " +
                                     slot.label + ": " + te.message);
                     }
                 }
@@ -166,62 +163,88 @@ if (onCands.length === 0) {
                                 JSON.parse(res.postMetricsJson || "[]"));
 
                 if (dryRun && !res.skipped) {
-                    LOG.dryrun("PROCESSING","Would delete:  " + slot.label);
+                    LOG.dryrun("PROCESSING", "Would delete:  " + slot.label);
                     logArr.push(makeEntry(slot.cand,"dry_run",true,null,null,res.durationMs));
                 } else if (res.skipped) {
-                    LOG.skip("PROCESSING","Skipped:  " + slot.label +
+                    LOG.skip("PROCESSING", "Skipped:  " + slot.label +
                              "  --  Reason: " + res.skipReason);
                     logArr.push(makeEntry(slot.cand,"skipped",false,
                                 res.skipReason,null,res.durationMs));
                 } else if (res.success) {
-                    LOG.done("PROCESSING","Deleted:  " + slot.label +
+                    LOG.done("PROCESSING", "Deleted:  " + slot.label +
                              "  (took " + Math.round(res.durationMs/1000) + "s)");
                     logArr.push(makeEntry(slot.cand,"deleted",true,null,null,res.durationMs));
                 } else {
-                    LOG.fail("PROCESSING","Failed to delete:  " + slot.label +
+                    LOG.fail("PROCESSING", "Failed to delete:  " + slot.label +
                              "  --  " + res.error);
                     logArr.push(makeEntry(slot.cand,"error",false,null,res.error,res.durationMs));
                 }
             }
             inFlightSlots = stillActive;
 
-            // ── Dispatch new tasks up to maxParallel ──────────────────────────
-            while (qi < queue.length && inFlightSlots.length < maxParallel) {
+            // ── After harvesting, re-evaluate concurrency ─────────────────────
+            // Only ramp up if at least one slot just completed, there is
+            // queue remaining, and we're below maxParallel.
+            if (completedCount > 0 && qi < queue.length &&
+                currentConcurrency < maxParallel) {
+
+                // Check storage health across all datastores in use
+                // by the next candidate in the queue
+                var nextCand    = queue[qi];
+                var nextDsRefs  = nextCand.datastoreMoRefs || [];
+                var govOk       = checkGovernor(vcConn, nextDsRefs, nextCand.vmName);
+
+                if (govOk) {
+                    currentConcurrency = Math.min(currentConcurrency + 1, maxParallel);
+                    LOG.ok("PROCESSING",
+                        "Storage healthy -- ramping concurrency to " +
+                        currentConcurrency + " of " + maxParallel);
+                } else {
+                    LOG.hold("PROCESSING",
+                        "Storage busy -- holding concurrency at " +
+                        currentConcurrency + " of " + maxParallel);
+                }
+            }
+
+            // ── Dispatch new tasks up to currentConcurrency ───────────────────
+            while (qi < queue.length && inFlightSlots.length < currentConcurrency) {
                 var cand   = queue[qi++];
                 var dsRefs = cand.datastoreMoRefs || [];
                 var label  = "VM '" + cand.vmName + "'  snapshot '" +
                              cand.snapshotName + "'  (age: " +
                              cand.snapshotAgeMinutes + " min)";
 
-                // I/O governor pre-check
-                var govOk = checkGovernor(vcConn, dsRefs, cand.vmName);
-                if (!govOk) {
-                    var attempts = 0;
-                    while (!govOk && attempts < 120) {
-                        LOG.hold("PROCESSING",
-                            "Storage I/O is too high to safely start another cleanup. " +
-                            "Waiting " + Math.round(govPollMs/1000) + "s...  " +
-                            "(attempt " + (attempts+1) + " of 120)  --  " + label);
-                        System.sleep(govPollMs);
-                        attempts++;
-                        govOk = checkGovernor(vcConn, dsRefs, cand.vmName);
+                // Governor pre-check before first dispatch or after holds
+                if (inFlightSlots.length === 0) {
+                    var govOk2 = checkGovernor(vcConn, dsRefs, cand.vmName);
+                    if (!govOk2) {
+                        var attempts = 0;
+                        while (!govOk2 && attempts < 120) {
+                            LOG.hold("PROCESSING",
+                                "Storage I/O too high to start cleanup. " +
+                                "Waiting " + Math.round(govPollMs/1000) + "s...  " +
+                                "(attempt " + (attempts+1) + " of 120)  --  " + label);
+                            System.sleep(govPollMs);
+                            attempts++;
+                            govOk2 = checkGovernor(vcConn, dsRefs, cand.vmName);
+                        }
+                        if (!govOk2) {
+                            LOG.warn("PROCESSING",
+                                "Storage did not settle -- deferring:  " + label);
+                            logArr.push(makeEntry(cand,"deferred",false,
+                                "Storage I/O governor max wait exceeded",null,0));
+                            continue;
+                        }
                     }
-                    if (!govOk) {
-                        LOG.warn("PROCESSING",
-                            "Waited too long for storage to settle -- deferring:  " + label);
-                        logArr.push(makeEntry(cand,"deferred",false,
-                            "Storage I/O governor max wait exceeded",null,0));
-                        continue;
-                    }
-                    LOG.ok("PROCESSING","Storage settled -- proceeding:  " + label);
                 }
 
-                // Async dispatch via wrapper workflow
+                // Async dispatch
                 var props = new Properties();
                 props.put("vcenterSdkConnection", vcConn);
                 props.put("vmMoRef",              cand.vmMoRef);
                 props.put("snapshotMoRef",        cand.snapshotMoRef);
                 props.put("snapshotName",         cand.snapshotName);
+                props.put("snapshotCreatedMs",    cand.snapshotCreatedMs || 0);
                 props.put("vmName",               cand.vmName);
                 props.put("datastoreMoRefsJson",  JSON.stringify(dsRefs));
                 props.put("dryRun",               dryRun);
@@ -234,8 +257,9 @@ if (onCands.length === 0) {
                     label:   label,
                     startMs: new Date().getTime()
                 });
-                LOG.ok("PROCESSING","Dispatched (async):  " + label);
-
+                LOG.ok("PROCESSING",
+                    "Dispatched [" + inFlightSlots.length + "/" + currentConcurrency +
+                    " slots]:  " + label);
             }
 
             // ── Sleep before next harvest/dispatch cycle ──────────────────────
@@ -243,6 +267,7 @@ if (onCands.length === 0) {
                 System.sleep(3000);
             }
         }
+
     }
     LOG.ok("PROCESSING","Powered-on VM lane complete.");
 }

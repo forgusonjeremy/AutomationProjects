@@ -16,7 +16,10 @@
  *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to use
  *   vmMoRef               string            vm.id as stored by getSnapshotCandidates
  *   snapshotMoRef         string            snapshot.snapshot.value
- *   snapshotName          string            For log messages
+ *   snapshotName          string            For log messages and fallback lookup
+ *   snapshotCreatedMs     number            Snapshot creation timestamp (ms since epoch).
+ *                                           Used as fallback lookup key if MoRef becomes
+ *                                           stale after chain reorganisation by vCenter.
  *   vmName                string            For log messages
  *   datastoreMoRefsJson   string            JSON array of datastore.id strings
  *   dryRun                boolean           When true, skip actual deletion
@@ -26,10 +29,11 @@
  *   string  JSON result object
  */
 
-var STORAGEMODULE = "com.broadcom.pso.vc.storage";
-var startMs       = new Date().getTime();
-var timeout       = taskTimeoutSeconds || 1800;
-var dsRefs        = JSON.parse(datastoreMoRefsJson || "[]");
+var STORAGEMODULE     = "com.broadcom.pso.vc.storage";
+var startMs           = new Date().getTime();
+var timeout           = taskTimeoutSeconds || 1800;
+var dsRefs            = JSON.parse(datastoreMoRefsJson || "[]");
+var snapshotCreatedMs = snapshotCreatedMs || 0;
 
 var result = {
     success:         false,
@@ -97,30 +101,32 @@ try {
     }
 
     // ── Safety: confirm snapshot still exists ─────────────────────────────────
+    // Primary lookup: by MoRef. This may fail if a parent snapshot's MoRef
+    // was invalidated by vCenter when its child was deleted (vCenter
+    // reorganises the chain internally during consolidation). In that case
+    // we fall back to locating the snapshot by name + creation time, which
+    // survive chain reorganisation.
     var snapObj = null;
     if (vm.snapshot && vm.snapshot.rootSnapshotList) {
         snapObj = findSnapshot(vm.snapshot.rootSnapshotList, snapshotMoRef);
+        if (!snapObj && snapshotName && snapshotCreatedMs) {
+            // Fallback: find by name and creation timestamp (within 60s tolerance
+            // to account for any clock skew in the stored value)
+            snapObj = findSnapshotByNameAndTime(
+                vm.snapshot.rootSnapshotList, snapshotName, snapshotCreatedMs);
+            if (snapObj) {
+                System.log("deleteSnapshot: MoRef stale after chain reorganisation -- " +
+                           "located '" + snapshotName + "' by name+time fallback on " + vmName);
+            }
+        }
     }
     if (!snapObj) {
-        // Diagnostic: log the first snapshot's .value to check format vs snapshotMoRef
-        if (vm.snapshot && vm.snapshot.rootSnapshotList &&
-            vm.snapshot.rootSnapshotList.length > 0) {
-            var firstSnap = vm.snapshot.rootSnapshotList[0];
-            System.warn("deleteSnapshot: snapshot not found. " +
-                "Looking for snapshotMoRef='" + snapshotMoRef + "' " +
-                "(type=" + typeof snapshotMoRef + "). " +
-                "First snap in tree: snap.snapshot=" + firstSnap.snapshot +
-                " .value='" + firstSnap.snapshot.value + "' " +
-                " .type='" + firstSnap.snapshot.type + "' " +
-                "name='" + firstSnap.name + "'");
-        } else {
-            System.warn("deleteSnapshot: snapshot not found and VM has no snapshots. " +
-                "snapshotMoRef='" + snapshotMoRef + "' VM=" + vmName);
-        }
         result.skipped    = true;
-        result.skipReason = "Snapshot not found: snapshotMoRef='" + snapshotMoRef +
-                            "' -- check diagnostic log for format details";
+        result.skipReason = "Snapshot '" + snapshotName + "' not found on VM " + vmName +
+                            " -- may have been deleted by a concurrent operation or " +
+                            "consolidated when its child was removed";
         result.durationMs = new Date().getTime() - startMs;
+        System.warn("deleteSnapshot: " + result.skipReason);
         return JSON.stringify(result);
     }
 
@@ -255,6 +261,26 @@ function findVmById(folder, targetId) {
         } else if (child.childEntity !== undefined) {
             var found2 = findVmById(child, targetId);
             if (found2) return found2;
+        }
+    }
+    return null;
+}
+
+// ── Find snapshot by name and creation time ──────────────────────────────────
+// Fallback for when MoRef is stale after chain reorganisation. Matches on
+// snapshot name and creation timestamp within a 60-second tolerance window.
+function findSnapshotByNameAndTime(snapList, name, createdMs) {
+    var tolerance = 60000; // 60 seconds
+    for (var i = 0; i < snapList.length; i++) {
+        var s = snapList[i];
+        if (s.name === name) {
+            var snapMs = s.createTime ? s.createTime.getTime() : 0;
+            if (Math.abs(snapMs - createdMs) <= tolerance) return s;
+        }
+        if (s.childSnapshotList && s.childSnapshotList.length > 0) {
+            var found = findSnapshotByNameAndTime(
+                s.childSnapshotList, name, createdMs);
+            if (found) return found;
         }
     }
     return null;
