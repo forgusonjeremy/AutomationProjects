@@ -2,33 +2,32 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * ST-05  SORT & SPLIT EXECUTION LANES
  * ─────────────────────────────────────────────────────────────────────────────
- * Prepares the candidate list for safe, efficient processing by doing two things:
+ * Takes the flat candidate list from ST-03 and produces two ordered queues:
  *
- * 1. CHAIN-ORDER SORT: Sorts candidates so child snapshots always appear before
- *    their parent in the queue. This is required because vCenter cannot delete a
- *    parent snapshot while one of its children still exists. Within the same VM,
- *    the oldest sibling snapshots are processed first to maximise storage reclaim.
+ * GROUPING & ORDER:
+ *   Candidates are grouped by VM. Within each VM group, snapshots are sorted
+ *   newest-first using a topological (Kahn's) sort so that leaf snapshots
+ *   (newest/deepest) are always processed before their parents. This means
+ *   the workflow deletes snapshot-6 before snapshot-5, snapshot-5 before
+ *   snapshot-4, and so on -- never touching a parent until its child has
+ *   been removed.
  *
- * 2. LANE SPLIT: Divides candidates into two queues based on VM power state.
- *    Powered-off VMs have no guest stun lock risk so they can be processed
- *    without the per-vCenter concurrency limit, making them faster to clean up.
- *    Powered-on and suspended VMs go to the throttled lane with full governor
- *    and concurrency enforcement.
+ *   The topological sort operates only on candidates actually present in the
+ *   list. If a snapshot was excluded (desc filter, age filter) its MoRef is
+ *   not in the candidate set, so it is never treated as a blocking parent.
+ *   This prevents the sort from getting stuck when a filtered snapshot sits
+ *   in the middle of a chain.
+ *
+ * LANE SPLIT:
+ *   Powered-OFF VMs go to the fast lane (ST-07, no I/O governor).
+ *   Powered-ON and suspended VMs go to the throttled lane (ST-06).
  *
  * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name               vRO Type  Source / Description
- *   ─────────────────────────────────────────────────────────────────────────────────────────────
- *   allCandidatesJson  string    Attribute: allCandidatesJson
- *                                The complete flat candidate list from ST-03.
- *                                Parsed, sorted, and split into two sub-lists.
+ *   allCandidatesJson  string  Flat candidate array from _getSnapshotCandidates
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
- *   Name               vRO Type  Description
- *   ─────────────────────────────────────────────────────────────────────────────────────────────
- *   onCandidatesJson   string    JSON array of candidates whose VM power state is poweredOn
- *                                or suspended. Fed into ST-06 (throttled lane). Chain-ordered.
- *   offCandidatesJson  string    JSON array of candidates whose VM power state is poweredOff.
- *                                Fed into ST-07 (fast lane). Chain-ordered.
+ *   onCandidatesJson   string  Ordered candidates for powered-on VMs (ST-06)
+ *   offCandidatesJson  string  Ordered candidates for powered-off VMs (ST-07)
  */
 var LOG = {
     ok: function(p,m){ System.log("[SNAPSHOT-CLEANUP] ["+p+"] [OK]      "+m); }
@@ -36,92 +35,104 @@ var LOG = {
 
 var all = JSON.parse(allCandidatesJson || "[]");
 
-// ── Chain-safe sort: newest-first within each VM's snapshot chain ─────────
-// Within each VM we perform a topological sort so that leaf snapshots
-// (newest/deepest in the chain) are processed before their parents.
-// This ensures:
-//   1. We never attempt to delete a parent while its child still exists
-//      (vCenter would reject it anyway, but we avoid the error entirely).
-//   2. We only ever touch snapshots that have independently passed the age
-//      threshold -- deleting newest-first means we never force-consolidate
-//      a snapshot that wasn't individually eligible.
-// Across VMs, ordering is newest-first so that the most recent snapshots
-// across the whole environment are cleaned up before older ones in the
-// same batch, maximising reclaim of the most recently consumed delta space.
+// ── Step 1: Group candidates by VM ───────────────────────────────────────────
+var vmGroups = {};   // vmMoRef -> [candidate, ...]
+var vmOrder  = [];   // insertion order of vmMoRefs
 
-// Group candidates by VM
-var vmGroups = {};
-for (var gi = 0; gi < all.length; gi++) {
-    var c = all[gi];
-    var key = c.vcenterName + "|" + c.vmMoRef;
-    if (!vmGroups[key]) vmGroups[key] = [];
+for (var i = 0; i < all.length; i++) {
+    var c   = all[i];
+    var key = c.vmMoRef;
+    if (!vmGroups[key]) {
+        vmGroups[key] = [];
+        vmOrder.push(key);
+    }
     vmGroups[key].push(c);
 }
 
-// For each VM, topologically sort so children come before parents.
-// Build a map of snapshotMoRef -> candidate, then repeatedly pick
-// candidates whose snapshotMoRef is not referenced as anyone's parent
-// (i.e. they are current leaves) and emit them in order.
+// ── Step 2: Within each VM, topological sort newest-first ─────────────────────
+// Build a set of snapshotMoRefs that are in the candidate list for this VM.
+// Only consider parent links that point to another candidate -- filtered-out
+// snapshots are invisible to the sort.
 var sorted = [];
-var vmKeys = Object.keys(vmGroups);
-for (var vi = 0; vi < vmKeys.length; vi++) {
-    var group = vmGroups[vmKeys[vi]];
 
-    // Build parent lookup: which MoRefs are referenced as a parent?
-    var isParentOf = {};  // snapshotMoRef -> true if it has a child in this group
-    for (var pi = 0; pi < group.length; pi++) {
-        var parent = group[pi].parentSnapshotMoRef;
-        if (parent) isParentOf[parent] = true;
+for (var vi = 0; vi < vmOrder.length; vi++) {
+    var group = vmGroups[vmOrder[vi]];
+
+    // Index candidates in this group by their MoRef
+    var inGroup = {};
+    for (var gi = 0; gi < group.length; gi++) {
+        inGroup[group[gi].snapshotMoRef] = true;
     }
 
-    // Iteratively extract leaves (no children remaining) and emit them.
-    // This is Kahn's algorithm on a forest of snapshot chains.
+    // isParentOf[moRef] = true if moRef has at least one candidate child
+    // Only set for parents that are themselves in the candidate list.
+    var isParentOf = {};
+    for (var pi = 0; pi < group.length; pi++) {
+        var par = group[pi].parentSnapshotMoRef;
+        if (par && inGroup[par]) {
+            isParentOf[par] = true;
+        }
+    }
+
+    // Kahn's algorithm: repeatedly emit leaves (no remaining children),
+    // then remove each leaf so its parent may become the next leaf.
     var remaining = group.slice();
     var vmSorted  = [];
     var safety    = 0;
 
-    while (remaining.length > 0 && safety++ < 1000) {
-        var leaves = [];
+    while (remaining.length > 0 && safety++ < 5000) {
+        var leaves    = [];
         var nonLeaves = [];
+
         for (var ri = 0; ri < remaining.length; ri++) {
-            if (!isParentOf[remaining[ri].snapshotMoRef]) {
-                leaves.push(remaining[ri]);
-            } else {
+            if (isParentOf[remaining[ri].snapshotMoRef]) {
                 nonLeaves.push(remaining[ri]);
+            } else {
+                leaves.push(remaining[ri]);
             }
         }
 
         if (leaves.length === 0) {
-            // Cycle or bad data -- emit remaining as-is to avoid infinite loop
-            for (var ci2 = 0; ci2 < remaining.length; ci2++) vmSorted.push(remaining[ci2]);
+            // Cycle or corrupt chain -- emit remainder as-is to avoid hang
+            for (var ci = 0; ci < remaining.length; ci++) {
+                vmSorted.push(remaining[ci]);
+            }
+            System.warn("ST-05: cycle detected in snapshot chain for VM " +
+                        group[0].vmName + " -- emitting remaining " +
+                        remaining.length + " candidate(s) unsorted");
             break;
         }
 
-        // Sort leaves newest-first (youngest age = most recently created)
-        leaves.sort(function(a,b){ return a.snapshotAgeMinutes - b.snapshotAgeMinutes; });
+        // Sort leaves newest-first (smallest age = most recently created)
+        leaves.sort(function(a, b) {
+            return a.snapshotAgeMinutes - b.snapshotAgeMinutes;
+        });
+
         for (var li = 0; li < leaves.length; li++) {
             vmSorted.push(leaves[li]);
-            // Remove this leaf from isParentOf so its parent can become a leaf
-            delete isParentOf[leaves[li].parentSnapshotMoRef];
+            // Unmark the leaf's parent so it can become a leaf next round
+            if (leaves[li].parentSnapshotMoRef) {
+                delete isParentOf[leaves[li].parentSnapshotMoRef];
+            }
         }
         remaining = nonLeaves;
     }
 
-    for (var si2 = 0; si2 < vmSorted.length; si2++) sorted.push(vmSorted[si2]);
+    for (var si = 0; si < vmSorted.length; si++) {
+        sorted.push(vmSorted[si]);
+    }
 }
 
-// Final cross-VM sort: newest-first so the most recently created snapshots
-// are processed first across the entire batch.
-sorted.sort(function(a,b){ return a.snapshotAgeMinutes - b.snapshotAgeMinutes; });
-var all = sorted;
-
-var on  = all.filter(function(c){ return c.vmPowerState !== "poweredOff"; });
-var off = all.filter(function(c){ return c.vmPowerState === "poweredOff"; });
+// ── Step 3: Split into lanes ──────────────────────────────────────────────────
+var on  = sorted.filter(function(c){ return c.vmPowerState !== "poweredOff"; });
+var off = sorted.filter(function(c){ return c.vmPowerState === "poweredOff";  });
 
 onCandidatesJson  = JSON.stringify(on);
 offCandidatesJson = JSON.stringify(off);
 
-LOG.ok("PROCESSING","Snapshot queue ready:");
-LOG.ok("PROCESSING","  Powered-ON  VMs : " + on.length  + " snapshot(s)  (processed with I/O throttling)");
-LOG.ok("PROCESSING","  Powered-OFF VMs : " + off.length + " snapshot(s)  (processed in fast lane)");
-LOG.ok("PROCESSING","Beginning cleanup...");
+LOG.ok("PROCESSING", "Snapshot queue ready:");
+LOG.ok("PROCESSING", "  Powered-ON  VMs : " + on.length  +
+       " snapshot(s)  (processed with I/O throttling)");
+LOG.ok("PROCESSING", "  Powered-OFF VMs : " + off.length +
+       " snapshot(s)  (processed in fast lane)");
+LOG.ok("PROCESSING", "Beginning cleanup...");

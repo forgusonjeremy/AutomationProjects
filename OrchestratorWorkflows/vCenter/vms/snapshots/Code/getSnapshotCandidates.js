@@ -85,6 +85,10 @@ for (var vi = 0; vi < allVms.length; vi++) {
     );
 }
 
+// Return all eligible candidates unordered. Grouping and sort order
+// (newest-first per VM chain) is handled by ST-05 which has full visibility
+// of the chain topology. The action's job is only: enumerate, age-filter,
+// desc-filter, name-filter, and return the flat list.
 return JSON.stringify(result);
 
 // ── Recursive VM collector ────────────────────────────────────────────────────

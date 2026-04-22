@@ -98,23 +98,49 @@ if (onCands.length === 0) {
         }
         LOG.ok("PROCESSING","Processing " + queue.length + " powered-on snapshot(s) on " + vcKey);
 
-        // ── Adaptive concurrency dispatch ────────────────────────────────────
-        // Starts at 1 concurrent task per vCenter. After each task completes,
-        // re-evaluates storage metrics. If performance is within threshold,
-        // ramps up by 1 (up to maxParallel). If storage is busy, holds at
-        // the current concurrency level until it settles. This gives the
-        // governor real feedback from actual consolidation I/O rather than
-        // pre-dispatch estimates.
+        // ── Adaptive dispatch ─────────────────────────────────────────────
         //
-        // currentConcurrency: how many tasks we are currently allowing at once
-        // inFlightSlots:      active workflow tokens { token, cand, label, startMs }
+        // RULES (from spec):
+        //   1. Only 1 snapshot cleanup per VM at a time (hard constraint, always).
+        //   2. Start with 1 concurrent task across all datastores.
+        //   3. Before dispatching any additional task, measure the DELTA between
+        //      baseline (pre-dispatch) and current (post-dispatch) datastore
+        //      performance on the datastores the next candidate uses.
+        //   4. If projected latency (current + observed delta) will stay within
+        //      threshold → ramp up by 1 and dispatch.
+        //   5. If projected latency would exceed threshold → hold until a slot
+        //      completes, then re-evaluate.
+        //   6. Cap at maxParallel concurrent tasks.
+        //
+        // inFlightSlots:  active tokens { token, cand, label, startMs, vmMoRef }
+        // vmInFlight:     set of vmMoRef values currently being processed
+        // currentConcurrency: current allowed concurrency level (ramps 1→maxParallel)
 
-        var currentConcurrency = 1;   // start conservative
         var inFlightSlots      = [];
+        var vmInFlight         = {};   // vmMoRef -> true if a task is active for that VM
+        var currentConcurrency = 1;
         var qi                 = 0;
 
         LOG.ok("PROCESSING", "Starting adaptive dispatch -- initial concurrency: 1 of " +
                maxParallel + " max");
+
+        // Sample baseline metrics for all datastores in the queue before
+        // any tasks start. Used to compute deltas after dispatch.
+        var dsBaseline = {};
+        for (var bi = 0; bi < queue.length; bi++) {
+            var bds = queue[bi].datastoreMoRefs || [];
+            for (var bdi = 0; bdi < bds.length; bdi++) {
+                if (!dsBaseline[bds[bdi]]) {
+                    try {
+                        dsBaseline[bds[bdi]] = JSON.parse(
+                            System.getModule(STORAGEMODULE)
+                                ._getDatastoreMetrics(vcConn, bds[bdi]));
+                    } catch(be) {
+                        // non-fatal -- governor will approve if baseline missing
+                    }
+                }
+            }
+        }
 
         while (qi < queue.length || inFlightSlots.length > 0) {
 
@@ -132,8 +158,10 @@ if (onCands.length === 0) {
                 }
 
                 completedCount++;
+                // Free the per-VM lock
+                delete vmInFlight[slot.vmMoRef];
 
-                // Extract result via named getter
+                // Extract result
                 var res = null;
                 try {
                     var rawJson = slot.token.getOutputParameters().get("resultJson");
@@ -146,8 +174,8 @@ if (onCands.length === 0) {
                             if (rawJson2) res = JSON.parse(rawJson2);
                         }
                     } catch (te2) {
-                        System.warn("ST-06: could not read output for " +
-                                    slot.label + ": " + te.message);
+                        LOG.warn("PROCESSING", "Could not read output for " +
+                                 slot.label + ": " + te.message);
                     }
                 }
 
@@ -167,7 +195,7 @@ if (onCands.length === 0) {
                     logArr.push(makeEntry(slot.cand,"dry_run",true,null,null,res.durationMs));
                 } else if (res.skipped) {
                     LOG.skip("PROCESSING", "Skipped:  " + slot.label +
-                             "  --  Reason: " + res.skipReason);
+                             "  --  " + res.skipReason);
                     logArr.push(makeEntry(slot.cand,"skipped",false,
                                 res.skipReason,null,res.durationMs));
                 } else if (res.success) {
@@ -182,63 +210,101 @@ if (onCands.length === 0) {
             }
             inFlightSlots = stillActive;
 
-            // ── After harvesting, re-evaluate concurrency ─────────────────────
-            // Only ramp up if at least one slot just completed, there is
-            // queue remaining, and we're below maxParallel.
-            if (completedCount > 0 && qi < queue.length &&
+            // ── After harvest: ramp concurrency if storage permits ────────────
+            // Only ramp when slots just completed (we have real post-delete
+            // metrics to evaluate), queue still has work, and we're below max.
+            if (completedCount > 0 &&
+                qi < queue.length &&
+                inFlightSlots.length < maxParallel &&
                 currentConcurrency < maxParallel) {
 
-                // Check storage health across all datastores in use
-                // by the next candidate in the queue
-                var nextCand    = queue[qi];
-                var nextDsRefs  = nextCand.datastoreMoRefs || [];
-                var govOk       = checkGovernor(vcConn, nextDsRefs, nextCand.vmName);
+                // Find the next candidate not already being processed on its VM
+                var nextIdx = -1;
+                for (var ni = qi; ni < queue.length; ni++) {
+                    if (!vmInFlight[queue[ni].vmMoRef]) {
+                        nextIdx = ni;
+                        break;
+                    }
+                }
 
-                if (govOk) {
-                    currentConcurrency = Math.min(currentConcurrency + 1, maxParallel);
-                    LOG.ok("PROCESSING",
-                        "Storage healthy -- ramping concurrency to " +
-                        currentConcurrency + " of " + maxParallel);
-                } else {
-                    LOG.hold("PROCESSING",
-                        "Storage busy -- holding concurrency at " +
-                        currentConcurrency + " of " + maxParallel);
+                if (nextIdx >= 0) {
+                    var nextCand   = queue[nextIdx];
+                    var nextDsRefs = nextCand.datastoreMoRefs || [];
+                    var govOk      = checkGovernorDelta(vcConn, nextDsRefs,
+                                        nextCand.vmName, dsBaseline);
+                    if (govOk) {
+                        currentConcurrency = Math.min(currentConcurrency + 1, maxParallel);
+                        LOG.ok("PROCESSING",
+                            "Storage healthy -- ramping concurrency to " +
+                            currentConcurrency + " of " + maxParallel);
+                    } else {
+                        LOG.hold("PROCESSING",
+                            "Storage busy -- holding concurrency at " +
+                            currentConcurrency + " of " + maxParallel);
+                    }
                 }
             }
 
-            // ── Dispatch new tasks up to currentConcurrency ───────────────────
+            // ── Dispatch tasks up to currentConcurrency ───────────────────────
+            // Hard constraints:
+            //   - Total in-flight <= currentConcurrency
+            //   - Never dispatch a second task for a VM already in-flight
             while (qi < queue.length && inFlightSlots.length < currentConcurrency) {
-                var cand   = queue[qi++];
+                var cand = queue[qi];
+
+                // Skip: this VM already has an active task
+                if (vmInFlight[cand.vmMoRef]) {
+                    qi++;
+                    continue;
+                }
+
                 var dsRefs = cand.datastoreMoRefs || [];
                 var label  = "VM '" + cand.vmName + "'  snapshot '" +
                              cand.snapshotName + "'  (age: " +
                              cand.snapshotAgeMinutes + " min)";
 
-                // Governor pre-check before first dispatch or after holds
-                if (inFlightSlots.length === 0) {
-                    var govOk2 = checkGovernor(vcConn, dsRefs, cand.vmName);
-                    if (!govOk2) {
-                        var attempts = 0;
-                        while (!govOk2 && attempts < 120) {
+                // Governor check before dispatch (pre-check for first slot
+                // and whenever we are filling empty slots)
+                var govOk3 = checkGovernorDelta(vcConn, dsRefs,
+                                 cand.vmName, dsBaseline);
+                if (!govOk3) {
+                    if (inFlightSlots.length === 0) {
+                        // Nothing running -- wait and retry
+                        var holdAttempts = 0;
+                        while (!govOk3 && holdAttempts < 120) {
                             LOG.hold("PROCESSING",
-                                "Storage I/O too high to start cleanup. " +
-                                "Waiting " + Math.round(govPollMs/1000) + "s...  " +
-                                "(attempt " + (attempts+1) + " of 120)  --  " + label);
+                                "Storage too busy to start first task. " +
+                                "Waiting " + Math.round(govPollMs/1000) + "s... " +
+                                "(attempt " + (holdAttempts+1) + " of 120)  -- " + label);
                             System.sleep(govPollMs);
-                            attempts++;
-                            govOk2 = checkGovernor(vcConn, dsRefs, cand.vmName);
+                            holdAttempts++;
+                            govOk3 = checkGovernorDelta(vcConn, dsRefs,
+                                         cand.vmName, dsBaseline);
                         }
-                        if (!govOk2) {
+                        if (!govOk3) {
                             LOG.warn("PROCESSING",
-                                "Storage did not settle -- deferring:  " + label);
+                                "Storage did not settle -- deferring: " + label);
                             logArr.push(makeEntry(cand,"deferred",false,
                                 "Storage I/O governor max wait exceeded",null,0));
+                            qi++;
                             continue;
                         }
+                    } else {
+                        // Other tasks are running -- break inner loop and wait
+                        // for next harvest cycle before trying again
+                        break;
                     }
                 }
 
-                // Async dispatch
+                qi++;
+
+                if (dryRun) {
+                    LOG.dryrun("PROCESSING", "Would delete:  " + label);
+                    logArr.push(makeEntry(cand,"dry_run",true,null,null,0));
+                    continue;
+                }
+
+                // Dispatch async wrapper workflow
                 var props = new Properties();
                 props.put("vcenterSdkConnection", vcConn);
                 props.put("vmMoRef",              cand.vmMoRef);
@@ -247,22 +313,24 @@ if (onCands.length === 0) {
                 props.put("snapshotCreatedMs",    cand.snapshotCreatedMs || 0);
                 props.put("vmName",               cand.vmName);
                 props.put("datastoreMoRefsJson",  JSON.stringify(dsRefs));
-                props.put("dryRun",               dryRun);
+                props.put("dryRun",               false);
                 props.put("taskTimeoutSeconds",   taskTimeoutSeconds || 1800);
 
                 var token = wrapperWf.execute(props);
+                vmInFlight[cand.vmMoRef] = true;
                 inFlightSlots.push({
                     token:   token,
                     cand:    cand,
                     label:   label,
-                    startMs: new Date().getTime()
+                    startMs: new Date().getTime(),
+                    vmMoRef: cand.vmMoRef
                 });
                 LOG.ok("PROCESSING",
                     "Dispatched [" + inFlightSlots.length + "/" + currentConcurrency +
                     " slots]:  " + label);
             }
 
-            // ── Sleep before next harvest/dispatch cycle ──────────────────────
+            // Sleep before next harvest/dispatch cycle
             if (inFlightSlots.length > 0) {
                 System.sleep(3000);
             }
@@ -277,22 +345,59 @@ runLog = JSON.stringify(logArr);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function checkGovernor(vcConn, dsRefs, vmName) {
+function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
+    // Approve immediately if no datastores to check
     if (!dsRefs || dsRefs.length === 0) return true;
-    var curr = [], pre = [], post = [];
-    for each (var r in dsRefs) {
-        try { curr.push(JSON.parse(System.getModule(STORAGEMODULE)._getDatastoreMetrics(vcConn, r))); }
-        catch (e) { LOG.warn("PROCESSING","Could not read storage metrics for datastore " + r + ": " + e.message); }
-        var st = dsState[r];
-        if (st) { if (st.lastPre) pre.push(st.lastPre); if (st.lastPost) post.push(st.lastPost); }
+
+    for (var gi = 0; gi < dsRefs.length; gi++) {
+        var r = dsRefs[gi];
+        var curr = null;
+        try {
+            curr = JSON.parse(System.getModule(STORAGEMODULE)
+                              ._getDatastoreMetrics(vcConn, r));
+        } catch(ge) {
+            LOG.warn("PROCESSING", "Could not sample metrics for " + r +
+                     " -- approving to avoid permanent hold: " + ge.message);
+            continue;
+        }
+
+        var base = baseline[r];
+
+        // VMFS latency delta check
+        var curLat  = (curr.readLatencyMs !== null ? curr.readLatencyMs : 0) +
+                      (curr.writeLatencyMs !== null ? curr.writeLatencyMs : 0);
+        var baseLat = base
+            ? ((base.readLatencyMs !== null ? base.readLatencyMs : 0) +
+               (base.writeLatencyMs !== null ? base.writeLatencyMs : 0))
+            : 0;
+        var deltaLat = Math.max(0, curLat - baseLat);
+
+        if (curLat + deltaLat > (latencyThresholdMs || 30)) {
+            LOG.hold("PROCESSING",
+                "Datastore " + r + " latency " + curLat.toFixed(1) +
+                "ms + projected delta " + deltaLat.toFixed(1) +
+                "ms would exceed " + (latencyThresholdMs||30) + "ms threshold" +
+                " for VM '" + vmName + "'");
+            return false;
+        }
+
+        // vSAN congestion delta check
+        if (curr.vsanCongestion !== null) {
+            var curCong  = curr.vsanCongestion || 0;
+            var baseCong = base && base.vsanCongestion !== null
+                ? base.vsanCongestion : 0;
+            var deltaCong = Math.max(0, curCong - baseCong);
+            if (curCong + deltaCong > (vsanCongestionThresh || 50)) {
+                LOG.hold("PROCESSING",
+                    "Datastore " + r + " vSAN congestion " + curCong.toFixed(1) +
+                    " + projected delta " + deltaCong.toFixed(1) +
+                    " would exceed " + (vsanCongestionThresh||50) + " threshold" +
+                    " for VM '" + vmName + "'");
+                return false;
+            }
+        }
     }
-    var g = JSON.parse(System.getModule(STORAGEMODULE)._adaptiveGovernorCheck(
-        JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(post),
-        latencyThresholdMs || 30, vsanCongestionThresh || 50,
-        vsanResyncThresholdBytes || 10737418240));
-    if (!g.approved)
-        LOG.hold("PROCESSING","Storage governor says WAIT for VM '" + vmName + "': " + g.reason);
-    return g.approved;
+    return true;
 }
 
 function updateState(preArr, postArr) {
