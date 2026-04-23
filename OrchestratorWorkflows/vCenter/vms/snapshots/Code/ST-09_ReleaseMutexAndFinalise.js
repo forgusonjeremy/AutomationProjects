@@ -35,7 +35,7 @@
  *                                             filter was active for this run.
  *   nameMatchString   string                  Workflow Input: nameMatchString
  *                                             Included in the result block for full filter context.
- *   descIgnoreString  string                  Workflow Input: descIgnoreString
+ *   descIgnoreStrings  string[]                Workflow Input: descIgnoreStrings
  *                                             Included in the result block for full filter context.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
@@ -114,7 +114,17 @@ LOG.result("FINALISE","  Scan errors  : " + counts.enum_error + " vCenter(s) cou
 LOG.result("FINALISE","  ── Scope ──────────────────────────────────");
 LOG.result("FINALISE","  Age filter   : Snapshots older than " + ageLabel);
 LOG.result("FINALISE","  Name filter  : " + (nameMatchString  ? "'" + nameMatchString  + "'" : "None"));
-LOG.result("FINALISE","  Desc ignore  : " + (descIgnoreString ? "'" + descIgnoreString + "'" : "None"));
+// Build readable summary of ignore list for the finalise report
+var descIgnoreFinal = "None";
+if (descIgnoreStrings && descIgnoreStrings.length > 0) {
+    var fTerms = [];
+    for (var fdi = 0; fdi < descIgnoreStrings.length; fdi++) {
+        var ft = (descIgnoreStrings[fdi] || "").trim();
+        if (ft !== "") fTerms.push("'" + ft + "'");
+    }
+    if (fTerms.length > 0) descIgnoreFinal = fTerms.join(", ");
+}
+LOG.result("FINALISE","  Desc ignore  : " + descIgnoreFinal);
 LOG.result("FINALISE","  vCenters     : " + vcList);
 LOG.result("FINALISE","  Datastores   : " + dsCnt + " datastore(s) evaluated");
 LOG.result("FINALISE","  ── Status ─────────────────────────────────");
@@ -147,7 +157,8 @@ runSummaryJson = JSON.stringify({
     filters: {
         ageThresholdMinutes: maxAgeMinutes    || 60,
         nameFilter:          nameMatchString  || null,
-        descIgnoreFilter:    descIgnoreString || null
+        descIgnoreFilter:    (descIgnoreStrings && descIgnoreStrings.length > 0)
+                                ? descIgnoreStrings.slice() : null
     },
     counts: {
         deleted:    counts.deleted,

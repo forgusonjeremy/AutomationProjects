@@ -15,7 +15,7 @@
  *   nameMatchString          string    Whitelist filter — only delete snapshots whose name
  *                                      contains this string (case-insensitive). Leave empty
  *                                      to target all snapshot names.
- *   descIgnoreString         string    Skip filter — skip any snapshot whose description
+ *   descIgnoreStrings        string[]  Skip filter array — skip any snapshot whose description
  *                                      contains this string (case-insensitive). Leave empty
  *                                      to apply no description filter.
  *   dryRun                   boolean   When true, no snapshots are deleted. All operations
@@ -84,9 +84,18 @@ LOG.ok("STARTUP","  Age limit   : Snapshots older than " + ageLabel);
 LOG.ok("STARTUP","  Name filter : " + (nameMatchString
     ? "Only delete snapshots named like: '" + nameMatchString + "'"
     : "None  (all snapshot names are eligible)"));
-LOG.ok("STARTUP","  Desc ignore : " + (descIgnoreString
-    ? "Skip if description contains: '" + descIgnoreString + "'"
-    : "None  (no description filter)"));
+// Build a readable summary of the desc ignore list for the startup banner
+var descIgnoreSummary = "None  (no description filter)";
+if (descIgnoreStrings && descIgnoreStrings.length > 0) {
+    var validTerms = [];
+    for (var dli = 0; dli < descIgnoreStrings.length; dli++) {
+        var t = (descIgnoreStrings[dli] || "").trim();
+        if (t !== "") validTerms.push("'" + t + "'");
+    }
+    if (validTerms.length > 0)
+        descIgnoreSummary = "Skip if description contains any of: " + validTerms.join(", ");
+}
+LOG.ok("STARTUP","  Desc ignore : " + descIgnoreSummary);
 LOG.ok("STARTUP","  I/O ceiling : " + (latencyThresholdMs||30)+"ms latency  |  vSAN congestion max "+(vsanCongestionThresh||50)+"/255");
 LOG.ok("STARTUP","  Parallelism : Up to "+maxParallel+" simultaneous cleanup(s) per vCenter");
 LOG.ok("STARTUP","================================================");

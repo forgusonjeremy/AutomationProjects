@@ -26,7 +26,7 @@
  *   nameMatchString   string    Workflow Input: nameMatchString
  *                               Passed to getSnapshotCandidates. When non-empty, only
  *                               snapshots whose name contains this string are returned.
- *   descIgnoreString  string    Workflow Input: descIgnoreString
+ *   descIgnoreStrings  string[]  Workflow Input: descIgnoreStrings
  *                               Passed to getSnapshotCandidates. Snapshots whose description
  *                               contains this string are excluded from the returned list.
  *
@@ -69,7 +69,7 @@ if (!allVCs || allVCs.length === 0) {
             var raw   = System.getModule(MODULE)._getSnapshotCandidatesgetSnapshotCandidates(
                             vc, maxAgeMinutes || 60,
                             nameMatchString  || "",
-                            descIgnoreString || "");
+                            descIgnoreStrings || []);
             var cands = JSON.parse(raw);
 
             if (cands.length === 0) {

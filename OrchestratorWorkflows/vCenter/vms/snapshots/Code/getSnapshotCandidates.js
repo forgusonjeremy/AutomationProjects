@@ -13,7 +13,11 @@
  *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to enumerate
  *   maxAgeMinutes         number            Candidates older than this (minutes)
  *   nameMatchString       string            Whitelist filter (empty = all names)
- *   descIgnoreString      string            Skip filter  (empty = no filter)
+ *   descIgnoreStrings     string[]          Skip filter array. Each element is a substring
+ *                                           to match against snapshot descriptions (case-
+ *                                           insensitive). A snapshot is excluded if its
+ *                                           description contains ANY of the supplied strings.
+ *                                           Pass an empty array (or null) for no filter.
  *
  * ── RETURN TYPE ──────────────────────────────────────────────────────────────
  *   string  JSON array of candidate snapshot objects. Each object contains:
@@ -34,8 +38,16 @@
 var result     = [];
 var now        = new Date();
 var cutoffMs   = (maxAgeMinutes || 60) * 60 * 1000;
-var nameFilter = (nameMatchString  || "").toLowerCase().trim();
-var descIgnore = (descIgnoreString || "").toLowerCase().trim();
+var nameFilter     = (nameMatchString || "").toLowerCase().trim();
+// descIgnoreStrings is a vRO string[] (Array). Normalise to a plain JS array
+// of trimmed, lower-cased strings with empty entries removed.
+var descIgnoreList = [];
+if (descIgnoreStrings) {
+    for (var dii = 0; dii < descIgnoreStrings.length; dii++) {
+        var term = (descIgnoreStrings[dii] || "").toLowerCase().trim();
+        if (term !== "") descIgnoreList.push(term);
+    }
+}
 
 // ── Collect all VMs by traversing the vRO inventory tree ─────────────────────
 // Path: sdkConnection.rootFolder
@@ -138,15 +150,26 @@ function walkSnapshots(snapList, parentMoRef, vmId, vmName, pwrState, dsMoRefs) 
             continue;
         }
 
-        // Description ignore filter -- skip this snap, still walk children
-        if (descIgnore !== "" &&
-            snapDesc.toLowerCase().indexOf(descIgnore) !== -1) {
-            System.log("SKIP (desc match): VM=" + vmName + " snap=" + snapName);
-            if (snap.childSnapshotList && snap.childSnapshotList.length > 0) {
-                walkSnapshots(snap.childSnapshotList, snapMoRef,
-                              vmId, vmName, pwrState, dsMoRefs);
+        // Description ignore filter -- skip this snap if its description
+        // contains ANY of the strings in descIgnoreList, still walk children.
+        if (descIgnoreList.length > 0) {
+            var descLower   = snapDesc.toLowerCase();
+            var descMatched = false;
+            for (var dfi = 0; dfi < descIgnoreList.length; dfi++) {
+                if (descLower.indexOf(descIgnoreList[dfi]) !== -1) {
+                    descMatched = true;
+                    break;
+                }
             }
-            continue;
+            if (descMatched) {
+                System.log("SKIP (desc match): VM=" + vmName +
+                           " snap=" + snapName);
+                if (snap.childSnapshotList && snap.childSnapshotList.length > 0) {
+                    walkSnapshots(snap.childSnapshotList, snapMoRef,
+                                  vmId, vmName, pwrState, dsMoRefs);
+                }
+                continue;
+            }
         }
 
         // Name whitelist filter -- skip this snap, still walk children
