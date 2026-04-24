@@ -271,11 +271,11 @@ if (onCands.length === 0) {
                     if (inFlightSlots.length === 0) {
                         // Nothing running -- wait and retry
                         var holdAttempts = 0;
-                        while (!govOk3 && holdAttempts < 120) {
+                        while (!govOk3 && holdAttempts < maxGovernorWaitMinutes ) {
                             LOG.hold("PROCESSING",
                                 "Storage too busy to start first task. " +
                                 "Waiting " + Math.round(govPollMs/1000) + "s... " +
-                                "(attempt " + (holdAttempts+1) + " of 120)  -- " + label);
+                                "(attempt " + (holdAttempts+1) + " of " + maxGovernorWaitMinutes  + ")  -- " + label);
                             System.sleep(govPollMs);
                             holdAttempts++;
                             govOk3 = checkGovernorDelta(vcConn, dsRefs,

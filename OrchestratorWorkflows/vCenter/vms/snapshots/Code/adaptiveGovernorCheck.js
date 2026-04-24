@@ -1,6 +1,6 @@
 /**
  * ACTION: adaptiveGovernorCheck
- * Module : com.company.snapshotcleanup
+ * Module : com.broadcom.pso.vc.vm.snapshots
  *
  * Adaptive I/O governor decision engine. Called before starting each new
  * consolidation task. Projects the expected I/O impact of the next task

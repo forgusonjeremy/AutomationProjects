@@ -1,6 +1,6 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * ST-09  RELEASE MUTEX & FINALISE
+ * ST-08  RELEASE MUTEX & FINALISE
  * ─────────────────────────────────────────────────────────────────────────────
  * The final task in the normal execution path. Performs three actions:
  *   1. Releases the mutex lock so future runs are not blocked.

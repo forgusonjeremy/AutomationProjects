@@ -59,7 +59,8 @@ var LOG = {
     fail:   function(p,m){ System.error("[SNAPSHOT-CLEANUP] ["+p+"] [FAIL]    "+m); }
 };
 
-var MODULE   = "com.company.snapshotcleanup";
+var MODULE        = "com.broadcom.pso.vc.vm.snapshots";
+var STORAGEMODULE = "com.broadcom.pso.vc.storage";
 var offCands = JSON.parse(offCandidatesJson || "[]");
 var logArr   = JSON.parse(runLog || "[]");
 var dsState  = JSON.parse(datastoreStateJson || "{}");
@@ -90,9 +91,9 @@ if (offCands.length === 0) {
         var govOk = checkGovernor(vcConn, dsRefs, cand.vmName);
         if (!govOk) {
             var attempts = 0;
-            while (!govOk && attempts < 120) {
+            while (!govOk && attempts < maxGovernorWaitMinutes) {
                 LOG.hold("PROCESSING","Storage I/O is too high -- waiting " + Math.round(govPollMs/1000)
-                        + "s before retrying...  (attempt " + (attempts+1) + " of 120)  --  " + label);
+                        + "s before retrying...  (attempt " + (attempts+1) + " of " + maxGovernorWaitMinutes + ")  --  " + label);
                 System.sleep(govPollMs);
                 attempts++;
                 govOk = checkGovernor(vcConn, dsRefs, cand.vmName);
@@ -138,12 +139,12 @@ function checkGovernor(vcConn, dsRefs, vmName) {
     if (!dsRefs || dsRefs.length === 0) return true;
     var curr = [], pre = [], post = [];
     for each (var r in dsRefs) {
-        try { curr.push(JSON.parse(System.getModule(MODULE).getDatastoreMetrics(vcConn, r))); }
+        try { curr.push(JSON.parse(System.getModule(STORAGEMODULE).getDatastoreMetrics(vcConn, r))); }
         catch (e) { LOG.warn("PROCESSING","Could not read storage metrics for " + r + ": " + e.message); }
         var st = dsState[r];
         if (st) { if (st.lastPre) pre.push(st.lastPre); if (st.lastPost) post.push(st.lastPost); }
     }
-    var g = JSON.parse(System.getModule(MODULE).adaptiveGovernorCheck(
+    var g = JSON.parse(System.getModule(STORAGEMODULE).adaptiveGovernorCheck(
         JSON.stringify(curr), JSON.stringify(pre), JSON.stringify(pre), JSON.stringify(post),
         latencyThresholdMs || 30, vsanCongestionThresh || 50,
         vsanResyncThresholdBytes || 10737418240));
