@@ -6,7 +6,7 @@
 
   
   vars:
-    group_dn: "CN=mytest,dc=corp,dc=local"
+    group_dn: "OU=Servers,,DC=corp,DC=local"
 
   tasks:
     - name: Get computer members
