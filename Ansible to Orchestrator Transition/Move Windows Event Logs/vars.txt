@@ -1,5 +1,4 @@
-DomainName: corp.local
-group_dn: Admin Servers
+group_dn: CN=All-Servers,OU=Groups,OU=Lab,DC=CORP,DC=LOCAL
 source_path: C$\Windows\System32\winevt\Logs
 target_path: \\fileserver.corp.local\mdcarchivelog$\Windows
 file_filter: Archive-*.evtx
