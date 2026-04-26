@@ -1,0 +1,11 @@
+var_ps_folder: ps_scripts
+var_ps_script_file: cvs_functions.ps1
+var_parameter_action: clean-ServerDisk
+var_DomainName: connect.sbu  #changes with job
+var_ADGroupMember: CVS-DPT-AllServers   #changes with job
+var_FolderIncluded: 'yes'
+var_ForceEnable: 'no'
+var_NumberOfDays: '-1'
+var_FilterOn: '*.*'
+var_FolderTarget:
+  - c:\Windows\ccmcache
