@@ -1,0 +1,11 @@
+var_sAMAccountName: svcCVSAnsWin		#Changes with job
+var_LDAPUsername: answin@corp.local		#Changes with job
+var_domain_server: dc1.corp.local
+var_LDAPBaseDN: OU=Service Accounts,DC=corp,DC=local
+var_AAP_Credentials: svcCVSAnsWin		#Changes with job
+var_AAP_organization: cvs
+var_Credential_type:
+  - Machine
+  - cvs-WinRM_Cred		#Changes with job
+controller_host: https://automation.corp.local
+var_debug: 123
