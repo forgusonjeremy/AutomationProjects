@@ -1,0 +1,15 @@
+var_ps_folder: ps_scripts
+var_ps_script_file: cvs_functions.ps1
+var_parameter_action: Invoke-ServerReboot
+var_eMailReport: 'no'										                        #Changes with job
+var_SMTPServer: mailrelay.corp.local
+var_MailToString: security.corp.local,dep-security.corp.local		                #Changes with job
+var_MailCcString: servermonitoring@corp.local						                #Changes with job
+var_MailSubjectstring: 'Ansible-Report: Monitoring Servers Reboot status'
+var_DomainName: corp.local							                             	#Changes with job
+var_OUPath: OU=Admin Accounts,DC=corp,DC=local                          			#Changes with job
+var_cleanup_temporary_folder: true
+var_ADGroupMember: Security-Reboot-Servers							                 #Changes with job
+var_HeaderNotesSubstr: Security-Reboot-Servers						                 #Changes with job
+var_RebootIt: simpleMode
+var_RebootIt_DelayBetweenServer: 10							                    	#Changes with job
