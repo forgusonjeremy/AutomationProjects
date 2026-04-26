@@ -1,0 +1,12 @@
+var_ps_folder: ps_scripts
+var_ps_script_file: cvs_functions.ps1
+var_parameter_action: Get-ServerRebootReportStatus-ByCN
+var_eMailReport: 'yes'
+var_SMTPServer: relay.corp.local
+var_MailToString: admin@corp.local
+var_MailCcString: monitoring@corp.local
+var_MailSubjectstring: 'Ansible-Report: Monitoring Servers Reboot status'
+var_cleanup_temporary_folder: true
+var_HeaderNotesSubstr: Monitoring-Servers
+var_SecurityGroup_CN: CN=Monitoring-Servers,OU=Groups,OU=Lab,DC=CORP,DC=LOCAL
+var_DomainName: corp.local
