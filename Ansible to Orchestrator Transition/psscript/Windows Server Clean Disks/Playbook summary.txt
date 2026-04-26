@@ -1,0 +1,1 @@
+Copies a PowerShell script (cvs_functions.ps1) to a temp directory on target Windows hosts via WinRM, executes the "clean-ServerDisk" function to purge files (e.g., ccmcache) based on age/filter parameters, then cleans up the temp directory. Targets are determined by AD group membership.
