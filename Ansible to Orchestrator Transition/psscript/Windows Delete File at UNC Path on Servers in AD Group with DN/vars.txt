@@ -1,0 +1,4 @@
+group_dn: CN=CVS-Converged-All-Servers,OU=Groups,DC=CORP,DC=LOCAL
+source_path: C$\Windows\ccmcache
+file_filter: '*'
+days_old: '-3'

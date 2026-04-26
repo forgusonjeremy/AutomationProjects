@@ -1,0 +1,122 @@
+---
+- name: "Retrieve Computer Objects"
+  hosts: all
+  gather_facts: false
+  run_once: true
+
+  
+  vars:
+    group_dn: "CN=CVS-Monitoring-Servers,OU=Servers,DC=corp,DC=local"
+
+  tasks:
+    - name: Get computer members
+      ansible.windows.win_shell: |
+        Import-Module ActiveDirectory
+        
+        # Get all group members recursively (including nested groups)
+        $groupMembers = Get-ADGroupMember -Identity "{{ group_dn }}" -Recursive
+        
+        # Filter for computer objects only
+        $computers = $groupMembers | Where-Object { $_.objectClass -eq 'computer' } | ForEach-Object {
+            try {
+                Get-ADComputer -Identity $_.distinguishedName -Properties DNSHostName, OperatingSystem, DistinguishedName
+            } catch {
+                # Silently skip any errors
+            }
+        }
+        
+        $computers | Select-Object Name, DNSHostName, OperatingSystem, DistinguishedName | ConvertTo-Json -Depth 3
+      register: ad_query
+
+    - name: Parse AD query results
+      set_fact:
+        ad_computers: "{{ ad_query.stdout | from_json }}"
+      when: ad_query.stdout is defined and ad_query.stdout != ""
+
+    - name: Handle single result (convert to list)
+      set_fact:
+        ad_computers: "{{ [ad_computers] }}"
+      when: 
+        - ad_computers is defined
+        - ad_computers is mapping
+
+    - name: Create server list from AD results
+      set_fact:
+        server_list: "{{ ad_computers | map(attribute='DNSHostName') | select() | list }}"
+      when: 
+        - ad_computers is defined
+        - ad_computers | length > 0
+
+    - name: Display server list
+      debug:
+        msg: "Servers to process: {{ server_list | default([]) | join(', ') }}"
+
+    - name: Add servers to dynamic inventory
+      add_host:
+        name: "{{ item }}"
+        groups:
+          - cvs_monitoring_servers
+        ansible_user: "{{ WinRM_username }}"
+        ansible_password: "{{ WinRM_password }}"
+        become_method: runas
+        ansible_become_user: "{{ WinRM_username }}"
+        ansible_become_pass: "{{ WinRM_password }}"
+        ansible_connection: winrm
+        ansible_winrm_transport: kerberos
+        ansible_winrm_kerberos_delegation: true
+        ansible_winrm_server_cert_validation: ignore
+        ansible_port: 5986
+      loop: "{{ server_list | default([]) }}"
+
+    - name: Execute Delete-files function
+      ansible.windows.win_shell: |
+        Function Delete-files {
+            [CmdletBinding()]
+            Param(
+                [Parameter(Mandatory=$true)]
+                [string] $Path,     
+                [Parameter(Mandatory=$false)]
+                [string] $FilterOn = '*',
+                [Parameter(Mandatory=$false)]
+                [string] $Days = '0'
+            )
+            Begin{
+                $fqdn = "{{item}}"
+                $hostname = $fqdn.Split('.')[0]
+                $dateTime = (Get-Date).AddDays([int]$Days)
+            }
+            Process{
+                Try {
+                    # Delete files
+                    $deletedFiles = Get-ChildItem -Path $Path -Recurse -File -Filter $FilterOn | 
+                        Where-Object { $_.LastWriteTime -lt $dateTime } | 
+                        ForEach-Object {
+                            Remove-Item -Path $_.FullName -Force
+                            $_.Name
+                        }
+                    
+                    $fileCount = ($deletedFiles | Measure-Object).Count
+                    
+                    # Remove empty folders
+                    Get-ChildItem -Path $Path -Recurse -Directory | 
+                        Sort-Object -Property FullName -Descending | 
+                        Where-Object { (Get-ChildItem -Path $_.FullName -Force | Measure-Object).Count -eq 0 } | 
+                        Remove-Item -Force
+                    
+                    Write-Output "Deleted $fileCount files and removed empty folders FROM: $($Path)\$($FilterOn) on $hostname"
+                }
+                Catch{ 
+                    Write-Error $_.Exception.Message
+                    throw
+                }
+            }
+        }
+        Delete-files -Path "\\{{item}}\{{ source_path }}" -FilterOn "{{ file_filter }}" -Days "{{ days_old }}"
+      loop: "{{ server_list | default([]) }}"
+      become: yes
+      become_user: "{{ WinRM_username }}"
+      vars:
+        ansible_become_password: "{{ WinRM_password }}"
+
+
+
