@@ -6,20 +6,6 @@
   connection: winrm
   port: 5986
 
-  vars:
-    # var_ps_folder: 'thieu_scripts' # root folder of scripts
-    # var_ps_script_file: 'ESOC-Admin-Scripts.ps1' # script to be execute
-    # var_parameter_action: 'Get-ServiceAccountExpiration' # parameter -Action
-    # var_eMailReport: 'yes' # parameter email configuration
-    # var_SMTPServer: 'nccsmtprelay.irm.state.gov' # parameter email configuration
-    # var_MailToString: "NguyenTD4@state.gov,NguyenTD4@state.gov" # parameter email configuration 
-    # var_MailCcString: "NguyenTD4@state.gov,NguyenTD4@state.gov" # parameter email configuration
-    # var_MailSubjectstring: 'Ansible-Report: ESOC Service Account Expiration Report' # parameter email configuration
-    # var_OUPath: 'OU=Service Accounts,OU=ESOC,OU=M,OU=IRM,DC=washdc,DC=state,DC=sbu' # parameter OU path to the services location
-    # var_cleanup_temporary_folder: true # parameter clean your crap after done
-    # var_ADGroupMember: 'ESOC-Monitoring-Servers' # parameter security group of list of servers
-    # var_HeaderNotesSubstr: "ESOC-Monitoring-Servers" # parameter note in part of the email body
-
   tasks:
   - name: "Create temporary directory"
     ansible.windows.win_tempfile:
