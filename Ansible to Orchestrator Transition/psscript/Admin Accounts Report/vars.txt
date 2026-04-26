@@ -1,0 +1,38 @@
+var_ps_folder: ps_scripts
+var_ps_script_file: cvs_functions-v2.ps1
+var_eMailReport: 'yes'
+var_parameter_action: Get-AllAdmin-Accounts
+var_SMTPServer: smtp.corp.local
+var_MailToString: >-
+  user1@corp.local,user2@corp.local,user3@corp.local,user4@corp.local
+var_MailCcString: >-
+  user5@corp.local,user6@corp.local,user7@corp.local,user8@corp.local
+var_MailSubjectstring: 'Ansible-Report: Admin PKI Card Status'
+var_DomainOUs:
+  domain1.corp.local:
+    - >-
+      OU=Admin Accounts,OU=Servers,DC=domain1,DC=corp,DC=local
+    - OU=Admin Accounts,OU=Workstations,DC=domain1,DC=corp,DC=local
+  domain2.corp.local:
+    - >-
+      OU=Admin Accounts,OU=Servers,DC=domain2,DC=corp,DC=local
+    - OU=Admin Accounts,OU=Workstations,DC=domain2,DC=corp,DC=local
+  domain3.corp.local:
+    - >-
+      OU=Admin Accounts,OU=Servers,DC=domain3,DC=corp,DC=local
+    - OU=Admin Accounts,OU=Workstations,DC=domain3,DC=corp,DC=local
+  domain4.corp.local:
+    - >-
+      OU=Admin Accounts,OU=Servers,DC=domain4,DC=corp,DC=local
+    - OU=Admin Accounts,OU=Workstations,DC=domain4,DC=corp,DC=local
+  domain5.corp.local:
+    - >-
+      OU=Admin Accounts,OU=Servers,DC=domain5,DC=corp,DC=local
+    - OU=Admin Accounts,OU=Workstations,DC=domain5,DC=corp,DC=local
+  domain6.corp.local:
+    - >-
+      OU=Admin Accounts,OU=Servers,DC=domain6,DC=corp,DC=local
+    - OU=Admin Accounts,OU=Workstations,DC=domain6,DC=corp,DC=local
+  domain7.corp.local:
+    - >-
+      OU=Admin Accounts,OU=Servers,DC=domain7,DC=corp,DC=local
