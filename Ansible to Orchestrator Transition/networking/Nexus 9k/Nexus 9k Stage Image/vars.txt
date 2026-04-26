@@ -1,0 +1,10 @@
+_groups: n9kv
+exec_timeout_transfer: 60
+scp_timeout_sec: 2400
+new_image: nxos64-cs.10.5.5.M.bin
+remote_file: /var/cvs-scp/{{ new_image }}
+remote_scp_server: 192.168.1.10			#Changes with job
+cisco_vrf: management				#Changes with job
+expected_file_size: 2895731712
+sha_hash: >-
+  d05b8fb0df63d1b16974139dde84f6b6174ffed67e57d55ec4c352434dfd69d606ef4ee8c35109761d4caee3771b1ab4d99fa02e68ed896d1e13ba2252d85dca
