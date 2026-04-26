@@ -1,0 +1,16 @@
+aap_cred: my-aap-cred
+gitlab_cred: cvs-Gitlab-AT
+cisco_cred: admin1@cisco-cred		#Changes with job
+ansible_organization: myorg
+ansible_project: net-project
+ansible_inventory:Nex9k-key
+ansible_ee: ee-supported-rhel9
+gitlab_project: network
+job_template_diff: Network-Git-n9kv-Diff	#Changes with job
+job_template_restore: Network-Git-n9kv-Restore	#Changes with job
+play_dir: clab_n9kv
+dir_path: /tmp/{{gitlab_project}}/network_backup_files
+git_url: gitlab.corp.local/automation/network.git
+branch_name: mybranch		#Changes with job
+_group:
+  - n9kv
