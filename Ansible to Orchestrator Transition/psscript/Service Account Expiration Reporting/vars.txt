@@ -1,0 +1,12 @@
+var_ps_folder: ps_scripts
+var_ps_script_file: cvs_functions.ps1
+var_parameter_action: Get-ServiceAccountExpiration
+var_eMailReport: 'yes'
+var_SMTPServer: mailrelay.corp.local
+var_MailToString: >-
+  security@corp.local,infadmins@corp.local
+var_MailCcString: monitoring@corp.local
+var_MailSubjectstring: 'Service Account Expiration Report'
+var_DomainName: corp.local
+var_OUPath: OU=Service Accounts,DC=corp,DC=local
+var_cleanup_temporary_folder: true
