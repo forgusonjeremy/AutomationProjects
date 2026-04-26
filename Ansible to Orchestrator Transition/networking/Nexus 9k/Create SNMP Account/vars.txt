@@ -1,0 +1,11 @@
+_groups: n9kv
+snmp_username: SNMPv3-dynatrace-sha-aes
+snmp_auth_password: $encrypted$
+snmp_privacy_password: $encrypted$
+snmp_group: network-operator
+snmp_auth_protocol: sha-256
+snmp_privacy_protocol: aes-128
+snmp_contact: netadmin@corp.local
+snmp_location: CVS OnPrem
+_group:
+  - n9kv
