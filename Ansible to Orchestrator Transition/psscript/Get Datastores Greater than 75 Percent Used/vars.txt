@@ -1,0 +1,13 @@
+var_ps_folder: ps_scripts
+var_ps_script_file: cvs_functions.ps1
+var_parameter_action: Get_Datastores_75_100_Used
+var_eMailReport: 'yes'
+var_SMTPServer: mailrelay.corp.local
+var_MailToString: On-PremEngineering@corp.local
+var_MailCcString: Monitoring@corp.local
+var_MailSubjectstring: 'Ansible-Report: Datastore Report'
+var_cleanup_temporary_folder: true
+var_vCenterList: >-
+  vc01.corp.local, vcb01.corp.local,
+  vcb02.corp.local, vc.corp.local,
+  vc02.corp.local
