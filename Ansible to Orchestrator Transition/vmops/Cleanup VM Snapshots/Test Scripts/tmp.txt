@@ -1,7 +1,9 @@
 PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> .\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\generate_snapshot_io.sh' -CsvPath .\servers.csv
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_scp.ps1:143 char:1
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_scp.ps1:147 char:1
 + }
 + ~
 Unexpected token '}' in expression or statement.
     + CategoryInfo          : ParserError: (:) [], ParseException
     + FullyQualifiedErrorId : UnexpectedToken
+ 
+PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> 
