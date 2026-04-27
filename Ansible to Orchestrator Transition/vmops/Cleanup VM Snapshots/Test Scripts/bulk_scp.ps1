@@ -80,7 +80,7 @@ foreach ($row in $servers) {
         "-o", "ConnectTimeout=10",
         "-p", $port,
         "${username}@${server}",
-        "cat > '$remotePath'"
+        "cat > `"$remotePath`""
     )
 
     # Pipe file content through SSH — the remote cat writes it verbatim.
@@ -97,7 +97,7 @@ foreach ($row in $servers) {
             "-o", "ConnectTimeout=10",
             "-p", $port,
             "${username}@${server}",
-            "sed -i 's/\r//' '$remotePath'"
+            "sed -i 's/\r//' `"$remotePath`""
         )
         & ssh @stripArgs 2>&1 | Out-Null
 
@@ -108,7 +108,7 @@ foreach ($row in $servers) {
             "-o", "ConnectTimeout=10",
             "-p", $port,
             "${username}@${server}",
-            "grep -cP '\r' '$remotePath' 2>/dev/null || echo 0"
+            "grep -cP '\r' `"$remotePath`" 2>/dev/null || echo 0"
         )
         $crlfCount = (& ssh @verifyArgs 2>&1).Trim()
 
