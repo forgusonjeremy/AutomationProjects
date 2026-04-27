@@ -53,9 +53,8 @@ foreach ($col in $requiredCols) {
     }
 }
 
-# --- Read file as raw bytes and convert to UTF8 string for piping ---
-# Using ReadAllText preserves exact bytes — no line ending conversion.
-$fileName   = Split-Path $FilePath -Leaf
+# --- Read file content for piping ---
+$fileName    = Split-Path $FilePath -Leaf
 $fileContent = [System.IO.File]::ReadAllText($FilePath)
 
 # --- Transfer loop ---
@@ -81,7 +80,7 @@ foreach ($row in $servers) {
         "-o", "ConnectTimeout=10",
         "-p", $port,
         "${username}@${server}",
-        'cat > "$remotePath"'
+        "cat > '$remotePath'"
     )
 
     # Pipe file content through SSH — the remote cat writes it verbatim.
@@ -98,19 +97,18 @@ foreach ($row in $servers) {
             "-o", "ConnectTimeout=10",
             "-p", $port,
             "${username}@${server}",
-            "sed -i 's/\\r//' `"$remotePath`""
+            "sed -i 's/\r//' '$remotePath'"
         )
         & ssh @stripArgs 2>&1 | Out-Null
 
-        # Verify by counting actual \r bytes — more reliable than 'file' output
-        # which varies in wording across distros and versions.
+        # Verify by counting actual \r bytes
         $verifyArgs = @(
             "-o", "StrictHostKeyChecking=no",
             "-o", "BatchMode=yes",
             "-o", "ConnectTimeout=10",
             "-p", $port,
             "${username}@${server}",
-            "grep -cP '\\r' `"$remotePath`" 2>/dev/null || echo 0"
+            "grep -cP '\r' '$remotePath' 2>/dev/null || echo 0"
         )
         $crlfCount = (& ssh @verifyArgs 2>&1).Trim()
 
@@ -142,6 +140,7 @@ foreach ($row in $servers) {
         Write-Warning "StopOnError is set. Halting after failure on $server."
         break
     }
+}
 
 # --- Summary ---
 Write-Host "`n===== Transfer Summary =====" -ForegroundColor Cyan
