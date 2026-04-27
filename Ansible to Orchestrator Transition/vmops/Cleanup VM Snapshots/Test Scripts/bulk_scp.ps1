@@ -1,4 +1,4 @@
-# bulk_scp.ps1 v1
+# bulk_scp.ps1
 # Usage: .\bulk_scp.ps1 -FilePath "C:\path\to\file.txt" -CsvPath "servers.csv"
 #
 # Transfers files using SSH pipe (cat >) rather than scp to prevent Windows
@@ -61,7 +61,7 @@ $successCount = 0
 $failCount    = 0
 
 Write-Host "`nStarting transfers for: $FilePath" -ForegroundColor Cyan
-Write-Host "Method  : SSH pipe (cat >) — CRLF-safe" -ForegroundColor Cyan
+Write-Host "Method  : SSH pipe (cat >) - CRLF-safe" -ForegroundColor Cyan
 Write-Host "Servers : $($servers.Count)`n" -ForegroundColor Cyan
 
 foreach ($row in $servers) {
@@ -89,7 +89,7 @@ foreach ($row in $servers) {
     $fileContent | & ssh @sshArgs
     $exitCode = $LASTEXITCODE
 
-    # Strip \r bytes unconditionally — no-op if already clean
+    # Strip \r bytes unconditionally - no-op if already clean
     if ($exitCode -eq 0) {
         $stripArgs = @(
             "-o", "StrictHostKeyChecking=no",
