@@ -70,7 +70,7 @@ foreach ($row in $servers) {
     $server     = $row.Server.Trim()
     $username   = $row.Username.Trim()
     $remotePath = $row.RemotePath.Trim().TrimEnd('/') + "/$fileName"
-    $port       = if ($row.PSObject.Properties.Name -contains "Port" -and $row.Port) { $row.Port.Trim() } else { "22" }
+    $port       = $(if ($row.PSObject.Properties.Name -contains "Port" -and $row.Port) { $row.Port.Trim() } else { "22" })
 
     Write-Host "[$server] Transferring to ${username}@${server}:${remotePath} ..." -ForegroundColor Yellow
 
@@ -119,8 +119,8 @@ foreach ($row in $servers) {
         }
     }
 
-    $status = if ($exitCode -eq 0) { "SUCCESS" } else { "FAILED" }
-    $color  = if ($exitCode -eq 0) { "Green" }   else { "Red" }
+    $status = $(if ($exitCode -eq 0) { "SUCCESS" } else { "FAILED" })
+    $color  = $(if ($exitCode -eq 0) { "Green" }   else { "Red" })
 
     Write-Host "[$server] $status (exit code: $exitCode)" -ForegroundColor $color
 
