@@ -1,4 +1,4 @@
-# SCP-to-Servers.ps1
+# SCP-to-Servers.ps1 v1
 # Usage: .\SCP-to-Servers.ps1 -FilePath "C:\path\to\file.txt" -CsvPath "servers.csv"
 #
 # Transfers files using SSH pipe (cat >) rather than scp to prevent Windows
