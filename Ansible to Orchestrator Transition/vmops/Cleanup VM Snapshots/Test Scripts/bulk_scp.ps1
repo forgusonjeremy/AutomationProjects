@@ -1,4 +1,4 @@
-# bulk_scp.ps1
+# bulk_scp.ps1 v1
 # Usage: .\bulk_scp.ps1 -FilePath "C:\path\to\file.txt" -CsvPath "servers.csv"
 #
 # Transfers files using SSH pipe (cat >) rather than scp to prevent Windows
