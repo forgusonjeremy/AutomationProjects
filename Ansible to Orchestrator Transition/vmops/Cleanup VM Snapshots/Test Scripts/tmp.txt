@@ -6,4 +6,4 @@ Unexpected token '}' in expression or statement.
     + CategoryInfo          : ParserError: (:) [], ParseException
     + FullyQualifiedErrorId : UnexpectedToken
  
-PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> 
+PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts>  
