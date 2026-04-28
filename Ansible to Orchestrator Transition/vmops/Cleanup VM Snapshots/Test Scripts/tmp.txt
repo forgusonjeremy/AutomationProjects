@@ -1,9 +1,7 @@
-PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> .\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\generate_snapshot_io.sh' -CsvPath .\servers.csv
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_scp.ps1:147 char:1
-+ }
-+ ~
-Unexpected token '}' in expression or statement.
+PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> ./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 1 -ScriptDurationMinutes 20 -MaxParallelJobs 45
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:266 char:90
++ ... $meta.SshArgs) "cat `${HOME}/.snapshot_io.done 2>/dev/null || echo RU ...
++                                                                ~~
+The token '||' is not a valid statement separator in this version.
     + CategoryInfo          : ParserError: (:) [], ParseException
-    + FullyQualifiedErrorId : UnexpectedToken
- 
-PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts>  
+    + FullyQualifiedErrorId : InvalidEndOfLine
