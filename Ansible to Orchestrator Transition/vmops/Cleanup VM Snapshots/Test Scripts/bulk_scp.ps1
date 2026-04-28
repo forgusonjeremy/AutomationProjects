@@ -1,23 +1,21 @@
-# SCP-to-Servers.ps1
-# Usage: .\SCP-to-Servers.ps1 -FilePath "C:\path\to\file.txt" -CsvPath "servers.csv"
+# bulk_scp.ps1
+# Usage: .\bulk_scp.ps1 -FilePath "C:\path\to\file.txt" -CsvPath "servers.csv"
 #
 # Transfers files using SSH pipe (cat >) rather than scp to prevent Windows
-# OpenSSH from introducing CRLF line endings during transfer. Bytes are sent
-# exactly as they exist on disk regardless of file type.
+# OpenSSH from introducing CRLF line endings during transfer.
 #
 # CSV format (headers required):
 #   Server,Username,RemotePath,Port
 #   192.168.1.10,sshuser,/tmp/,22
-#   myserver.com,sshuser,/home/sshuser/,22
 
 param(
     [Parameter(Mandatory=$true)]
-    [string]$FilePath,           # Local file to transfer
+    [string]$FilePath,
 
     [Parameter(Mandatory=$true)]
-    [string]$CsvPath,            # Path to CSV file with server list
+    [string]$CsvPath,
 
-    [switch]$StopOnError         # Stop script if any transfer fails
+    [switch]$StopOnError
 )
 
 # --- Validate inputs ---
@@ -53,9 +51,8 @@ foreach ($col in $requiredCols) {
     }
 }
 
-# --- Read file as raw bytes and convert to UTF8 string for piping ---
-# Using ReadAllText preserves exact bytes — no line ending conversion.
-$fileName   = Split-Path $FilePath -Leaf
+# --- Read file content for piping ---
+$fileName    = Split-Path $FilePath -Leaf
 $fileContent = [System.IO.File]::ReadAllText($FilePath)
 
 # --- Transfer loop ---
@@ -64,14 +61,19 @@ $successCount = 0
 $failCount    = 0
 
 Write-Host "`nStarting transfers for: $FilePath" -ForegroundColor Cyan
-Write-Host "Method  : SSH pipe (cat >) — CRLF-safe" -ForegroundColor Cyan
+Write-Host "Method  : SSH pipe (cat >) - CRLF-safe" -ForegroundColor Cyan
 Write-Host "Servers : $($servers.Count)`n" -ForegroundColor Cyan
 
 foreach ($row in $servers) {
     $server     = $row.Server.Trim()
     $username   = $row.Username.Trim()
     $remotePath = $row.RemotePath.Trim().TrimEnd('/') + "/$fileName"
-    $port       = if ($row.PSObject.Properties.Name -contains "Port" -and $row.Port) { $row.Port.Trim() } else { "22" }
+
+    if ($row.PSObject.Properties.Name -contains "Port" -and $row.Port) {
+        $port = $row.Port.Trim()
+    } else {
+        $port = "22"
+    }
 
     Write-Host "[$server] Transferring to ${username}@${server}:${remotePath} ..." -ForegroundColor Yellow
 
@@ -81,16 +83,13 @@ foreach ($row in $servers) {
         "-o", "ConnectTimeout=10",
         "-p", $port,
         "${username}@${server}",
-        "cat > `"$remotePath`""
+        "cat > '$remotePath'"
     )
 
-    # Pipe file content through SSH — the remote cat writes it verbatim.
-    # This bypasses any text-mode conversion that scp applies on Windows.
     $fileContent | & ssh @sshArgs
     $exitCode = $LASTEXITCODE
 
-    # Always strip \r bytes unconditionally — no-op if already clean,
-    # safety net if anything in the transfer chain introduced CRLF.
+    # Strip \r bytes unconditionally - no-op if already clean
     if ($exitCode -eq 0) {
         $stripArgs = @(
             "-o", "StrictHostKeyChecking=no",
@@ -98,19 +97,17 @@ foreach ($row in $servers) {
             "-o", "ConnectTimeout=10",
             "-p", $port,
             "${username}@${server}",
-            "sed -i 's/\r//' `"$remotePath`""
+            "sed -i 's/\r//' '$remotePath'"
         )
         & ssh @stripArgs 2>&1 | Out-Null
 
-        # Verify by counting actual \r bytes — more reliable than 'file' output
-        # which varies in wording across distros and versions.
         $verifyArgs = @(
             "-o", "StrictHostKeyChecking=no",
             "-o", "BatchMode=yes",
             "-o", "ConnectTimeout=10",
             "-p", $port,
             "${username}@${server}",
-            "grep -cP '\r' `"$remotePath`" 2>/dev/null || echo 0"
+            "grep -cP '\r' '$remotePath' 2>/dev/null || echo 0"
         )
         $crlfCount = (& ssh @verifyArgs 2>&1).Trim()
 
@@ -121,8 +118,15 @@ foreach ($row in $servers) {
         }
     }
 
-    $status = if ($exitCode -eq 0) { "SUCCESS" } else { "FAILED" }
-    $color  = if ($exitCode -eq 0) { "Green" }   else { "Red" }
+    if ($exitCode -eq 0) {
+        $status = "SUCCESS"
+        $color  = "Green"
+        $successCount++
+    } else {
+        $status = "FAILED"
+        $color  = "Red"
+        $failCount++
+    }
 
     Write-Host "[$server] $status (exit code: $exitCode)" -ForegroundColor $color
 
@@ -135,8 +139,6 @@ foreach ($row in $servers) {
         ExitCode   = $exitCode
         Timestamp  = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
     }
-
-    if ($exitCode -eq 0) { $successCount++ } else { $failCount++ }
 
     if ($StopOnError -and $exitCode -ne 0) {
         Write-Warning "StopOnError is set. Halting after failure on $server."
