@@ -1,7 +1,7 @@
 # Invoke-SnapshotIO.ps1
 # Usage: .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_snapshot_io.sh"
 #
-# Basic — 15 min minimum runtime (default), 2GB target delta (default)
+# Basic - 15 min minimum runtime (default), 2GB target delta (default)
 #   .\Invoke-SnapshotIO.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_snapshot_io.sh"
 #
 # Custom delta size (1GB per snapshot interval) and script runtime (30 min)
@@ -90,15 +90,6 @@ $scriptArgs = "--target-gb $TargetDeltaGB --duration $scriptDurationSeconds"
 
 Write-Host "Script arguments  : $scriptArgs" -ForegroundColor Cyan
 
-# Remote command strategy:
-#   Rather than piping a script to bash -s (which dies when SSH stdin closes),
-#   we write a wrapper script to the remote host and launch it under nohup so
-#   it survives SSH session termination. A PID file lets us poll for completion
-#   without keeping the SSH connection open.
-#
-# Bash variables use backtick escaping so PowerShell does not expand them.
-# $minimumRuntimeSeconds and $ScriptRemotePath are intentionally left unescaped
-# so PowerShell substitutes their values before the string is sent.
 $wrapperScript = @"
 #!/bin/bash
 PIDFILE=`${HOME}/.snapshot_io.pid
@@ -134,8 +125,6 @@ echo `$EXIT_CODE > "`$DONEFILE"
 
 $wrapperScript = $wrapperScript -replace "`r", ""
 
-# Launch command: write the wrapper to the remote host and run it detached
-# under nohup so it is fully independent of the SSH session lifetime.
 $remoteCommand = @"
 cat > `${HOME}/.snapshot_io_wrapper.sh << 'WRAPPER'
 $($wrapperScript)
@@ -149,14 +138,8 @@ echo "[LAUNCHED] nohup PID `$!"
 
 $remoteCommand = $remoteCommand -replace "`r", ""
 
-# --- Phase 1: Launch all servers in parallel via short-lived SSH jobs ---
-# Each job only does the nohup launch and returns immediately.
-# No polling happens inside jobs — that was causing the lockup at 12 jobs
-# because each job's sleep loop was saturating the PowerShell runspace pool.
-# All polling is done in the main thread after all launches complete.
-
-$serverMeta = @{}   # server key -> metadata + launch result
-$launchJobs = @{}   # jobName -> server key
+$serverMeta = @{}
+$launchJobs = @{}
 $results    = @()
 $startTime  = Get-Date
 
@@ -169,10 +152,13 @@ Write-Host "Max parallel jobs : $MaxParallelJobs`n" -ForegroundColor Cyan
 foreach ($row in $servers) {
     $server   = $row.Server.Trim()
     $username = $row.Username.Trim()
-    $port     = if ($row.PSObject.Properties.Name -contains "Port" -and $row.Port) { $row.Port.Trim() } else { "22" }
+    if ($row.PSObject.Properties.Name -contains "Port" -and $row.Port) {
+        $port = $row.Port.Trim()
+    } else {
+        $port = "22"
+    }
     $srvKey   = $server
 
-    # Throttle launch parallelism
     while ((Get-Job -State Running).Count -ge $MaxParallelJobs) {
         Start-Sleep -Seconds 1
     }
@@ -205,7 +191,6 @@ foreach ($row in $servers) {
     }
 }
 
-# Wait for all launch jobs to complete
 Write-Host "`nWaiting for all launch SSH connections to return..." -ForegroundColor Cyan
 while (Get-Job -State Running) { Start-Sleep -Seconds 1 }
 
@@ -230,11 +215,7 @@ foreach ($jobName in $launchJobs.Keys) {
     }
 }
 
-# --- Phase 2: Poll all servers from the main thread ---
-# One SSH call per server per poll cycle. No background jobs, no sleep loops
-# competing for runspace slots. Simple and scales to any number of servers.
-
-$pollInterval  = 30  # seconds between poll rounds
+$pollInterval  = 30
 $timeoutSec    = $JobTimeoutMinutes * 60
 $pendingCount  = ($serverMeta.Values | Where-Object { -not $_.Done }).Count
 
@@ -250,10 +231,8 @@ while ($pendingCount -gt 0) {
         $elapsed     = [int]((Get-Date) - $meta.StartTime).TotalSeconds
         $elapsedMins = [math]::Round($elapsed / 60, 1)
 
-        # Check timeout
         if ($elapsed -gt $timeoutSec) {
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] TIMEOUT after ${elapsedMins} min — killing remote wrapper" -ForegroundColor Magenta
-            # Best-effort kill of remote wrapper and IO script
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] TIMEOUT after ${elapsedMins} min - killing remote wrapper" -ForegroundColor Magenta
             & ssh @($meta.SshArgs) "pkill -f snapshot_io_wrapper; pkill -f generate_snapshot_io" 2>&1 | Out-Null
             $meta.Done     = $true
             $meta.ExitCode = -1
@@ -262,23 +241,27 @@ while ($pendingCount -gt 0) {
             continue
         }
 
-        # Poll for done file
-        $pollResult = & ssh @($meta.SshArgs) "cat `${HOME}/.snapshot_io.done 2>/dev/null || echo RUNNING" 2>&1
+        # Poll for done file - use bash -c to keep || inside bash, not PowerShell
+        $pollCmd = 'bash -c "cat ~/.snapshot_io.done 2>/dev/null || echo RUNNING"'
+        $pollResult = & ssh @($meta.SshArgs) $pollCmd 2>&1
         $pollText   = ($pollResult -join "").Trim()
 
         if ($pollText -ne "RUNNING" -and $pollText -ne "") {
             try { $meta.ExitCode = [int]$pollText } catch { $meta.ExitCode = 1 }
-            # Grab tail of script output
-            $remoteLog = & ssh @($meta.SshArgs) "cat `${HOME}/.snapshot_io.out 2>/dev/null | tail -20" 2>&1
+            $logCmd = 'bash -c "cat ~/.snapshot_io.out 2>/dev/null | tail -20"'
+            $remoteLog = & ssh @($meta.SshArgs) $logCmd 2>&1
             $meta.Output  += "`n" + ($remoteLog -join "`n")
             $meta.Done     = $true
             $pendingCount--
 
-            $status = if ($meta.ExitCode -eq 0) { "SUCCESS" } else { "FAILED" }
-            $color  = if ($meta.ExitCode -eq 0) { "Green" }   else { "Red" }
+            if ($meta.ExitCode -eq 0) {
+                $status = "SUCCESS"; $color = "Green"
+            } else {
+                $status = "FAILED"; $color = "Red"
+            }
             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] $status after ${elapsedMins} min" -ForegroundColor $color
         } else {
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Still running — ${elapsedMins} min elapsed" -ForegroundColor DarkCyan
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Still running - ${elapsedMins} min elapsed" -ForegroundColor DarkCyan
         }
     }
 
