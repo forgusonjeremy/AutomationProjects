@@ -1,6 +1,6 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE) 
+ * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE)
  * ─────────────────────────────────────────────────────────────────────────────
  * Processes snapshots on powered-on and suspended VMs. For each candidate:
  *   1. Enforces per-vCenter concurrency limit (maxParallel simultaneous tasks).
@@ -376,38 +376,64 @@ function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
             continue;
         }
 
+        // Metrics are in curr.aggregate (per-host shape from new getDatastoreMetrics).
+        // Use MAX latency (worst host) not average -- a single saturated host is
+        // enough to cause I/O problems even if the others are idle.
+        var agg  = curr.aggregate || {};
         var base = baseline[r];
+        var baseAgg = (base && base.aggregate) ? base.aggregate : {};
 
-        // VMFS latency delta check
-        var curLat  = (curr.readLatencyMs !== null ? curr.readLatencyMs : 0) +
-                      (curr.writeLatencyMs !== null ? curr.writeLatencyMs : 0);
-        var baseLat = base
-            ? ((base.readLatencyMs !== null ? base.readLatencyMs : 0) +
-               (base.writeLatencyMs !== null ? base.writeLatencyMs : 0))
-            : 0;
+        // ── VMFS / NFS latency check ──────────────────────────────────────────
+        // maxWriteLatencyMs is the most sensitive signal -- write latency on
+        // the busiest host. Fall back to avgWriteLatencyMs if max is null.
+        var curW  = agg.maxWriteLatencyMs  !== null && agg.maxWriteLatencyMs  !== undefined
+                        ? agg.maxWriteLatencyMs
+                        : (agg.avgWriteLatencyMs || 0);
+        var curR  = agg.maxReadLatencyMs   !== null && agg.maxReadLatencyMs   !== undefined
+                        ? agg.maxReadLatencyMs
+                        : (agg.avgReadLatencyMs  || 0);
+        var curLat = Math.max(curW, curR);   // use whichever is worse
+
+        var baseW  = baseAgg.maxWriteLatencyMs !== null && baseAgg.maxWriteLatencyMs !== undefined
+                         ? baseAgg.maxWriteLatencyMs
+                         : (baseAgg.avgWriteLatencyMs || 0);
+        var baseR  = baseAgg.maxReadLatencyMs  !== null && baseAgg.maxReadLatencyMs  !== undefined
+                         ? baseAgg.maxReadLatencyMs
+                         : (baseAgg.avgReadLatencyMs  || 0);
+        var baseLat = Math.max(baseW, baseR);
+
         var deltaLat = Math.max(0, curLat - baseLat);
+        var threshold = latencyThresholdMs || 30;
 
-        if (curLat + deltaLat > (latencyThresholdMs || 30)) {
+        if (curLat > threshold) {
             LOG.hold("PROCESSING",
-                "Datastore " + r + " latency " + curLat.toFixed(1) +
-                "ms + projected delta " + deltaLat.toFixed(1) +
-                "ms would exceed " + (latencyThresholdMs||30) + "ms threshold" +
-                " for VM '" + vmName + "'");
+                "Datastore " + r + " worst-host latency " + curLat.toFixed(1) +
+                "ms already exceeds " + threshold + "ms threshold" +
+                " (hotHost=" + (agg.hotHost || "unknown") + ")" +
+                " -- holding for VM '" + vmName + "'");
             return false;
         }
 
-        // vSAN congestion delta check
-        if (curr.vsanCongestion !== null) {
-            var curCong  = curr.vsanCongestion || 0;
-            var baseCong = base && base.vsanCongestion !== null
-                ? base.vsanCongestion : 0;
+        if (curLat + deltaLat > threshold) {
+            LOG.hold("PROCESSING",
+                "Datastore " + r + " worst-host latency " + curLat.toFixed(1) +
+                "ms + projected delta " + deltaLat.toFixed(1) +
+                "ms would exceed " + threshold + "ms threshold" +
+                " -- holding for VM '" + vmName + "'");
+            return false;
+        }
+
+        // ── vSAN congestion check ─────────────────────────────────────────────
+        if (agg.maxVsanCongestion !== null && agg.maxVsanCongestion !== undefined) {
+            var curCong  = agg.maxVsanCongestion  || 0;
+            var baseCong = baseAgg.maxVsanCongestion || 0;
             var deltaCong = Math.max(0, curCong - baseCong);
-            if (curCong + deltaCong > (vsanCongestionThresh || 50)) {
+            var congThresh = vsanCongestionThresh || 50;
+            if (curCong > congThresh || curCong + deltaCong > congThresh) {
                 LOG.hold("PROCESSING",
                     "Datastore " + r + " vSAN congestion " + curCong.toFixed(1) +
-                    " + projected delta " + deltaCong.toFixed(1) +
-                    " would exceed " + (vsanCongestionThresh||50) + " threshold" +
-                    " for VM '" + vmName + "'");
+                    " exceeds or would exceed " + congThresh + " threshold" +
+                    " -- holding for VM '" + vmName + "'");
                 return false;
             }
         }

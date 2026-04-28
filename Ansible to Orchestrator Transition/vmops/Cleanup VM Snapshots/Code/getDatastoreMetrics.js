@@ -399,18 +399,8 @@ try {
                         for (var si = 0; si < s.value.length; si++) sum += s.value[si];
                         avg = sum / s.value.length;
                     }
-                    // DIAGNOSTIC: log raw counter value before any conversion
-                    // so we can determine the actual unit vCenter returns.
-                    System.log("getDatastoreMetrics RAW: host=" + hostName +
-                               " ds=" + datastoreMoRef +
-                               " interval=" + intervalUsed +
-                               " counter=" + s.id.counterId +
-                               " field=" + field +
-                               " rawAvg=" + avg +
-                               " samples=" + (s.value ? s.value.length : 0) +
-                               " values=" + (s.value ? JSON.stringify(Array.prototype.slice.call(s.value, 0, 5)) : "[]"));
-                    // Store raw value for now -- NO unit conversion until we
-                    // confirm from the diagnostic log what unit vCenter returns.
+                    // Values are already in milliseconds at both intervalId=20
+                    // and intervalId=300. No unit conversion needed.
                     hostMetrics[field] = avg;
                 }
 
