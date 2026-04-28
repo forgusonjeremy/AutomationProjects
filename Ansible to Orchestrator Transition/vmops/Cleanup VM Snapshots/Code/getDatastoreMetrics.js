@@ -229,20 +229,91 @@ try {
         }
 
         // ── Resolve the datastore instance key for host-level queries ─────────
-        // The instance string for datastore counters on a host entity is
-        // typically the datastore name. We verify by probing queryPerf directly
-        // with the name as the instance -- if it returns data, the name is
-        // correct. This avoids calling queryAvailablePerfMetric with an
-        // intervalId argument, which causes a Date conversion error in vRO
-        // 8.17 Polyglot (the API signature expects (entity, beginTime, endTime,
-        // intervalId) but vRO exposes it without the time range overload).
-        var dsInstanceKey = ds.name;
-        var dsHosts       = ds.host;
+        // For VMFS/NFS datastore counters queried against a HOST entity, the
+        // instance string is NOT the datastore display name. It is one of:
+        //   1. The datastore URL path  e.g. "/vmfs/volumes/<uuid>"
+        //   2. The datastore UUID only e.g. "<uuid>"
+        //   3. The datastore name      e.g. "ds1"  (rare, older vCenter builds)
+        //
+        // We resolve this by calling queryAvailablePerfMetric with no intervalId
+        // (pass null / omit) and scanning the returned metric instances for one
+        // that contains the datastore name or MoRef. vRO 8.17 Polyglot exposes
+        // the no-arg overload: queryAvailablePerfMetric(entity) which does not
+        // require a Date argument.
+        var dsHosts = ds.host;
 
         if (!dsHosts || dsHosts.length === 0) {
             System.warn("getDatastoreMetrics: no hosts mount datastore " +
                         datastoreMoRef);
             return JSON.stringify(result);
+        }
+
+        // Build candidate list: try URL path, UUID from URL, and display name.
+        // The URL is typically "ds:///vmfs/volumes/<uuid>/" -- extract the UUID.
+        var dsUrl        = (ds.summary && ds.summary.url) ? ds.summary.url : "";
+        var dsUuid       = "";
+        var urlMatch     = dsUrl.replace(/\/+$/, "").split("/");
+        if (urlMatch.length > 0) dsUuid = urlMatch[urlMatch.length - 1];
+
+        // Candidate instance keys in priority order.
+        // We probe with queryPerf using a tiny time window to find which one
+        // returns data, then use that for all subsequent host queries.
+        var instanceCandidates = [];
+        if (dsUuid && dsUuid !== "")            instanceCandidates.push(dsUuid);
+        if (dsUrl  && dsUrl  !== "")            instanceCandidates.push(dsUrl.replace(/\/+$/, ""));
+        if (ds.name && ds.name !== "")          instanceCandidates.push(ds.name);
+        instanceCandidates.push("");  // wildcard -- returns all instances
+
+        var dsInstanceKey = ds.name;  // safe default
+        var probeHost     = dsHosts[0].key;
+        var probeNow      = new Date();
+
+        // Use the first counter in metricIds for probing.
+        var probeMetricId = new VcPerfMetricId();
+        probeMetricId.counterId = metricIds[0].counterId;
+
+        for (var ci2 = 0; ci2 < instanceCandidates.length; ci2++) {
+            var candidate = instanceCandidates[ci2];
+            probeMetricId.instance = candidate;
+
+            try {
+                var probeQs       = new VcPerfQuerySpec();
+                probeQs.entity    = probeHost;
+                probeQs.startTime = new Date(probeNow.getTime() - 120000);
+                probeQs.endTime   = probeNow;
+                probeQs.intervalId= 20;
+                probeQs.metricId  = [probeMetricId];
+                probeQs.maxSample = 1;
+
+                var probeRes = perfMgr.queryPerf([probeQs]);
+                if (probeRes && probeRes.length > 0 && probeRes[0].value &&
+                    probeRes[0].value.length > 0) {
+                    // Found a working instance key -- use the actual instance
+                    // string returned by vCenter (may differ from what we sent
+                    // if we sent the wildcard "").
+                    var actualInstance = probeRes[0].value[0].id.instance;
+                    dsInstanceKey = (actualInstance !== null && actualInstance !== undefined)
+                                        ? String(actualInstance) : candidate;
+                    System.log("getDatastoreMetrics: resolved instance key '" +
+                               dsInstanceKey + "' for " + datastoreMoRef +
+                               " (probe candidate: '" + candidate + "')");
+                    break;
+                }
+            } catch (probeErr) {
+                System.warn("getDatastoreMetrics: instance probe failed for '" +
+                            candidate + "' on " + datastoreMoRef + ": " +
+                            probeErr.message);
+            }
+
+            // Wildcard returned nothing -- log available instances for diagnosis.
+            if (candidate === "" && ci2 === instanceCandidates.length - 1) {
+                System.warn("getDatastoreMetrics: all instance key probes failed " +
+                            "for " + datastoreMoRef +
+                            ". dsName='" + ds.name + "'" +
+                            " dsUrl='" + dsUrl + "'" +
+                            " dsUuid='" + dsUuid + "'" +
+                            ". No host-level perf data will be available.");
+            }
         }
 
         // ── Query each host individually at real-time resolution ──────────────
