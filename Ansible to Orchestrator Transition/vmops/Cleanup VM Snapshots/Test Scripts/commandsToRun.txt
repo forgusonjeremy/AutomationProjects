@@ -1,8 +1,8 @@
 .\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1' -CsvPath ./servers.csv  //copies gen io script to VMs
 
-./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 1 -ScriptDurationMinutes 20 -MaxParallelJobs 45  //runs the gen io script inside each VM, target delta disk size 1GB, for 20 minutes
+./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 2 -ScriptDurationMinutes 27 -MaxParallelJobs 45  //runs the gen io script inside each VM, target delta disk size 2GB, for 27 minutes.  10 VMs per datastore should create 200GB of deltas since workflow to create snapshots takes snapshots at 3 minute intervals
 
-./Stop-SnapshotIO.ps1 -CsvPath .\servers.csv -MaxParallelJobs 30  //stops existing generate_snapshot_io.sh processes
+./Stop-SnapshotIO.ps1 -CsvPath .\servers.csv -MaxParallelJobs 40  //stops existing generate_snapshot_io.sh processes
 
 
 
