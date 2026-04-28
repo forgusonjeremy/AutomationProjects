@@ -203,22 +203,28 @@ try {
             counterMap[k] = ctr.key;
         }
 
+        // isMicros=true: counter is in microseconds at real-time (intervalId=20)
+        //                and milliseconds at rollup (intervalId=300).
+        //                Code converts to ms when real-time data is used.
+        // isMicros=false: counter unit is the same at both intervals (no conversion).
         var vmfsKeys = [
-            { k: "datastore:totalReadLatency:average",    f: "readLatencyMs"  },
-            { k: "datastore:totalWriteLatency:average",   f: "writeLatencyMs" },
-            { k: "datastore:numberReadAveraged:average",  f: "iopsRead"       },
-            { k: "datastore:numberWriteAveraged:average", f: "iopsWrite"      }
+            { k: "datastore:totalReadLatency:average",    f: "readLatencyMs",  isMicros: true  },
+            { k: "datastore:totalWriteLatency:average",   f: "writeLatencyMs", isMicros: true  },
+            { k: "datastore:numberReadAveraged:average",  f: "iopsRead",       isMicros: false },
+            { k: "datastore:numberWriteAveraged:average", f: "iopsWrite",      isMicros: false }
         ];
 
-        var metricIds = [];
-        var keyMap    = {};
+        var metricIds     = [];
+        var keyMap        = {};   // counterId -> field name
+        var microCounters = {};   // counterId -> true if microseconds at real-time
         for (var vfi = 0; vfi < vmfsKeys.length; vfi++) {
             var vf = vmfsKeys[vfi];
             if (counterMap[vf.k] !== undefined) {
                 var mid = new VcPerfMetricId();
                 mid.counterId = counterMap[vf.k];
                 metricIds.push(mid);
-                keyMap[counterMap[vf.k]] = vf.f;
+                keyMap[counterMap[vf.k]]        = vf.f;
+                microCounters[counterMap[vf.k]] = vf.isMicros;
             }
         }
 
@@ -351,8 +357,15 @@ try {
             var intervalUsed = null;
 
             var attempts = [
-                { interval: 20,  windowMs: 60000,  maxSample: 3, label: "real-time"   },
-                { interval: 300, windowMs: 600000, maxSample: 2, label: "5min-rollup"  }
+                // Real-time: take up to 3 samples over a 90s window and use
+                // the MAXIMUM observed value rather than the mean. This avoids
+                // idle samples diluting a burst that happened 40-60s ago.
+                // The 90s window ensures we always capture at least one 20s
+                // sample even with slight clock skew between the query and vCenter.
+                { interval: 20,  windowMs: 90000,  maxSample: 3, label: "real-time",   useMax: true  },
+                // 5-minute rollup: mean is fine here as it already represents
+                // the sustained average over the full 300s bucket.
+                { interval: 300, windowMs: 600000, maxSample: 2, label: "5min-rollup", useMax: false }
             ];
 
             for (var ai2 = 0; ai2 < attempts.length; ai2++) {
@@ -384,15 +397,32 @@ try {
                 hostMetrics.intervalUsed = intervalUsed;
                 for (var vi = 0; vi < values.length; vi++) {
                     var s     = values[vi];
-                    var field = keyMap[s.id.counterId];
+                    var field    = keyMap[s.id.counterId];
+                    var isMicros = microCounters[s.id.counterId];
                     if (!field) continue;
                     var avg = 0;
                     if (s.value && s.value.length > 0) {
-                        var sum = 0;
-                        for (var si = 0; si < s.value.length; si++) sum += s.value[si];
-                        avg = sum / s.value.length;
+                        if (att.useMax) {
+                            // Use the peak sample in the window so a burst that
+                            // happened partway through the window is not diluted
+                            // by idle samples before or after it.
+                            var peak = s.value[0];
+                            for (var si = 1; si < s.value.length; si++) {
+                                if (s.value[si] > peak) peak = s.value[si];
+                            }
+                            avg = peak;
+                        } else {
+                            var sum = 0;
+                            for (var si = 0; si < s.value.length; si++) sum += s.value[si];
+                            avg = sum / s.value.length;
+                        }
                     }
-                    hostMetrics[field] = avg;
+                    // Latency counters at intervalId=20 are in microseconds.
+                    // At intervalId=300 they are already in milliseconds.
+                    // Convert so hostMetrics always stores milliseconds.
+                    hostMetrics[field] = (isMicros && intervalUsed === 20)
+                                         ? avg / 1000
+                                         : avg;
                 }
 
                 if (intervalUsed === 20) {

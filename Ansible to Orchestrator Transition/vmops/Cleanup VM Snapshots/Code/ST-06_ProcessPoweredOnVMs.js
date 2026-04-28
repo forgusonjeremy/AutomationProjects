@@ -119,7 +119,14 @@ if (onCands.length === 0) {
         var inFlightSlots      = [];
         var vmInFlight         = {};   // vmMoRef -> true if a task is active for that VM
         var currentConcurrency = 1;
-        var qi                 = 0;
+
+        // pending holds all candidates not yet dispatched.
+        // Entries are only removed when actually dispatched (or deferred due to
+        // a governor timeout). Candidates skipped because their VM is in-flight
+        // remain in pending and are retried on the next harvest cycle.
+        // This is the fix for the qi-pointer bug where vmInFlight skips
+        // permanently consumed queue entries for subsequent VM snapshots.
+        var pending = queue.slice();
 
         LOG.ok("PROCESSING", "Starting adaptive dispatch -- initial concurrency: 1 of " +
                maxParallel + " max");
@@ -142,7 +149,7 @@ if (onCands.length === 0) {
             }
         }
 
-        while (qi < queue.length || inFlightSlots.length > 0) {
+        while (pending.length > 0 || inFlightSlots.length > 0) {
 
             // ── Harvest completed slots ───────────────────────────────────────
             var stillActive    = [];
@@ -214,21 +221,21 @@ if (onCands.length === 0) {
             // Only ramp when slots just completed (we have real post-delete
             // metrics to evaluate), queue still has work, and we're below max.
             if (completedCount > 0 &&
-                qi < queue.length &&
+                pending.length > 0 &&
                 inFlightSlots.length < maxParallel &&
                 currentConcurrency < maxParallel) {
 
                 // Find the next candidate not already being processed on its VM
                 var nextIdx = -1;
-                for (var ni = qi; ni < queue.length; ni++) {
-                    if (!vmInFlight[queue[ni].vmMoRef]) {
+                for (var ni = 0; ni < pending.length; ni++) {
+                    if (!vmInFlight[pending[ni].vmMoRef]) {
                         nextIdx = ni;
                         break;
                     }
                 }
 
                 if (nextIdx >= 0) {
-                    var nextCand   = queue[nextIdx];
+                    var nextCand   = pending[nextIdx];
                     var nextDsRefs = nextCand.datastoreMoRefs || [];
                     var govOk      = checkGovernorDelta(vcConn, nextDsRefs,
                                         nextCand.vmName, dsBaseline);
@@ -249,12 +256,18 @@ if (onCands.length === 0) {
             // Hard constraints:
             //   - Total in-flight <= currentConcurrency
             //   - Never dispatch a second task for a VM already in-flight
-            while (qi < queue.length && inFlightSlots.length < currentConcurrency) {
-                var cand = queue[qi];
+            // We iterate pending[] by index. When a candidate is dispatched
+            // (or permanently deferred) it is spliced out of pending so it is
+            // never revisited. When it is skipped due to vmInFlight the index
+            // advances but the entry stays in pending for the next cycle.
+            var di = 0;
+            while (di < pending.length && inFlightSlots.length < currentConcurrency) {
+                var cand = pending[di];
 
-                // Skip: this VM already has an active task
+                // Skip: this VM already has an active task -- leave in pending,
+                // advance index, try the next candidate.
                 if (vmInFlight[cand.vmMoRef]) {
-                    qi++;
+                    di++;
                     continue;
                 }
 
@@ -263,19 +276,18 @@ if (onCands.length === 0) {
                              cand.snapshotName + "'  (age: " +
                              cand.snapshotAgeMinutes + " min)";
 
-                // Governor check before dispatch (pre-check for first slot
-                // and whenever we are filling empty slots)
+                // Governor check before dispatch
                 var govOk3 = checkGovernorDelta(vcConn, dsRefs,
                                  cand.vmName, dsBaseline);
                 if (!govOk3) {
                     if (inFlightSlots.length === 0) {
                         // Nothing running -- wait and retry
                         var holdAttempts = 0;
-                        while (!govOk3 && holdAttempts < maxGovernorWaitMinutes ) {
+                        while (!govOk3 && holdAttempts < 120) {
                             LOG.hold("PROCESSING",
                                 "Storage too busy to start first task. " +
                                 "Waiting " + Math.round(govPollMs/1000) + "s... " +
-                                "(attempt " + (holdAttempts+1) + " of " + maxGovernorWaitMinutes  + ")  -- " + label);
+                                "(attempt " + (holdAttempts+1) + " of 120)  -- " + label);
                             System.sleep(govPollMs);
                             holdAttempts++;
                             govOk3 = checkGovernorDelta(vcConn, dsRefs,
@@ -286,8 +298,8 @@ if (onCands.length === 0) {
                                 "Storage did not settle -- deferring: " + label);
                             logArr.push(makeEntry(cand,"deferred",false,
                                 "Storage I/O governor max wait exceeded",null,0));
-                            qi++;
-                            continue;
+                            pending.splice(di, 1);  // remove permanently
+                            continue;  // di already points to next entry after splice
                         }
                     } else {
                         // Other tasks are running -- break inner loop and wait
@@ -296,7 +308,10 @@ if (onCands.length === 0) {
                     }
                 }
 
-                qi++;
+                // Remove from pending -- this candidate is being handled now
+                pending.splice(di, 1);
+                // Note: di is NOT incremented; after splice the next entry
+                // slides into position di automatically.
 
                 if (dryRun) {
                     LOG.dryrun("PROCESSING", "Would delete:  " + label);
