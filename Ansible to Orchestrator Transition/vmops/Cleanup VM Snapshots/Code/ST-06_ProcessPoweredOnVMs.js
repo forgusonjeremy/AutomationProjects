@@ -1,6 +1,6 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE)
+ * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE) 
  * ─────────────────────────────────────────────────────────────────────────────
  * Processes snapshots on powered-on and suspended VMs. For each candidate:
  *   1. Enforces per-vCenter concurrency limit (maxParallel simultaneous tasks).
