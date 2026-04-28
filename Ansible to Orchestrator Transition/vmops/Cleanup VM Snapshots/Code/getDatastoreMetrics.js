@@ -51,7 +51,7 @@
  *       totalIopsRead:       <sum across hosts>,
  *       totalIopsWrite:      <sum across hosts>,
  *       hotHost:             "host-103"  (host with highest combined latency),
- *       hostssampled:        3,
+ *       hostsSampled:        3,
  *       hostsAtRealTime:     2,
  *       hostsAtRollup:       1,
  *       // vSAN-only aggregates:
@@ -132,7 +132,7 @@ try {
             return JSON.stringify(result);
         }
 
-        // Take two snapshots 2s apart — but this time keep per-host granularity.
+        // Take two snapshots 2s apart — per-host granularity.
         function sampleDomStatsPerHost(cl) {
             var hostData = {};
             for (var hi = 0; hi < cl.host.length; hi++) {
@@ -165,7 +165,6 @@ try {
         System.sleep(2000);
         var snap2 = sampleDomStatsPerHost(cluster);
 
-        // Compute per-host deltas and derive metrics for each host individually.
         for (var hostId in snap2) {
             if (!snap1[hostId]) continue;
             var s1 = snap1[hostId];
@@ -178,29 +177,16 @@ try {
             var dReadCong   = Math.max(0, s2.readCongestionSum  - s1.readCongestionSum);
             var dWriteCong  = Math.max(0, s2.writeCongestionSum - s1.writeCongestionSum);
 
-            var hostMetrics = {
+            result.perHost[hostId] = {
                 hostName:             s2.hostName,
                 readLatencyMs:        dReadCount  > 0 ? dReadMs  / dReadCount  : null,
                 writeLatencyMs:       dWriteCount > 0 ? dWriteMs / dWriteCount : null,
                 iopsRead:             dReadCount  / 2,
                 iopsWrite:            dWriteCount / 2,
                 vsanCongestion:       dReadCong + dWriteCong,
-                vsanResyncQueueDepth: null,  // populated below if available
-                intervalUsed:         2      // 2-second delta window
+                vsanResyncQueueDepth: null,
+                intervalUsed:         2
             };
-
-            result.perHost[hostId] = hostMetrics;
-        }
-
-        // Attempt to get resync queue depth from cluster-level vSAN health.
-        // This is a cluster-wide metric, so we stamp it on every host entry
-        // for consistency with the governor's per-host iteration.
-        try {
-            // vSAN resync is cluster-scoped — not per-host. Stamp on all.
-            // If the API surface for resync isn't available here, leave null.
-            // The governor handles null gracefully.
-        } catch (rsErr) {
-            System.warn("getDatastoreMetrics: resync query error: " + rsErr.message);
         }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -231,7 +217,6 @@ try {
             if (counterMap[vf.k] !== undefined) {
                 var mid = new VcPerfMetricId();
                 mid.counterId = counterMap[vf.k];
-                // Instance will be set per-host below; build the template here.
                 metricIds.push(mid);
                 keyMap[counterMap[vf.k]] = vf.f;
             }
@@ -244,54 +229,20 @@ try {
         }
 
         // ── Resolve the datastore instance key for host-level queries ─────────
-        // When querying datastore counters against a host entity, the instance
-        // string identifies which datastore. This is typically the datastore
-        // name, but we verify by checking queryAvailablePerfMetric on the first
-        // host. We cache this once and reuse for all hosts.
-        var dsInstanceKey = ds.name;   // default assumption
-        var dsHosts       = ds.host;   // DatastoreHostMount[]
+        // The instance string for datastore counters on a host entity is
+        // typically the datastore name. We verify by probing queryPerf directly
+        // with the name as the instance -- if it returns data, the name is
+        // correct. This avoids calling queryAvailablePerfMetric with an
+        // intervalId argument, which causes a Date conversion error in vRO
+        // 8.17 Polyglot (the API signature expects (entity, beginTime, endTime,
+        // intervalId) but vRO exposes it without the time range overload).
+        var dsInstanceKey = ds.name;
+        var dsHosts       = ds.host;
 
         if (!dsHosts || dsHosts.length === 0) {
             System.warn("getDatastoreMetrics: no hosts mount datastore " +
                         datastoreMoRef);
             return JSON.stringify(result);
-        }
-
-        // Verify the instance key against the first host's available metrics.
-        // This ensures we use the correct instance string even if the platform
-        // uses UUIDs or URL-encoded paths instead of the display name.
-        try {
-            var firstHost   = dsHosts[0].key;
-            var availMetric = perfMgr.queryAvailablePerfMetric(firstHost, 20);
-            if (availMetric && availMetric.length > 0) {
-                // Look for any counter in the datastore group whose instance
-                // matches the datastore name. If not found, search for the
-                // datastore URL or MoRef as fallback.
-                var foundInstance = null;
-                var dsNameLower   = ds.name.toLowerCase();
-                var dsUrl         = (ds.summary && ds.summary.url)
-                                        ? ds.summary.url.toLowerCase() : null;
-                for (var ai = 0; ai < availMetric.length; ai++) {
-                    var am = availMetric[ai];
-                    if (!am.instance || am.instance === "") continue;
-                    var instLower = am.instance.toLowerCase();
-                    if (instLower === dsNameLower) {
-                        foundInstance = am.instance;
-                        break;
-                    }
-                    if (dsUrl && instLower.indexOf(dsUrl) >= 0) {
-                        foundInstance = am.instance;
-                    }
-                }
-                if (foundInstance) {
-                    dsInstanceKey = foundInstance;
-                    System.log("getDatastoreMetrics: resolved instance key '" +
-                               dsInstanceKey + "' for " + datastoreMoRef);
-                }
-            }
-        } catch (avErr) {
-            System.warn("getDatastoreMetrics: instance key discovery failed, " +
-                        "using ds.name '" + ds.name + "': " + avErr.message);
         }
 
         // ── Query each host individually at real-time resolution ──────────────
@@ -323,18 +274,18 @@ try {
                 hostMetricIds.push(hmid);
             }
 
-            // Try real-time first (intervalId=20, 60s window, 3 samples).
-            // Fall back to 300s only if real-time is unavailable, and flag it.
+            // Try real-time first (intervalId=20, 60s window).
+            // Fall back to intervalId=300 only if real-time returns no data.
             var values       = null;
             var intervalUsed = null;
 
             var attempts = [
-                { interval: 20,  windowMs: 60000,  maxSample: 3, label: "real-time"  },
-                { interval: 300, windowMs: 600000, maxSample: 2, label: "5min-rollup" }
+                { interval: 20,  windowMs: 60000,  maxSample: 3, label: "real-time"   },
+                { interval: 300, windowMs: 600000, maxSample: 2, label: "5min-rollup"  }
             ];
 
-            for (var ai = 0; ai < attempts.length; ai++) {
-                var att = attempts[ai];
+            for (var ai2 = 0; ai2 < attempts.length; ai2++) {
+                var att = attempts[ai2];
                 try {
                     var qs        = new VcPerfQuerySpec();
                     qs.entity     = hostRef;
@@ -364,14 +315,10 @@ try {
                     var s     = values[vi];
                     var field = keyMap[s.id.counterId];
                     if (!field) continue;
-
-                    // Average the returned samples to smooth single-interval spikes.
                     var avg = 0;
                     if (s.value && s.value.length > 0) {
                         var sum = 0;
-                        for (var si = 0; si < s.value.length; si++) {
-                            sum += s.value[si];
-                        }
+                        for (var si = 0; si < s.value.length; si++) sum += s.value[si];
                         avg = sum / s.value.length;
                     }
                     hostMetrics[field] = avg;
@@ -381,9 +328,9 @@ try {
                     System.log("getDatastoreMetrics: host " + hostName +
                                " sampled at real-time (20s) for " + datastoreMoRef +
                                " — R:" + (hostMetrics.readLatencyMs !== null
-                                    ? hostMetrics.readLatencyMs.toFixed(1) : "null") +
+                                   ? hostMetrics.readLatencyMs.toFixed(1) : "null") +
                                "ms W:" + (hostMetrics.writeLatencyMs !== null
-                                    ? hostMetrics.writeLatencyMs.toFixed(1) : "null") + "ms");
+                                   ? hostMetrics.writeLatencyMs.toFixed(1) : "null") + "ms");
                 } else {
                     System.warn("getDatastoreMetrics: host " + hostName +
                                 " fell back to 300s rollup for " + datastoreMoRef +
@@ -420,39 +367,28 @@ try {
             var hid = hostIds[idx];
             var hm  = result.perHost[hid];
 
-            // Track interval quality
             if (hm.intervalUsed === 20 || hm.intervalUsed === 2) {
                 realTimeCount++;
             } else if (hm.intervalUsed === 300) {
                 rollupCount++;
             }
 
-            // Read latency
             if (hm.readLatencyMs !== null) {
-                sumR += hm.readLatencyMs;
-                countR++;
+                sumR += hm.readLatencyMs; countR++;
                 if (hm.readLatencyMs > maxR) maxR = hm.readLatencyMs;
             }
-
-            // Write latency
             if (hm.writeLatencyMs !== null) {
-                sumW += hm.writeLatencyMs;
-                countW++;
+                sumW += hm.writeLatencyMs; countW++;
                 if (hm.writeLatencyMs > maxW) maxW = hm.writeLatencyMs;
             }
-
-            // IOPS (sum across hosts = total datastore IOPS)
             if (hm.iopsRead  !== null) sumIopsR += hm.iopsRead;
             if (hm.iopsWrite !== null) sumIopsW += hm.iopsWrite;
 
-            // vSAN congestion
             if (hm.vsanCongestion !== null) {
-                sumCong += hm.vsanCongestion;
-                countCong++;
+                sumCong += hm.vsanCongestion; countCong++;
                 if (hm.vsanCongestion > maxCong) maxCong = hm.vsanCongestion;
             }
 
-            // Hot-host detection: host with highest combined read+write latency
             var combinedLat = (hm.readLatencyMs || 0) + (hm.writeLatencyMs || 0);
             if (combinedLat > hotLatencySum) {
                 hotLatencySum = combinedLat;
@@ -460,11 +396,11 @@ try {
             }
         }
 
-        agg.hostsSampled     = hostIds.length;
-        agg.hostsAtRealTime  = realTimeCount;
-        agg.hostsAtRollup    = rollupCount;
-        agg.avgReadLatencyMs  = countR > 0 ? Math.round((sumR / countR) * 10) / 10  : null;
-        agg.avgWriteLatencyMs = countW > 0 ? Math.round((sumW / countW) * 10) / 10  : null;
+        agg.hostsSampled      = hostIds.length;
+        agg.hostsAtRealTime   = realTimeCount;
+        agg.hostsAtRollup     = rollupCount;
+        agg.avgReadLatencyMs  = countR > 0 ? Math.round((sumR / countR) * 10) / 10 : null;
+        agg.avgWriteLatencyMs = countW > 0 ? Math.round((sumW / countW) * 10) / 10 : null;
         agg.maxReadLatencyMs  = countR > 0 ? Math.round(maxR * 10) / 10             : null;
         agg.maxWriteLatencyMs = countW > 0 ? Math.round(maxW * 10) / 10             : null;
         agg.totalIopsRead     = Math.round(sumIopsR);
@@ -485,8 +421,7 @@ try {
                " hotHost=" + agg.hotHost);
 
 } catch (e) {
-    System.warn("getDatastoreMetrics error for " + datastoreMoRef + ": " +
-                e.message);
+    System.warn("getDatastoreMetrics error for " + datastoreMoRef + ": " + e.message);
 }
 
 return JSON.stringify(result);

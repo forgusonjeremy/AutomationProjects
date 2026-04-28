@@ -58,24 +58,28 @@ var sorted = [];
 for (var vi = 0; vi < vmOrder.length; vi++) {
     var group = vmGroups[vmOrder[vi]];
 
-    // Index candidates in this group by their MoRef
+    // Index candidates in this group by their MoRef.
+    // Only parent links pointing to another candidate count --
+    // filtered-out snapshots are invisible to the sort.
     var inGroup = {};
     for (var gi = 0; gi < group.length; gi++) {
         inGroup[group[gi].snapshotMoRef] = true;
     }
 
-    // isParentOf[moRef] = true if moRef has at least one candidate child
-    // Only set for parents that are themselves in the candidate list.
-    var isParentOf = {};
+    // childCount[moRef] = number of candidate children still waiting.
+    // Using a count (not a boolean) correctly handles the case where a
+    // snapshot has multiple candidate children: the parent only becomes
+    // a leaf once ALL children have been emitted, not just the first.
+    var childCount = {};
     for (var pi = 0; pi < group.length; pi++) {
         var par = group[pi].parentSnapshotMoRef;
         if (par && inGroup[par]) {
-            isParentOf[par] = true;
+            childCount[par] = (childCount[par] || 0) + 1;
         }
     }
 
-    // Kahn's algorithm: repeatedly emit leaves (no remaining children),
-    // then remove each leaf so its parent may become the next leaf.
+    // Kahn's algorithm: emit all candidates whose childCount is 0 (leaves),
+    // decrement each emitted leaf's parent, repeat until done.
     var remaining = group.slice();
     var vmSorted  = [];
     var safety    = 0;
@@ -85,15 +89,17 @@ for (var vi = 0; vi < vmOrder.length; vi++) {
         var nonLeaves = [];
 
         for (var ri = 0; ri < remaining.length; ri++) {
-            if (isParentOf[remaining[ri].snapshotMoRef]) {
-                nonLeaves.push(remaining[ri]);
-            } else {
+            var moRef = remaining[ri].snapshotMoRef;
+            if (!childCount[moRef] || childCount[moRef] <= 0) {
                 leaves.push(remaining[ri]);
+            } else {
+                nonLeaves.push(remaining[ri]);
             }
         }
 
         if (leaves.length === 0) {
-            // Cycle or corrupt chain -- emit remainder as-is to avoid hang
+            // Genuine cycle in vCenter snapshot metadata -- emit remainder
+            // as-is so the run still processes what it can.
             for (var ci = 0; ci < remaining.length; ci++) {
                 vmSorted.push(remaining[ci]);
             }
@@ -110,9 +116,11 @@ for (var vi = 0; vi < vmOrder.length; vi++) {
 
         for (var li = 0; li < leaves.length; li++) {
             vmSorted.push(leaves[li]);
-            // Unmark the leaf's parent so it can become a leaf next round
-            if (leaves[li].parentSnapshotMoRef) {
-                delete isParentOf[leaves[li].parentSnapshotMoRef];
+            // Decrement the parent's outstanding child count.
+            // When it reaches 0 the parent becomes a leaf in the next round.
+            var parentMoRef = leaves[li].parentSnapshotMoRef;
+            if (parentMoRef && childCount[parentMoRef] !== undefined) {
+                childCount[parentMoRef]--;
             }
         }
         remaining = nonLeaves;
