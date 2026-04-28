@@ -25,3 +25,6 @@ foreach ($row in $servers) {
 
 ./Stop-DatastoreLatency.ps1 -CsvPath vsanservers.csv
 ./Stop-DatastoreLatency.ps1 -CsvPath iscsiservers.csv
+
+
+Snapshot used by Content Library

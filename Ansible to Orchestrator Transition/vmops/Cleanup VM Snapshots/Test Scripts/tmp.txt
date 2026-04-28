@@ -1,21 +1,556 @@
-[10.111.101.128] Transferring to sshuser@10.111.101.128:/tmp/generate_snapshot_io.sh ...
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
-Someone could be eavesdropping on you right now (man-in-the-middle attack)!
-It is also possible that a host key has just been changed.
-The fingerprint for the ED25519 key sent by the remote host is
-SHA256:l4MPcL3S8a9KX2NR/Wc8UELpHWq2m/+wiKQWo0t+HHk.
-Please contact your system administrator.
-Add correct host key in C:\\Users\\forgusonjw/.ssh/known_hosts to get rid of this message.
-Offending ED25519 key in C:\\Users\\forgusonjw/.ssh/known_hosts:113
-Password authentication is disabled to avoid man-in-the-middle attacks.
-Keyboard-interactive authentication is disabled to avoid man-in-the-middle attacks.
-UpdateHostkeys is disabled because the host key is not trusted.
-Method invocation failed because [System.Management.Automation.ErrorRecord] does not contain a method named 'Trim'.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_scp.ps1:112 char:9
-+         $crlfCount = (& ssh @verifyArgs 2>&1).Trim()
-+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
-    + FullyQualifiedErrorId : MethodNotFound
+asdfasdf
+
+
+
+
+2026-04-28 17:23:52.782 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      ================================================
+2026-04-28 17:23:52.783 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Adaptive Snapshot Cleanup  --  Starting up
+2026-04-28 17:23:52.784 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Run ID      : SCR-2026-04-28T21-23-52
+2026-04-28 17:23:52.785 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Mode        : LIVE  (snapshots WILL be deleted)
+2026-04-28 17:23:52.786 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Age limit   : Snapshots older than 60 minute(s)
+2026-04-28 17:23:52.787 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Name filter : None  (all snapshot names are eligible)
+2026-04-28 17:23:52.788 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Desc ignore : Skip if description contains any of: 'Snapshot used by Content Library'
+2026-04-28 17:23:52.789 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        I/O ceiling : 30ms latency  |  vSAN congestion max 50/255
+2026-04-28 17:23:52.790 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Parallelism : Up to 20 simultaneous cleanup(s) per vCenter
+2026-04-28 17:23:52.791 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      ================================================
+2026-04-28 17:23:52.806 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      Lock acquired -- this is the only active cleanup run  [SCR-2026-04-28T21-23-52]
+2026-04-28 17:23:52.819 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      Scanning 1 vCenter(s) for eligible snapshots...
+2026-04-28 17:23:52.820 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]        Connecting to: https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-28 17:23:52.862 -04:00INFO_getSnapshotCandidates: found 65 VMs on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-28 17:23:52.863 -04:00INFO_getSnapshotCandidates: sample vm.id='vm-1016'  vm.name='Windows-2022-template'
+2026-04-28 17:23:52.939 -04:00INFOSKIP (desc match): VM=snaptestds208 snap=snapshot-9
+2026-04-28 17:23:53.020 -04:00INFOSKIP (desc match): VM=snaptestds108 snap=snapshot-9
+2026-04-28 17:23:53.121 -04:00INFOSKIP (desc match): VM=snaptestds107 snap=snapshot-9
+2026-04-28 17:23:53.221 -04:00INFOSKIP (desc match): VM=snaptestds106 snap=snapshot-8
+2026-04-28 17:23:53.322 -04:00INFOSKIP (desc match): VM=snaptestvsan04 snap=snapshot-9
+2026-04-28 17:23:53.421 -04:00INFOSKIP (desc match): VM=snaptestvsan03 snap=snapshot-7
+2026-04-28 17:23:53.571 -04:00INFOSKIP (desc match): VM=snaptestds101 snap=snapshot-5
+2026-04-28 17:23:53.673 -04:00INFOSKIP (desc match): VM=snaptestds102 snap=snapshot-6
+2026-04-28 17:23:53.971 -04:00INFOSKIP (desc match): VM=snaptestds105 snap=snapshot-9
+2026-04-28 17:23:54.072 -04:00INFOSKIP (desc match): VM=snaptestds306 snap=snapshot-7
+2026-04-28 17:23:54.123 -04:00INFOSKIP (desc match): VM=snaptestds202 snap=snapshot-9
+2026-04-28 17:23:54.173 -04:00INFOSKIP (desc match): VM=snaptstvsan01 snap=snapshot-6
+2026-04-28 17:23:54.223 -04:00INFOSKIP (desc match): VM=snaptestds203 snap=snapshot-4
+2026-04-28 17:23:54.571 -04:00INFOSKIP (desc match): VM=snaptestds305 snap=snapshot-9
+2026-04-28 17:23:54.621 -04:00INFOSKIP (desc match): VM=snaptestvsan09 snap=snapshot-7
+2026-04-28 17:23:54.672 -04:00INFOSKIP (desc match): VM=snaptestvsan02 snap=snapshot-7
+2026-04-28 17:23:54.722 -04:00INFOSKIP (desc match): VM=snaptestds304 snap=snapshot-9
+2026-04-28 17:23:54.920 -04:00INFOSKIP (desc match): VM=snaptestds201 snap=snapshot-8
+2026-04-28 17:23:55.082 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]          Found 133 eligible snapshot(s) on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-28 17:23:55.085 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      Scan complete -- 133 eligible snapshot(s) found across all vCenters.
+2026-04-28 17:23:55.097 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      133 snapshot(s) are eligible for cleanup -- continuing...
+2026-04-28 17:23:55.118 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds106 -- emitting remaining 2 candidate(s) unsorted
+2026-04-28 17:23:55.119 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestvsan04 -- emitting remaining 3 candidate(s) unsorted
+2026-04-28 17:23:55.120 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestvsan03 -- emitting remaining 3 candidate(s) unsorted
+2026-04-28 17:23:55.121 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds101 -- emitting remaining 4 candidate(s) unsorted
+2026-04-28 17:23:55.122 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds102 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.123 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds103 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.124 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds104 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.125 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds105 -- emitting remaining 4 candidate(s) unsorted
+2026-04-28 17:23:55.126 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds306 -- emitting remaining 4 candidate(s) unsorted
+2026-04-28 17:23:55.127 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds202 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.128 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptstvsan01 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.129 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds203 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.130 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds204 -- emitting remaining 6 candidate(s) unsorted
+2026-04-28 17:23:55.131 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds301 -- emitting remaining 6 candidate(s) unsorted
+2026-04-28 17:23:55.132 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds302 -- emitting remaining 6 candidate(s) unsorted
+2026-04-28 17:23:55.133 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds205 -- emitting remaining 6 candidate(s) unsorted
+2026-04-28 17:23:55.134 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestvsan07 -- emitting remaining 6 candidate(s) unsorted
+2026-04-28 17:23:55.135 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds305 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.136 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestvsan09 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.137 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestvsan02 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.138 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds304 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.139 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestvsan05 -- emitting remaining 6 candidate(s) unsorted
+2026-04-28 17:23:55.140 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds303 -- emitting remaining 6 candidate(s) unsorted
+2026-04-28 17:23:55.141 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds109 -- emitting remaining 6 candidate(s) unsorted
+2026-04-28 17:23:55.142 -04:00WARNINGST-05: cycle detected in snapshot chain for VM snaptestds201 -- emitting remaining 5 candidate(s) unsorted
+2026-04-28 17:23:55.143 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Snapshot queue ready:
+2026-04-28 17:23:55.144 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]        Powered-ON  VMs : 133 snapshot(s)  (processed with I/O throttling)
+2026-04-28 17:23:55.145 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]        Powered-OFF VMs : 0 snapshot(s)  (processed in fast lane)
+2026-04-28 17:23:55.146 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Beginning cleanup...
+2026-04-28 17:23:55.156 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Processing 133 powered-on snapshot(s) on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-28 17:23:55.157 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Starting adaptive dispatch -- initial concurrency: 1 of 20 max
+2026-04-28 17:23:57.987 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.2ms hotHost=host-13
+2026-04-28 17:23:58.036 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-28 17:23:58.047 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:23:58.048 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=4.333333333333333 samples=3 values=[11,0,2]
+2026-04-28 17:23:58.049 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=171.33333333333334 samples=3 values=[119,246,149]
+2026-04-28 17:23:58.050 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=8 samples=3 values=[2,21,1]
+2026-04-28 17:23:58.051 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:4.3ms
+2026-04-28 17:23:58.064 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:23:58.065 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[1,0,2]
+2026-04-28 17:23:58.066 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=67.33333333333333 samples=3 values=[73,60,69]
+2026-04-28 17:23:58.067 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.068 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:1.0ms W:1.0ms
+2026-04-28 17:23:58.080 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.081 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,0,1]
+2026-04-28 17:23:58.082 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.083 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.084 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.3ms
+2026-04-28 17:23:58.107 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=4 samples=3 values=[5,3,4]
+2026-04-28 17:23:58.108 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=101.66666666666667 samples=3 values=[107,63,135]
+2026-04-28 17:23:58.109 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=376.3333333333333 samples=3 values=[324,482,323]
+2026-04-28 17:23:58.110 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=31.666666666666668 samples=3 values=[21,50,24]
+2026-04-28 17:23:58.111 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:4.0ms W:101.7ms
+2026-04-28 17:23:58.112 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1.4ms avgW=26.8ms maxR=4ms maxW=101.7ms hotHost=host-13
+2026-04-28 17:23:58.167 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-28 17:23:58.179 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.180 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.181 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.182 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.183 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-28 17:23:58.194 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,0,1]
+2026-04-28 17:23:58.195 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=2.3333333333333335 samples=3 values=[0,1,6]
+2026-04-28 17:23:58.196 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=99 samples=3 values=[187,55,55]
+2026-04-28 17:23:58.197 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=7 samples=3 values=[21,0,0]
+2026-04-28 17:23:58.198 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:2.3ms
+2026-04-28 17:23:58.209 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.210 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=1.6666666666666667 samples=3 values=[5,0,0]
+2026-04-28 17:23:58.211 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=106.66666666666667 samples=3 values=[108,107,105]
+2026-04-28 17:23:58.212 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:23:58.213 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:1.7ms
+2026-04-28 17:23:58.224 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=1.3333333333333333 samples=3 values=[1,2,1]
+2026-04-28 17:23:58.225 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=38.666666666666664 samples=3 values=[22,45,49]
+2026-04-28 17:23:58.226 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=537.6666666666666 samples=3 values=[503,559,551]
+2026-04-28 17:23:58.227 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=18 samples=3 values=[28,16,10]
+2026-04-28 17:23:58.228 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:1.3ms W:38.7ms
+2026-04-28 17:23:58.229 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.4ms avgW=10.7ms maxR=1.3ms maxW=38.7ms hotHost=host-13
+2026-04-28 17:23:58.288 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:23:58.305 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:23:58.306 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1.3333333333333333 samples=3 values=[0,0,4]
+2026-04-28 17:23:58.307 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=89.66666666666667 samples=3 values=[146,72,51]
+2026-04-28 17:23:58.308 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=8 samples=3 values=[23,1,0]
+2026-04-28 17:23:58.309 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.3ms
+2026-04-28 17:23:58.323 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:23:58.324 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:23:58.325 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=232 samples=3 values=[209,295,192]
+2026-04-28 17:23:58.326 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=23 samples=3 values=[32,37,0]
+2026-04-28 17:23:58.327 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.7ms
+2026-04-28 17:23:58.340 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,0,1]
+2026-04-28 17:23:58.341 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=2 samples=3 values=[0,0,6]
+2026-04-28 17:23:58.342 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=98 samples=3 values=[181,52,61]
+2026-04-28 17:23:58.343 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.666666666666667 samples=3 values=[20,0,0]
+2026-04-28 17:23:58.344 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:2.0ms
+2026-04-28 17:23:58.356 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:23:58.357 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,2,0]
+2026-04-28 17:23:58.358 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=326 samples=3 values=[469,247,262]
+2026-04-28 17:23:58.359 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=25.333333333333332 samples=3 values=[71,5,0]
+2026-04-28 17:23:58.360 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.7ms
+2026-04-28 17:23:58.361 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.6ms avgW=1.2ms maxR=0.7ms maxW=2ms hotHost=host-29
+2026-04-28 17:24:01.099 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-32
+2026-04-28 17:24:01.120 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/1 slots]:  VM 'snaptestvsan08'  snapshot 'snapshot-9'  (age: 197 min)
+2026-04-28 17:24:28.141 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestvsan08'  snapshot 'snapshot-9'  (age: 197 min)  (took 26s)
+2026-04-28 17:24:30.906 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-13
+2026-04-28 17:24:30.907 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 2 of 20
+2026-04-28 17:24:33.659 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-13
+2026-04-28 17:24:33.676 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/2 slots]:  VM 'snaptestvsan06'  snapshot 'snapshot-9'  (age: 197 min)
+2026-04-28 17:24:33.730 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-28 17:24:33.745 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=1.3333333333333333 samples=3 values=[1,2,1]
+2026-04-28 17:24:33.747 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=0.6666666666666666 samples=3 values=[2,0,0]
+2026-04-28 17:24:33.748 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=168 samples=3 values=[149,192,163]
+2026-04-28 17:24:33.750 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:24:33.751 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:1.3ms W:0.7ms
+2026-04-28 17:24:33.764 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:24:33.765 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=0.6666666666666666 samples=3 values=[2,0,0]
+2026-04-28 17:24:33.766 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=80.66666666666667 samples=3 values=[69,81,92]
+2026-04-28 17:24:33.767 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:24:33.768 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:1.0ms W:0.7ms
+2026-04-28 17:24:33.779 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:24:33.780 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:24:33.781 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:24:33.782 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:24:33.783 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.3ms W:0.7ms
+2026-04-28 17:24:33.795 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=3 samples=3 values=[4,3,2]
+2026-04-28 17:24:33.796 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=111.33333333333333 samples=3 values=[135,131,68]
+2026-04-28 17:24:33.797 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=341 samples=3 values=[323,376,324]
+2026-04-28 17:24:33.798 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=19.333333333333332 samples=3 values=[24,18,16]
+2026-04-28 17:24:33.799 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:3.0ms W:111.3ms
+2026-04-28 17:24:33.800 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1.4ms avgW=28.3ms maxR=3ms maxW=111.3ms hotHost=host-13
+2026-04-28 17:24:33.816 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/2 slots]:  VM 'snaptestds308'  snapshot 'snapshot-9'  (age: 197 min)
+2026-04-28 17:25:06.851 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestvsan06'  snapshot 'snapshot-9'  (age: 197 min)  (took 31s)
+2026-04-28 17:25:06.855 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestds308'  snapshot 'snapshot-9'  (age: 197 min)  (took 30s)
+2026-04-28 17:25:06.907 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-28 17:25:06.919 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[2,0,0]
+2026-04-28 17:25:06.920 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:06.921 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:06.922 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:06.923 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:0.0ms
+2026-04-28 17:25:06.936 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:06.937 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=2.3333333333333335 samples=3 values=[0,7,0]
+2026-04-28 17:25:06.938 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=56.333333333333336 samples=3 values=[51,66,52]
+2026-04-28 17:25:06.939 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:06.940 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.0ms W:2.3ms
+2026-04-28 17:25:06.955 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:06.956 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=11.666666666666666 samples=3 values=[2,21,12]
+2026-04-28 17:25:06.957 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=101.66666666666667 samples=3 values=[103,103,99]
+2026-04-28 17:25:06.958 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:25:06.959 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:11.7ms
+2026-04-28 17:25:06.973 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:25:06.974 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=61.333333333333336 samples=3 values=[49,74,61]
+2026-04-28 17:25:06.975 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=341 samples=3 values=[411,362,250]
+2026-04-28 17:25:06.976 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=8.666666666666666 samples=3 values=[9,9,8]
+2026-04-28 17:25:06.977 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:61.3ms
+2026-04-28 17:25:06.978 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.6ms avgW=18.8ms maxR=1ms maxW=61.3ms hotHost=host-13
+2026-04-28 17:25:06.979 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 3 of 20
+2026-04-28 17:25:07.029 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-28 17:25:07.043 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[2,0,0]
+2026-04-28 17:25:07.044 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.045 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.046 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.047 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:0.0ms
+2026-04-28 17:25:07.062 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:07.063 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=2.3333333333333335 samples=3 values=[0,7,0]
+2026-04-28 17:25:07.064 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=56.333333333333336 samples=3 values=[51,66,52]
+2026-04-28 17:25:07.065 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.066 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.0ms W:2.3ms
+2026-04-28 17:25:07.080 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.081 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=11.666666666666666 samples=3 values=[2,21,12]
+2026-04-28 17:25:07.082 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=101.66666666666667 samples=3 values=[103,103,99]
+2026-04-28 17:25:07.083 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:25:07.084 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:11.7ms
+2026-04-28 17:25:07.097 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:25:07.099 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=61.333333333333336 samples=3 values=[49,74,61]
+2026-04-28 17:25:07.100 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=341 samples=3 values=[411,362,250]
+2026-04-28 17:25:07.101 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=8.666666666666666 samples=3 values=[9,9,8]
+2026-04-28 17:25:07.102 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:61.3ms
+2026-04-28 17:25:07.103 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.6ms avgW=18.8ms maxR=1ms maxW=61.3ms hotHost=host-13
+2026-04-28 17:25:07.124 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/3 slots]:  VM 'snaptestds207'  snapshot 'snapshot-9'  (age: 196 min)
+2026-04-28 17:25:07.176 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-28 17:25:07.189 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[2,0,0]
+2026-04-28 17:25:07.190 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.191 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.192 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.193 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:0.0ms
+2026-04-28 17:25:07.206 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:07.207 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=2.3333333333333335 samples=3 values=[0,7,0]
+2026-04-28 17:25:07.208 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=56.333333333333336 samples=3 values=[51,66,52]
+2026-04-28 17:25:07.209 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.210 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.0ms W:2.3ms
+2026-04-28 17:25:07.223 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.224 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=11.666666666666666 samples=3 values=[2,21,12]
+2026-04-28 17:25:07.225 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=101.66666666666667 samples=3 values=[103,103,99]
+2026-04-28 17:25:07.226 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:25:07.227 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:11.7ms
+2026-04-28 17:25:07.238 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:25:07.239 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=61.333333333333336 samples=3 values=[49,74,61]
+2026-04-28 17:25:07.240 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=341 samples=3 values=[411,362,250]
+2026-04-28 17:25:07.241 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=8.666666666666666 samples=3 values=[9,9,8]
+2026-04-28 17:25:07.243 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:61.3ms
+2026-04-28 17:25:07.244 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.6ms avgW=18.8ms maxR=1ms maxW=61.3ms hotHost=host-13
+2026-04-28 17:25:07.279 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/3 slots]:  VM 'snaptestds206'  snapshot 'snapshot-9'  (age: 196 min)
+2026-04-28 17:25:07.332 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:25:07.371 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,0,1]
+2026-04-28 17:25:07.372 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=10 samples=3 values=[0,30,0]
+2026-04-28 17:25:07.373 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=55.666666666666664 samples=3 values=[54,51,62]
+2026-04-28 17:25:07.374 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.375 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:10.0ms
+2026-04-28 17:25:07.419 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:25:07.420 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=2 samples=3 values=[0,4,2]
+2026-04-28 17:25:07.421 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=184 samples=3 values=[169,218,165]
+2026-04-28 17:25:07.423 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:25:07.424 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:2.0ms
+2026-04-28 17:25:07.470 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:07.471 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=4.666666666666667 samples=3 values=[3,5,6]
+2026-04-28 17:25:07.472 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=56 samples=3 values=[62,54,52]
+2026-04-28 17:25:07.473 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:07.474 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:1.0ms W:4.7ms
+2026-04-28 17:25:07.520 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:07.521 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1.6666666666666667 samples=3 values=[0,5,0]
+2026-04-28 17:25:07.522 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=216.66666666666666 samples=3 values=[246,252,152]
+2026-04-28 17:25:07.523 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:25:07.524 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:1.0ms W:1.7ms
+2026-04-28 17:25:07.525 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.8ms avgW=4.6ms maxR=1ms maxW=10ms hotHost=host-35
+2026-04-28 17:25:07.544 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/3 slots]:  VM 'snaptestds110'  snapshot 'snapshot-9'  (age: 196 min)
+2026-04-28 17:25:52.598 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestds207'  snapshot 'snapshot-9'  (age: 196 min)  (took 45s)
+2026-04-28 17:25:52.659 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-28 17:25:52.671 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.672 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=11 samples=3 values=[0,5,28]
+2026-04-28 17:25:52.673 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.674 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.675 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:11.0ms
+2026-04-28 17:25:52.689 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=1.6666666666666667 samples=3 values=[1,0,4]
+2026-04-28 17:25:52.690 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=25.666666666666668 samples=3 values=[0,0,77]
+2026-04-28 17:25:52.691 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=718 samples=3 values=[52,1411,691]
+2026-04-28 17:25:52.692 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=8.333333333333334 samples=3 values=[0,9,16]
+2026-04-28 17:25:52.693 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.7ms W:25.7ms
+2026-04-28 17:25:52.704 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,0,1]
+2026-04-28 17:25:52.705 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=5.333333333333333 samples=3 values=[12,2,2]
+2026-04-28 17:25:52.706 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=78.33333333333333 samples=3 values=[99,69,67]
+2026-04-28 17:25:52.707 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.708 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:5.3ms
+2026-04-28 17:25:52.725 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:25:52.726 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=36.333333333333336 samples=3 values=[61,30,18]
+2026-04-28 17:25:52.727 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=924.3333333333334 samples=3 values=[250,1547,976]
+2026-04-28 17:25:52.728 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=13.666666666666666 samples=3 values=[8,17,16]
+2026-04-28 17:25:52.729 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:36.3ms
+2026-04-28 17:25:52.730 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.7ms avgW=19.6ms maxR=1.7ms maxW=36.3ms hotHost=host-13
+2026-04-28 17:25:52.731 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 4 of 20
+2026-04-28 17:25:52.793 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-28 17:25:52.805 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.806 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=11 samples=3 values=[0,5,28]
+2026-04-28 17:25:52.807 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.808 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.809 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:11.0ms
+2026-04-28 17:25:52.821 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=1.6666666666666667 samples=3 values=[1,0,4]
+2026-04-28 17:25:52.822 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=25.666666666666668 samples=3 values=[0,0,77]
+2026-04-28 17:25:52.823 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=718 samples=3 values=[52,1411,691]
+2026-04-28 17:25:52.824 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=8.333333333333334 samples=3 values=[0,9,16]
+2026-04-28 17:25:52.825 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.7ms W:25.7ms
+2026-04-28 17:25:52.837 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,0,1]
+2026-04-28 17:25:52.838 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=5.333333333333333 samples=3 values=[12,2,2]
+2026-04-28 17:25:52.839 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=78.33333333333333 samples=3 values=[99,69,67]
+2026-04-28 17:25:52.840 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.841 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:5.3ms
+2026-04-28 17:25:52.853 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:25:52.854 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=191 field=writeLatencyMs rawAvg=36.333333333333336 samples=3 values=[61,30,18]
+2026-04-28 17:25:52.855 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=186 field=iopsRead rawAvg=924.3333333333334 samples=3 values=[250,1547,976]
+2026-04-28 17:25:52.856 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-96 interval=20 counter=187 field=iopsWrite rawAvg=13.666666666666666 samples=3 values=[8,17,16]
+2026-04-28 17:25:52.857 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:36.3ms
+2026-04-28 17:25:52.858 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.7ms avgW=19.6ms maxR=1.7ms maxW=36.3ms hotHost=host-13
+2026-04-28 17:25:52.874 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/4 slots]:  VM 'snaptestds210'  snapshot 'snapshot-9'  (age: 196 min)
+2026-04-28 17:25:52.927 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-28 17:25:52.938 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,0,2]
+2026-04-28 17:25:52.939 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=3 samples=3 values=[5,1,3]
+2026-04-28 17:25:52.940 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=141.33333333333334 samples=3 values=[178,12,234]
+2026-04-28 17:25:52.942 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.943 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:1.0ms W:3.0ms
+2026-04-28 17:25:52.964 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:25:52.965 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=2.6666666666666665 samples=3 values=[0,0,8]
+2026-04-28 17:25:52.966 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=44.666666666666664 samples=3 values=[77,6,51]
+2026-04-28 17:25:52.968 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.969 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:2.7ms
+2026-04-28 17:25:52.981 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.982 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=6.666666666666667 samples=3 values=[5,13,2]
+2026-04-28 17:25:52.983 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.984 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:52.985 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:6.7ms
+2026-04-28 17:25:52.999 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=190 field=readLatencyMs rawAvg=9.666666666666666 samples=3 values=[3,5,21]
+2026-04-28 17:25:53.000 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=191 field=writeLatencyMs rawAvg=142.66666666666666 samples=3 values=[92,72,264]
+2026-04-28 17:25:53.001 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=186 field=iopsRead rawAvg=324 samples=3 values=[564,208,200]
+2026-04-28 17:25:53.002 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-97 interval=20 counter=187 field=iopsWrite rawAvg=22 samples=3 values=[31,13,22]
+2026-04-28 17:25:53.003 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:9.7ms W:142.7ms
+2026-04-28 17:25:53.004 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=2.8ms avgW=38.8ms maxR=9.7ms maxW=142.7ms hotHost=host-13
+2026-04-28 17:25:53.020 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [4/4 slots]:  VM 'snaptestds310'  snapshot 'snapshot-9'  (age: 196 min)
+2026-04-28 17:25:56.027 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestds206'  snapshot 'snapshot-9'  (age: 196 min)  (took 46s)
+2026-04-28 17:25:56.031 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestds110'  snapshot 'snapshot-9'  (age: 196 min)  (took 46s)
+2026-04-28 17:25:56.084 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:25:56.097 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:25:56.098 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[0,1,2]
+2026-04-28 17:25:56.099 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=42.333333333333336 samples=3 values=[62,58,7]
+2026-04-28 17:25:56.100 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.101 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:25:56.112 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1.6666666666666667 samples=3 values=[1,0,4]
+2026-04-28 17:25:56.113 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=18 samples=3 values=[2,1,51]
+2026-04-28 17:25:56.114 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=800 samples=3 values=[165,1613,622]
+2026-04-28 17:25:56.115 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=10 samples=3 values=[1,10,19]
+2026-04-28 17:25:56.116 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:1.7ms W:18.0ms
+2026-04-28 17:25:56.128 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:56.129 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=3 samples=3 values=[6,0,3]
+2026-04-28 17:25:56.130 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=39 samples=3 values=[52,0,65]
+2026-04-28 17:25:56.131 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.132 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:1.0ms W:3.0ms
+2026-04-28 17:25:56.144 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:25:56.145 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:25:56.146 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=175 samples=3 values=[152,111,262]
+2026-04-28 17:25:56.147 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.148 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.3ms
+2026-04-28 17:25:56.149 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1ms avgW=5.6ms maxR=1.7ms maxW=18ms hotHost=host-32
+2026-04-28 17:25:56.150 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 5 of 20
+2026-04-28 17:25:56.199 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:25:56.211 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:25:56.212 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[0,1,2]
+2026-04-28 17:25:56.213 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=42.333333333333336 samples=3 values=[62,58,7]
+2026-04-28 17:25:56.214 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.215 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:25:56.226 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1.6666666666666667 samples=3 values=[1,0,4]
+2026-04-28 17:25:56.227 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=18 samples=3 values=[2,1,51]
+2026-04-28 17:25:56.228 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=800 samples=3 values=[165,1613,622]
+2026-04-28 17:25:56.229 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=10 samples=3 values=[1,10,19]
+2026-04-28 17:25:56.230 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:1.7ms W:18.0ms
+2026-04-28 17:25:56.241 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:56.242 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=3 samples=3 values=[6,0,3]
+2026-04-28 17:25:56.243 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=39 samples=3 values=[52,0,65]
+2026-04-28 17:25:56.244 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.245 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:1.0ms W:3.0ms
+2026-04-28 17:25:56.256 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:25:56.257 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:25:56.258 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=175 samples=3 values=[152,111,262]
+2026-04-28 17:25:56.259 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.260 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.3ms
+2026-04-28 17:25:56.261 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1ms avgW=5.6ms maxR=1.7ms maxW=18ms hotHost=host-32
+2026-04-28 17:25:56.276 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/5 slots]:  VM 'snaptestds108'  snapshot 'snapshot-8'  (age: 202 min)
+2026-04-28 17:25:56.332 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:25:56.346 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:25:56.347 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[0,1,2]
+2026-04-28 17:25:56.348 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=42.333333333333336 samples=3 values=[62,58,7]
+2026-04-28 17:25:56.349 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.350 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:25:56.360 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1.6666666666666667 samples=3 values=[1,0,4]
+2026-04-28 17:25:56.361 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=18 samples=3 values=[2,1,51]
+2026-04-28 17:25:56.362 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=800 samples=3 values=[165,1613,622]
+2026-04-28 17:25:56.363 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=10 samples=3 values=[1,10,19]
+2026-04-28 17:25:56.364 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:1.7ms W:18.0ms
+2026-04-28 17:25:56.375 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:56.376 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=3 samples=3 values=[6,0,3]
+2026-04-28 17:25:56.377 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=39 samples=3 values=[52,0,65]
+2026-04-28 17:25:56.378 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.379 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:1.0ms W:3.0ms
+2026-04-28 17:25:56.390 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:25:56.391 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:25:56.392 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=175 samples=3 values=[152,111,262]
+2026-04-28 17:25:56.393 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.394 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.3ms
+2026-04-28 17:25:56.395 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1ms avgW=5.6ms maxR=1.7ms maxW=18ms hotHost=host-32
+2026-04-28 17:25:56.410 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [4/5 slots]:  VM 'snaptestds107'  snapshot 'snapshot-8'  (age: 202 min)
+2026-04-28 17:25:56.463 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:25:56.602 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:25:56.603 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[0,1,2]
+2026-04-28 17:25:56.604 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=42.333333333333336 samples=3 values=[62,58,7]
+2026-04-28 17:25:56.605 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.606 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:25:56.747 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1.6666666666666667 samples=3 values=[1,0,4]
+2026-04-28 17:25:56.748 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=18 samples=3 values=[2,1,51]
+2026-04-28 17:25:56.749 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=800 samples=3 values=[165,1613,622]
+2026-04-28 17:25:56.750 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=10 samples=3 values=[1,10,19]
+2026-04-28 17:25:56.751 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:1.7ms W:18.0ms
+2026-04-28 17:25:56.849 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:25:56.850 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=3 samples=3 values=[6,0,3]
+2026-04-28 17:25:56.851 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=39 samples=3 values=[52,0,65]
+2026-04-28 17:25:56.852 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.853 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:1.0ms W:3.0ms
+2026-04-28 17:25:56.952 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:25:56.953 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,1,0]
+2026-04-28 17:25:56.954 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=175 samples=3 values=[152,111,262]
+2026-04-28 17:25:56.955 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:25:56.956 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.3ms
+2026-04-28 17:25:56.957 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1ms avgW=5.6ms maxR=1.7ms maxW=18ms hotHost=host-32
+2026-04-28 17:25:56.973 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [5/5 slots]:  VM 'snaptestds106'  snapshot 'snapshot-7'  (age: 209 min)
+2026-04-28 17:26:12.001 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestds108'  snapshot 'snapshot-8'  (age: 202 min)  (took 15s)
+2026-04-28 17:26:14.803 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.2ms hotHost=host-13
+2026-04-28 17:26:14.805 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 6 of 20
+2026-04-28 17:26:17.589 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.2ms hotHost=host-35
+2026-04-28 17:26:17.606 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [5/6 slots]:  VM 'snaptestvsan04'  snapshot 'snapshot-6'  (age: 215 min)
+2026-04-28 17:26:20.362 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-13
+2026-04-28 17:26:20.379 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [6/6 slots]:  VM 'snaptestvsan03'  snapshot 'snapshot-6'  (age: 215 min)
+2026-04-28 17:26:23.388 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestds107'  snapshot 'snapshot-8'  (age: 202 min)  (took 16s)
+2026-04-28 17:26:23.392 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestds106'  snapshot 'snapshot-7'  (age: 209 min)  (took 16s)
+2026-04-28 17:26:23.451 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:26:23.464 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[1,0,0]
+2026-04-28 17:26:23.465 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=5.666666666666667 samples=3 values=[1,2,14]
+2026-04-28 17:26:23.466 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=38.333333333333336 samples=3 values=[58,7,50]
+2026-04-28 17:26:23.467 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:26:23.468 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:5.7ms
+2026-04-28 17:26:23.478 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=2.3333333333333335 samples=3 values=[0,4,3]
+2026-04-28 17:26:23.480 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=61.666666666666664 samples=3 values=[1,51,133]
+2026-04-28 17:26:23.481 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=794.3333333333334 samples=3 values=[1613,622,148]
+2026-04-28 17:26:23.482 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=18 samples=3 values=[10,19,25]
+2026-04-28 17:26:23.483 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:2.3ms W:61.7ms
+2026-04-28 17:26:23.497 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:26:23.498 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[0,3,0]
+2026-04-28 17:26:23.499 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=77 samples=3 values=[0,65,166]
+2026-04-28 17:26:23.500 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.333333333333333 samples=3 values=[0,0,19]
+2026-04-28 17:26:23.501 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:26:23.512 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:26:23.513 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[1,0,0]
+2026-04-28 17:26:23.514 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=242.33333333333334 samples=3 values=[111,262,354]
+2026-04-28 17:26:23.515 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.333333333333333 samples=3 values=[0,0,19]
+2026-04-28 17:26:23.516 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.3ms
+2026-04-28 17:26:23.517 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1ms avgW=17.2ms maxR=2.3ms maxW=61.7ms hotHost=host-32
+2026-04-28 17:26:23.518 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 7 of 20
+2026-04-28 17:26:23.565 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:26:23.578 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[1,0,0]
+2026-04-28 17:26:23.579 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=5.666666666666667 samples=3 values=[1,2,14]
+2026-04-28 17:26:23.580 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=38.333333333333336 samples=3 values=[58,7,50]
+2026-04-28 17:26:23.581 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:26:23.582 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:5.7ms
+2026-04-28 17:26:23.592 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=2.3333333333333335 samples=3 values=[0,4,3]
+2026-04-28 17:26:23.593 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=61.666666666666664 samples=3 values=[1,51,133]
+2026-04-28 17:26:23.594 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=794.3333333333334 samples=3 values=[1613,622,148]
+2026-04-28 17:26:23.595 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=18 samples=3 values=[10,19,25]
+2026-04-28 17:26:23.596 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:2.3ms W:61.7ms
+2026-04-28 17:26:23.607 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:26:23.608 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[0,3,0]
+2026-04-28 17:26:23.609 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=77 samples=3 values=[0,65,166]
+2026-04-28 17:26:23.610 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.333333333333333 samples=3 values=[0,0,19]
+2026-04-28 17:26:23.611 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:26:23.622 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:26:23.623 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[1,0,0]
+2026-04-28 17:26:23.625 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=242.33333333333334 samples=3 values=[111,262,354]
+2026-04-28 17:26:23.626 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.333333333333333 samples=3 values=[0,0,19]
+2026-04-28 17:26:23.627 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.3ms
+2026-04-28 17:26:23.628 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1ms avgW=17.2ms maxR=2.3ms maxW=61.7ms hotHost=host-32
+2026-04-28 17:26:23.645 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [5/7 slots]:  VM 'snaptestds106'  snapshot 'snapshot-9'  (age: 196 min)
+2026-04-28 17:26:23.694 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:26:23.707 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[1,0,0]
+2026-04-28 17:26:23.708 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=5.666666666666667 samples=3 values=[1,2,14]
+2026-04-28 17:26:23.709 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=38.333333333333336 samples=3 values=[58,7,50]
+2026-04-28 17:26:23.710 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:26:23.711 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:5.7ms
+2026-04-28 17:26:23.721 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=2.3333333333333335 samples=3 values=[0,4,3]
+2026-04-28 17:26:23.722 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=61.666666666666664 samples=3 values=[1,51,133]
+2026-04-28 17:26:23.723 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=794.3333333333334 samples=3 values=[1613,622,148]
+2026-04-28 17:26:23.724 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=18 samples=3 values=[10,19,25]
+2026-04-28 17:26:23.725 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:2.3ms W:61.7ms
+2026-04-28 17:26:23.737 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:26:23.738 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[0,3,0]
+2026-04-28 17:26:23.739 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=77 samples=3 values=[0,65,166]
+2026-04-28 17:26:23.740 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.333333333333333 samples=3 values=[0,0,19]
+2026-04-28 17:26:23.741 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:26:23.751 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:26:23.752 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[1,0,0]
+2026-04-28 17:26:23.753 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=242.33333333333334 samples=3 values=[111,262,354]
+2026-04-28 17:26:23.754 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.333333333333333 samples=3 values=[0,0,19]
+2026-04-28 17:26:23.755 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.3ms
+2026-04-28 17:26:23.756 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1ms avgW=17.2ms maxR=2.3ms maxW=61.7ms hotHost=host-32
+2026-04-28 17:26:23.772 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [6/7 slots]:  VM 'snaptestds101'  snapshot 'snapshot-6'  (age: 215 min)
+2026-04-28 17:26:23.820 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:26:23.959 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[1,0,0]
+2026-04-28 17:26:23.960 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=5.666666666666667 samples=3 values=[1,2,14]
+2026-04-28 17:26:23.961 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=38.333333333333336 samples=3 values=[58,7,50]
+2026-04-28 17:26:23.962 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:26:23.963 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:5.7ms
+2026-04-28 17:26:24.211 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=2.3333333333333335 samples=3 values=[0,4,3]
+2026-04-28 17:26:24.212 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=61.666666666666664 samples=3 values=[1,51,133]
+2026-04-28 17:26:24.213 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=794.3333333333334 samples=3 values=[1613,622,148]
+2026-04-28 17:26:24.214 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=18 samples=3 values=[10,19,25]
+2026-04-28 17:26:24.215 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:2.3ms W:61.7ms
+2026-04-28 17:26:24.410 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,1,0]
+2026-04-28 17:26:24.411 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[0,3,0]
+2026-04-28 17:26:24.412 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=77 samples=3 values=[0,65,166]
+2026-04-28 17:26:24.413 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.333333333333333 samples=3 values=[0,0,19]
+2026-04-28 17:26:24.414 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:26:24.608 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[0,1,1]
+2026-04-28 17:26:24.609 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[1,0,0]
+2026-04-28 17:26:24.610 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=242.33333333333334 samples=3 values=[111,262,354]
+2026-04-28 17:26:24.611 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.333333333333333 samples=3 values=[0,0,19]
+2026-04-28 17:26:24.612 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:0.3ms
+2026-04-28 17:26:24.613 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1ms avgW=17.2ms maxR=2.3ms maxW=61.7ms hotHost=host-32
+2026-04-28 17:26:24.632 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [7/7 slots]:  VM 'snaptestds102'  snapshot 'snapshot-4'  (age: 227 min)
+2026-04-28 17:26:33.650 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [DONE]    Deleted:  VM 'snaptestds210'  snapshot 'snapshot-9'  (age: 196 min)  (took 41s)
+2026-04-28 17:26:36.412 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.2ms hotHost=host-13
+2026-04-28 17:26:36.413 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 8 of 20
+2026-04-28 17:26:39.154 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-32
+2026-04-28 17:26:39.177 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [7/8 slots]:  VM 'snaptestds103'  snapshot 'snapshot-5'  (age: 221 min)
+2026-04-28 17:26:39.242 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-28 17:26:39.253 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,0,1]
+2026-04-28 17:26:39.254 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=5.333333333333333 samples=3 values=[2,14,0]
+2026-04-28 17:26:39.256 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=36.333333333333336 samples=3 values=[7,50,52]
+2026-04-28 17:26:39.257 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx04.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=0 samples=3 values=[0,0,0]
+2026-04-28 17:26:39.258 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:5.3ms
+2026-04-28 17:26:39.269 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=4.666666666666667 samples=3 values=[4,3,7]
+2026-04-28 17:26:39.270 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=180 samples=3 values=[51,133,356]
+2026-04-28 17:26:39.271 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=373.3333333333333 samples=3 values=[622,148,350]
+2026-04-28 17:26:39.272 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx03.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=19.333333333333332 samples=3 values=[19,25,14]
+2026-04-28 17:26:39.273 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:4.7ms W:180.0ms
+2026-04-28 17:26:39.285 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=0.6666666666666666 samples=3 values=[1,0,1]
+2026-04-28 17:26:39.286 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=1 samples=3 values=[3,0,0]
+2026-04-28 17:26:39.287 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=102 samples=3 values=[65,166,75]
+2026-04-28 17:26:39.288 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx05.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=6.666666666666667 samples=3 values=[0,19,1]
+2026-04-28 17:26:39.289 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.7ms W:1.0ms
+2026-04-28 17:26:39.300 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=190 field=readLatencyMs rawAvg=1 samples=3 values=[1,1,1]
+2026-04-28 17:26:39.301 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=191 field=writeLatencyMs rawAvg=0.3333333333333333 samples=3 values=[0,0,1]
+2026-04-28 17:26:39.302 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=186 field=iopsRead rawAvg=331.6666666666667 samples=3 values=[262,354,379]
+2026-04-28 17:26:39.303 -04:00INFOgetDatastoreMetrics RAW: host=sfo01-m01-r01-esx02.connect.lab ds=datastore-95 interval=20 counter=187 field=iopsWrite rawAvg=12.666666666666666 samples=3 values=[0,19,19]
+2026-04-28 17:26:39.304 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:1.0ms W:0.3ms
+2026-04-28 17:26:39.305 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=1.7ms avgW=46.7ms maxR=4.7ms maxW=180ms hotHost=host-32
+2026-04-28 17:26:39.322 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [8/8 slots]:  VM 'snaptestds104'  snapshot 'snapshot-5'  (age: 221 min) 
