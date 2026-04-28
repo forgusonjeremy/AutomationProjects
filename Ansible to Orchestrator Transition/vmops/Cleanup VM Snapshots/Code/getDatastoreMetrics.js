@@ -1,5 +1,5 @@
 /**
- * ACTION: _getDatastoreMetrics 
+ * ACTION: _getDatastoreMetrics
  * Module : com.broadcom.pso.vc.storage
  *
  * Samples current I/O performance for a single datastore across ALL hosts
@@ -357,15 +357,8 @@ try {
             var intervalUsed = null;
 
             var attempts = [
-                // Real-time: take up to 3 samples over a 90s window and use
-                // the MAXIMUM observed value rather than the mean. This avoids
-                // idle samples diluting a burst that happened 40-60s ago.
-                // The 90s window ensures we always capture at least one 20s
-                // sample even with slight clock skew between the query and vCenter.
-                { interval: 20,  windowMs: 90000,  maxSample: 3, label: "real-time",   useMax: true  },
-                // 5-minute rollup: mean is fine here as it already represents
-                // the sustained average over the full 300s bucket.
-                { interval: 300, windowMs: 600000, maxSample: 2, label: "5min-rollup", useMax: false }
+                { interval: 20,  windowMs: 90000,  maxSample: 3, label: "real-time"   },
+                { interval: 300, windowMs: 600000, maxSample: 2, label: "5min-rollup"  }
             ];
 
             for (var ai2 = 0; ai2 < attempts.length; ai2++) {
@@ -402,27 +395,23 @@ try {
                     if (!field) continue;
                     var avg = 0;
                     if (s.value && s.value.length > 0) {
-                        if (att.useMax) {
-                            // Use the peak sample in the window so a burst that
-                            // happened partway through the window is not diluted
-                            // by idle samples before or after it.
-                            var peak = s.value[0];
-                            for (var si = 1; si < s.value.length; si++) {
-                                if (s.value[si] > peak) peak = s.value[si];
-                            }
-                            avg = peak;
-                        } else {
-                            var sum = 0;
-                            for (var si = 0; si < s.value.length; si++) sum += s.value[si];
-                            avg = sum / s.value.length;
-                        }
+                        var sum = 0;
+                        for (var si = 0; si < s.value.length; si++) sum += s.value[si];
+                        avg = sum / s.value.length;
                     }
-                    // Latency counters at intervalId=20 are in microseconds.
-                    // At intervalId=300 they are already in milliseconds.
-                    // Convert so hostMetrics always stores milliseconds.
-                    hostMetrics[field] = (isMicros && intervalUsed === 20)
-                                         ? avg / 1000
-                                         : avg;
+                    // DIAGNOSTIC: log raw counter value before any conversion
+                    // so we can determine the actual unit vCenter returns.
+                    System.log("getDatastoreMetrics RAW: host=" + hostName +
+                               " ds=" + datastoreMoRef +
+                               " interval=" + intervalUsed +
+                               " counter=" + s.id.counterId +
+                               " field=" + field +
+                               " rawAvg=" + avg +
+                               " samples=" + (s.value ? s.value.length : 0) +
+                               " values=" + (s.value ? JSON.stringify(Array.prototype.slice.call(s.value, 0, 5)) : "[]"));
+                    // Store raw value for now -- NO unit conversion until we
+                    // confirm from the diagnostic log what unit vCenter returns.
+                    hostMetrics[field] = avg;
                 }
 
                 if (intervalUsed === 20) {
