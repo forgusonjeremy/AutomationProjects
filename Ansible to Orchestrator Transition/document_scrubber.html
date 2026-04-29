@@ -236,7 +236,6 @@ body {
 
 .hidden { display: none !important; }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 <div class="app" id="app">
@@ -692,7 +691,6 @@ body {
     const withReplacements = findings.filter(f => f.replacement).length;
     const without = findings.length - withReplacements;
     const fileNames = Object.keys(files);
-    let renamedAny = false;
 
     if (typeof JSZip === 'undefined') {
       // Fallback: individual .txt downloads
@@ -707,51 +705,58 @@ body {
     }
 
     const zip = new JSZip();
-    const renames = [];
 
-    for (const fname of fileNames) {
-      const scrubbed = scrubContent(files[fname]);
-      let outName = scrubOutName(fname);
+      for (const fname of fileNames) {
+        const scrubbed = scrubContent(files[fname]);
+        let outName = scrubOutName(fname);
 
-      if (BLOCKED_EXTS.test(outName)) {
-        const safeName = outName + '_';
-        renames.push({ from: safeName, to: outName });
-        outName = safeName;
-        renamedAny = true;
+        if (BLOCKED_EXTS.test(outName)) {
+          outName = outName + '_';
+        }
+        zip.file(outName, scrubbed);
       }
-      zip.file(outName, scrubbed);
-    }
 
     // If any files were renamed, add a restore script and README
-    if (renamedAny) {
-      // PowerShell restore script
-      const ps1Lines = [
-        '# Run this in the extracted folder to restore original extensions',
-        '# Usage: Right-click > Run with PowerShell  (or run from a PS terminal)',
-        ''
-      ];
-      for (const r of renames) {
-        ps1Lines.push(`if (Test-Path '${r.from}') { Rename-Item '${r.from}' '${r.to}' -Force; Write-Host "Restored: ${r.to}" }`);
-      }
-      ps1Lines.push('', 'Write-Host "`nDone. Press Enter to close." -ForegroundColor Green', 'Read-Host');
-      // The restore script itself gets .txt extension so it's not blocked
-      zip.file('_restore_extensions.ps1.txt', ps1Lines.join('\r\n'));
-
-      // README
-      zip.file('_README.txt', [
-        'SCRUBBED FILES — EXTENSION NOTICE',
-        '═'.repeat(50),
-        '',
-        'Some file extensions were changed to bypass Edge SmartScreen:',
-        ...renames.map(r => `  ${r.from}  →  rename to  →  ${r.to}`),
-        '',
-        'To restore all extensions at once:',
-        '  1. Rename _restore_extensions.ps1.txt to _restore_extensions.ps1',
-        '  2. Right-click it > Run with PowerShell',
-        '',
-        'Or rename the files manually in File Explorer.',
-      ].join('\r\n'));
+    // Build full rename list: every file gets _scrubbed removed, and blocked
+    // extensions also get the trailing _ removed
+    const allRenames = [];
+    for (const fname of fileNames) {
+      let zipName = scrubOutName(fname);
+      if (BLOCKED_EXTS.test(zipName)) zipName = zipName + '_';
+      // Final name = original filename (no _scrubbed, no trailing _)
+      allRenames.push({ from: zipName, to: fname });
     }
+
+    // PowerShell restore script
+    const ps1Lines = [
+      '# Run this in the extracted folder to restore original file names',
+      '# Removes "_scrubbed" from names and restores neutralized extensions',
+      '# Usage: Rename this file to _restore_names.ps1, then right-click > Run with PowerShell',
+      ''
+    ];
+    for (const r of allRenames) {
+      if (r.from !== r.to) {
+        ps1Lines.push(`if (Test-Path '${r.from}') { Rename-Item '${r.from}' '${r.to}' -Force; Write-Host "Renamed: ${r.from} -> ${r.to}" }`);
+      }
+    }
+    ps1Lines.push('', 'Write-Host "`nDone. Press Enter to close." -ForegroundColor Green', 'Read-Host');
+    zip.file('_restore_names.ps1.txt', ps1Lines.join('\r\n'));
+
+    // README
+    const renameLines = allRenames.filter(r => r.from !== r.to);
+    zip.file('_README.txt', [
+      'SCRUBBED FILES — RENAME NOTICE',
+      '═'.repeat(50),
+      '',
+      'Files were renamed during export:',
+      ...renameLines.map(r => `  ${r.from}  →  ${r.to}`),
+      '',
+      'To restore all original names at once:',
+      '  1. Rename _restore_names.ps1.txt to _restore_names.ps1',
+      '  2. Right-click it > Run with PowerShell',
+      '',
+      'Or rename the files manually in File Explorer.',
+    ].join('\r\n'));
 
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
@@ -762,8 +767,9 @@ body {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
+    const renameCount = allRenames.filter(r => r.from !== r.to).length;
     let msg = `✅ ${fileNames.length} file(s) packaged into scrubbed_files.zip with ${withReplacements} replacement(s) applied.`;
-    if (renamedAny) msg += ` 📝 ${renames.length} file(s) had extensions neutralized for Edge — see _README.txt in the zip.`;
+    if (renameCount > 0) msg += ` 📝 ${renameCount} file(s) renamed — run _restore_names.ps1.txt to restore original names.`;
     if (without > 0) msg += ` ⚠️ ${without} finding(s) had no replacement and were left as-is.`;
     statusBar.innerHTML = `<div class="status-bar ${without > 0 ? 'warn' : ''}">${msg}</div>`;
   });
