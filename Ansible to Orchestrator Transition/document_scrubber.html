@@ -236,6 +236,7 @@ body {
 
 .hidden { display: none !important; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 <div class="app" id="app">
@@ -253,6 +254,7 @@ body {
     <div class="dropzone-icon">📂</div>
     <div class="dropzone-title">Drop any text files here or click to browse</div>
     <div class="dropzone-sub">.yml, .yaml, .ps1, .txt, .cfg, .conf, .ini, .json, .xml, .sh, .py, .js, .log, .md, .csv, .env — anything you can open in a text editor</div>
+    <div class="dropzone-sub" style="margin-top:4px;font-size:11px;color:var(--text-muted);">All processing happens locally in your browser — nothing is uploaded anywhere</div>
     <input type="file" id="fileInput" multiple>
   </div>
   <div class="file-tags" id="fileTags"></div>
@@ -294,7 +296,7 @@ body {
     </div>
 
     <div class="actions" style="margin-top:20px">
-      <button class="btn btn-green" id="downloadBtn">⬇ Download Scrubbed Files</button>
+      <button class="btn btn-green" id="downloadBtn">⬇ Download Scrubbed Files (.zip)</button>
       <button class="btn btn-secondary" id="previewBtn">👁 Preview Changes</button>
     </div>
 
@@ -681,22 +683,44 @@ body {
   }
 
   // ── Download ────────────────────────────────────────────────────────────
-  downloadBtn.addEventListener('click', () => {
+  // Package all scrubbed files into a single .zip to avoid Edge SmartScreen
+  // blocking individual .ps1 / .sh / .py downloads.
+  downloadBtn.addEventListener('click', async () => {
     const withReplacements = findings.filter(f => f.replacement).length;
     const without = findings.length - withReplacements;
-
     const fileNames = Object.keys(files);
-    for (const fname of fileNames) {
-      const scrubbed = scrubContent(files[fname]);
-      // Insert _scrubbed before the last extension, or append if no extension
-      const dotIdx = fname.lastIndexOf('.');
-      const outName = dotIdx > 0
-        ? fname.slice(0, dotIdx) + '_scrubbed' + fname.slice(dotIdx)
-        : fname + '_scrubbed';
-      downloadFile(outName, scrubbed);
+
+    // If JSZip hasn't loaded yet, fall back to individual downloads
+    if (typeof JSZip === 'undefined') {
+      for (const fname of fileNames) {
+        const scrubbed = scrubContent(files[fname]);
+        const dotIdx = fname.lastIndexOf('.');
+        const outName = dotIdx > 0
+          ? fname.slice(0, dotIdx) + '_scrubbed' + fname.slice(dotIdx)
+          : fname + '_scrubbed';
+        downloadFile(outName, scrubbed);
+      }
+    } else {
+      const zip = new JSZip();
+      for (const fname of fileNames) {
+        const scrubbed = scrubContent(files[fname]);
+        const dotIdx = fname.lastIndexOf('.');
+        const outName = dotIdx > 0
+          ? fname.slice(0, dotIdx) + '_scrubbed' + fname.slice(dotIdx)
+          : fname + '_scrubbed';
+        zip.file(outName, scrubbed);
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'scrubbed_files.zip';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
-    let msg = `✅ ${fileNames.length} file(s) downloaded with ${withReplacements} replacement(s) applied.`;
+    let msg = `✅ ${fileNames.length} file(s) packaged into scrubbed_files.zip with ${withReplacements} replacement(s) applied.`;
     if (without > 0) msg += ` ⚠️ ${without} finding(s) had no replacement and were left as-is.`;
     statusBar.innerHTML = `<div class="status-bar ${without > 0 ? 'warn' : ''}">${msg}</div>`;
   });
