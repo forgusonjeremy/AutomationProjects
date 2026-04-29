@@ -1,0 +1,54 @@
+---
+- name: playbook to run powershell script remotely
+  hosts: all
+  become_method: runas
+  gather_facts: yes
+  connection: winrm
+  port: 5986
+
+  tasks:
+
+
+  - name: "Create temporary directory"
+    ansible.windows.win_tempfile:
+      state: directory
+    register: tempdir
+
+  - name: Write DomainOUs JSON to file
+    ansible.windows.win_copy:
+      content: "{{ var_DomainOUs | to_json }}"
+      dest: "{{ tempdir.path }}\\domain_ous.json"
+      
+  - name: "Scipt Operations"
+    block:
+    - name: "Copy Scripts to Host"
+      ansible.windows.win_copy:
+        src: "files/{{var_ps_folder}}"
+        dest: "{{ tempdir.path }}"
+
+    - name: check if file exist
+      ansible.windows.win_stat:
+        path: "{{ tempdir.path }}\\{{var_ps_folder}}\\{{var_ps_script_file}}"
+      register: file_data
+
+    - name: Run PowerShell script
+      when: file_data.stat.exists == true
+      ansible.windows.win_command: >-
+        powershell.exe -ExecutionPolicy ByPass
+        -File "{{ tempdir.path }}\\{{var_ps_folder}}\\{{var_ps_script_file}}"
+        -Action "{{var_parameter_action}}"
+        -eMailReport "{{var_eMailReport}}"
+        -SMTPServer "{{var_SMTPServer}}"
+        -MailToString "{{var_MailToString}}"
+        -MailCcString "{{var_MailCcString}}"
+        -DomainOUsFile "{{ tempdir.path }}\\domain_ous.json"
+        -MailSubjectstring "{{var_MailSubjectstring}}"
+
+    - name: "List the debug folder content"
+      ansible.windows.win_shell: "ls -Recurse {{ tempdir.path }}\\{{var_ps_folder}}\\debug"
+
+    always:
+    - name: "Cleanup Temporary Files"
+      ansible.windows.win_file:
+        state: absent
+        path: "{{ tempdir.path }}"

@@ -1,0 +1,13 @@
+---
+- name: Playbook to discovery
+  hosts: "{{ _groups }}"
+  gather_facts: False
+  
+  tasks:
+  - name: show cdp
+    cisco.nxos.nxos_command:
+      commands: 'show cdp neighbor detail'
+
+  - name: show vpc
+    cisco.nxos.nxos_command:
+      commands: 'show vpc'

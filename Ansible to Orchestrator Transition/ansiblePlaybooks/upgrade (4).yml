@@ -1,0 +1,83 @@
+---
+- name: Playbook to upgrade Cat9kv 
+  hosts: "{{ _groups }}"
+  gather_facts: True
+  
+  tasks:
+
+  - name: Grab Current Time
+    ansible.builtin.setup:
+    delegate_to: localhost
+    run_once: true
+
+  - name: Set current Cat9kv version as variable
+    ansible.builtin.set_fact:
+      current_ios_ver: "{{ ansible_facts.net_version }}"
+
+  - name: Verify new_image
+      ansible.builtin.set_fact:
+        verify_image: "{{ new_image | split ('cat9k_iosxe.') | last | trim | split ('.SPA.bin') | first | trim }}"
+  
+  - debug:
+       msg: "New Image to upgrade {{ verify_image }}"
+
+  - name: Change boot system to load new image next reload
+    cisco.ios.ios_config:
+      lines: 
+       - "boot system bootflash:packages.conf"
+      before:
+       - 'no boot system'
+      save_when: always
+    when: current_ios_ver != verify_image
+
+  - name: Rename previous packages.conf file
+    cisco.ios.ios_command:
+      commands:
+        - command: rename bootflash:packages.conf packages.{{ansible_date_time.iso8601_basic_short}}
+          prompt: 
+          - 'Destination filename [packages.{{ansible_date_time.iso8601_basic_short}}]?'
+          answer:
+          - "\r"
+    when: current_ios_ver != verify_image
+
+  - name: Check if correct image still exist in bootflash, if not FAIL the playbook
+    cisco.ios.ios_command:
+      commands: 'dir bootflash: | include {{ new_image }}'
+    register: check_image
+    failed_when: check_image.stdout[0].find( new_image )  == -1
+    when: current_ios_ver != verify_image
+ 
+  - name: install new version with activate and commit
+    vars:
+      ansible_command_timeout: 1200
+    cisco.ios.ios_command:
+      commands: 
+        - command: install add file bootflash:{{ new_image }} activate commit
+          prompt: 
+          - 'This operation may require a reload of the system. Do you want to proceed\? \[y/n]'
+          answer: 
+          - 'y'
+    register: install_activate_output
+    when: current_ios_ver != verify_image
+   
+  - debug:
+      var: install_activate_output.stdout_lines
+    when: current_ios_ver != verify_image
+    
+  - name: Waiting for reboot
+    ansible.builtin.wait_for_connection:
+      delay: 60
+      timeout: 600
+    when: current_ios_ver != verify_image
+
+  - name: Check post upgrade version
+    cisco.ios.ios_facts:
+ 
+  - name: Assert that switch is running with the target NXOS version {{ verify_image }} After Upgrade
+    assert:
+        quiet: no
+        success_msg: "{{ inventory_hostname }} has been upgraded to {{ verify_image }}"
+        fail_msg: "Failed to upgrade the {{ inventory_hostname }}, it is still runninng {{ current_nxos_ver }}"
+        that:
+          - "'{{ ansible_facts.net_version }}' == '{{ verify_image }}'"
+  

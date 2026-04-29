@@ -1,0 +1,163 @@
+---
+- name: VMware vSphere 8.0 STIG ESXi Remediation
+  hosts: localhost
+  gather_facts: true
+  collections:
+    - community.vmware
+  vars:
+    # Connection parameters (from AAP survey)
+    vcenter_hostname: "{{ vcenter_server }}"
+    vcenter_username: "{{ vcenter_user }}"
+    vcenter_password: "{{ vcenter_pass }}"
+    
+    # Target configuration - simplified parsing
+    target_hostname_list: "{{ target_hostname.split(',') | map('trim') | list if target_hostname is defined and target_hostname | length > 0 else [] }}"
+    target_cluster: "{{ target_cluster | default('') }}"
+    
+    # Infrastructure settings
+    syslog_server: "{{ syslog_host | default('') }}"
+    ntp_servers: "{{ ntp_server_list | default([]) }}"
+    esx_admin_group: "{{ esxi_admin_group | default('root') }}"
+    
+  tasks:
+  - name: Parameter validation
+    block:
+      - name: Validate required parameters
+        ansible.builtin.assert:
+          that:
+            - vcenter_hostname is defined and vcenter_hostname | length > 0
+            - vcenter_username is defined and vcenter_username | length > 0
+            - vcenter_password is defined and vcenter_password | length > 0
+            - (target_hostname_list | length > 0) or (target_cluster | length > 0)
+          fail_msg: "Missing required parameters: vCenter details and target (hostname or cluster)"
+
+      - name: Load production STIG configuration
+        ansible.builtin.include_vars:
+          file: "config/production_stig_config.yml"
+        tags: [config]
+
+      - name: Verify STIG configuration is loaded
+        ansible.builtin.assert:
+          that:
+            - stig_config is defined
+            - security is defined
+            - logging is defined
+            - services is defined
+          fail_msg: "STIG configuration not loaded properly or missing required sections"
+        tags: [config]
+
+      - name: Debug target configuration
+        ansible.builtin.debug:
+          msg: 
+            - "Target hostnames: {{ target_hostname_list }}"
+            - "Target cluster: {{ target_cluster }}"
+
+    rescue:
+      - name: Handle parameter validation or connectivity failure
+        ansible.builtin.fail:
+          msg: "Pre-flight validation failed. Please verify required parameters and vCenter connectivity."
+
+  - name: vCenter connectivity validation
+    block:
+      - name: vCenter connectivity check
+        community.vmware.vmware_about_info:
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_username }}"
+          password: "{{ vcenter_password }}"
+          validate_certs: false
+        register: vcenter_info
+
+    rescue:
+      - name: vCenter connectivityfailures
+        ansible.builtin.debug:
+          msg: "vCenter connectivity validation failed. Stopping execution to prevent proceeding with incomplete configuration."
+      
+      - name: Fail the playbook
+        ansible.builtin.fail:
+          msg: "Pre-requisite validation failed. Cannot proceed with STIG remediation."
+
+  - name: Get ESXi host list and Validation
+    block:        
+      - name: Get target ESXi hosts by CLUSTER
+        community.vmware.vmware_host_config_info:
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_username }}"
+          password: "{{ vcenter_password }}"
+          validate_certs: false
+          cluster_name: "{{ target_cluster }}"
+        register: esxi_hosts_info
+        when: 
+          - target_hostname_list | length == 0
+          - target_cluster | length > 0
+
+      - name: Extract cluster hostnames
+        ansible.builtin.set_fact:
+          esxi_hosts: "{{ esxi_hosts_info.hosts_info.keys() | list }}"
+        when:
+          - target_hostname_list | length == 0
+          - esxi_hosts_info is defined
+
+      - name: Get target ESXi hosts by input list
+        community.vmware.vmware_host_config_info:
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_username }}"
+          password: "{{ vcenter_password }}"
+          validate_certs: false
+          esxi_hostname: "{{ item }}"
+        loop: "{{ target_hostname_list }}"
+        register: esxi_hosts_info
+        when: target_hostname_list | length > 0
+
+      - name: Extract ESXi hostnames from results
+        ansible.builtin.set_fact:
+          esxi_hosts: "{{ esxi_hosts_info.results | map(attribute='hosts_info') | map('dict2items') | flatten | map(attribute='key') | list }}"
+        when:
+          - target_hostname_list | length > 0
+          - esxi_hosts_info is defined
+          - esxi_hosts_info.results is defined
+
+      - name: Display discovered hosts
+        ansible.builtin.debug:
+          msg: "Found {{ esxi_hosts | length }} ESXi host(s): {{ esxi_hosts | join(', ') }}"
+
+      - name: Display job configuration
+        ansible.builtin.debug:
+          msg:
+            - "=== VMware vSphere 8.0 STIG Remediation ==="
+            - "vCenter: {{ vcenter_hostname }}"
+            - "Target Host: {{ target_hostname | default('N/A') }}"
+            - "Target Cluster: {{ target_cluster | default('N/A') }}"
+            - "Syslog: {{ syslog_server | default('Not configured') }}"
+            - "NTP: {{ ntp_servers | join(', ') if ntp_servers | length > 0 else 'Not configured' }}"
+
+    rescue:
+      - name: Handle setup and validation failures
+        ansible.builtin.debug:
+          msg: "Setup and validation failed. Stopping execution to prevent proceeding with incomplete configuration."
+      
+      - name: Fail the playbook
+        ansible.builtin.fail:
+          msg: "Pre-requisite validation failed. Cannot proceed with STIG remediation."
+
+  - name: Execute STIG remediation
+    block:
+        
+      - name: Run STIG security remediation
+        ansible.builtin.include_role:
+          name: vsphere_stig_security
+        tags: [security]
+        
+      - name: Run STIG logging remediation
+        ansible.builtin.include_role:
+          name: vsphere_stig_logging
+        tags: [logging]
+        
+      - name: Run STIG services remediation
+        ansible.builtin.include_role:
+          name: vsphere_stig_services
+        tags: [services]
+        
+      - name: Generate compliance report
+        ansible.builtin.include_role:
+          name: vsphere_stig_reporting
+        tags: [reporting]

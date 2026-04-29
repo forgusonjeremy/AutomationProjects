@@ -1,0 +1,31 @@
+---
+- name: Compare Cisco Configs in Gitea in Branches to Running Routers
+  hosts: "{{ _group }}"
+  gather_facts: False
+
+  tasks:
+    - name: Retrieve a repository from a distant location and make it available to the local EE
+      ansible.scm.git_retrieve:
+        origin:
+          url: "https://{{ username }}:{{ token }}@{{ git_url }}"
+        parent_directory: /tmp/
+        branch:
+            name: "{{branch_name}}"
+            duplicate_detection: no  
+      delegate_to: "localhost"
+      run_once: true
+
+    - name: "Diff against nexus9k ios configuration"
+      cisco.nxos.nxos_config:
+        intended_config: "{{ lookup('file', '/tmp/{{gitlab_project}}/network_backup_files/{{ inventory_hostname }}.txt') }}"
+        diff_against: intended
+      when: inventory_hostname in groups['n9kv']
+
+    # - name: "Diff against cat9k ios configuration"
+    #   cisco.ios.ios_config:
+    #     intended_config: "{{ lookup('file', '/tmp/{{gitlab_project}}/network_backup_files/{{ inventory_hostname }}.txt') }}"
+    #     diff_against: intended
+    #   when: inventory_hostname in groups['cat9k']
+
+
+    
