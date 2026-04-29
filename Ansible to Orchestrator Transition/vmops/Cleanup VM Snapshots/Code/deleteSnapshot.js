@@ -210,6 +210,57 @@ try {
         return JSON.stringify(result);
     }
 
+    // ── Verify snapshot is actually gone from VM snapshot tree ────────────────
+    // vCenter may report task success before the snapshot entry is fully
+    // removed from the inventory tree (e.g. when consolidation is deferred
+    // or the snapshot is protected by a Content Library lock on a sibling).
+    // Poll the snapshot tree for up to 60s to confirm removal.
+    var verifyMs      = 0;
+    var verifyLimit   = 60000;
+    var verifySleep   = 5000;
+    var snapGone      = false;
+
+    while (verifyMs < verifyLimit) {
+        System.sleep(verifySleep);
+        verifyMs += verifySleep;
+        try {
+            var vmVerify = findVmById(vcenterSdkConnection.rootFolder, vmMoRef);
+            if (!vmVerify || !vmVerify.snapshot || !vmVerify.snapshot.rootSnapshotList) {
+                // No snapshots at all on the VM -- definitely gone
+                snapGone = true;
+                break;
+            }
+            var stillPresent = findSnapshot(vmVerify.snapshot.rootSnapshotList, snapshotMoRef);
+            // Also check by name+time in case MoRef was reassigned
+            if (!stillPresent && snapshotName && snapshotCreatedMs) {
+                stillPresent = findSnapshotByNameAndTime(
+                    vmVerify.snapshot.rootSnapshotList, snapshotName, snapshotCreatedMs);
+            }
+            if (!stillPresent) {
+                snapGone = true;
+                break;
+            }
+            System.log("deleteSnapshot: task reported success but snapshot still present " +
+                       "on " + vmName + " -- waiting for vCenter to complete removal " +
+                       "(" + verifyMs/1000 + "s elapsed)");
+        } catch (ve) {
+            System.warn("deleteSnapshot: post-success verification error: " + ve.message);
+            snapGone = true;  // assume gone if we can't check
+            break;
+        }
+    }
+
+    if (!snapGone) {
+        result.error      = "vCenter task reported success but snapshot '" + snapshotName +
+                            "' is still present on VM " + vmName + " after " +
+                            verifyLimit/1000 + "s. The snapshot may be locked by " +
+                            "another operation (e.g. Content Library consolidation).";
+        result.success    = false;
+        result.durationMs = new Date().getTime() - startMs;
+        System.error("deleteSnapshot: " + result.error);
+        return JSON.stringify(result);
+    }
+
     // ── Sample post-deletion I/O metrics ─────────────────────────────────────
     System.sleep(10000);
     var postMetrics = [];
