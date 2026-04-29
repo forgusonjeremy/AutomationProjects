@@ -175,16 +175,19 @@ function Build-LaunchCommand {
     $bytes      = [System.Text.Encoding]::UTF8.GetBytes($WrapperContent)
     $b64        = [Convert]::ToBase64String($bytes)
 
-    # Remote command: decode base64 back to a file, then nohup it
+    # Remote command: decode base64 back to a file, then nohup it.
+    # Lines joined with newline not semicolon - nohup ... & cannot be
+    # followed by ; as & already terminates the statement in bash.
     $lines = @(
         "echo '$b64' | base64 -d > `${HOME}/.snapshot_io_wrapper.sh",
         "chmod +x `${HOME}/.snapshot_io_wrapper.sh",
         "rm -f `${HOME}/.snapshot_io.done",
         "nohup `${HOME}/.snapshot_io_wrapper.sh > `${HOME}/.snapshot_io_nohup.out 2>&1 &",
-        "echo `$! > `${HOME}/.snapshot_io_launcher.pid",
-        "echo `"[LAUNCHED] nohup PID `$!`""
+        "LAUNCHER_PID=`$!",
+        "echo `$LAUNCHER_PID > `${HOME}/.snapshot_io_launcher.pid",
+        "echo `"[LAUNCHED] nohup PID `$LAUNCHER_PID`""
     )
-    return ($lines -join "; ")
+    return ($lines -join "`n")
 }
 
 $wrapperContent = Build-WrapperScript `
