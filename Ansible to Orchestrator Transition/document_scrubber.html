@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Document Scrubber</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f1117;
+  --surface: #181a23;
+  --surface-2: #1e2130;
+  --surface-3: #252838;
+  --border: #2d3148;
+  --border-focus: #5b6abf;
+  --text: #e2e4ed;
+  --text-dim: #8b8fa4;
+  --text-muted: #5e627a;
+  --accent: #7c8aff;
+  --accent-dim: #5b6abf;
+  --red: #ff6b7a;
+  --red-dim: #3d1f25;
+  --orange: #ffb06b;
+  --orange-dim: #3d2e1f;
+  --green: #6bffb0;
+  --green-dim: #1f3d2e;
+  --yellow: #ffe06b;
+  --yellow-dim: #3d381f;
+  --cyan: #6be0ff;
+  --cyan-dim: #1f333d;
+  --purple: #b06bff;
+  --purple-dim: #2e1f3d;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.header-icon {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: var(--radius);
+  display: grid; place-items: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.header h1 {
+  font-size: 22px; font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.header p { color: var(--text-dim); font-size: 14px; margin-top: 2px; }
+
+/* Drop zone */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: var(--surface);
+}
+.dropzone:hover, .dropzone.drag-over {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.dropzone-icon { font-size: 36px; margin-bottom: 12px; }
+.dropzone-title { font-size: 16px; font-weight: 600; }
+.dropzone-sub { font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+.dropzone input { display: none; }
+
+/* File tags */
+.file-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.file-tag {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 10px;
+  font-size: 13px; font-family: 'JetBrains Mono', monospace;
+}
+.file-tag .remove {
+  cursor: pointer; color: var(--text-muted);
+  font-size: 16px; line-height: 1;
+}
+.file-tag .remove:hover { color: var(--red); }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border-radius: var(--radius);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  border: none; cursor: pointer; transition: all 0.15s;
+}
+.btn-primary {
+  background: var(--accent); color: #fff;
+}
+.btn-primary:hover { background: var(--accent-dim); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--surface-3); border-color: var(--accent-dim); }
+.btn-green { background: var(--green); color: #111; }
+.btn-green:hover { opacity: 0.85; }
+
+.actions { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+
+/* Report */
+.report { margin-top: 32px; }
+.report-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.report-header h2 { font-size: 18px; font-weight: 700; }
+.stat-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.stat-pill {
+  font-size: 12px; font-weight: 600; padding: 4px 10px;
+  border-radius: 20px; font-family: 'JetBrains Mono', monospace;
+}
+.pill-ip { background: var(--cyan-dim); color: var(--cyan); }
+.pill-fqdn { background: var(--orange-dim); color: var(--orange); }
+.pill-email { background: var(--purple-dim); color: var(--purple); }
+.pill-password { background: var(--red-dim); color: var(--red); }
+.pill-hostname { background: var(--yellow-dim); color: var(--yellow); }
+
+/* Table */
+.findings-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px;
+}
+.findings-table th {
+  text-align: left; padding: 10px 12px;
+  background: var(--surface-2); color: var(--text-dim);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 1;
+}
+.findings-table td {
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.findings-table tr:hover td { background: var(--surface-2); }
+.type-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.type-badge.ip { background: var(--cyan-dim); color: var(--cyan); }
+.type-badge.fqdn { background: var(--orange-dim); color: var(--orange); }
+.type-badge.email { background: var(--purple-dim); color: var(--purple); }
+.type-badge.password { background: var(--red-dim); color: var(--red); }
+.type-badge.hostname { background: var(--yellow-dim); color: var(--yellow); }
+
+.val-cell {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  word-break: break-all;
+}
+.occurrences {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-dim); font-size: 12px;
+}
+.file-list {
+  font-size: 11px; color: var(--text-muted); max-width: 180px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.replacement-input {
+  width: 100%; padding: 6px 8px;
+  background: var(--surface-3); border: 1px solid var(--border);
+  border-radius: 5px; color: var(--text);
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  outline: none; transition: border-color 0.15s;
+}
+.replacement-input:focus { border-color: var(--accent); }
+.replacement-input::placeholder { color: var(--text-muted); }
+
+/* Table wrapper for scroll */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: auto; max-height: 520px;
+}
+
+/* Status bar */
+.status-bar {
+  margin-top: 24px; padding: 14px 16px;
+  background: var(--green-dim); border: 1px solid #2a5e40;
+  border-radius: var(--radius); font-size: 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.status-bar.warn {
+  background: var(--orange-dim); border-color: #5e4a2a;
+}
+
+/* YAML key context */
+.yaml-key {
+  color: var(--text-muted); font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Filter bar */
+.filter-bar {
+  display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;
+}
+.filter-btn {
+  font-size: 12px; font-weight: 600; padding: 5px 12px;
+  border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-dim);
+  cursor: pointer; transition: all 0.15s;
+  font-family: inherit;
+}
+.filter-btn:hover { border-color: var(--accent-dim); color: var(--text); }
+.filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="header">
+    <div class="header-icon">🔒</div>
+    <div>
+      <h1>Interactive Document Scrubber</h1>
+      <p>Scan YAML files for sensitive data — review findings — provide replacements — download scrubbed files</p>
+    </div>
+  </div>
+
+  <!-- Step 1: Drop files -->
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">📂</div>
+    <div class="dropzone-title">Drop .yml / .yaml files here or click to browse</div>
+    <div class="dropzone-sub">All processing happens locally in your browser — nothing is uploaded anywhere</div>
+    <input type="file" id="fileInput" accept=".yml,.yaml" multiple>
+  </div>
+  <div class="file-tags" id="fileTags"></div>
+  <div class="actions" id="scanActions">
+    <button class="btn btn-primary" id="scanBtn" disabled>🔍 Scan for Sensitive Data</button>
+    <button class="btn btn-secondary" id="clearBtn" style="display:none">✕ Clear All</button>
+  </div>
+
+  <!-- Step 2: Report -->
+  <div class="report hidden" id="report">
+    <div class="report-header">
+      <h2>Scan Results</h2>
+      <div class="stat-pills" id="statPills"></div>
+    </div>
+
+    <div class="filter-bar" id="filterBar">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="ip">IPs</button>
+      <button class="filter-btn" data-filter="fqdn">FQDNs</button>
+      <button class="filter-btn" data-filter="hostname">Hostnames</button>
+      <button class="filter-btn" data-filter="email">Emails</button>
+      <button class="filter-btn" data-filter="password">Passwords</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="findings-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Detected Value</th>
+            <th>YAML Key</th>
+            <th>Files</th>
+            <th style="text-align:center">#</th>
+            <th style="min-width:200px">Replacement</th>
+          </tr>
+        </thead>
+        <tbody id="findingsBody"></tbody>
+      </table>
+    </div>
+
+    <div class="actions" style="margin-top:20px">
+      <button class="btn btn-green" id="downloadBtn">⬇ Download Scrubbed Files</button>
+      <button class="btn btn-secondary" id="previewBtn">👁 Preview Changes</button>
+    </div>
+
+    <div id="statusBar"></div>
+  </div>
+
+  <!-- Preview modal -->
+  <div id="previewOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:100%;max-width:900px;max-height:90vh;display:flex;flex-direction:column;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="font-size:16px;font-weight:700;">Preview — Scrubbed Output</h3>
+        <button class="btn btn-secondary" id="closePreview" style="padding:6px 14px;">✕ Close</button>
+      </div>
+      <div style="padding:20px;overflow:auto;flex:1;">
+        <select id="previewFileSelect" style="width:100%;padding:8px 10px;background:var(--surface-3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;margin-bottom:16px;"></select>
+        <pre id="previewContent" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;overflow:auto;white-space:pre-wrap;word-break:break-all;color:var(--text);max-height:55vh;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // State
+  let files = {};       // filename -> content string
+  let findings = [];     // { id, type, value, yamlKeys[], files[], count, replacement }
+  let activeFilter = 'all';
+
+  // DOM refs
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileTags = document.getElementById('fileTags');
+  const scanBtn = document.getElementById('scanBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const report = document.getElementById('report');
+  const statPills = document.getElementById('statPills');
+  const findingsBody = document.getElementById('findingsBody');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const previewBtn = document.getElementById('previewBtn');
+  const statusBar = document.getElementById('statusBar');
+  const previewOverlay = document.getElementById('previewOverlay');
+  const previewFileSelect = document.getElementById('previewFileSelect');
+  const previewContent = document.getElementById('previewContent');
+  const closePreview = document.getElementById('closePreview');
+  const filterBar = document.getElementById('filterBar');
+
+  // ── Regex patterns ──────────────────────────────────────────────────────
+  const patterns = {
+    ip:       /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\/\d{1,2})?\b/g,
+    email:    /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g,
+    fqdn:     /\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.){2,}[a-zA-Z]{2,}\b/g,
+  };
+
+  // Password-like YAML keys (case-insensitive)
+  const passwordKeys = /(?:password|passwd|secret|token|api_key|apikey|private_key|credential|auth|psk|passphrase)/i;
+  // Hostname-like YAML keys
+  const hostnameKeys = /(?:hostname|host_name|host|server|node|endpoint|target|fqdn|address|dns_name|server_name|inventory_hostname)/i;
+
+  // Values to ignore (common non-sensitive patterns)
+  const ignoreValues = new Set([
+    '0.0.0.0', '127.0.0.1', '255.255.255.0', '255.255.255.255',
+    'localhost', 'example.com', 'example.org',
+  ]);
+  const ignorePatterns = [
+    /^0\.0\.0\.0/, /^127\./, /^169\.254\./,
+    /\.example\.com$/, /\.example\.org$/, /\.test$/, /\.local$/,
+  ];
+
+  function shouldIgnore(val) {
+    if (ignoreValues.has(val)) return true;
+    return false; // keep .local and all others — user decides
+  }
+
+  // ── File handling ───────────────────────────────────────────────────────
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => addFiles(e.target.files));
+
+  dropzone.addEventListener('dragover', e => {
+    e.preventDefault(); dropzone.classList.add('drag-over');
+  });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault(); dropzone.classList.remove('drag-over');
+    addFiles(e.dataTransfer.files);
+  });
+
+  function addFiles(fileList) {
+    for (const f of fileList) {
+      if (!f.name.match(/\.ya?ml$/i)) continue;
+      const reader = new FileReader();
+      reader.onload = () => {
+        files[f.name] = reader.result;
+        renderTags();
+      };
+      reader.readAsText(f);
+    }
+  }
+
+  function renderTags() {
+    const names = Object.keys(files);
+    fileTags.innerHTML = names.map(n =>
+      `<div class="file-tag"><span>📄 ${n}</span><span class="remove" data-name="${n}">&times;</span></div>`
+    ).join('');
+    fileTags.querySelectorAll('.remove').forEach(el => {
+      el.addEventListener('click', () => {
+        delete files[el.dataset.name];
+        renderTags();
+      });
+    });
+    scanBtn.disabled = names.length === 0;
+    clearBtn.style.display = names.length > 0 ? '' : 'none';
+  }
+
+  clearBtn.addEventListener('click', () => {
+    files = {}; findings = [];
+    renderTags();
+    report.classList.add('hidden');
+    statusBar.innerHTML = '';
+  });
+
+  // ── Scan logic ──────────────────────────────────────────────────────────
+  scanBtn.addEventListener('click', () => {
+    findings = [];
+    const map = {}; // key = type+value -> finding object
+
+    for (const [fname, content] of Object.entries(files)) {
+      const lines = content.split(/\r?\n/);
+
+      for (let li = 0; li < lines.length; li++) {
+        const line = lines[li];
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+
+        // Extract YAML key if present
+        const keyMatch = trimmed.match(/^([A-Za-z0-9_.\-/]+)\s*:/);
+        const yamlKey = keyMatch ? keyMatch[1] : '';
+
+        // Value portion (after colon, or entire line if no colon)
+        const valuePart = keyMatch ? trimmed.slice(keyMatch[0].length).trim() : trimmed;
+
+        // ── Password detection (key-based) ────────────────────────────
+        if (yamlKey && passwordKeys.test(yamlKey) && valuePart && valuePart !== '""' && valuePart !== "''" && valuePart !== 'null' && valuePart !== '~') {
+          let val = valuePart.replace(/^['"]|['"]$/g, '');
+          // Skip Jinja2 / variable references
+          if (val.startsWith('{{') || val.startsWith('${') || val.startsWith('!vault')) continue;
+          if (val.length < 2) continue;
+          addFinding(map, 'password', val, yamlKey, fname);
+        }
+
+        // ── Hostname detection (key-based) ────────────────────────────
+        if (yamlKey && hostnameKeys.test(yamlKey) && valuePart) {
+          let val = valuePart.replace(/^['"]|['"]$/g, '').trim();
+          if (val && !val.startsWith('{{') && !val.startsWith('${') && val !== 'null' && val !== '~' && val.length > 1) {
+            // Only if it looks like a hostname (not an IP, not already caught as FQDN/email)
+            if (!val.match(patterns.ip) && !val.match(patterns.email) && !val.includes(' ')) {
+              // If it has dots, it's an FQDN — still record as hostname since the key tells us intent
+              addFinding(map, 'hostname', val, yamlKey, fname);
+            }
+          }
+        }
+
+        // ── Regex-based detection ─────────────────────────────────────
+        // IPs
+        let m;
+        const ipRe = new RegExp(patterns.ip.source, 'g');
+        while ((m = ipRe.exec(valuePart)) !== null) {
+          if (!shouldIgnore(m[0])) addFinding(map, 'ip', m[0], yamlKey, fname);
+        }
+        // Emails
+        const emailRe = new RegExp(patterns.email.source, 'g');
+        while ((m = emailRe.exec(valuePart)) !== null) {
+          if (!shouldIgnore(m[0])) addFinding(map, 'email', m[0], yamlKey, fname);
+        }
+        // FQDNs
+        const fqdnRe = new RegExp(patterns.fqdn.source, 'g');
+        while ((m = fqdnRe.exec(valuePart)) !== null) {
+          const v = m[0];
+          // Skip if already caught as email domain
+          if (valuePart.includes('@' + v)) continue;
+          // Skip common non-sensitive domains
+          if (shouldIgnore(v)) continue;
+          // Skip if same value already caught as hostname from key detection
+          const hKey = 'hostname|' + v;
+          if (map[hKey]) continue;
+          addFinding(map, 'fqdn', v, yamlKey, fname);
+        }
+      }
+    }
+
+    findings = Object.values(map);
+    findings.sort((a, b) => {
+      const order = { password: 0, ip: 1, fqdn: 2, hostname: 3, email: 4 };
+      return (order[a.type] ?? 9) - (order[b.type] ?? 9) || a.value.localeCompare(b.value);
+    });
+
+    renderReport();
+  });
+
+  function addFinding(map, type, value, yamlKey, fname) {
+    const key = type + '|' + value;
+    if (!map[key]) {
+      map[key] = { id: key, type, value, yamlKeys: new Set(), files: new Set(), count: 0, replacement: '' };
+    }
+    map[key].count++;
+    if (yamlKey) map[key].yamlKeys.add(yamlKey);
+    map[key].files.add(fname);
+  }
+
+  // ── Render report ───────────────────────────────────────────────────────
+  function renderReport() {
+    report.classList.remove('hidden');
+
+    // Stats
+    const counts = {};
+    findings.forEach(f => { counts[f.type] = (counts[f.type] || 0) + 1; });
+    const pillMap = {
+      ip: ['pill-ip', 'IPs'],
+      fqdn: ['pill-fqdn', 'FQDNs'],
+      hostname: ['pill-hostname', 'Hostnames'],
+      email: ['pill-email', 'Emails'],
+      password: ['pill-password', 'Passwords'],
+    };
+    statPills.innerHTML = Object.entries(counts)
+      .map(([t, c]) => `<span class="stat-pill ${pillMap[t]?.[0] || ''}">${c} ${pillMap[t]?.[1] || t}</span>`)
+      .join('');
+
+    renderFindings();
+  }
+
+  function renderFindings() {
+    const filtered = activeFilter === 'all' ? findings : findings.filter(f => f.type === activeFilter);
+
+    findingsBody.innerHTML = filtered.map(f => {
+      const yamlKeysArr = [...f.yamlKeys];
+      const filesArr = [...f.files];
+      const masked = f.type === 'password' ? maskValue(f.value) : escHtml(f.value);
+
+      return `<tr data-type="${f.type}">
+        <td><span class="type-badge ${f.type}">${f.type.toUpperCase()}</span></td>
+        <td class="val-cell">${masked}</td>
+        <td class="yaml-key">${yamlKeysArr.map(escHtml).join(', ') || '—'}</td>
+        <td class="file-list" title="${filesArr.join(', ')}">${filesArr.join(', ')}</td>
+        <td class="occurrences" style="text-align:center">${f.count}</td>
+        <td><input class="replacement-input" data-id="${f.id}"
+              placeholder="${f.type === 'password' ? '********' : 'replacement value'}"
+              value="${escAttr(f.replacement)}" spellcheck="false"></td>
+      </tr>`;
+    }).join('');
+
+    // Bind inputs
+    findingsBody.querySelectorAll('.replacement-input').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const f = findings.find(x => x.id === e.target.dataset.id);
+        if (f) f.replacement = e.target.value;
+      });
+    });
+  }
+
+  // Filter buttons
+  filterBar.addEventListener('click', e => {
+    if (!e.target.classList.contains('filter-btn')) return;
+    filterBar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    activeFilter = e.target.dataset.filter;
+    renderFindings();
+  });
+
+  // ── Scrub engine ────────────────────────────────────────────────────────
+  function scrubContent(content) {
+    let result = content;
+    // Sort by value length descending to avoid partial replacements
+    const sorted = [...findings].filter(f => f.replacement).sort((a, b) => b.value.length - a.value.length);
+    for (const f of sorted) {
+      // Escape special regex chars in the value
+      const escaped = f.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      result = result.replace(new RegExp(escaped, 'g'), f.replacement);
+    }
+    return result;
+  }
+
+  // ── Preview ─────────────────────────────────────────────────────────────
+  previewBtn.addEventListener('click', () => {
+    previewOverlay.classList.remove('hidden');
+    previewFileSelect.innerHTML = Object.keys(files).map(n =>
+      `<option value="${n}">${n}</option>`
+    ).join('');
+    renderPreview();
+  });
+
+  previewFileSelect.addEventListener('change', renderPreview);
+  closePreview.addEventListener('click', () => previewOverlay.classList.add('hidden'));
+  previewOverlay.addEventListener('click', e => {
+    if (e.target === previewOverlay) previewOverlay.classList.add('hidden');
+  });
+
+  function renderPreview() {
+    const fname = previewFileSelect.value;
+    if (!fname || !files[fname]) return;
+    const scrubbed = scrubContent(files[fname]);
+    previewContent.textContent = scrubbed;
+  }
+
+  // ── Download ────────────────────────────────────────────────────────────
+  downloadBtn.addEventListener('click', () => {
+    const withReplacements = findings.filter(f => f.replacement).length;
+    const without = findings.length - withReplacements;
+
+    const fileNames = Object.keys(files);
+    if (fileNames.length === 1) {
+      // Single file — direct download
+      const fname = fileNames[0];
+      const scrubbed = scrubContent(files[fname]);
+      downloadFile(fname.replace(/\.(ya?ml)$/i, '_scrubbed.$1'), scrubbed);
+    } else {
+      // Multiple files — download each with _scrubbed suffix
+      for (const fname of fileNames) {
+        const scrubbed = scrubContent(files[fname]);
+        downloadFile(fname.replace(/\.(ya?ml)$/i, '_scrubbed.$1'), scrubbed);
+      }
+    }
+
+    let msg = `✅ ${fileNames.length} file(s) downloaded with ${withReplacements} replacement(s) applied.`;
+    if (without > 0) msg += ` ⚠️ ${without} finding(s) had no replacement and were left as-is.`;
+    statusBar.innerHTML = `<div class="status-bar ${without > 0 ? 'warn' : ''}">${msg}</div>`;
+  });
+
+  function downloadFile(name, content) {
+    const blob = new Blob([content], { type: 'text/yaml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escAttr(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  }
+  function maskValue(s) {
+    if (s.length <= 4) return '●'.repeat(s.length);
+    return escHtml(s.slice(0, 2)) + '●'.repeat(Math.min(s.length - 4, 12)) + escHtml(s.slice(-2));
+  }
+})();
+</script>
+</body>
+</html>
