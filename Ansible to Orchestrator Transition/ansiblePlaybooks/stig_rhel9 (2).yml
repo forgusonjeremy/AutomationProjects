@@ -1,7 +1,0 @@
-- hosts: all
-  gather_facts: no
-
-  tasks:
-  - name: import role
-    include_role:
-      name: "{{ var_role }}"
