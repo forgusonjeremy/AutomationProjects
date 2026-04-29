@@ -17,7 +17,7 @@ var LOG = {
 
 var all = JSON.parse(allCandidatesJson || "[]");
 
-// ── Group by VM ───────────────────────────────────────────────────────────────
+// -- Group by VM ---------------------------------------------------------------
 var vmGroups = {};
 var vmOrder  = [];
 for (var i = 0; i < all.length; i++) {
@@ -30,7 +30,7 @@ for (var i = 0; i < all.length; i++) {
     vmGroups[key].push(c);
 }
 
-// ── Sort each VM's snapshots newest-first ─────────────────────────────────────
+// -- Sort each VM's snapshots newest-first -------------------------------------
 // Smallest snapshotCreatedMs = oldest; largest = newest.
 // We want newest first so sort descending by createdMs.
 var sorted = [];
@@ -44,7 +44,7 @@ for (var vi = 0; vi < vmOrder.length; vi++) {
     }
 }
 
-// ── Split lanes ───────────────────────────────────────────────────────────────
+// -- Split lanes ---------------------------------------------------------------
 var on  = sorted.filter(function(c) { return c.vmPowerState !== "poweredOff"; });
 var off = sorted.filter(function(c) { return c.vmPowerState === "poweredOff";  });
 

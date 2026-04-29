@@ -1,7 +1,7 @@
 /**
- * ─────────────────────────────────────────────────────────────────────────────
+ * -----------------------------------------------------------------------------
  * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE)
- * ─────────────────────────────────────────────────────────────────────────────
+ * -----------------------------------------------------------------------------
  * Processes snapshots on powered-on and suspended VMs. For each candidate:
  *   1. Starts with a single concurrent task, ramping up as storage permits.
  *   2. Enforces one active task per VM at a time (hard constraint).
@@ -17,14 +17,14 @@
  * MoRefs are stored at scan time -- all resolution happens at deletion time
  * inside _deleteSnapshot against the live vCenter inventory.
  *
- * ── EXTERNALLY PROVIDED VALUES ────────────────────────────────────────────────
+ * -- EXTERNALLY PROVIDED VALUES ------------------------------------------------
  * All values below are injected by vRO at runtime from workflow inputs,
  * workflow attributes, or workflow-level variable bindings. None are declared
  * as JavaScript variables in this script -- vRO makes them available
  * automatically in the script execution context.
  *
  *   Name                     vRO Type   Source
- *   ──────────────────────────────────────────────────────────────────────────
+ *   --------------------------------------------------------------------------
  *   WORKFLOW INPUTS (set by the operator when running the workflow):
  *
  *   dryRun                   boolean    Workflow Input
@@ -79,9 +79,9 @@
  *                                       the vRO Designer -- it is never assigned
  *                                       in script.
  *
- * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ * -- OUTPUTS ------------------------------------------------------------------
  *   Name                vRO Type  Description
- *   ──────────────────────────────────────────────────────────────────────────
+ *   --------------------------------------------------------------------------
  *   datastoreStateJson  string    JSON object keyed by datastore MoRef. Holds
  *                                 lastPre and lastPost metric snapshots from the
  *                                 most recent deletion on each datastore. Passed
@@ -131,7 +131,7 @@ if (onCands.length === 0) {
         }
         LOG.ok("PROCESSING","Processing " + queue.length + " powered-on snapshot(s) on " + vcKey);
 
-        // ── Adaptive dispatch ─────────────────────────────────────────────
+        // -- Adaptive dispatch ---------------------------------------------
         //
         // RULES (from spec):
         //   1. Only 1 snapshot cleanup per VM at a time (hard constraint, always).
@@ -140,14 +140,14 @@ if (onCands.length === 0) {
         //      baseline (pre-dispatch) and current (post-dispatch) datastore
         //      performance on the datastores the next candidate uses.
         //   4. If projected latency (current + observed delta) will stay within
-        //      threshold → ramp up by 1 and dispatch.
-        //   5. If projected latency would exceed threshold → hold until a slot
+        //      threshold -> ramp up by 1 and dispatch.
+        //   5. If projected latency would exceed threshold -> hold until a slot
         //      completes, then re-evaluate.
         //   6. Cap at maxParallel concurrent tasks.
         //
         // inFlightSlots:  active tokens { token, cand, label, startMs, vmMoRef }
         // vmInFlight:     set of vmMoRef values currently being processed
-        // currentConcurrency: current allowed concurrency level (ramps 1→maxParallel)
+        // currentConcurrency: current allowed concurrency level (ramps 1->maxParallel)
 
         var inFlightSlots      = [];
         var vmInFlight         = {};   // vmMoRef -> true if a task is active for that VM
@@ -184,7 +184,7 @@ if (onCands.length === 0) {
 
         while (pending.length > 0 || inFlightSlots.length > 0) {
 
-            // ── Harvest completed slots ───────────────────────────────────────
+            // -- Harvest completed slots ---------------------------------------
             var stillActive    = [];
             var completedCount = 0;
 
@@ -262,7 +262,7 @@ if (onCands.length === 0) {
             }
             inFlightSlots = stillActive;
 
-            // ── After harvest: ramp concurrency if storage permits ────────────
+            // -- After harvest: ramp concurrency if storage permits ------------
             // Only ramp when slots just completed (we have real post-delete
             // metrics to evaluate), queue still has work, and we're below max.
             if (completedCount > 0 &&
@@ -297,7 +297,7 @@ if (onCands.length === 0) {
                 }
             }
 
-            // ── Dispatch tasks up to currentConcurrency ───────────────────────
+            // -- Dispatch tasks up to currentConcurrency -----------------------
             // Hard constraints:
             //   - Total in-flight <= currentConcurrency
             //   - Never dispatch a second task for a VM already in-flight
@@ -402,7 +402,7 @@ if (onCands.length === 0) {
 datastoreStateJson = JSON.stringify(dsState);
 runLog = JSON.stringify(logArr);
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
     // Approve immediately if no datastores to check
@@ -427,7 +427,7 @@ function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
         var base = baseline[r];
         var baseAgg = (base && base.aggregate) ? base.aggregate : {};
 
-        // ── VMFS / NFS latency check ──────────────────────────────────────────
+        // -- VMFS / NFS latency check ------------------------------------------
         // maxWriteLatencyMs is the most sensitive signal -- write latency on
         // the busiest host. Fall back to avgWriteLatencyMs if max is null.
         var curW  = agg.maxWriteLatencyMs  !== null && agg.maxWriteLatencyMs  !== undefined
@@ -467,7 +467,7 @@ function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
             return false;
         }
 
-        // ── vSAN congestion check ─────────────────────────────────────────────
+        // -- vSAN congestion check ---------------------------------------------
         if (agg.maxVsanCongestion !== null && agg.maxVsanCongestion !== undefined) {
             var curCong  = agg.maxVsanCongestion  || 0;
             var baseCong = baseAgg.maxVsanCongestion || 0;

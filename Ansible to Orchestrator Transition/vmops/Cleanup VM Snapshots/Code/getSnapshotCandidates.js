@@ -8,15 +8,15 @@
  * against the live vCenter inventory, ensuring stale references are never
  * an issue.
  *
- * ── INPUTS ───────────────────────────────────────────────────────────────────
+ * -- INPUTS -------------------------------------------------------------------
  *   Name                  Type              Description
- *   ──────────────────────────────────────────────────────────────────────────
+ *   --------------------------------------------------------------------------
  *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to enumerate
  *   maxAgeMinutes         number            Candidates older than this (minutes)
  *   nameMatchString       string            Whitelist filter (empty = all names)
  *   descIgnoreStrings     string[]          Skip if description contains any term
  *
- * ── RETURN TYPE ──────────────────────────────────────────────────────────────
+ * -- RETURN TYPE --------------------------------------------------------------
  *   string  JSON array of candidate objects. Each object contains:
  *   {
  *     vcenterName       : string,   // sdkConnection.name for multi-vCenter routing
@@ -48,7 +48,7 @@ if (descIgnoreStrings) {
     }
 }
 
-// ── Collect all VMs ───────────────────────────────────────────────────────────
+// -- Collect all VMs -----------------------------------------------------------
 var allVms = [];
 collectVmsFromFolder(vcenterSdkConnection.rootFolder);
 
@@ -60,7 +60,7 @@ if (allVms.length > 0) {
                "'  vm.name='" + allVms[0].name + "'");
 }
 
-// ── Walk each VM's snapshot tree ─────────────────────────────────────────────
+// -- Walk each VM's snapshot tree ---------------------------------------------
 for (var vi = 0; vi < allVms.length; vi++) {
     var vm = allVms[vi];
     if (!vm || !vm.config) continue;
@@ -86,7 +86,7 @@ for (var vi = 0; vi < allVms.length; vi++) {
 
 return JSON.stringify(result);
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// -- Helpers -------------------------------------------------------------------
 function collectVmsFromFolder(folder) {
     if (!folder || !folder.childEntity) return;
     for (var i = 0; i < folder.childEntity.length; i++) {

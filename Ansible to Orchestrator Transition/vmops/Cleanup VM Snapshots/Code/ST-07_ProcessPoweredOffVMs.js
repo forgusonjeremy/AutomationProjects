@@ -1,7 +1,7 @@
 /**
- * ─────────────────────────────────────────────────────────────────────────────
+ * -----------------------------------------------------------------------------
  * ST-07  PROCESS POWERED-OFF VMs  (FAST LANE)
- * ─────────────────────────────────────────────────────────────────────────────
+ * -----------------------------------------------------------------------------
  * Processes snapshots on powered-off VMs. Because powered-off VMs have no
  * running guest workload there is no stun-lock risk, so no per-VM concurrency
  * limit and no async dispatch are needed -- deletions run sequentially and
@@ -17,13 +17,13 @@
  * MoRefs are stored at scan time -- all resolution happens at deletion time
  * inside _deleteSnapshot against the live vCenter inventory.
  *
- * ── EXTERNALLY PROVIDED VALUES ────────────────────────────────────────────────
+ * -- EXTERNALLY PROVIDED VALUES ------------------------------------------------
  * All values below are injected by vRO at runtime from workflow inputs or
  * workflow attributes. None are declared as JavaScript variables in this
  * script -- vRO makes them available automatically in the execution context.
  *
  *   Name                     vRO Type   Source
- *   ──────────────────────────────────────────────────────────────────────────
+ *   --------------------------------------------------------------------------
  *   WORKFLOW INPUTS (set by the operator when running the workflow):
  *
  *   dryRun                   boolean    Workflow Input
@@ -67,9 +67,9 @@
  *                                       when a deletion is held (converted by
  *                                       ST-01).
  *
- * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ * -- OUTPUTS ------------------------------------------------------------------
  *   Name                vRO Type  Description
- *   ──────────────────────────────────────────────────────────────────────────
+ *   --------------------------------------------------------------------------
  *   runLog              string    Updated JSON array containing all log entries
  *                                 from ST-06 and this task combined. Passed to
  *                                 ST-09 for result tallying and summary.
@@ -123,7 +123,7 @@ if (offCands.length === 0) {
             continue;
         }
 
-        // ── I/O governor ─────────────────────────────────────────────────────
+        // -- I/O governor -----------------------------------------------------
         // Uses the same delta-based governor as ST-06. Baseline is inherited
         // from datastoreStateJson so datastores already active in ST-06 are
         // evaluated against that known-good baseline rather than re-sampled.
@@ -149,7 +149,7 @@ if (offCands.length === 0) {
             LOG.ok("PROCESSING", "Storage settled -- proceeding:  " + label);
         }
 
-        // ── Execute deletion synchronously ────────────────────────────────────
+        // -- Execute deletion synchronously ------------------------------------
         // Powered-off lane runs synchronously -- no async wrapper workflow
         // needed since there is no stun-lock risk and no concurrency ramp.
         var res = JSON.parse(
@@ -194,7 +194,7 @@ if (offCands.length === 0) {
 datastoreStateJson = JSON.stringify(dsBaseline);
 runLog             = JSON.stringify(logArr);
 
-// ── Governor: delta-based latency check ──────────────────────────────────────
+// -- Governor: delta-based latency check --------------------------------------
 // Mirrors ST-06's checkGovernorDelta. Uses worst-host (max) latency from the
 // aggregate metrics object. Compares current reading against the inherited
 // baseline to project whether adding another deletion would push latency over
@@ -271,7 +271,7 @@ function checkGovernorDelta(vcConn, dsRefs, vmName) {
     return true;
 }
 
-// ── Update baseline with pre/post metric pairs from completed deletions ────────
+// -- Update baseline with pre/post metric pairs from completed deletions --------
 function updateBaseline(preArr, postArr) {
     for (var pi = 0; pi < preArr.length; pi++) {
         var p = preArr[pi];
@@ -280,7 +280,7 @@ function updateBaseline(preArr, postArr) {
     }
 }
 
-// ── Build a structured log entry ─────────────────────────────────────────────
+// -- Build a structured log entry ---------------------------------------------
 function makeEntry(c, action, success, skipReason, error, durationMs) {
     return {
         timestampMs:        new Date().getTime(),

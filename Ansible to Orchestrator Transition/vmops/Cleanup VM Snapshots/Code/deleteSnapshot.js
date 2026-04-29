@@ -8,9 +8,9 @@
  * reference issues that can occur when snapshot chains are reorganised
  * between scan time and deletion time.
  *
- * ── INPUTS ───────────────────────────────────────────────────────────────────
+ * -- INPUTS -------------------------------------------------------------------
  *   Name                  Type              Description
- *   ──────────────────────────────────────────────────────────────────────────
+ *   --------------------------------------------------------------------------
  *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to use
  *   vmMoRef               string            vm.id as stored by getSnapshotCandidates
  *   snapshotName          string            Name of snapshot to delete
@@ -21,7 +21,7 @@
  *   dryRun                boolean           When true, skip actual deletion
  *   taskTimeoutSeconds    number            Max seconds to wait for vCenter task
  *
- * ── RETURN TYPE ──────────────────────────────────────────────────────────────
+ * -- RETURN TYPE --------------------------------------------------------------
  *   string  JSON result object
  */
 
@@ -41,7 +41,7 @@ var result = {
 };
 
 try {
-    // ── Locate VM ─────────────────────────────────────────────────────────────
+    // -- Locate VM -------------------------------------------------------------
     var vm = findVmById(vcenterSdkConnection.rootFolder, vmMoRef);
     if (!vm) {
         result.skipped    = true;
@@ -50,7 +50,7 @@ try {
         return JSON.stringify(result);
     }
 
-    // ── Safety checks ─────────────────────────────────────────────────────────
+    // -- Safety checks ---------------------------------------------------------
     if (vm.config && vm.config.template) {
         result.skipped    = true;
         result.skipReason = "VM is a template";
@@ -87,7 +87,7 @@ try {
         }
     }
 
-    // ── Locate snapshot by name from live tree ────────────────────────────────
+    // -- Locate snapshot by name from live tree --------------------------------
     // Resolution happens here at deletion time, not at scan time.
     // If multiple snapshots share the same name, pick the one closest to
     // snapshotCreatedMs (within 60s tolerance). If none match by time,
@@ -114,14 +114,14 @@ try {
         return JSON.stringify(result);
     }
 
-    // ── Dry run ───────────────────────────────────────────────────────────────
+    // -- Dry run ---------------------------------------------------------------
     if (dryRun) {
         result.success    = true;
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
 
-    // ── Pre-deletion metrics ──────────────────────────────────────────────────
+    // -- Pre-deletion metrics --------------------------------------------------
     var preMetrics = [];
     for (var pi = 0; pi < dsRefs.length; pi++) {
         try {
@@ -132,14 +132,14 @@ try {
     }
     result.preMetricsJson = JSON.stringify(preMetrics);
 
-    // ── Execute deletion ──────────────────────────────────────────────────────
+    // -- Execute deletion ------------------------------------------------------
     // snapNode.snapshot is the VcSnapshot MoRef. In vRO 8.17 Polyglot the
     // removeSnapshot_Task method is bound on this object and dispatches
     // directly to vCenter via the SDK connection.
     System.log("Deleting: VM=" + vmName + " snap=" + snapshotName);
     var delTask = snapNode.snapshot.removeSnapshot_Task(false);
 
-    // ── Poll task state ───────────────────────────────────────────────────────
+    // -- Poll task state -------------------------------------------------------
     var waited     = 0;
     var finalState = "running";
     var pollSleep  = 5000;
@@ -184,7 +184,7 @@ try {
         return JSON.stringify(result);
     }
 
-    // ── Post-deletion metrics ─────────────────────────────────────────────────
+    // -- Post-deletion metrics -------------------------------------------------
     System.sleep(5000);
     var postMetrics = [];
     for (var poi = 0; poi < dsRefs.length; poi++) {
@@ -210,7 +210,7 @@ try {
 
 return JSON.stringify(result);
 
-// ── Find VM by id ─────────────────────────────────────────────────────────────
+// -- Find VM by id -------------------------------------------------------------
 function findVmById(folder, targetId) {
     if (!folder || !folder.childEntity) return null;
     for (var i = 0; i < folder.childEntity.length; i++) {
@@ -231,7 +231,7 @@ function findVmById(folder, targetId) {
     return null;
 }
 
-// ── Find snapshot by name from live tree ──────────────────────────────────────
+// -- Find snapshot by name from live tree --------------------------------------
 // Walks the current snapshot tree and returns the node whose name matches.
 // If multiple nodes share the name, returns the one closest to createdMs
 // (within 60s tolerance). If none match within tolerance, returns the
