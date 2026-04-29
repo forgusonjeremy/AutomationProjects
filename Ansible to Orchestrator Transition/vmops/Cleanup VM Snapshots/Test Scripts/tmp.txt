@@ -1,18 +1,10 @@
-  asdf
-
-  2026-04-29 09:06:24.065 -04:00ERROR(com.broadcom.pso.vc.vm.snapshots/_deleteSnapshot) Error in (Dynamic Script Module name : _deleteSnapshot#31) SyntaxError: Unexpected token: s
-2026-04-29 09:06:24.074 -04:00ERRORWorkflow execution stack:
-***
-item: '#Adaptive Snapshot Delete Task/item1', state: 'failed', business state: 'null', exception: 'SyntaxError: Unexpected token: s (Dynamic Script Module name : _deleteSnapshot#31)'
-workflow: '#Adaptive Snapshot Delete Task' (584d6306-c37a-4498-ae44-9802eea5c30e) 
-|  'input': name=vcenterSdkConnection type=VC:SdkConnection value=dunes://service.dunes.ch/CustomSDKObject?id='cvsd26vcfvc001.connect.lab'&dunesName='VC:SdkConnection'
-|  'input': name=vmMoRef type=string value=vm-271
-|  'input': name=snapshotMoRef type=string value=
-|  'input': name=snapshotName type=string value=snapshot-1
-|  'input': name=vmName type=string value=snaptestds201
-|  'input': name=datastoreMoRefsJson type=string value=["datastore-96"]
-|  'input': name=dryRun type=boolean value=false
-|  'input': name=taskTimeoutSeconds type=number value=1800.0
-|  'output': name=resultJson type=string value=null
-|  'no attributes'
-*** End of execution stack.  
+resultJson = System.getModule("com.broadcom.pso.vc.vm.snapshots")._deleteSnapshot(
+    vcenterSdkConnection,
+    vmMoRef,
+    snapshotName,
+    snapshotCreatedMs,
+    vmName,
+    datastoreMoRefsJson,
+    dryRun,
+    taskTimeoutSeconds
+);

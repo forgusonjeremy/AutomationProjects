@@ -190,9 +190,11 @@ if (onCands.length === 0) {
 
             for (var si = 0; si < inFlightSlots.length; si++) {
                 var slot  = inFlightSlots[si];
-                var state = slot.token.state;
+                // token.state is a WorkflowTokenState enum object in vRO 8.17
+                // Polyglot -- not a plain string. Use .value to get the string.
+                var state = slot.token.state ? String(slot.token.state.value || slot.token.state) : "unknown";
 
-                if (state === "running") {
+                if (state === "running" || state === "waiting") {
                     stillActive.push(slot);
                     continue;
                 }
@@ -220,8 +222,18 @@ if (onCands.length === 0) {
                 }
 
                 if (!res) {
+                    var tokenStateStr = slot.token.state
+                        ? String(slot.token.state.value || slot.token.state)
+                        : "unknown";
+                    var tokenErr = "";
+                    try {
+                        tokenErr = slot.token.globalException
+                            ? String(slot.token.globalException) : "";
+                    } catch(ge) { /* ignore */ }
                     res = { success: false, skipped: false,
-                            error: "Could not read workflow output",
+                            error: "Could not read workflow output" +
+                                   " (token state=" + tokenStateStr + ")" +
+                                   (tokenErr ? " error=" + tokenErr : ""),
                             durationMs: new Date().getTime() - slot.startMs,
                             preMetricsJson: "[]", postMetricsJson: "[]" };
                 }

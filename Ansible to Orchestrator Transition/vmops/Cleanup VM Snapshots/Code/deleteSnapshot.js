@@ -236,29 +236,35 @@ function findVmById(folder, targetId) {
 // If multiple nodes share the name, returns the one closest to createdMs
 // (within 60s tolerance). If none match within tolerance, returns the
 // newest matching node -- safe because we always process newest-first.
+//
+// Uses an iterative stack instead of nested function declarations to stay
+// compatible with vRO 8.17 Rhino (ES5) which does not support function
+// declarations inside function bodies in all contexts.
 function findSnapshotByName(snapList, name, createdMs) {
     var tolerance = 60000;
     var best      = null;
-    var bestDelta = Infinity;
+    var bestDelta = Number.MAX_VALUE;
 
-    function walk(list) {
-        for (var i = 0; i < list.length; i++) {
-            var s = list[i];
-            if (s.name === name) {
-                var snapMs = s.createTime ? s.createTime.getTime() : 0;
-                var delta  = Math.abs(snapMs - createdMs);
-                if (delta < bestDelta) {
-                    bestDelta = delta;
-                    best      = s;
-                }
+    // Iterative depth-first walk using an explicit stack
+    var stack = [];
+    for (var si = 0; si < snapList.length; si++) stack.push(snapList[si]);
+
+    while (stack.length > 0) {
+        var s = stack.pop();
+        if (s.name === name) {
+            var snapMs = s.createTime ? s.createTime.getTime() : 0;
+            var delta  = Math.abs(snapMs - createdMs);
+            if (delta < bestDelta) {
+                bestDelta = delta;
+                best      = s;
             }
-            if (s.childSnapshotList && s.childSnapshotList.length > 0) {
-                walk(s.childSnapshotList);
+        }
+        if (s.childSnapshotList && s.childSnapshotList.length > 0) {
+            for (var ci = 0; ci < s.childSnapshotList.length; ci++) {
+                stack.push(s.childSnapshotList[ci]);
             }
         }
     }
-
-    walk(snapList);
 
     // Accept if within tolerance, or if it's the only match regardless
     if (best && bestDelta <= tolerance) return best;
