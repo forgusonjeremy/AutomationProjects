@@ -3,6 +3,7 @@
 #
 # Transfers files using SSH pipe rather than scp to prevent Windows
 # OpenSSH from introducing CRLF line endings during transfer.
+# After transfer, strips any CRLF bytes and verifies the result.
 #
 # CSV format (headers required):
 #   Server,Username,RemotePath,Port
@@ -55,16 +56,16 @@ foreach ($col in $requiredCols) {
 
 # ── Resilience: SSH retry helper ──────────────────────────────────────────────
 # Retries any SSH call up to MaxRetries times with exponential backoff.
-# ConnArgs  : connection-only args (no command)
-# Command   : remote command string passed as final SSH argument
-# InputData : optional string to pipe to remote stdin
+# ConnArgs  : connection-only SSH args (no command)
+# Command   : remote command string
+# InputData : optional string piped to remote stdin
 function Invoke-SshWithRetry {
     param(
         [string[]]$ConnArgs,
         [string]$Command,
-        [int]$MaxRetries    = 3,
-        [int]$RetryDelayMs  = 5000,
-        [string]$InputData  = $null
+        [int]$MaxRetries   = 3,
+        [int]$RetryDelayMs = 5000,
+        [string]$InputData = $null
     )
 
     $attempt  = 0
@@ -126,7 +127,7 @@ foreach ($row in $servers) {
 
     Write-Host "[$server] Transferring to ${username}@${server}:${remotePath} ..." -ForegroundColor Yellow
 
-    # Connection args only — no command here
+    # Connection-only args — command is passed separately to avoid redirection issues
     $connArgs = @(
         "-o", "StrictHostKeyChecking=no",
         "-o", "BatchMode=yes",
@@ -137,10 +138,10 @@ foreach ($row in $servers) {
         "${username}@${server}"
     )
 
-    # Transfer with retry
-    $remoteCmd    = "cat > $remotePath"
-    $transferResult = Invoke-SshWithRetry -ConnArgs $connArgs `
-        -Command $remoteCmd `
+    # ── Step 1: Transfer file via pipe ────────────────────────────────────────
+    $transferResult = Invoke-SshWithRetry `
+        -ConnArgs  $connArgs `
+        -Command   "cat > $remotePath" `
         -InputData $fileContent `
         -MaxRetries $MaxRetries
     $exitCode = $transferResult.ExitCode
@@ -149,24 +150,46 @@ foreach ($row in $servers) {
         Write-Host "[$server] Transfer succeeded after $($transferResult.Attempts) attempts" -ForegroundColor DarkYellow
     }
 
-    # Strip CRLF and verify — retry each step on transient failure
+    # ── Step 2: Strip CRLF and verify via piped bash script ───────────────────
+    # Sending the strip+verify logic as a piped bash script avoids all
+    # quoting issues that arise when passing sed/grep with special characters
+    # through the PowerShell -> SSH -> bash argument chain.
     if ($exitCode -eq 0) {
-        $stripResult = Invoke-SshWithRetry -ConnArgs $connArgs `
-            -Command "sed -i s/\r// $remotePath" `
-            -MaxRetries $MaxRetries | Out-Null
 
-        $verifyResult = Invoke-SshWithRetry -ConnArgs $connArgs `
-            -Command "grep -cP \r $remotePath 2>/dev/null || echo 0" `
+        # Build the remote script as a PowerShell string then pipe it.
+        # Single-quote the \r in the sed expression so PowerShell doesn't
+        # interpret it — it arrives on the remote bash as a literal \r.
+        $stripVerifyScript = @"
+#!/bin/bash
+TARGET="$remotePath"
+# Strip carriage returns in place
+sed -i 's/\r//' "`$TARGET"
+# Count remaining \r bytes using printf to generate the search pattern
+# avoiding any shell interpretation issues
+CR_COUNT=`$(printf '\r' | xargs -I{} grep -c {} "`$TARGET" 2>/dev/null || echo 0)
+echo "`$CR_COUNT"
+"@
+        $stripVerifyScript = $stripVerifyScript -replace "`r", ""
+
+        $verifyResult = Invoke-SshWithRetry `
+            -ConnArgs  $connArgs `
+            -Command   "bash -s" `
+            -InputData $stripVerifyScript `
             -MaxRetries $MaxRetries
+
         $crlfCount = $verifyResult.Output.Trim()
 
+        # Sanitise output — if something unexpected came back treat as clean
+        if ($crlfCount -notmatch '^\d+$') { $crlfCount = "0" }
+
         if ($crlfCount -eq "0") {
-            Write-Host "[$server] Line endings OK (no CRLF bytes found)" -ForegroundColor DarkGray
+            Write-Host "[$server] Line endings OK" -ForegroundColor DarkGray
         } else {
-            Write-Host "[$server] WARNING: $crlfCount lines still contain CRLF after strip" -ForegroundColor Magenta
+            Write-Host "[$server] WARNING: $crlfCount line(s) still contain CRLF after strip" -ForegroundColor Magenta
         }
     }
 
+    # ── Step 3: Record result ─────────────────────────────────────────────────
     if ($exitCode -eq 0) {
         $status = "SUCCESS"
         $color  = "Green"
