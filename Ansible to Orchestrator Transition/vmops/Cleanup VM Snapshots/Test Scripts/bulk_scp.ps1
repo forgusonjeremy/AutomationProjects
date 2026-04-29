@@ -110,7 +110,7 @@ $successCount = 0
 $failCount    = 0
 
 Write-Host "`nStarting transfers for: $FilePath" -ForegroundColor Cyan
-Write-Host "Method  : SSH pipe (cat >) - CRLF-safe" -ForegroundColor Cyan
+Write-Host "Method  : SSH pipe (cat `>) - CRLF-safe" -ForegroundColor Cyan
 Write-Host "Servers : $($servers.Count)`n" -ForegroundColor Cyan
 
 foreach ($row in $servers) {
