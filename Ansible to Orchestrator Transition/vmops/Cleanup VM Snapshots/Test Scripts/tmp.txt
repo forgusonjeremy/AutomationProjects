@@ -1,51 +1,388 @@
-[10.111.101.124]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.105]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.103]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.97]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.92]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.106]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.93]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.90]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.96]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.112]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.101]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.123]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
-
-[10.111.101.119]
-bash: -c: line 1: syntax error near unexpected token `;'
-bash: -c: line 1: `echo 'IyEvYmluL2Jhc2gKUElERklMRT0ke0hPTUV9Ly5zbmFwc2hvdF9pby5waWQKRE9ORUZJTEU9JHtIT01FfS8uc25hcHNob3RfaW8uZG9uZQpPVVRGSUxFPSR7SE9NRX0vLnNuYXBzaG90X2lvLm91dApybSAtZiAiJERPTkVGSUxFIgpjaG1vZCAreCAnL3RtcC9nZW5lcmF0ZV9zbmFwc2hvdF9pby5zaCcKU1RBUlQ9JChkYXRlICslcykKJy90bXAvZ2VuZXJhdGVfc25hcHNob3RfaW8uc2gnIC0tdGFyZ2V0LWdiIDIgLS1kdXJhdGlvbiAyMTYwMCA+ICIkT1VURklMRSIgMj4mMSAmClNDUklQVF9QSUQ9JCEKZWNobyAkU0NSSVBUX1BJRCA+ICIkUElERklMRSIKZWNobyAiW0lORk9dIFNjcmlwdCBzdGFydGVkIHdpdGggUElEICRTQ1JJUFRfUElEIgp3YWl0ICRTQ1JJUFRfUElECkVYSVRfQ09ERT0kPwpFTkQ9JChkYXRlICslcykKRUxBUFNFRD0kKCggRU5EIC0gU1RBUlQgKSkKZWNobyAiW0lORk9dIFNjcmlwdCBleGl0ZWQgd2l0aCBjb2RlICRFWElUX0NPREUgYWZ0ZXIgJHtFTEFQU0VEfXMiCmlmIFsgJEVMQVBTRUQgLWx0IDkwMCBdOyB0aGVuCiAgICBSRU1BSU5JTkc9JCgoIDkwMCAtIEVMQVBTRUQgKSkKICAgIGVjaG8gIltJTkZPXSBSdW50aW1lIGJlbG93IG1pbmltdW0uIEhvbGRpbmcgZm9yICR7UkVNQUlOSU5HfXMgbW9yZS4uLiIKICAgIHNsZWVwICRSRU1BSU5JTkcKZmkKVE9UQUw9JCgoICQoZGF0ZSArJXMpIC0gU1RBUlQgKSkKZWNobyAiW0RPTkVdIFRvdGFsIGVuZm9yY2VkIHJ1bnRpbWU6ICR7VE9UQUx9cyAvIGV4aXQgY29kZTogJEVYSVRfQ09ERSIKcm0gLWYgIiRQSURGSUxFIgplY2hvICRFWElUX0NPREUgPiAiJERPTkVGSUxFIg==' | base64 -d > ${HOME}/.snapshot_io_wrapper.sh; chmod +x ${HOME}/.snapshot_io_wrapper.sh; rm -f ${HOME}/.snapshot_io.done; nohup ${HOME}/.snapshot_io_wrapper.sh > ${HOME}/.snapshot_io_nohup.out 2>&1 &; echo $! > ${HOME}/.snapshot_io_launcher.pid; echo [LAUNCHED] nohup PID $!'
+2026-04-29 09:01:32.909 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      ================================================
+2026-04-29 09:01:32.911 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Adaptive Snapshot Cleanup  --  Starting up
+2026-04-29 09:01:32.912 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Run ID      : SCR-2026-04-29T13-01-32
+2026-04-29 09:01:32.913 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Mode        : LIVE  (snapshots WILL be deleted)
+2026-04-29 09:01:32.914 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Age limit   : Snapshots older than 1 minute(s)
+2026-04-29 09:01:32.915 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Name filter : None  (all snapshot names are eligible)
+2026-04-29 09:01:32.916 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Desc ignore : Skip if description contains any of: 'Snapshot used by Content Library'
+2026-04-29 09:01:32.917 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        I/O ceiling : 30ms latency  |  vSAN congestion max 50/255
+2026-04-29 09:01:32.918 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Parallelism : Up to 20 simultaneous cleanup(s) per vCenter
+2026-04-29 09:01:32.919 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      ================================================
+2026-04-29 09:01:32.938 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      Lock acquired -- this is the only active cleanup run  [SCR-2026-04-29T13-01-32]
+2026-04-29 09:01:32.951 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      Scanning 1 vCenter(s) for eligible snapshots...
+2026-04-29 09:01:32.952 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]        Connecting to: https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-29 09:01:33.048 -04:00INFO_getSnapshotCandidates: found 65 VMs on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-29 09:01:33.052 -04:00INFO_getSnapshotCandidates: sample vm.id='vm-1016'  vm.name='Windows-2022-template'
+2026-04-29 09:01:33.118 -04:00INFOSKIP (desc match): VM=snaptestds307 snap=snapshot-5
+2026-04-29 09:01:33.368 -04:00INFOSKIP (desc match): VM=snaptestds209 snap=snapshot-3
+2026-04-29 09:01:33.617 -04:00INFOSKIP (desc match): VM=snaptestvsan10 snap=snapshot-3
+2026-04-29 09:01:34.617 -04:00INFOSKIP (desc match): VM=snaptestds308 snap=snapshot-3
+2026-04-29 09:01:34.867 -04:00INFOSKIP (desc match): VM=snaptestds208 snap=snapshot-1
+2026-04-29 09:01:34.868 -04:00INFOSKIP (desc match): VM=snaptestds208 snap=snapshot-5
+2026-04-29 09:01:35.167 -04:00INFOSKIP (desc match): VM=snaptestds207 snap=snapshot-5
+2026-04-29 09:01:35.667 -04:00INFOSKIP (desc match): VM=snaptestds110 snap=snapshot-1
+2026-04-29 09:01:35.917 -04:00INFOSKIP (desc match): VM=snaptestds210 snap=snapshot-1
+2026-04-29 09:01:36.167 -04:00INFOSKIP (desc match): VM=snaptestds310 snap=snapshot-1
+2026-04-29 09:01:36.417 -04:00INFOSKIP (desc match): VM=snaptestds108 snap=snapshot-3
+2026-04-29 09:01:37.218 -04:00INFOSKIP (desc match): VM=snaptestvsan04 snap=snapshot-1
+2026-04-29 09:01:37.219 -04:00INFOSKIP (desc match): VM=snaptestvsan04 snap=snapshot-5
+2026-04-29 09:01:37.718 -04:00INFOSKIP (desc match): VM=snaptestds101 snap=snapshot-3
+2026-04-29 09:01:37.967 -04:00INFOSKIP (desc match): VM=snaptestds102 snap=snapshot-5
+2026-04-29 09:01:38.218 -04:00INFOSKIP (desc match): VM=snaptestds103 snap=snapshot-3
+2026-04-29 09:01:38.717 -04:00INFOSKIP (desc match): VM=snaptestds105 snap=snapshot-5
+2026-04-29 09:01:38.967 -04:00INFOSKIP (desc match): VM=snaptestds306 snap=snapshot-3
+2026-04-29 09:01:38.968 -04:00INFOSKIP (desc match): VM=snaptestds306 snap=snapshot-5
+2026-04-29 09:01:39.517 -04:00INFOSKIP (desc match): VM=snaptstvsan01 snap=snapshot-3
+2026-04-29 09:01:39.767 -04:00INFOSKIP (desc match): VM=snaptestds203 snap=snapshot-2
+2026-04-29 09:01:39.768 -04:00INFOSKIP (desc match): VM=snaptestds203 snap=snapshot-5
+2026-04-29 09:01:40.520 -04:00INFOSKIP (desc match): VM=snaptestds302 snap=snapshot-3
+2026-04-29 09:01:40.767 -04:00INFOSKIP (desc match): VM=snaptestds205 snap=snapshot-3
+2026-04-29 09:01:40.768 -04:00INFOSKIP (desc match): VM=snaptestds205 snap=snapshot-5
+2026-04-29 09:01:41.016 -04:00INFOSKIP (desc match): VM=snaptestvsan07 snap=snapshot-1
+2026-04-29 09:01:41.318 -04:00INFOSKIP (desc match): VM=snaptestds305 snap=snapshot-1
+2026-04-29 09:01:41.817 -04:00INFOSKIP (desc match): VM=snaptestvsan02 snap=snapshot-2
+2026-04-29 09:01:42.067 -04:00INFOSKIP (desc match): VM=snaptestds304 snap=snapshot-1
+2026-04-29 09:01:42.317 -04:00INFOSKIP (desc match): VM=snaptestvsan05 snap=snapshot-5
+2026-04-29 09:01:42.568 -04:00INFOSKIP (desc match): VM=snaptestds303 snap=snapshot-5
+2026-04-29 09:01:42.817 -04:00INFOSKIP (desc match): VM=snaptestds109 snap=snapshot-1
+2026-04-29 09:01:42.818 -04:00INFOSKIP (desc match): VM=snaptestds109 snap=snapshot-5
+2026-04-29 09:01:45.267 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]          Found 219 eligible snapshot(s) on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-29 09:01:45.270 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      Scan complete -- 219 eligible snapshot(s) found across all vCenters.
+2026-04-29 09:01:45.280 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      219 snapshot(s) are eligible for cleanup -- continuing...
+2026-04-29 09:01:45.298 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Snapshot queue ready:
+2026-04-29 09:01:45.299 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]        Powered-ON  VMs : 219 snapshot(s)  (processed with I/O throttling)
+2026-04-29 09:01:45.300 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]        Powered-OFF VMs : 0 snapshot(s)  (processed in fast lane)
+2026-04-29 09:01:45.301 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Beginning cleanup...
+2026-04-29 09:01:45.315 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Processing 219 powered-on snapshot(s) on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-29 09:01:45.316 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Starting adaptive dispatch -- initial concurrency: 1 of 20 max
+2026-04-29 09:01:45.572 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:01:45.671 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:0.0ms
+2026-04-29 09:01:45.772 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:45.874 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:45.973 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:45.974 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.7ms maxW=0ms hotHost=host-32
+2026-04-29 09:01:46.226 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:01:46.272 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:01:46.323 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.0ms W:0.0ms
+2026-04-29 09:01:46.372 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.3ms
+2026-04-29 09:01:46.424 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:01:46.425 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.3ms avgW=0.1ms maxR=1ms maxW=0.3ms hotHost=host-35
+2026-04-29 09:01:49.751 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-29
+2026-04-29 09:01:49.811 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-29 09:01:49.824 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:0.0ms
+2026-04-29 09:01:49.837 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.0ms
+2026-04-29 09:01:49.849 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.3ms
+2026-04-29 09:01:49.860 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.0ms
+2026-04-29 09:01:49.861 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0.1ms maxR=0.3ms maxW=0.3ms hotHost=host-35
+2026-04-29 09:01:49.918 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:01:49.928 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:0.0ms
+2026-04-29 09:01:49.939 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:49.950 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:49.962 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:49.963 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.7ms maxW=0ms hotHost=host-32
+2026-04-29 09:01:49.985 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/1 slots]:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:01:52.990 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:01:53.041 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:01:53.051 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:0.0ms
+2026-04-29 09:01:53.062 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:53.074 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:53.085 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:53.086 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.7ms maxW=0ms hotHost=host-32
+2026-04-29 09:01:53.087 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 2 of 20
+2026-04-29 09:01:53.134 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:01:53.144 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:0.0ms
+2026-04-29 09:01:53.155 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:53.166 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:53.176 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:53.177 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.7ms maxW=0ms hotHost=host-32
+2026-04-29 09:01:53.194 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/2 slots]:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:01:53.243 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:01:53.253 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:01:53.264 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.0ms W:0.0ms
+2026-04-29 09:01:53.275 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.3ms
+2026-04-29 09:01:53.286 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:01:53.287 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.3ms avgW=0.1ms maxR=1ms maxW=0.3ms hotHost=host-35
+2026-04-29 09:01:53.303 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/2 slots]:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:01:56.309 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:01:56.313 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:01:56.366 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:01:56.376 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:0.0ms
+2026-04-29 09:01:56.389 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:56.401 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:56.414 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:56.415 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.7ms maxW=0ms hotHost=host-32
+2026-04-29 09:01:56.417 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 3 of 20
+2026-04-29 09:01:56.480 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:01:56.490 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:0.0ms
+2026-04-29 09:01:56.501 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:56.512 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:56.522 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:01:56.523 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.7ms maxW=0ms hotHost=host-32
+2026-04-29 09:01:56.543 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/3 slots]:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:01:56.590 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:01:56.599 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:01:56.611 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.0ms W:0.0ms
+2026-04-29 09:01:56.622 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.3ms
+2026-04-29 09:01:56.632 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:01:56.633 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.3ms avgW=0.1ms maxR=1ms maxW=0.3ms hotHost=host-35
+2026-04-29 09:01:56.650 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/3 slots]:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:01:59.406 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-29
+2026-04-29 09:01:59.423 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/3 slots]:  VM 'snaptestvsan10'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:02:02.428 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:02.432 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:02.436 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan10'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:02.487 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:02.497 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:0.0ms
+2026-04-29 09:02:02.509 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:02.520 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:02.532 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:02.533 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.7ms maxW=0ms hotHost=host-32
+2026-04-29 09:02:02.534 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 4 of 20
+2026-04-29 09:02:02.580 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:02.589 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.7ms W:0.0ms
+2026-04-29 09:02:02.600 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:02.611 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:02.622 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:02.623 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.7ms maxW=0ms hotHost=host-32
+2026-04-29 09:02:02.640 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/4 slots]:  VM 'snaptestds307'  snapshot 'snapshot-3'  (age: 13 min)
+2026-04-29 09:02:02.687 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:02:02.696 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:02.706 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:1.0ms W:0.0ms
+2026-04-29 09:02:02.718 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.3ms
+2026-04-29 09:02:02.729 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:02.730 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.3ms avgW=0.1ms maxR=1ms maxW=0.3ms hotHost=host-35
+2026-04-29 09:02:02.746 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/4 slots]:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:02:05.496 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:05.515 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/4 slots]:  VM 'snaptestvsan10'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:02:08.249 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:08.265 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [4/4 slots]:  VM 'snaptestvsan08'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:02:11.271 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'snapshot-3'  (age: 13 min)  --  Could not read workflow output
+2026-04-29 09:02:11.275 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:11.278 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan10'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:11.282 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan08'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:11.334 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:11.345 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.3ms W:0.0ms
+2026-04-29 09:02:11.361 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:11.373 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:11.384 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:11.385 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:02:11.386 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 5 of 20
+2026-04-29 09:02:11.432 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:11.443 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.3ms W:0.0ms
+2026-04-29 09:02:11.455 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:11.467 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:11.479 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:11.480 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:02:11.498 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/5 slots]:  VM 'snaptestds307'  snapshot 'snapshot-2'  (age: 17 min)
+2026-04-29 09:02:11.547 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:02:11.558 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:11.569 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:0.0ms
+2026-04-29 09:02:11.581 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:11.592 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:11.593 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0.2ms maxR=0.7ms maxW=0.3ms hotHost=host-35
+2026-04-29 09:02:11.612 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/5 slots]:  VM 'snaptestds209'  snapshot 'snapshot-2'  (age: 17 min)
+2026-04-29 09:02:14.379 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:14.397 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/5 slots]:  VM 'snaptestvsan10'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:02:17.137 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:17.193 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [4/5 slots]:  VM 'snaptestvsan08'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:02:19.951 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:19.970 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [5/5 slots]:  VM 'snaptestvsan06'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:02:22.976 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'snapshot-2'  (age: 17 min)  --  Could not read workflow output
+2026-04-29 09:02:22.980 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds209'  snapshot 'snapshot-2'  (age: 17 min)  --  Could not read workflow output
+2026-04-29 09:02:22.984 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan10'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:22.987 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan08'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:22.990 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan06'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:23.043 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:23.053 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.3ms W:0.0ms
+2026-04-29 09:02:23.065 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:23.078 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:23.090 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:23.091 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:02:23.092 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 6 of 20
+2026-04-29 09:02:23.136 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:23.146 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.3ms W:0.0ms
+2026-04-29 09:02:23.162 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:23.174 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:23.184 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:23.185 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:02:23.200 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/6 slots]:  VM 'snaptestds307'  snapshot 'snapshot-1'  (age: 22 min)
+2026-04-29 09:02:23.248 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:02:23.257 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:23.269 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.7ms W:0.0ms
+2026-04-29 09:02:23.280 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:23.290 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:23.291 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0.2ms maxR=0.7ms maxW=0.3ms hotHost=host-35
+2026-04-29 09:02:23.307 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/6 slots]:  VM 'snaptestds209'  snapshot 'snapshot-1'  (age: 22 min)
+2026-04-29 09:02:26.088 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:26.106 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/6 slots]:  VM 'snaptestvsan10'  snapshot 'snapshot-2'  (age: 17 min)
+2026-04-29 09:02:28.895 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-29
+2026-04-29 09:02:28.911 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [4/6 slots]:  VM 'snaptestvsan08'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:02:31.644 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:31.664 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [5/6 slots]:  VM 'snaptestvsan06'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:02:31.724 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:31.735 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.3ms W:0.0ms
+2026-04-29 09:02:31.749 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:31.763 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:31.777 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:31.778 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:02:31.792 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [6/6 slots]:  VM 'snaptestds309'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:02:34.799 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'snapshot-1'  (age: 22 min)  --  Could not read workflow output
+2026-04-29 09:02:34.808 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds209'  snapshot 'snapshot-1'  (age: 22 min)  --  Could not read workflow output
+2026-04-29 09:02:34.816 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan10'  snapshot 'snapshot-2'  (age: 17 min)  --  Could not read workflow output
+2026-04-29 09:02:34.823 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan08'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:34.828 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan06'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:34.833 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds309'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:37.580 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:37.581 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 7 of 20
+2026-04-29 09:02:40.370 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:40.385 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/7 slots]:  VM 'snaptestvsan10'  snapshot 'snapshot-1'  (age: 22 min)
+2026-04-29 09:02:43.117 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:43.133 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/7 slots]:  VM 'snaptestvsan08'  snapshot 'snapshot-3'  (age: 13 min)
+2026-04-29 09:02:45.866 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:45.881 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/7 slots]:  VM 'snaptestvsan06'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:02:45.929 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:45.938 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:45.948 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:45.960 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:45.970 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:45.971 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0ms avgW=0ms maxR=0ms maxW=0ms hotHost=null
+2026-04-29 09:02:45.986 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [4/7 slots]:  VM 'snaptestds309'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:02:46.032 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:46.042 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:46.054 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:46.065 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:46.075 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:46.076 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0ms avgW=0ms maxR=0ms maxW=0ms hotHost=null
+2026-04-29 09:02:46.091 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [5/7 slots]:  VM 'snaptestds308'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:02:46.139 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:02:46.149 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:02:46.161 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:46.172 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:46.182 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:46.183 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0.1ms maxR=0.3ms maxW=0.3ms hotHost=host-32
+2026-04-29 09:02:46.197 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [6/7 slots]:  VM 'snaptestds208'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:02:46.243 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:02:46.251 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:02:46.264 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:46.274 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:46.282 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:46.283 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0.1ms maxR=0.3ms maxW=0.3ms hotHost=host-32
+2026-04-29 09:02:46.298 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [7/7 slots]:  VM 'snaptestds207'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:02:49.303 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan10'  snapshot 'snapshot-1'  (age: 22 min)  --  Could not read workflow output
+2026-04-29 09:02:49.306 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan08'  snapshot 'snapshot-3'  (age: 13 min)  --  Could not read workflow output
+2026-04-29 09:02:49.310 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan06'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:49.315 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds309'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:49.318 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds308'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:49.322 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds208'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:49.326 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds207'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:02:52.065 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:52.066 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 8 of 20
+2026-04-29 09:02:54.813 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:54.829 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/8 slots]:  VM 'snaptestvsan08'  snapshot 'snapshot-2'  (age: 17 min)
+2026-04-29 09:02:57.585 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:02:57.640 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/8 slots]:  VM 'snaptestvsan06'  snapshot 'snapshot-3'  (age: 12 min)
+2026-04-29 09:02:57.694 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:57.703 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.715 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.727 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.740 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.741 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0ms avgW=0ms maxR=0ms maxW=0ms hotHost=null
+2026-04-29 09:02:57.759 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/8 slots]:  VM 'snaptestds309'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:02:57.805 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:02:57.815 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.826 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.837 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.849 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.850 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0ms avgW=0ms maxR=0ms maxW=0ms hotHost=null
+2026-04-29 09:02:57.864 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [4/8 slots]:  VM 'snaptestds308'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:02:57.910 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:02:57.919 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:02:57.931 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.942 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:57.952 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:57.953 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0.1ms maxR=0.3ms maxW=0.3ms hotHost=host-32
+2026-04-29 09:02:57.968 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [5/8 slots]:  VM 'snaptestds208'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:02:58.059 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:02:58.068 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:02:58.080 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:58.092 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:58.102 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:58.103 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0.1ms maxR=0.3ms maxW=0.3ms hotHost=host-32
+2026-04-29 09:02:58.117 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [6/8 slots]:  VM 'snaptestds207'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:02:58.164 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:02:58.174 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:02:58.186 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:58.199 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:02:58.210 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.3ms
+2026-04-29 09:02:58.211 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0.1ms maxR=0.3ms maxW=0.3ms hotHost=host-32
+2026-04-29 09:02:58.226 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [7/8 slots]:  VM 'snaptestds206'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:02:58.282 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-29 09:02:58.293 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.0ms
+2026-04-29 09:02:58.302 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:0.0ms
+2026-04-29 09:02:58.353 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.0ms
+2026-04-29 09:02:58.403 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.0ms
+2026-04-29 09:02:58.404 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:02:58.420 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [8/8 slots]:  VM 'snaptestds110'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
+2026-04-29 09:03:01.425 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan08'  snapshot 'snapshot-2'  (age: 17 min)  --  Could not read workflow output
+2026-04-29 09:03:01.429 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan06'  snapshot 'snapshot-3'  (age: 12 min)  --  Could not read workflow output
+2026-04-29 09:03:01.434 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds309'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:03:01.438 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds308'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:03:01.443 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds208'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:03:01.446 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds207'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:03:01.450 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds206'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:03:01.453 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds110'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)  --  Could not read workflow output
+2026-04-29 09:03:04.229 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:03:04.230 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 9 of 20
+2026-04-29 09:03:06.985 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:03:07.003 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/9 slots]:  VM 'snaptestvsan08'  snapshot 'snapshot-1'  (age: 21 min)
+2026-04-29 09:03:09.756 -04:00INFOgetDatastoreMetrics: completed for datastore-18 — 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:03:09.770 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/9 slots]:  VM 'snaptestvsan06'  snapshot 'snapshot-2'  (age: 17 min)
+2026-04-29 09:03:09.819 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:03:09.829 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:03:09.842 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:03:09.854 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.3ms
+2026-04-29 09:03:09.865 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:03:09.866 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0ms avgW=0.1ms maxR=0ms maxW=0.3ms hotHost=host-29
+2026-04-29 09:03:09.881 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/9 slots]:  VM 'snaptestds309'  snapshot 'snapshot-3'  (age: 12 min)
+2026-04-29 09:03:09.927 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:03:09.936 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:03:09.948 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:03:09.959 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.3ms
+2026-04-29 09:03:09.969 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 — R:0.0ms W:0.0ms
+2026-04-29 09:03:09.970 -04:00INFOgetDatastoreMetrics: completed for datastore-97 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0ms avgW=0.1ms maxR=0ms maxW=0.3ms hotHost=host-29
+2026-04-29 09:03:09.985 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [4/9 slots]:  VM 'snaptestds308'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:03:10.037 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:03:10.048 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.059 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.071 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.083 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.084 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:03:10.107 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [5/9 slots]:  VM 'snaptestds208'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:03:10.155 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:03:10.165 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.177 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.190 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.201 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.202 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:03:10.217 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [6/9 slots]:  VM 'snaptestds207'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 8 min)
+2026-04-29 09:03:10.263 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:03:10.272 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.284 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.294 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.305 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.306 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:03:10.321 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [7/9 slots]:  VM 'snaptestds206'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:03:10.384 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-29 09:03:10.439 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.482 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.534 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.584 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.585 -04:00INFOgetDatastoreMetrics: completed for datastore-95 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:03:10.605 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [8/9 slots]:  VM 'snaptestds110'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 8 min)
+2026-04-29 09:03:10.682 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:03:10.733 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.783 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 — R:0.3ms W:0.0ms
+2026-04-29 09:03:10.834 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.883 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 — R:0.0ms W:0.0ms
+2026-04-29 09:03:10.885 -04:00INFOgetDatastoreMetrics: completed for datastore-96 — 4 hosts sampled (4 real-time, 0 rollup) avgR=0.2ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:03:10.901 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [9/9 slots]:  VM 'snaptestds210'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 8 min)
