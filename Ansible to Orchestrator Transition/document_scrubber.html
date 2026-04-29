@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Interactive Document Scrubber</title>
+<title>Interactive Text File Scrubber</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -214,7 +214,7 @@ body {
   background: var(--orange-dim); border-color: #5e4a2a;
 }
 
-/* YAML key context */
+/* Context key */
 .yaml-key {
   color: var(--text-muted); font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
@@ -243,17 +243,17 @@ body {
   <div class="header">
     <div class="header-icon">🔒</div>
     <div>
-      <h1>Interactive Document Scrubber</h1>
-      <p>Scan YAML files for sensitive data — review findings — provide replacements — download scrubbed files</p>
+      <h1>Interactive Text File Scrubber</h1>
+      <p>Scan any text file for sensitive data — review findings — provide replacements — download scrubbed files</p>
     </div>
   </div>
 
   <!-- Step 1: Drop files -->
   <div class="dropzone" id="dropzone">
     <div class="dropzone-icon">📂</div>
-    <div class="dropzone-title">Drop .yml / .yaml files here or click to browse</div>
-    <div class="dropzone-sub">All processing happens locally in your browser — nothing is uploaded anywhere</div>
-    <input type="file" id="fileInput" accept=".yml,.yaml" multiple>
+    <div class="dropzone-title">Drop any text files here or click to browse</div>
+    <div class="dropzone-sub">.yml, .yaml, .ps1, .txt, .cfg, .conf, .ini, .json, .xml, .sh, .py, .js, .log, .md, .csv, .env — anything you can open in a text editor</div>
+    <input type="file" id="fileInput" multiple>
   </div>
   <div class="file-tags" id="fileTags"></div>
   <div class="actions" id="scanActions">
@@ -283,7 +283,7 @@ body {
           <tr>
             <th>Type</th>
             <th>Detected Value</th>
-            <th>YAML Key</th>
+            <th>Context</th>
             <th>Files</th>
             <th style="text-align:center">#</th>
             <th style="min-width:200px">Replacement</th>
@@ -383,9 +383,20 @@ body {
 
   function addFiles(fileList) {
     for (const f of fileList) {
-      if (!f.name.match(/\.ya?ml$/i)) continue;
+      // Accept any file — browser FileReader handles text files gracefully.
+      // Binary files will produce garbled content but won't break anything.
       const reader = new FileReader();
       reader.onload = () => {
+        // Quick binary check: if more than 5% of first 1KB is non-printable, warn and skip
+        const sample = reader.result.slice(0, 1024);
+        const nonPrint = [...sample].filter(c => {
+          const code = c.charCodeAt(0);
+          return code < 9 || (code > 13 && code < 32) || code === 0xFFFD;
+        }).length;
+        if (nonPrint > sample.length * 0.05) {
+          alert(`"${f.name}" appears to be a binary file and was skipped.\nOnly text files can be scrubbed.`);
+          return;
+        }
         files[f.name] = reader.result;
         renderTags();
       };
@@ -426,60 +437,67 @@ body {
       for (let li = 0; li < lines.length; li++) {
         const line = lines[li];
         const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
+        if (!trimmed) continue;
 
-        // Extract YAML key if present
-        const keyMatch = trimmed.match(/^([A-Za-z0-9_.\-/]+)\s*:/);
-        const yamlKey = keyMatch ? keyMatch[1] : '';
+        // ── Extract context key (format-agnostic) ─────────────────────
+        // Tries YAML (key:), INI/env (key=), PowerShell ($var=, -Param),
+        // XML (<tag>), JSON ("key":), shell export, and generic assignment
+        let contextKey = '';
+        let valuePart = trimmed;
 
-        // Value portion (after colon, or entire line if no colon)
-        const valuePart = keyMatch ? trimmed.slice(keyMatch[0].length).trim() : trimmed;
+        // Skip pure comment lines (but still scan inline comments below)
+        const isComment = /^(?:#|\/\/|;|--|REM\s)/i.test(trimmed);
+        if (isComment) {
+          // Still scan comment text for IPs/FQDNs/emails but no key context
+          valuePart = trimmed;
+          contextKey = '';
+        } else {
+          // YAML / generic colon-separated: key: value
+          let km = trimmed.match(/^([A-Za-z0-9_.\-/]+)\s*:\s*(.*)/);
+          if (km) { contextKey = km[1]; valuePart = km[2]; }
 
-        // ── Password detection (key-based) ────────────────────────────
-        if (yamlKey && passwordKeys.test(yamlKey) && valuePart && valuePart !== '""' && valuePart !== "''" && valuePart !== 'null' && valuePart !== '~') {
-          let val = valuePart.replace(/^['"]|['"]$/g, '');
-          // Skip Jinja2 / variable references
-          if (val.startsWith('{{') || val.startsWith('${') || val.startsWith('!vault')) continue;
-          if (val.length < 2) continue;
-          addFinding(map, 'password', val, yamlKey, fname);
-        }
+          // INI / env / shell: KEY=value or export KEY=value
+          if (!contextKey) {
+            km = trimmed.match(/^(?:export\s+|set\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)/);
+            if (km) { contextKey = km[1]; valuePart = km[2]; }
+          }
 
-        // ── Hostname detection (key-based) ────────────────────────────
-        if (yamlKey && hostnameKeys.test(yamlKey) && valuePart) {
-          let val = valuePart.replace(/^['"]|['"]$/g, '').trim();
-          if (val && !val.startsWith('{{') && !val.startsWith('${') && val !== 'null' && val !== '~' && val.length > 1) {
-            // Only if it looks like a hostname (not an IP, not already caught as FQDN/email)
-            if (!val.match(patterns.ip) && !val.match(patterns.email) && !val.includes(' ')) {
-              // If it has dots, it's an FQDN — still record as hostname since the key tells us intent
-              addFinding(map, 'hostname', val, yamlKey, fname);
+          // PowerShell: $variable = value  or  -Parameter value
+          if (!contextKey) {
+            km = trimmed.match(/^\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)/);
+            if (km) { contextKey = '$' + km[1]; valuePart = km[2]; }
+          }
+          if (!contextKey) {
+            km = trimmed.match(/^-([A-Za-z][A-Za-z0-9]*)\s+(.+)/);
+            if (km) { contextKey = '-' + km[1]; valuePart = km[2]; }
+          }
+
+          // JSON: "key": "value" or "key": value
+          if (!contextKey) {
+            km = trimmed.match(/^"([^"]+)"\s*:\s*(.*?)[\s,]*$/);
+            if (km) { contextKey = km[1]; valuePart = km[2]; }
+          }
+
+          // XML attribute: name="value"
+          if (!contextKey) {
+            // Scan for multiple attributes on one line
+            const attrRe = /([A-Za-z_][A-Za-z0-9_.\-]*)=["']([^"']+)["']/g;
+            let attrMatch;
+            while ((attrMatch = attrRe.exec(trimmed)) !== null) {
+              const ak = attrMatch[1];
+              const av = attrMatch[2];
+              scanValue(map, av, ak, fname);
             }
           }
         }
 
-        // ── Regex-based detection ─────────────────────────────────────
-        // IPs
-        let m;
-        const ipRe = new RegExp(patterns.ip.source, 'g');
-        while ((m = ipRe.exec(valuePart)) !== null) {
-          if (!shouldIgnore(m[0])) addFinding(map, 'ip', m[0], yamlKey, fname);
-        }
-        // Emails
-        const emailRe = new RegExp(patterns.email.source, 'g');
-        while ((m = emailRe.exec(valuePart)) !== null) {
-          if (!shouldIgnore(m[0])) addFinding(map, 'email', m[0], yamlKey, fname);
-        }
-        // FQDNs
-        const fqdnRe = new RegExp(patterns.fqdn.source, 'g');
-        while ((m = fqdnRe.exec(valuePart)) !== null) {
-          const v = m[0];
-          // Skip if already caught as email domain
-          if (valuePart.includes('@' + v)) continue;
-          // Skip common non-sensitive domains
-          if (shouldIgnore(v)) continue;
-          // Skip if same value already caught as hostname from key detection
-          const hKey = 'hostname|' + v;
-          if (map[hKey]) continue;
-          addFinding(map, 'fqdn', v, yamlKey, fname);
+        // ── Scan the value portion ────────────────────────────────────
+        scanValue(map, valuePart, contextKey, fname);
+
+        // Also scan the full line for IPs/FQDNs/emails that might be
+        // embedded in strings, comments, or multi-value lines
+        if (valuePart !== trimmed) {
+          scanValueRegexOnly(map, trimmed, contextKey, fname);
         }
       }
     }
@@ -492,6 +510,71 @@ body {
 
     renderReport();
   });
+
+  /** Scan a value string for all sensitive data types */
+  function scanValue(map, rawValue, contextKey, fname) {
+    if (!rawValue) return;
+
+    // Strip surrounding quotes
+    let val = rawValue.replace(/^['"]|['",;}\])\s]*$/g, '').trim();
+
+    // ── Password detection (key-based) ──────────────────────────────
+    if (contextKey && passwordKeys.test(contextKey) && val &&
+        val !== '""' && val !== "''" && val !== 'null' && val !== '~' &&
+        val !== 'None' && val !== 'true' && val !== 'false' && val !== '$null') {
+      let pval = val.replace(/^['"]|['"]$/g, '');
+      // Skip variable references / vault markers
+      if (!pval.startsWith('{{') && !pval.startsWith('${') && !pval.startsWith('!vault') &&
+          !pval.startsWith('$env:') && !pval.startsWith('$Env:') &&
+          !pval.match(/^\$[A-Za-z]/) && pval.length >= 2) {
+        addFinding(map, 'password', pval, contextKey, fname);
+      }
+    }
+
+    // ── Hostname detection (key-based) ──────────────────────────────
+    if (contextKey && hostnameKeys.test(contextKey) && val) {
+      let hval = val.replace(/^['"]|['"]$/g, '').trim();
+      if (hval && !hval.startsWith('{{') && !hval.startsWith('${') &&
+          !hval.startsWith('$env:') && !hval.match(/^\$[A-Za-z]/) &&
+          hval !== 'null' && hval !== '~' && hval !== 'None' &&
+          hval !== 'localhost' && hval.length > 1 &&
+          !hval.match(patterns.ip) && !hval.match(patterns.email) && !hval.includes(' ')) {
+        addFinding(map, 'hostname', hval, contextKey, fname);
+      }
+    }
+
+    // ── Regex-based detection ───────────────────────────────────────
+    scanValueRegexOnly(map, rawValue, contextKey, fname);
+  }
+
+  /** Scan a string with regex patterns only (IPs, emails, FQDNs) */
+  function scanValueRegexOnly(map, text, contextKey, fname) {
+    if (!text) return;
+    let m;
+
+    // IPs
+    const ipRe = new RegExp(patterns.ip.source, 'g');
+    while ((m = ipRe.exec(text)) !== null) {
+      if (!shouldIgnore(m[0])) addFinding(map, 'ip', m[0], contextKey, fname);
+    }
+
+    // Emails
+    const emailRe = new RegExp(patterns.email.source, 'g');
+    while ((m = emailRe.exec(text)) !== null) {
+      if (!shouldIgnore(m[0])) addFinding(map, 'email', m[0], contextKey, fname);
+    }
+
+    // FQDNs
+    const fqdnRe = new RegExp(patterns.fqdn.source, 'g');
+    while ((m = fqdnRe.exec(text)) !== null) {
+      const v = m[0];
+      if (text.includes('@' + v)) continue;
+      if (shouldIgnore(v)) continue;
+      const hKey = 'hostname|' + v;
+      if (map[hKey]) continue;
+      addFinding(map, 'fqdn', v, contextKey, fname);
+    }
+  }
 
   function addFinding(map, type, value, yamlKey, fname) {
     const key = type + '|' + value;
@@ -528,14 +611,14 @@ body {
     const filtered = activeFilter === 'all' ? findings : findings.filter(f => f.type === activeFilter);
 
     findingsBody.innerHTML = filtered.map(f => {
-      const yamlKeysArr = [...f.yamlKeys];
+      const ctxArr = [...f.yamlKeys];
       const filesArr = [...f.files];
       const masked = f.type === 'password' ? maskValue(f.value) : escHtml(f.value);
 
       return `<tr data-type="${f.type}">
         <td><span class="type-badge ${f.type}">${f.type.toUpperCase()}</span></td>
         <td class="val-cell">${masked}</td>
-        <td class="yaml-key">${yamlKeysArr.map(escHtml).join(', ') || '—'}</td>
+        <td class="yaml-key">${ctxArr.map(escHtml).join(', ') || '—'}</td>
         <td class="file-list" title="${filesArr.join(', ')}">${filesArr.join(', ')}</td>
         <td class="occurrences" style="text-align:center">${f.count}</td>
         <td><input class="replacement-input" data-id="${f.id}"
@@ -603,17 +686,14 @@ body {
     const without = findings.length - withReplacements;
 
     const fileNames = Object.keys(files);
-    if (fileNames.length === 1) {
-      // Single file — direct download
-      const fname = fileNames[0];
+    for (const fname of fileNames) {
       const scrubbed = scrubContent(files[fname]);
-      downloadFile(fname.replace(/\.(ya?ml)$/i, '_scrubbed.$1'), scrubbed);
-    } else {
-      // Multiple files — download each with _scrubbed suffix
-      for (const fname of fileNames) {
-        const scrubbed = scrubContent(files[fname]);
-        downloadFile(fname.replace(/\.(ya?ml)$/i, '_scrubbed.$1'), scrubbed);
-      }
+      // Insert _scrubbed before the last extension, or append if no extension
+      const dotIdx = fname.lastIndexOf('.');
+      const outName = dotIdx > 0
+        ? fname.slice(0, dotIdx) + '_scrubbed' + fname.slice(dotIdx)
+        : fname + '_scrubbed';
+      downloadFile(outName, scrubbed);
     }
 
     let msg = `✅ ${fileNames.length} file(s) downloaded with ${withReplacements} replacement(s) applied.`;
@@ -622,7 +702,7 @@ body {
   });
 
   function downloadFile(name, content) {
-    const blob = new Blob([content], { type: 'text/yaml' });
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = name;
