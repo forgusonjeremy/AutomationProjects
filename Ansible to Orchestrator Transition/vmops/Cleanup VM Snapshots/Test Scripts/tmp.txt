@@ -1,7 +1,20 @@
-PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> ./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 1 -ScriptDurationMinutes 20 -MaxParallelJobs 45
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:266 char:90
-+ ... $meta.SshArgs) "cat `${HOME}/.snapshot_io.done 2>/dev/null || echo RU ...
-+                                                                ~~
-The token '||' is not a valid statement separator in this version.
+ 
+PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> .\bulk_generate_DatastoreLatency.ps1 -CsvPath "iscsiservers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh"
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:281 char:29
++ while ($pendingCount -gt 0) {
++                             ~
+Missing closing '}' in statement block or type definition.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:108 char:39
++         if ($attempt -lt $MaxRetries) {
++                                       ~
+Missing closing '}' in statement block or type definition.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:93 char:38
++     while ($attempt -lt $MaxRetries) {
++                                      ~
+Missing closing '}' in statement block or type definition.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:80 char:30
++ function Invoke-SshWithRetry {
++                              ~
+Missing closing '}' in statement block or type definition.
     + CategoryInfo          : ParserError: (:) [], ParseException
-    + FullyQualifiedErrorId : InvalidEndOfLine
+    + FullyQualifiedErrorId : MissingEndCurlyBrace

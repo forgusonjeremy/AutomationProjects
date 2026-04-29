@@ -13,6 +13,12 @@
 #   A sequential sweep pattern ensures every write hits a new block rather
 #   than re-dirtying an already-tracked block.
 #
+# Data pattern:
+#   All writes use random data (/dev/urandom) to prevent zero-block
+#   deduplication by vSphere CBT, vSAN, or thin-provisioned storage.
+#   This ensures every written block registers as a genuine change in
+#   snapshot deltas.
+#
 # Disk usage:
 #   Fixed at --working-set MB. Files are pre-allocated once and overwritten
 #   in place — disk usage does not grow beyond the initial allocation.
@@ -126,22 +132,23 @@ log " Aggregate rate : ${AGG_MBPS} MB/s"
 log " Per-thread rate: ${PER_THREAD_MBPS} MB/s"
 log " Block size     : ${BLOCK_MB}MB"
 log " Sleep/block    : ${SLEEP_PER_BLOCK}s"
+log " Data pattern   : random (/dev/urandom — no zero-block dedup)"
 log " Disk available : ${AVAIL_MB}MB"
 log "====================================================="
 log ""
 
 # ── Worker: rate-controlled sequential sweep ──────────────────────────────────
-# Writes sequentially through the file in BLOCK_MB chunks.
+# Writes sequentially through the file in BLOCK_MB chunks using random data.
 # Sleeps SLEEP_PER_BLOCK seconds after each block to hit the target rate.
 # Sequential pattern guarantees every write hits a previously-untracked block
 # within the current snapshot interval (no re-dirties until after full sweep).
+# Random data (/dev/urandom) prevents zero-block deduplication by CBT/storage.
 dd_worker() {
   local id="$1"
   local file="$IO_DIR/worker_${id}.dat"
 
-  log "  [Worker $id] Allocating ${PER_THREAD_MB}MB working file..."
-  fallocate -l "${PER_THREAD_MB}M" "$file" 2>/dev/null || \
-    dd if=/dev/zero of="$file" bs=1M count="$PER_THREAD_MB" status=none 2>/dev/null
+  log "  [Worker $id] Allocating ${PER_THREAD_MB}MB working file with random data..."
+  dd if=/dev/urandom of="$file" bs=1M count="$PER_THREAD_MB" status=none 2>/dev/null
   log "  [Worker $id] Ready — starting rate-controlled sweep at ${PER_THREAD_MBPS} MB/s"
 
   local pass=0
@@ -155,7 +162,7 @@ dd_worker() {
       local write_start
       write_start=$(date +%s%N)   # nanoseconds for accurate sleep calculation
 
-      dd if=/dev/zero of="$file" bs="${BLOCK_MB}M" count=1 \
+      dd if=/dev/urandom of="$file" bs="${BLOCK_MB}M" count=1 \
          seek="$block" conv=notrunc status=none 2>/dev/null
 
       total_written_mb=$(( total_written_mb + BLOCK_MB ))
@@ -187,31 +194,38 @@ dd_worker() {
 
 # ── fio mode (if available) ───────────────────────────────────────────────────
 # fio's --rate option gives more precise rate control than shell sleep loops.
+# direct=1 bypasses the page cache so writes hit the virtual disk immediately,
+# ensuring CBT tracks every block change accurately.
+# refill_buffers ensures each write uses unique random data (no pattern reuse).
 run_fio() {
-  log "fio detected — using fio rate-controlled mode"
+  log "fio detected — using fio rate-controlled mode (direct I/O + random data)"
 
   local per_thread_kbps
   per_thread_kbps=$(awk "BEGIN { printf \"%d\", $PER_THREAD_MBPS * 1024 }")
 
-  log "  Pre-allocating ${THREADS} worker files..."
+  log "  Pre-allocating ${THREADS} worker files with random data..."
   for i in $(seq 1 "$THREADS"); do
-    fallocate -l "${PER_THREAD_MB}M" "$IO_DIR/worker_${i}.dat" 2>/dev/null || \
-      dd if=/dev/zero of="$IO_DIR/worker_${i}.dat" bs=1M count="$PER_THREAD_MB" status=none 2>/dev/null
+    dd if=/dev/urandom of="$IO_DIR/worker_${i}.dat" bs=1M count="$PER_THREAD_MB" status=progress 2>&1 | tail -1
   done
+  log "  Pre-allocation complete."
 
   local jobfile="$IO_DIR/fio_jobs.ini"
   cat > "$jobfile" <<FIOEOF
 [global]
-ioengine=sync
+ioengine=libaio
 rw=write
 bs=${BLOCK_MB}M
-direct=0
-buffered=1
+direct=1
+buffered=0
 end_fsync=1
 runtime=${DURATION}
 time_based=1
 group_reporting=1
 rate=${per_thread_kbps}k
+randrepeat=0
+refill_buffers=1
+buffer_compress_percentage=0
+iodepth=1
 
 FIOEOF
 
@@ -226,6 +240,7 @@ FIOEOF
 
   log "  Launching fio — ${THREADS} workers at ${PER_THREAD_MBPS} MB/s each..."
   log "  Target aggregate: ${AGG_MBPS} MB/s = ~${TARGET_GB}GB per ${INTERVAL_SEC}s interval"
+  log "  I/O mode: direct=1, random data, no buffer reuse"
   fio "$jobfile" 2>&1 | tee -a "$LOG_FILE"
 }
 

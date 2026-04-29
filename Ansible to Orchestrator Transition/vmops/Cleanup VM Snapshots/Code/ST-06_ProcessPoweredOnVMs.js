@@ -119,7 +119,14 @@ if (onCands.length === 0) {
         var inFlightSlots      = [];
         var vmInFlight         = {};   // vmMoRef -> true if a task is active for that VM
         var currentConcurrency = 1;
-        var qi                 = 0;
+
+        // pending holds all candidates not yet dispatched.
+        // Entries are only removed when actually dispatched (or deferred due to
+        // a governor timeout). Candidates skipped because their VM is in-flight
+        // remain in pending and are retried on the next harvest cycle.
+        // This is the fix for the qi-pointer bug where vmInFlight skips
+        // permanently consumed queue entries for subsequent VM snapshots.
+        var pending = queue.slice();
 
         LOG.ok("PROCESSING", "Starting adaptive dispatch -- initial concurrency: 1 of " +
                maxParallel + " max");
@@ -142,7 +149,7 @@ if (onCands.length === 0) {
             }
         }
 
-        while (qi < queue.length || inFlightSlots.length > 0) {
+        while (pending.length > 0 || inFlightSlots.length > 0) {
 
             // ── Harvest completed slots ───────────────────────────────────────
             var stillActive    = [];
@@ -214,21 +221,21 @@ if (onCands.length === 0) {
             // Only ramp when slots just completed (we have real post-delete
             // metrics to evaluate), queue still has work, and we're below max.
             if (completedCount > 0 &&
-                qi < queue.length &&
+                pending.length > 0 &&
                 inFlightSlots.length < maxParallel &&
                 currentConcurrency < maxParallel) {
 
                 // Find the next candidate not already being processed on its VM
                 var nextIdx = -1;
-                for (var ni = qi; ni < queue.length; ni++) {
-                    if (!vmInFlight[queue[ni].vmMoRef]) {
+                for (var ni = 0; ni < pending.length; ni++) {
+                    if (!vmInFlight[pending[ni].vmMoRef]) {
                         nextIdx = ni;
                         break;
                     }
                 }
 
                 if (nextIdx >= 0) {
-                    var nextCand   = queue[nextIdx];
+                    var nextCand   = pending[nextIdx];
                     var nextDsRefs = nextCand.datastoreMoRefs || [];
                     var govOk      = checkGovernorDelta(vcConn, nextDsRefs,
                                         nextCand.vmName, dsBaseline);
@@ -249,12 +256,18 @@ if (onCands.length === 0) {
             // Hard constraints:
             //   - Total in-flight <= currentConcurrency
             //   - Never dispatch a second task for a VM already in-flight
-            while (qi < queue.length && inFlightSlots.length < currentConcurrency) {
-                var cand = queue[qi];
+            // We iterate pending[] by index. When a candidate is dispatched
+            // (or permanently deferred) it is spliced out of pending so it is
+            // never revisited. When it is skipped due to vmInFlight the index
+            // advances but the entry stays in pending for the next cycle.
+            var di = 0;
+            while (di < pending.length && inFlightSlots.length < currentConcurrency) {
+                var cand = pending[di];
 
-                // Skip: this VM already has an active task
+                // Skip: this VM already has an active task -- leave in pending,
+                // advance index, try the next candidate.
                 if (vmInFlight[cand.vmMoRef]) {
-                    qi++;
+                    di++;
                     continue;
                 }
 
@@ -263,19 +276,18 @@ if (onCands.length === 0) {
                              cand.snapshotName + "'  (age: " +
                              cand.snapshotAgeMinutes + " min)";
 
-                // Governor check before dispatch (pre-check for first slot
-                // and whenever we are filling empty slots)
+                // Governor check before dispatch
                 var govOk3 = checkGovernorDelta(vcConn, dsRefs,
                                  cand.vmName, dsBaseline);
                 if (!govOk3) {
                     if (inFlightSlots.length === 0) {
                         // Nothing running -- wait and retry
                         var holdAttempts = 0;
-                        while (!govOk3 && holdAttempts < maxGovernorWaitMinutes ) {
+                        while (!govOk3 && holdAttempts < 120) {
                             LOG.hold("PROCESSING",
                                 "Storage too busy to start first task. " +
                                 "Waiting " + Math.round(govPollMs/1000) + "s... " +
-                                "(attempt " + (holdAttempts+1) + " of " + maxGovernorWaitMinutes  + ")  -- " + label);
+                                "(attempt " + (holdAttempts+1) + " of 120)  -- " + label);
                             System.sleep(govPollMs);
                             holdAttempts++;
                             govOk3 = checkGovernorDelta(vcConn, dsRefs,
@@ -286,8 +298,8 @@ if (onCands.length === 0) {
                                 "Storage did not settle -- deferring: " + label);
                             logArr.push(makeEntry(cand,"deferred",false,
                                 "Storage I/O governor max wait exceeded",null,0));
-                            qi++;
-                            continue;
+                            pending.splice(di, 1);  // remove permanently
+                            continue;  // di already points to next entry after splice
                         }
                     } else {
                         // Other tasks are running -- break inner loop and wait
@@ -296,7 +308,10 @@ if (onCands.length === 0) {
                     }
                 }
 
-                qi++;
+                // Remove from pending -- this candidate is being handled now
+                pending.splice(di, 1);
+                // Note: di is NOT incremented; after splice the next entry
+                // slides into position di automatically.
 
                 if (dryRun) {
                     LOG.dryrun("PROCESSING", "Would delete:  " + label);
@@ -361,38 +376,64 @@ function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
             continue;
         }
 
+        // Metrics are in curr.aggregate (per-host shape from new getDatastoreMetrics).
+        // Use MAX latency (worst host) not average -- a single saturated host is
+        // enough to cause I/O problems even if the others are idle.
+        var agg  = curr.aggregate || {};
         var base = baseline[r];
+        var baseAgg = (base && base.aggregate) ? base.aggregate : {};
 
-        // VMFS latency delta check
-        var curLat  = (curr.readLatencyMs !== null ? curr.readLatencyMs : 0) +
-                      (curr.writeLatencyMs !== null ? curr.writeLatencyMs : 0);
-        var baseLat = base
-            ? ((base.readLatencyMs !== null ? base.readLatencyMs : 0) +
-               (base.writeLatencyMs !== null ? base.writeLatencyMs : 0))
-            : 0;
+        // ── VMFS / NFS latency check ──────────────────────────────────────────
+        // maxWriteLatencyMs is the most sensitive signal -- write latency on
+        // the busiest host. Fall back to avgWriteLatencyMs if max is null.
+        var curW  = agg.maxWriteLatencyMs  !== null && agg.maxWriteLatencyMs  !== undefined
+                        ? agg.maxWriteLatencyMs
+                        : (agg.avgWriteLatencyMs || 0);
+        var curR  = agg.maxReadLatencyMs   !== null && agg.maxReadLatencyMs   !== undefined
+                        ? agg.maxReadLatencyMs
+                        : (agg.avgReadLatencyMs  || 0);
+        var curLat = Math.max(curW, curR);   // use whichever is worse
+
+        var baseW  = baseAgg.maxWriteLatencyMs !== null && baseAgg.maxWriteLatencyMs !== undefined
+                         ? baseAgg.maxWriteLatencyMs
+                         : (baseAgg.avgWriteLatencyMs || 0);
+        var baseR  = baseAgg.maxReadLatencyMs  !== null && baseAgg.maxReadLatencyMs  !== undefined
+                         ? baseAgg.maxReadLatencyMs
+                         : (baseAgg.avgReadLatencyMs  || 0);
+        var baseLat = Math.max(baseW, baseR);
+
         var deltaLat = Math.max(0, curLat - baseLat);
+        var threshold = latencyThresholdMs || 30;
 
-        if (curLat + deltaLat > (latencyThresholdMs || 30)) {
+        if (curLat > threshold) {
             LOG.hold("PROCESSING",
-                "Datastore " + r + " latency " + curLat.toFixed(1) +
-                "ms + projected delta " + deltaLat.toFixed(1) +
-                "ms would exceed " + (latencyThresholdMs||30) + "ms threshold" +
-                " for VM '" + vmName + "'");
+                "Datastore " + r + " worst-host latency " + curLat.toFixed(1) +
+                "ms already exceeds " + threshold + "ms threshold" +
+                " (hotHost=" + (agg.hotHost || "unknown") + ")" +
+                " -- holding for VM '" + vmName + "'");
             return false;
         }
 
-        // vSAN congestion delta check
-        if (curr.vsanCongestion !== null) {
-            var curCong  = curr.vsanCongestion || 0;
-            var baseCong = base && base.vsanCongestion !== null
-                ? base.vsanCongestion : 0;
+        if (curLat + deltaLat > threshold) {
+            LOG.hold("PROCESSING",
+                "Datastore " + r + " worst-host latency " + curLat.toFixed(1) +
+                "ms + projected delta " + deltaLat.toFixed(1) +
+                "ms would exceed " + threshold + "ms threshold" +
+                " -- holding for VM '" + vmName + "'");
+            return false;
+        }
+
+        // ── vSAN congestion check ─────────────────────────────────────────────
+        if (agg.maxVsanCongestion !== null && agg.maxVsanCongestion !== undefined) {
+            var curCong  = agg.maxVsanCongestion  || 0;
+            var baseCong = baseAgg.maxVsanCongestion || 0;
             var deltaCong = Math.max(0, curCong - baseCong);
-            if (curCong + deltaCong > (vsanCongestionThresh || 50)) {
+            var congThresh = vsanCongestionThresh || 50;
+            if (curCong > congThresh || curCong + deltaCong > congThresh) {
                 LOG.hold("PROCESSING",
                     "Datastore " + r + " vSAN congestion " + curCong.toFixed(1) +
-                    " + projected delta " + deltaCong.toFixed(1) +
-                    " would exceed " + (vsanCongestionThresh||50) + " threshold" +
-                    " for VM '" + vmName + "'");
+                    " exceeds or would exceed " + congThresh + " threshold" +
+                    " -- holding for VM '" + vmName + "'");
                 return false;
             }
         }
