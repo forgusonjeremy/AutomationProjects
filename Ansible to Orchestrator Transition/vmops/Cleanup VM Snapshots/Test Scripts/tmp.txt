@@ -1,17 +1,19 @@
-+                             ~
-Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:108 char:39
-+         if ($attempt -lt $MaxRetries) {
-+                                       ~
-Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:93 char:38
-+     while ($attempt -lt $MaxRetries) {
-+                                      ~
-Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:80 char:30
-+ function Invoke-SshWithRetry {
-+                              ~
-Missing closing '}' in statement block or type definition.
-    + CategoryInfo          : ParserError: (:) [], ParseException
-    + FullyQualifiedErrorId : MissingEndCurlyBrace
-    
+PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1' -CsvPath "C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\iscsiservers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh"
+At line:1 char:174
++ ... ots\Test Scripts\bulk_generate_DatastoreLatency.ps1' -CsvPath "C:\Use ...
++                                                          ~~~~~~~~
+Unexpected token '-CsvPath' in expression or statement.
+At line:1 char:183
++ ... 1' -CsvPath "C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProj ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unexpected token '"C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\iscsiservers.csv"' in expression or statement.
+At line:1 char:338
++ ... VM Snapshots\Test Scripts\iscsiservers.csv" -ScriptRemotePath "/tmp/g ...
++                                                 ~~~~~~~~~~~~~~~~~
+Unexpected token '-ScriptRemotePath' in expression or statement.
+At line:1 char:356
++ ... siservers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh"
++                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unexpected token '"/tmp/generate_datastore_latency.sh"' in expression or statement.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
