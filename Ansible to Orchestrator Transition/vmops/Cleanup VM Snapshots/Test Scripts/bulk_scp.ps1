@@ -1,7 +1,7 @@
 # bulk_scp.ps1
 # Usage: .\bulk_scp.ps1 -FilePath "C:\path\to\file.txt" -CsvPath "servers.csv"
 #
-# Transfers files using SSH pipe (cat >) rather than scp to prevent Windows
+# Transfers files using SSH pipe rather than scp to prevent Windows
 # OpenSSH from introducing CRLF line endings during transfer.
 #
 # CSV format (headers required):
@@ -17,7 +17,7 @@ param(
 
     [switch]$StopOnError,
 
-    [int]$MaxRetries = 3           # Retry each transfer on failure (network resilience)
+    [int]$MaxRetries = 3
 )
 
 # --- Validate inputs ---
@@ -53,18 +53,18 @@ foreach ($col in $requiredCols) {
     }
 }
 
-
-# ── Resilience: SSH retry helper ─────────────────────────────────────────────
-# Retries any SSH command up to $MaxRetries times with exponential backoff.
-# Handles transient failures from network latency, packet drops, and
-# temporary disconnects without failing the entire run.
+# ── Resilience: SSH retry helper ──────────────────────────────────────────────
+# Retries any SSH call up to MaxRetries times with exponential backoff.
+# ConnArgs  : connection-only args (no command)
+# Command   : remote command string passed as final SSH argument
+# InputData : optional string to pipe to remote stdin
 function Invoke-SshWithRetry {
     param(
-        [string[]]$SshArgs,
+        [string[]]$ConnArgs,
         [string]$Command,
-        [int]$MaxRetries   = 3,
-        [int]$RetryDelayMs = 5000,   # Initial delay — doubles on each retry
-        [string]$InputData = $null   # Optional stdin to pipe
+        [int]$MaxRetries    = 3,
+        [int]$RetryDelayMs  = 5000,
+        [string]$InputData  = $null
     )
 
     $attempt  = 0
@@ -74,10 +74,10 @@ function Invoke-SshWithRetry {
     while ($attempt -lt $MaxRetries) {
         $attempt++
         try {
-            if ($InputData) {
-                $output   = $InputData | & ssh @SshArgs $Command 2>&1
+            if ($null -ne $InputData) {
+                $output = $InputData | & ssh @ConnArgs $Command 2>&1
             } else {
-                $output   = & ssh @SshArgs $Command 2>&1
+                $output = & ssh @ConnArgs $Command 2>&1
             }
             $lastExit = $LASTEXITCODE
             if ($lastExit -eq 0) { break }
@@ -87,8 +87,8 @@ function Invoke-SshWithRetry {
         }
 
         if ($attempt -lt $MaxRetries) {
-            $delay = $RetryDelayMs * [math]::Pow(2, $attempt - 1)
-            Write-Host "    [RETRY] Attempt $attempt failed (exit $lastExit) — retrying in $([math]::Round($delay/1000,1))s..." -ForegroundColor DarkYellow
+            $delay = [int]($RetryDelayMs * [math]::Pow(2, $attempt - 1))
+            Write-Host "    [RETRY] Attempt $attempt failed (exit $lastExit) - retrying in $([math]::Round($delay/1000,1))s..." -ForegroundColor DarkYellow
             Start-Sleep -Milliseconds $delay
         }
     }
@@ -110,7 +110,7 @@ $successCount = 0
 $failCount    = 0
 
 Write-Host "`nStarting transfers for: $FilePath" -ForegroundColor Cyan
-Write-Host "Method  : SSH pipe (cat `>) - CRLF-safe" -ForegroundColor Cyan
+Write-Host "Method  : SSH pipe - CRLF-safe" -ForegroundColor Cyan
 Write-Host "Servers : $($servers.Count)`n" -ForegroundColor Cyan
 
 foreach ($row in $servers) {
@@ -126,20 +126,21 @@ foreach ($row in $servers) {
 
     Write-Host "[$server] Transferring to ${username}@${server}:${remotePath} ..." -ForegroundColor Yellow
 
-    $sshArgs = @(
+    # Connection args only — no command here
+    $connArgs = @(
         "-o", "StrictHostKeyChecking=no",
         "-o", "BatchMode=yes",
         "-o", "ConnectTimeout=30",
         "-o", "ServerAliveInterval=15",
         "-o", "ServerAliveCountMax=4",
         "-p", $port,
-        "${username}@${server}",
-        "cat > '$remotePath'"
+        "${username}@${server}"
     )
 
-    # Transfer with retry — handles transient network issues
-    $transferResult = Invoke-SshWithRetry -SshArgs $sshArgs `
-        -Command "cat > '$remotePath'" `
+    # Transfer with retry
+    $remoteCmd    = "cat > $remotePath"
+    $transferResult = Invoke-SshWithRetry -ConnArgs $connArgs `
+        -Command $remoteCmd `
         -InputData $fileContent `
         -MaxRetries $MaxRetries
     $exitCode = $transferResult.ExitCode
@@ -148,14 +149,14 @@ foreach ($row in $servers) {
         Write-Host "[$server] Transfer succeeded after $($transferResult.Attempts) attempts" -ForegroundColor DarkYellow
     }
 
-    # Strip \r bytes unconditionally — retry on transient failure
+    # Strip CRLF and verify — retry each step on transient failure
     if ($exitCode -eq 0) {
-        $stripResult = Invoke-SshWithRetry -SshArgs $sshArgs `
-            -Command "sed -i 's/\r//' '$remotePath'" `
-            -MaxRetries $MaxRetries
-        
-        $verifyResult = Invoke-SshWithRetry -SshArgs $sshArgs `
-            -Command "grep -cP '\r' '$remotePath' 2>/dev/null || echo 0" `
+        $stripResult = Invoke-SshWithRetry -ConnArgs $connArgs `
+            -Command "sed -i s/\r// $remotePath" `
+            -MaxRetries $MaxRetries | Out-Null
+
+        $verifyResult = Invoke-SshWithRetry -ConnArgs $connArgs `
+            -Command "grep -cP \r $remotePath 2>/dev/null || echo 0" `
             -MaxRetries $MaxRetries
         $crlfCount = $verifyResult.Output.Trim()
 
