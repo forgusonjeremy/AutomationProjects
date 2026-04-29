@@ -1,10 +1,17 @@
-.\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1' -CsvPath ./servers.csv  //copies gen io script to VMs
-
-./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 2 -ScriptDurationMinutes 360 -MaxParallelJobs 45  //runs the gen io script inside each VM, target delta disk size 2GB, for 27 minutes.  10 VMs per datastore should create 200GB of deltas since workflow to create snapshots takes snapshots at 3 minute intervals
-
-./Stop-SnapshotIO.ps1 -CsvPath .\servers.csv -MaxParallelJobs 40  //stops existing generate_snapshot_io.sh processes
+#Test environment
+CVS-DEV instance of VCF 9 within the SLS Library
+VMs deployed via VCF Automation using the CentOS
 
 
+#File descriptions
+servers.csv                     - csv file containing all servers upon which to perform operations
+generate_snapshot_io.sh         - script to cause disk churn within VMs so as to create snapshot delta files of size to simulate real world snapshot sizes
+generate_datastore_latency.sh   - script to cause moderate disk I/O within guest VMs to force datastore to exhibit signs of real world activity
+bulk_scp.ps1                    - performs bulk SCP operations to servers listed in the servers.csv file.  No password is required
+bulk_generate_snapshot_io.ps1   - used to execute generate_snapshot_io.sh script on all servers listed in the csv file listed in the -CsvPath parameter
+Stop-SnapshotIO.ps1             - kills process and cleans up files created by the generate_snapshot_io.sh script on all servers listed in the csv file listed in the -CsvPath parameter
+
+In case there are any errors cleaning up files with the Stop-SnapshotIO.ps1 file, run the below code to clean up files in the servers in the csv file
 
 $servers = Import-Csv "servers.csv"
 foreach ($row in $servers) {
@@ -14,7 +21,24 @@ foreach ($row in $servers) {
     Write-Host "$($row.Server): $result"
 }
 
-.\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\OrchestratorWorkflows\vCenter\vms\snapshots\Test Scripts\generate_datastore_latency.sh' -CsvPath ./servers.csv     
+
+To prepare an environment for snapshot workflow testing / demonstration
+
+1. Update servers.csv file with the IPs and ssh username
+#Copy generate_snapshot_io.sh script to all servers in the servers.csv file
+.\bulk_scp.ps1 -FilePath '<path to file>\generate_snapshot_io.sh' -CsvPath ./servers.csv  
+
+
+#Launch the bu
+.\bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 2 -ScriptDurationMinutes 360 -MaxParallelJobs 45  //runs the gen io script inside each VM, target delta disk size 2GB, for 27 minutes.  10 VMs per datastore should create 200GB of deltas since workflow to create snapshots takes snapshots at 3 minute intervals
+
+./Stop-SnapshotIO.ps1 -CsvPath .\servers.csv -MaxParallelJobs 40  //stops existing generate_snapshot_io.sh processes
+
+
+
+
+
+.\bulk_scp.ps1 -FilePath '<path to file>\generate_datastore_latency.sh' -CsvPath ./servers.csv     
 
 //vSAN
 ./bulk_generate_DatastoreLatency.ps1 -CsvPath ./vsanservers.csv -ScriptRemotePath "/tmp/generate_datastore_latency.sh" -DurationSeconds 1200 -Workers 8 -IoDepth 16
@@ -23,8 +47,4 @@ foreach ($row in $servers) {
 ./bulk_generate_DatastoreLatency.ps1 -CsvPath ./iscsiservers.csv -ScriptRemotePath "/tmp/generate_datastore_latency.sh" -DurationSeconds 1200 -Workers 1 -IoDepth 1
 
 
-./Stop-DatastoreLatency.ps1 -CsvPath vsanservers.csv
-./Stop-DatastoreLatency.ps1 -CsvPath iscsiservers.csv
-
-
-Snapshot used by Content Library
+./Stop-DatastoreLatency.ps1 -CsvPath servers.csv
