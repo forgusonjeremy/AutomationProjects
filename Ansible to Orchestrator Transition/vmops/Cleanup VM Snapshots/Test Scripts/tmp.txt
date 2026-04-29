@@ -1,12 +1,17 @@
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_scp.ps1:74 char:38
++                             ~
+Missing closing '}' in statement block or type definition.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:108 char:39
++         if ($attempt -lt $MaxRetries) {
++                                       ~
+Missing closing '}' in statement block or type definition.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:93 char:38
 +     while ($attempt -lt $MaxRetries) {
 +                                      ~
 Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_scp.ps1:61 char:30
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:80 char:30
 + function Invoke-SshWithRetry {
 +                              ~
 Missing closing '}' in statement block or type definition.
     + CategoryInfo          : ParserError: (:) [], ParseException
     + FullyQualifiedErrorId : MissingEndCurlyBrace
- 
-PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> 
+    

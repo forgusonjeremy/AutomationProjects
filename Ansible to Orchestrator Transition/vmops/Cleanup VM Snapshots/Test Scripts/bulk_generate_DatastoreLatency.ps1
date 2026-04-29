@@ -1,21 +1,21 @@
-# Invoke-DatastoreLatency.ps1
+# bulk_generate_DatastoreLatency.ps1
 # Connects to each server in the CSV and launches generate_datastore_latency.sh
 # under nohup so it survives the SSH session. Polls for completion from the
 # main thread — no per-job sleep loops so it scales to any number of VMs.
 #
 # Usage:
-#   .\Invoke-DatastoreLatency.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh"
+#   .\bulk_generate_DatastoreLatency.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh"
 #
 # Custom duration and workers:
-#   .\Invoke-DatastoreLatency.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh" `
+#   .\bulk_generate_DatastoreLatency.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh" `
 #       -DurationSeconds 1200 -Workers 16
 #
 # With aggressive mode and higher I/O depth:
-#   .\Invoke-DatastoreLatency.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh" `
+#   .\bulk_generate_DatastoreLatency.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh" `
 #       -DurationSeconds 600 -Workers 16 -IoDepth 64 -Aggressive
 #
 # Full example:
-#   .\Invoke-DatastoreLatency.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh" `
+#   .\bulk_generate_DatastoreLatency.ps1 -CsvPath "servers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh" `
 #       -DurationSeconds 600 -Workers 16 -IoDepth 64 -Aggressive `
 #       -MaxParallelJobs 25 -JobTimeoutMinutes 30
 #
