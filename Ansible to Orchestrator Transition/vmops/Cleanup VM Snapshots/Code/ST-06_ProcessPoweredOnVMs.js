@@ -3,59 +3,92 @@
  * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE)
  * ─────────────────────────────────────────────────────────────────────────────
  * Processes snapshots on powered-on and suspended VMs. For each candidate:
- *   1. Enforces per-vCenter concurrency limit (maxParallel simultaneous tasks).
- *   2. Runs adaptive I/O governor pre-check — waits if storage is too busy.
- *   3. Calls deleteSnapshot action which performs VM safety checks and executes
- *      the vCenter task.
- *   4. Captures pre/post I/O metrics for governor self-calibration.
- *   5. Appends a log entry to runLog for each outcome.
+ *   1. Starts with a single concurrent task, ramping up as storage permits.
+ *   2. Enforces one active task per VM at a time (hard constraint).
+ *   3. Runs adaptive I/O governor pre-check before each dispatch -- holds if
+ *      the worst-host latency on the candidate's datastores exceeds threshold.
+ *   4. Dispatches each deletion asynchronously via the wrapper workflow
+ *      (wrapperWf) which calls the _deleteSnapshot action in a child run.
+ *   5. Harvests completed slots, ramps concurrency, and dispatches new tasks
+ *      each cycle until the pending queue is empty.
+ *   6. Appends a log entry to runLog for each outcome.
  *
- * Governor calibration state (datastoreStateJson) is passed to ST-07 so the
- * powered-off fast lane inherits the observed impact deltas from this lane and
- * does not have to start calibrating from scratch on shared datastores.
+ * Snapshot candidates are identified by VM name + snapshot name only. No
+ * MoRefs are stored at scan time -- all resolution happens at deletion time
+ * inside _deleteSnapshot against the live vCenter inventory.
  *
- * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name                     vRO Type  Source / Description
- *   ─────────────────────────────────────────────────────────────────────────────────────────────
- *   onCandidatesJson         string    Attribute: onCandidatesJson
- *                                      Chain-ordered list of powered-on/suspended VM snapshots
- *                                      from ST-05.
- *   runId                    string    Attribute: runId
- *                                      Included in each log entry so every action can be
- *                                      traced back to this specific run.
- *   runLog                   string    Attribute: runLog
- *                                      Accumulates one entry per snapshot processed.
- *                                      Passed forward to ST-07 and finally ST-09.
- *   dryRun                   boolean   Workflow Input: dryRun
- *                                      When true, deleteSnapshot logs [DRY-RUN] and returns
- *                                      immediately without submitting a vCenter task.
- *   latencyThresholdMs       number    Workflow Input: latencyThresholdMs
- *                                      VMFS/NFS governor ceiling. The governor projects
- *                                      current + observed delta; if projection exceeds this
- *                                      value the next task is held until I/O settles.
- *   vsanCongestionThresh     number    Workflow Input: vsanCongestionThresh
- *                                      vSAN congestion governor ceiling (0-255).
- *   vsanResyncThresholdBytes number    Attribute: vsanResyncThresholdBytes
- *                                      vSAN resync queue ceiling in bytes (converted by ST-01).
- *   govPollMs                number    Attribute: govPollMs
- *                                      Milliseconds between governor re-checks when a task
- *                                      is on hold (converted by ST-01).
- *   maxParallel              number    Attribute: maxParallel
- *                                      Maximum concurrent consolidation tasks per vCenter
- *                                      for powered-on VMs (validated by ST-01).
- *   taskTimeoutSeconds       number    Workflow Input: taskTimeoutSeconds
- *                                      Passed to deleteSnapshot. Maximum seconds to wait
- *                                      for the vCenter removal task to reach success or error.
+ * ── EXTERNALLY PROVIDED VALUES ────────────────────────────────────────────────
+ * All values below are injected by vRO at runtime from workflow inputs,
+ * workflow attributes, or workflow-level variable bindings. None are declared
+ * as JavaScript variables in this script -- vRO makes them available
+ * automatically in the script execution context.
+ *
+ *   Name                     vRO Type   Source
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   WORKFLOW INPUTS (set by the operator when running the workflow):
+ *
+ *   dryRun                   boolean    Workflow Input
+ *                                       When true, logs [DRY-RUN] and skips the
+ *                                       actual vCenter task submission.
+ *   latencyThresholdMs       number     Workflow Input
+ *                                       VMFS/NFS governor ceiling in ms. Governor
+ *                                       uses worst-host (max) latency across all
+ *                                       hosts mounting the datastore.
+ *   vsanCongestionThresh     number     Workflow Input
+ *                                       vSAN congestion governor ceiling (0-255).
+ *   taskTimeoutSeconds       number     Workflow Input
+ *                                       Max seconds to wait for each vCenter
+ *                                       snapshot removal task to complete.
+ *
+ *   WORKFLOW ATTRIBUTES (set at design time or by earlier scriptable tasks):
+ *
+ *   onCandidatesJson         string     Attribute: onCandidatesJson
+ *                                       Newest-first ordered list of powered-on
+ *                                       and suspended VM snapshot candidates from
+ *                                       ST-05. Each entry contains vmMoRef,
+ *                                       vmName, snapshotName, snapshotCreatedMs,
+ *                                       and datastoreMoRefs.
+ *   runId                    string     Attribute: runId
+ *                                       Unique identifier for this workflow run.
+ *                                       Included in every log entry.
+ *   runLog                   string     Attribute: runLog
+ *                                       Accumulating JSON array of log entries.
+ *                                       Updated by this task and passed forward
+ *                                       to ST-07 and ST-09.
+ *   vsanResyncThresholdBytes number     Attribute: vsanResyncThresholdBytes
+ *                                       vSAN resync queue ceiling in bytes
+ *                                       (converted from GB by ST-01).
+ *   govPollMs                number     Attribute: govPollMs
+ *                                       Milliseconds between governor re-checks
+ *                                       when a task is held (converted by ST-01).
+ *   maxParallel              number     Attribute: maxParallel
+ *                                       Maximum concurrent deletion tasks per
+ *                                       vCenter. Concurrency ramps from 1 up to
+ *                                       this value as storage permits.
+ *
+ *   WORKFLOW-LEVEL VARIABLE BINDING (hardset in the vRO Designer):
+ *
+ *   wrapperWf                Workflow   Attribute: wrapperWf
+ *                                       Bound to the "Adaptive Snapshot Delete
+ *                                       Task" child workflow. ST-06 calls
+ *                                       wrapperWf.execute(props) to dispatch each
+ *                                       deletion asynchronously. The returned
+ *                                       token is polled for completion during each
+ *                                       harvest cycle. This attribute must be
+ *                                       hardset to the wrapper workflow object in
+ *                                       the vRO Designer -- it is never assigned
+ *                                       in script.
  *
  * ── OUTPUTS ──────────────────────────────────────────────────────────────────
  *   Name                vRO Type  Description
- *   ─────────────────────────────────────────────────────────────────────────────────────────────
- *   datastoreStateJson  string    JSON object keyed by datastore MoRef. Each entry holds
- *                                 lastPre and lastPost metric snapshots from the most recent
- *                                 consolidation on that datastore. Passed to ST-07 so the
- *                                 fast lane inherits calibration data from this lane.
- *   runLog              string    Updated JSON array. Contains one entry per snapshot
- *                                 processed, with action, success flag, skip reason,
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   datastoreStateJson  string    JSON object keyed by datastore MoRef. Holds
+ *                                 lastPre and lastPost metric snapshots from the
+ *                                 most recent deletion on each datastore. Passed
+ *                                 to ST-07 so the fast lane inherits governor
+ *                                 calibration data from this lane.
+ *   runLog              string    Updated JSON array with one entry per snapshot
+ *                                 processed: action, success flag, skip reason,
  *                                 duration, and any error message.
  */
 var LOG = {
