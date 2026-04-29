@@ -1,16 +1,154 @@
-2026-04-29 09:28:46.545 -04:00ERROR(com.broadcom.pso.vc.vm.snapshots/_deleteSnapshot) Error in (Dynamic Script Module name : _deleteSnapshot#31) SyntaxError: Unexpected token: s
-2026-04-29 09:28:46.553 -04:00ERRORWorkflow execution stack:
-***
-item: '#Adaptive Snapshot Delete Task/item1', state: 'failed', business state: 'null', exception: 'SyntaxError: Unexpected token: s (Dynamic Script Module name : _deleteSnapshot#31)'
-workflow: '#Adaptive Snapshot Delete Task' (584d6306-c37a-4498-ae44-9802eea5c30e) 
-|  'input': name=vcenterSdkConnection type=VC:SdkConnection value=dunes://service.dunes.ch/CustomSDKObject?id='cvsd26vcfvc001.connect.lab'&dunesName='VC:SdkConnection'
-|  'input': name=vmMoRef type=string value=vm-1072
-|  'input': name=snapshotName type=string value=snapshot-2
-|  'input': name=vmName type=string value=snaptestds209
-|  'input': name=datastoreMoRefsJson type=string value=["datastore-96"]
-|  'input': name=dryRun type=boolean value=false
-|  'input': name=taskTimeoutSeconds type=number value=1800.0
-|  'input': name=snapshotCreatedMs type=number value=1.777466640787E12
-|  'output': name=resultJson type=string value=null
-|  'no attributes'
-*** End of execution stack.
+2026-04-29 09:37:50.312 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      ================================================
+2026-04-29 09:37:50.313 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Adaptive Snapshot Cleanup  --  Starting up
+2026-04-29 09:37:50.314 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Run ID      : SCR-2026-04-29T13-37-50
+2026-04-29 09:37:50.315 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Mode        : LIVE  (snapshots WILL be deleted)
+2026-04-29 09:37:50.316 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Age limit   : Snapshots older than 1 minute(s)
+2026-04-29 09:37:50.317 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Name filter : None  (all snapshot names are eligible)
+2026-04-29 09:37:50.318 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Desc ignore : Skip if description contains any of: 'Snapshot used by Content Library'
+2026-04-29 09:37:50.319 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        I/O ceiling : 30ms latency  |  vSAN congestion max 50/255
+2026-04-29 09:37:50.320 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]        Parallelism : Up to 20 simultaneous cleanup(s) per vCenter
+2026-04-29 09:37:50.321 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      ================================================
+2026-04-29 09:37:50.334 -04:00INFO[SNAPSHOT-CLEANUP] [STARTUP] [OK]      Lock acquired -- this is the only active cleanup run  [SCR-2026-04-29T13-37-50]
+2026-04-29 09:37:50.344 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      Scanning 1 vCenter(s) for eligible snapshots...
+2026-04-29 09:37:50.345 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]        Connecting to: https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-29 09:37:50.385 -04:00INFO_getSnapshotCandidates: found 65 VMs on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-29 09:37:50.386 -04:00INFO_getSnapshotCandidates: sample vm.id='vm-1016'  vm.name='Windows-2022-template'
+2026-04-29 09:37:50.389 -04:00INFOSKIP (desc match): VM=snaptestds307 snap=snapshot-5
+2026-04-29 09:37:50.391 -04:00INFOSKIP (desc match): VM=snaptestds209 snap=snapshot-3
+2026-04-29 09:37:50.393 -04:00INFOSKIP (desc match): VM=snaptestvsan10 snap=snapshot-3
+2026-04-29 09:37:50.398 -04:00INFOSKIP (desc match): VM=snaptestds308 snap=snapshot-3
+2026-04-29 09:37:50.400 -04:00INFOSKIP (desc match): VM=snaptestds208 snap=snapshot-1
+2026-04-29 09:37:50.401 -04:00INFOSKIP (desc match): VM=snaptestds208 snap=snapshot-5
+2026-04-29 09:37:50.403 -04:00INFOSKIP (desc match): VM=snaptestds207 snap=snapshot-5
+2026-04-29 09:37:50.406 -04:00INFOSKIP (desc match): VM=snaptestds110 snap=snapshot-1
+2026-04-29 09:37:50.408 -04:00INFOSKIP (desc match): VM=snaptestds210 snap=snapshot-1
+2026-04-29 09:37:50.410 -04:00INFOSKIP (desc match): VM=snaptestds310 snap=snapshot-1
+2026-04-29 09:37:50.412 -04:00INFOSKIP (desc match): VM=snaptestds108 snap=snapshot-3
+2026-04-29 09:37:50.416 -04:00INFOSKIP (desc match): VM=snaptestvsan04 snap=snapshot-1
+2026-04-29 09:37:50.417 -04:00INFOSKIP (desc match): VM=snaptestvsan04 snap=snapshot-5
+2026-04-29 09:37:50.420 -04:00INFOSKIP (desc match): VM=snaptestds101 snap=snapshot-3
+2026-04-29 09:37:50.422 -04:00INFOSKIP (desc match): VM=snaptestds102 snap=snapshot-5
+2026-04-29 09:37:50.423 -04:00INFOSKIP (desc match): VM=snaptestds103 snap=snapshot-3
+2026-04-29 09:37:50.426 -04:00INFOSKIP (desc match): VM=snaptestds105 snap=snapshot-5
+2026-04-29 09:37:50.428 -04:00INFOSKIP (desc match): VM=snaptestds306 snap=snapshot-3
+2026-04-29 09:37:50.429 -04:00INFOSKIP (desc match): VM=snaptestds306 snap=snapshot-5
+2026-04-29 09:37:50.432 -04:00INFOSKIP (desc match): VM=snaptstvsan01 snap=snapshot-3
+2026-04-29 09:37:50.443 -04:00INFOSKIP (desc match): VM=snaptestds203 snap=snapshot-2
+2026-04-29 09:37:50.444 -04:00INFOSKIP (desc match): VM=snaptestds203 snap=snapshot-5
+2026-04-29 09:37:50.447 -04:00INFOSKIP (desc match): VM=snaptestds302 snap=snapshot-3
+2026-04-29 09:37:50.449 -04:00INFOSKIP (desc match): VM=snaptestds205 snap=snapshot-3
+2026-04-29 09:37:50.450 -04:00INFOSKIP (desc match): VM=snaptestds205 snap=snapshot-5
+2026-04-29 09:37:50.452 -04:00INFOSKIP (desc match): VM=snaptestvsan07 snap=snapshot-1
+2026-04-29 09:37:50.453 -04:00INFOSKIP (desc match): VM=snaptestds305 snap=snapshot-1
+2026-04-29 09:37:50.456 -04:00INFOSKIP (desc match): VM=snaptestvsan02 snap=snapshot-2
+2026-04-29 09:37:50.458 -04:00INFOSKIP (desc match): VM=snaptestds304 snap=snapshot-1
+2026-04-29 09:37:50.460 -04:00INFOSKIP (desc match): VM=snaptestvsan05 snap=snapshot-5
+2026-04-29 09:37:50.462 -04:00INFOSKIP (desc match): VM=snaptestds303 snap=snapshot-5
+2026-04-29 09:37:50.464 -04:00INFOSKIP (desc match): VM=snaptestds109 snap=snapshot-1
+2026-04-29 09:37:50.465 -04:00INFOSKIP (desc match): VM=snaptestds109 snap=snapshot-5
+2026-04-29 09:37:50.478 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]          Found 219 eligible snapshot(s) on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-29 09:37:50.481 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      Scan complete -- 219 eligible snapshot(s) found across all vCenters.
+2026-04-29 09:37:50.489 -04:00INFO[SNAPSHOT-CLEANUP] [INVENTORY] [OK]      219 snapshot(s) are eligible for cleanup -- continuing...
+2026-04-29 09:37:50.506 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Snapshot queue ready:
+2026-04-29 09:37:50.507 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]        Powered-ON  VMs : 219 snapshot(s)  (processed with I/O throttling)
+2026-04-29 09:37:50.508 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]        Powered-OFF VMs : 0 snapshot(s)  (processed in fast lane)
+2026-04-29 09:37:50.509 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Beginning cleanup...
+2026-04-29 09:37:50.522 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Processing 219 powered-on snapshot(s) on https://cvsd26vcfvc001.connect.lab:443/sdk
+2026-04-29 09:37:50.523 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Starting adaptive dispatch -- initial concurrency: 1 of 20 max
+2026-04-29 09:37:50.581 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:37:50.592 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:50.604 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:50.615 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:50.625 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.3ms W:0.0ms
+2026-04-29 09:37:50.626 -04:00INFOgetDatastoreMetrics: completed for datastore-97 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-13
+2026-04-29 09:37:50.675 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:37:50.685 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.3ms W:0.0ms
+2026-04-29 09:37:50.697 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:50.708 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:50.718 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:50.719 -04:00INFOgetDatastoreMetrics: completed for datastore-96 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:37:53.479 -04:00INFOgetDatastoreMetrics: completed for datastore-18 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=0.1ms maxR=nullms maxW=0.1ms hotHost=host-29
+2026-04-29 09:37:53.527 -04:00INFOgetDatastoreMetrics: resolved instance key '69d92fec-c174b6cc-076e-e4434b941780' for datastore-95 (probe candidate: '69d92fec-c174b6cc-076e-e4434b941780')
+2026-04-29 09:37:53.537 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-95 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:53.548 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-95 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:53.559 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-95 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:53.570 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-95 -- R:0.3ms W:0.0ms
+2026-04-29 09:37:53.571 -04:00INFOgetDatastoreMetrics: completed for datastore-95 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-13
+2026-04-29 09:37:53.617 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:37:53.632 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:53.645 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:53.657 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:53.668 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.3ms W:0.0ms
+2026-04-29 09:37:53.669 -04:00INFOgetDatastoreMetrics: completed for datastore-97 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-13
+2026-04-29 09:37:53.688 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/1 slots]:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 44 min)
+2026-04-29 09:37:56.752 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 44 min)  --  Could not read workflow output (token state=failed)
+2026-04-29 09:37:56.804 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:37:56.814 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:56.826 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:56.838 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:56.851 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.3ms W:0.0ms
+2026-04-29 09:37:56.852 -04:00INFOgetDatastoreMetrics: completed for datastore-97 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-13
+2026-04-29 09:37:56.853 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 2 of 20
+2026-04-29 09:37:56.900 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:37:56.910 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:56.922 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:56.936 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:56.947 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.3ms W:0.0ms
+2026-04-29 09:37:56.948 -04:00INFOgetDatastoreMetrics: completed for datastore-97 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-13
+2026-04-29 09:37:56.962 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/2 slots]:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 44 min)
+2026-04-29 09:37:57.009 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:37:57.018 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.3ms W:0.0ms
+2026-04-29 09:37:57.030 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:57.040 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:57.050 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:37:57.051 -04:00INFOgetDatastoreMetrics: completed for datastore-96 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:37:57.067 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/2 slots]:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 44 min)
+2026-04-29 09:38:00.076 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 44 min)  --  Could not read workflow output (token state=failed)
+2026-04-29 09:38:00.083 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 44 min)  --  Could not read workflow output (token state=failed)
+2026-04-29 09:38:00.133 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:38:00.143 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.154 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.166 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.179 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.3ms W:0.0ms
+2026-04-29 09:38:00.180 -04:00INFOgetDatastoreMetrics: completed for datastore-97 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-13
+2026-04-29 09:38:00.181 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 3 of 20
+2026-04-29 09:38:00.232 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:38:00.242 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.254 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.265 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.275 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.3ms W:0.0ms
+2026-04-29 09:38:00.276 -04:00INFOgetDatastoreMetrics: completed for datastore-97 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-13
+2026-04-29 09:38:00.293 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/3 slots]:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 45 min)
+2026-04-29 09:38:00.344 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:38:00.356 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.3ms W:0.0ms
+2026-04-29 09:38:00.367 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.378 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.389 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:00.390 -04:00INFOgetDatastoreMetrics: completed for datastore-96 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:38:00.404 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/3 slots]:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 44 min)
+2026-04-29 09:38:03.140 -04:00INFOgetDatastoreMetrics: completed for datastore-18 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=nullms avgW=nullms maxR=nullms maxW=nullms hotHost=null
+2026-04-29 09:38:03.157 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [3/3 slots]:  VM 'snaptestvsan10'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 44 min)
+2026-04-29 09:38:06.166 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds307'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 45 min)  --  Could not read workflow output (token state=failed)
+2026-04-29 09:38:06.173 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:52:51 AM'  (age: 44 min)  --  Could not read workflow output (token state=failed)
+2026-04-29 09:38:06.181 -04:00ERROR[SNAPSHOT-CLEANUP] [PROCESSING] [FAIL]    Failed to delete:  VM 'snaptestvsan10'  snapshot 'VM Snapshot 4/29/2026, 8:53:02 AM'  (age: 44 min)  --  Could not read workflow output (token state=failed)
+2026-04-29 09:38:06.231 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:38:06.241 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.253 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.265 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.277 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.278 -04:00INFOgetDatastoreMetrics: completed for datastore-97 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0ms avgW=0ms maxR=0ms maxW=0ms hotHost=null
+2026-04-29 09:38:06.279 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Storage healthy -- ramping concurrency to 4 of 20
+2026-04-29 09:38:06.330 -04:00INFOgetDatastoreMetrics: resolved instance key '69d93048-c5a1caaa-205c-e4434b941780' for datastore-97 (probe candidate: '69d93048-c5a1caaa-205c-e4434b941780')
+2026-04-29 09:38:06.340 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.350 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.362 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.372 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-97 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.373 -04:00INFOgetDatastoreMetrics: completed for datastore-97 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0ms avgW=0ms maxR=0ms maxW=0ms hotHost=null
+2026-04-29 09:38:06.387 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [1/4 slots]:  VM 'snaptestds307'  snapshot 'snapshot-3'  (age: 49 min)
+2026-04-29 09:38:06.434 -04:00INFOgetDatastoreMetrics: resolved instance key '69d9301e-0586dbe4-936c-e4434b941780' for datastore-96 (probe candidate: '69d9301e-0586dbe4-936c-e4434b941780')
+2026-04-29 09:38:06.444 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx03.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.3ms W:0.0ms
+2026-04-29 09:38:06.455 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx04.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.468 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx05.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.478 -04:00INFOgetDatastoreMetrics: host sfo01-m01-r01-esx02.connect.lab sampled at real-time (20s) for datastore-96 -- R:0.0ms W:0.0ms
+2026-04-29 09:38:06.479 -04:00INFOgetDatastoreMetrics: completed for datastore-96 -- 4 hosts sampled (4 real-time, 0 rollup) avgR=0.1ms avgW=0ms maxR=0.3ms maxW=0ms hotHost=host-32
+2026-04-29 09:38:06.494 -04:00INFO[SNAPSHOT-CLEANUP] [PROCESSING] [OK]      Dispatched [2/4 slots]:  VM 'snaptestds209'  snapshot 'VM Snapshot 4/29/2026, 8:52:29 AM'  (age: 45 min)
