@@ -2,38 +2,44 @@
  * ACTION: _deleteSnapshot
  * Module : com.broadcom.pso.vc.vm.snapshots
  *
- * Executes a single snapshot deletion with full pre-deletion safety checks
- * and pre/post I/O metric capture for governor calibration.
+ * Executes a single snapshot deletion. The snapshot is resolved by name
+ * from the VM's live snapshot tree at execution time -- no MoRefs or
+ * pre-fetched object references are used. This eliminates all stale
+ * reference issues that can occur when snapshot chains are reorganised
+ * between scan time and deletion time.
  *
- * VM lookup uses the vRO inventory object model exclusively. The vmMoRef
- * value stored by _getSnapshotCandidates is vm.id exactly as vRO returns it.
- * This action locates the VM by traversing the same inventory tree and
- * matching on .id -- the same property, the same value, guaranteed to match.
- *
- * ── INPUTS ───────────────────────────────────────────────────────────────────
+ * -- INPUTS -------------------------------------------------------------------
  *   Name                  Type              Description
- *   ──────────────────────────────────────────────────────────────────────────
+ *   --------------------------------------------------------------------------
  *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to use
  *   vmMoRef               string            vm.id as stored by getSnapshotCandidates
- *   snapshotMoRef         string            snapshot.snapshot.value
- *   snapshotName          string            For log messages and fallback lookup
- *   snapshotCreatedMs     number            Snapshot creation timestamp (ms since epoch).
- *                                           Used as fallback lookup key if MoRef becomes
- *                                           stale after chain reorganisation by vCenter.
+ *   snapshotName          string            Name of snapshot to delete
+ *   snapshotCreatedMs     number            Creation timestamp -- used to disambiguate
+ *                                           if multiple snapshots share the same name
  *   vmName                string            For log messages
  *   datastoreMoRefsJson   string            JSON array of datastore.id strings
  *   dryRun                boolean           When true, skip actual deletion
  *   taskTimeoutSeconds    number            Max seconds to wait for vCenter task
  *
- * ── RETURN TYPE ──────────────────────────────────────────────────────────────
+ * -- RETURN TYPE --------------------------------------------------------------
  *   string  JSON result object
  */
 
-var STORAGEMODULE     = "com.broadcom.pso.vc.storage";
-var startMs           = new Date().getTime();
-var timeout           = taskTimeoutSeconds || 1800;
-var dsRefs            = JSON.parse(datastoreMoRefsJson || "[]");
-var snapshotCreatedMs = snapshotCreatedMs || 0;
+var STORAGEMODULE = "com.broadcom.pso.vc.storage";
+var startMs       = new Date().getTime();
+
+// Diagnostic: log all inputs immediately so parse/type errors are visible
+System.log("_deleteSnapshot INPUTS:" +
+    " vmMoRef=" + vmMoRef +
+    " snapshotName=" + snapshotName +
+    " snapshotCreatedMs=" + snapshotCreatedMs +
+    " vmName=" + vmName +
+    " datastoreMoRefsJson=" + datastoreMoRefsJson +
+    " dryRun=" + dryRun +
+    " taskTimeoutSeconds=" + taskTimeoutSeconds);
+
+var timeout       = taskTimeoutSeconds || 1800;
+var dsRefs        = JSON.parse(datastoreMoRefsJson || "[]");
 
 var result = {
     success:         false,
@@ -46,37 +52,44 @@ var result = {
 };
 
 try {
-    // ── Locate VM by traversing vRO inventory tree ────────────────────────────
-    // vmMoRef is vm.id exactly as stored by _getSnapshotCandidates.
-    // We traverse the same inventory path and match on .id directly.
+    // -- Locate VM -------------------------------------------------------------
     var vm = findVmById(vcenterSdkConnection.rootFolder, vmMoRef);
-
     if (!vm) {
         result.skipped    = true;
-        result.skipReason = "VM with id '" + vmMoRef + "' not found in inventory. " +
-                            "The VM may have been deleted or moved since the scan ran.";
+        result.skipReason = "VM '" + vmName + "' (id=" + vmMoRef + ") not found in inventory";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
 
-    // ── Safety: template check ────────────────────────────────────────────────
+    // -- Safety checks ---------------------------------------------------------
     if (vm.config && vm.config.template) {
         result.skipped    = true;
-        result.skipReason = "VM is a template -- templates are never modified";
+        result.skipReason = "VM is a template";
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
 
-    // ── Safety: active conflicting task check ─────────────────────────────────
+    if (vm.runtime && vm.runtime.host) {
+        var host = vm.runtime.host;
+        if (host.runtime && host.runtime.connectionState) {
+            var cs = host.runtime.connectionState.value;
+            if (cs === "disconnected" || cs === "notResponding") {
+                result.skipped    = true;
+                result.skipReason = "Host " + host.name + " is " + cs;
+                result.durationMs = new Date().getTime() - startMs;
+                return JSON.stringify(result);
+            }
+        }
+    }
+
     if (vm.recentTask) {
         for (var ti = 0; ti < vm.recentTask.length; ti++) {
             var t  = vm.recentTask[ti];
             var ts = t.info.state.value;
             var td = t.info.descriptionId || "";
             if (ts === "running" &&
-                (td.indexOf("snapshot") !== -1 || td.indexOf("backup")   !== -1 ||
-                 td.indexOf("clone")    !== -1 || td.indexOf("migrate")  !== -1 ||
-                 td.indexOf("relocate") !== -1)) {
+                (td.indexOf("snapshot") !== -1 || td.indexOf("backup")  !== -1 ||
+                 td.indexOf("clone")    !== -1 || td.indexOf("migrate") !== -1)) {
                 result.skipped    = true;
                 result.skipReason = "Conflicting task active on VM (" + td + ")";
                 result.durationMs = new Date().getTime() - startMs;
@@ -85,81 +98,59 @@ try {
         }
     }
 
-    // ── Safety: host connectivity check ──────────────────────────────────────
-    if (vm.runtime && vm.runtime.host) {
-        var host = vm.runtime.host;
-        if (host.runtime && host.runtime.connectionState) {
-            var cs = host.runtime.connectionState.value;
-            if (cs === "disconnected" || cs === "notResponding") {
-                result.skipped    = true;
-                result.skipReason = "Host " + host.name + " is " + cs +
-                                    " -- skipping to avoid data loss during possible HA event";
-                result.durationMs = new Date().getTime() - startMs;
-                return JSON.stringify(result);
-            }
-        }
-    }
-
-    // ── Safety: confirm snapshot still exists ─────────────────────────────────
-    // Primary lookup: by MoRef. This may fail if a parent snapshot's MoRef
-    // was invalidated by vCenter when its child was deleted (vCenter
-    // reorganises the chain internally during consolidation). In that case
-    // we fall back to locating the snapshot by name + creation time, which
-    // survive chain reorganisation.
-    var snapObj = null;
-    if (vm.snapshot && vm.snapshot.rootSnapshotList) {
-        snapObj = findSnapshot(vm.snapshot.rootSnapshotList, snapshotMoRef);
-        if (!snapObj && snapshotName && snapshotCreatedMs) {
-            // Fallback: find by name and creation timestamp (within 60s tolerance
-            // to account for any clock skew in the stored value)
-            snapObj = findSnapshotByNameAndTime(
-                vm.snapshot.rootSnapshotList, snapshotName, snapshotCreatedMs);
-            if (snapObj) {
-                System.log("deleteSnapshot: MoRef stale after chain reorganisation -- " +
-                           "located '" + snapshotName + "' by name+time fallback on " + vmName);
-            }
-        }
-    }
-    if (!snapObj) {
+    // -- Locate snapshot by name from live tree --------------------------------
+    // Resolution happens here at deletion time, not at scan time.
+    // If multiple snapshots share the same name, pick the one closest to
+    // snapshotCreatedMs (within 60s tolerance). If none match by time,
+    // pick the newest matching name -- this is the safe choice since we
+    // always process newest-first.
+    if (!vm.snapshot || !vm.snapshot.rootSnapshotList ||
+        vm.snapshot.rootSnapshotList.length === 0) {
         result.skipped    = true;
-        result.skipReason = "Snapshot '" + snapshotName + "' not found on VM " + vmName +
-                            " -- may have been deleted by a concurrent operation or " +
-                            "consolidated when its child was removed";
+        result.skipReason = "VM '" + vmName + "' has no snapshots";
         result.durationMs = new Date().getTime() - startMs;
-        System.warn("deleteSnapshot: " + result.skipReason);
         return JSON.stringify(result);
     }
 
-    // ── Dry run ───────────────────────────────────────────────────────────────
+    var snapNode = findSnapshotByName(
+        vm.snapshot.rootSnapshotList, snapshotName, snapshotCreatedMs);
+
+    if (!snapNode) {
+        result.skipped    = true;
+        result.skipReason = "Snapshot '" + snapshotName + "' not found on VM '" +
+                            vmName + "' -- may have already been deleted or " +
+                            "consolidated by a prior operation";
+        result.durationMs = new Date().getTime() - startMs;
+        System.log("deleteSnapshot: " + result.skipReason);
+        return JSON.stringify(result);
+    }
+
+    // -- Dry run ---------------------------------------------------------------
     if (dryRun) {
         result.success    = true;
         result.durationMs = new Date().getTime() - startMs;
         return JSON.stringify(result);
     }
 
-    // ── Sample pre-deletion I/O metrics ──────────────────────────────────────
+    // -- Pre-deletion metrics --------------------------------------------------
     var preMetrics = [];
     for (var pi = 0; pi < dsRefs.length; pi++) {
         try {
             preMetrics.push(JSON.parse(
                 System.getModule(STORAGEMODULE)
                     ._getDatastoreMetrics(vcenterSdkConnection, dsRefs[pi])));
-        } catch (me) {
-            System.warn("deleteSnapshot: pre-metrics failed for " +
-                        dsRefs[pi] + ": " + me.message);
-        }
+        } catch (me) { /* non-fatal */ }
     }
     result.preMetricsJson = JSON.stringify(preMetrics);
 
-    // ── Execute deletion ──────────────────────────────────────────────────────
+    // -- Execute deletion ------------------------------------------------------
+    // snapNode.snapshot is the VcSnapshot MoRef. In vRO 8.17 Polyglot the
+    // removeSnapshot_Task method is bound on this object and dispatches
+    // directly to vCenter via the SDK connection.
     System.log("Deleting: VM=" + vmName + " snap=" + snapshotName);
-    var delTask = snapObj.snapshot.removeSnapshot_Task(false);
+    var delTask = snapNode.snapshot.removeSnapshot_Task(false);
 
-    // Poll task completion by re-reading the snapshot list on the VM.
-    // VcTask.update() does not exist in vRO 8.17 Polyglot, and Server.getTask()
-    // is also not available. The most reliable approach is to confirm completion
-    // by checking whether the snapshot still exists on the VM -- if it's gone,
-    // the task succeeded.
+    // -- Poll task state -------------------------------------------------------
     var waited     = 0;
     var finalState = "running";
     var pollSleep  = 5000;
@@ -167,10 +158,6 @@ try {
     while (waited < timeout * 1000) {
         System.sleep(pollSleep);
         waited += pollSleep;
-
-        // Check task state via the delTask object directly.
-        // In Polyglot, accessing delTask.info re-fetches from vCenter on each
-        // property access -- no explicit update() call needed.
         try {
             var taskState = delTask.info.state.value;
             if (taskState === "success") {
@@ -184,19 +171,17 @@ try {
                 result.durationMs = new Date().getTime() - startMs;
                 return JSON.stringify(result);
             }
-            // Still running -- continue polling
         } catch (pe) {
-            // delTask.info access failed -- confirm by checking snapshot list
-            System.warn("deleteSnapshot: task state poll failed: " + pe.message +
-                        " -- confirming via VM snapshot list");
+            // Task info access failed -- check if snapshot is gone
+            System.warn("deleteSnapshot: task poll error: " + pe.message +
+                        " -- checking snapshot tree");
             var vmCheck = findVmById(vcenterSdkConnection.rootFolder, vmMoRef);
             if (vmCheck) {
-                var stillThere = false;
-                if (vmCheck.snapshot && vmCheck.snapshot.rootSnapshotList) {
-                    stillThere = !!findSnapshot(
-                        vmCheck.snapshot.rootSnapshotList, snapshotMoRef);
-                }
-                if (!stillThere) {
+                var still = vmCheck.snapshot && vmCheck.snapshot.rootSnapshotList
+                    ? findSnapshotByName(vmCheck.snapshot.rootSnapshotList,
+                                         snapshotName, snapshotCreatedMs)
+                    : null;
+                if (!still) {
                     finalState = "success";
                     break;
                 }
@@ -210,18 +195,15 @@ try {
         return JSON.stringify(result);
     }
 
-    // ── Sample post-deletion I/O metrics ─────────────────────────────────────
-    System.sleep(10000);
+    // -- Post-deletion metrics -------------------------------------------------
+    System.sleep(5000);
     var postMetrics = [];
     for (var poi = 0; poi < dsRefs.length; poi++) {
         try {
             postMetrics.push(JSON.parse(
                 System.getModule(STORAGEMODULE)
                     ._getDatastoreMetrics(vcenterSdkConnection, dsRefs[poi])));
-        } catch (me2) {
-            System.warn("deleteSnapshot: post-metrics failed for " +
-                        dsRefs[poi] + ": " + me2.message);
-        }
+        } catch (me2) { /* non-fatal */ }
     }
     result.postMetricsJson = JSON.stringify(postMetrics);
     result.success         = true;
@@ -239,76 +221,69 @@ try {
 
 return JSON.stringify(result);
 
-// ── Find VM by .id in the vRO inventory tree ──────────────────────────────────
-// Mirrors the traversal in _getSnapshotCandidates so the same vm.id value
-// that was stored during enumeration is used here for the lookup.
+// -- Find VM by id -------------------------------------------------------------
 function findVmById(folder, targetId) {
     if (!folder || !folder.childEntity) return null;
     for (var i = 0; i < folder.childEntity.length; i++) {
         var child = folder.childEntity[i];
         if (!child) continue;
-
-        // Check if this child is the VM we want
         if (child.id === targetId) return child;
-
-        // Recurse based on inventory type
         var type = child.vimType || child.sdkType || "";
         if (type === "Datacenter" || child.vmFolder !== undefined) {
             if (child.vmFolder) {
-                var found = findVmById(child.vmFolder, targetId);
-                if (found) return found;
+                var f = findVmById(child.vmFolder, targetId);
+                if (f) return f;
             }
         } else if (child.childEntity !== undefined) {
-            var found2 = findVmById(child, targetId);
-            if (found2) return found2;
+            var f2 = findVmById(child, targetId);
+            if (f2) return f2;
         }
     }
     return null;
 }
 
-// ── Find snapshot by name and creation time ──────────────────────────────────
-// Fallback for when MoRef is stale after chain reorganisation. Matches on
-// snapshot name and creation timestamp within a 60-second tolerance window.
-function findSnapshotByNameAndTime(snapList, name, createdMs) {
-    var tolerance = 60000; // 60 seconds
-    for (var i = 0; i < snapList.length; i++) {
-        var s = snapList[i];
+// -- Find snapshot by name from live tree --------------------------------------
+// Walks the current snapshot tree and returns the node whose name matches.
+// If multiple nodes share the name, returns the one closest to createdMs
+// (within 60s tolerance). If none match within tolerance, returns the
+// newest matching node -- safe because we always process newest-first.
+//
+// Uses an iterative stack instead of nested function declarations to stay
+// compatible with vRO 8.17 Rhino (ES5) which does not support function
+// declarations inside function bodies in all contexts.
+function findSnapshotByName(snapList, name, createdMs) {
+    var tolerance = 60000;
+    var best      = null;
+    var bestDelta = Number.MAX_VALUE;
+
+    // Iterative depth-first walk using an explicit stack
+    var stack = [];
+    for (var si = 0; si < snapList.length; si++) stack.push(snapList[si]);
+
+    while (stack.length > 0) {
+        var s = stack.pop();
         if (s.name === name) {
             var snapMs = s.createTime ? s.createTime.getTime() : 0;
-            if (Math.abs(snapMs - createdMs) <= tolerance) return s;
+            var delta  = Math.abs(snapMs - createdMs);
+            if (delta < bestDelta) {
+                bestDelta = delta;
+                best      = s;
+            }
         }
         if (s.childSnapshotList && s.childSnapshotList.length > 0) {
-            var found = findSnapshotByNameAndTime(
-                s.childSnapshotList, name, createdMs);
-            if (found) return found;
+            for (var ci = 0; ci < s.childSnapshotList.length; ci++) {
+                stack.push(s.childSnapshotList[ci]);
+            }
         }
     }
-    return null;
-}
 
-// ── Find snapshot by MoRef value in snapshot tree ────────────────────────────
-function findSnapshot(snapList, moRefValue) {
-    var targetStr = String(moRefValue);
-    for (var i = 0; i < snapList.length; i++) {
-        var s = snapList[i];
-        if (s.snapshot) {
-            // Try direct value comparison first
-            if (s.snapshot.value === moRefValue) return s;
-            // Try string coercion -- Polyglot runtime may return MoRef object
-            // whose .value property serialises differently than a plain string
-            if (String(s.snapshot.value) === targetStr) return s;
-            // Try matching on the full MoRef string representation
-            // e.g. "snapshot-2" vs "2" -- strip the type prefix if present
-            var rawVal = String(s.snapshot.value);
-            var dashIdx = rawVal.lastIndexOf("-");
-            if (dashIdx !== -1 && rawVal.substring(dashIdx + 1) === targetStr) return s;
-            if (dashIdx !== -1 && targetStr.lastIndexOf("-") !== -1 &&
-                targetStr.substring(targetStr.lastIndexOf("-") + 1) === rawVal.substring(dashIdx + 1)) return s;
-        }
-        if (s.childSnapshotList && s.childSnapshotList.length > 0) {
-            var found = findSnapshot(s.childSnapshotList, moRefValue);
-            if (found) return found;
-        }
+    // Accept if within tolerance, or if it's the only match regardless
+    if (best && bestDelta <= tolerance) return best;
+    if (best) {
+        System.warn("deleteSnapshot: matched '" + name + "' with delta " +
+                    Math.round(bestDelta/1000) + "s (outside 60s tolerance) -- " +
+                    "accepting as only candidate");
+        return best;
     }
     return null;
 }

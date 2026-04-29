@@ -1,61 +1,94 @@
 /**
- * ─────────────────────────────────────────────────────────────────────────────
+ * -----------------------------------------------------------------------------
  * ST-06  PROCESS POWERED-ON VMs  (THROTTLED LANE)
- * ─────────────────────────────────────────────────────────────────────────────
+ * -----------------------------------------------------------------------------
  * Processes snapshots on powered-on and suspended VMs. For each candidate:
- *   1. Enforces per-vCenter concurrency limit (maxParallel simultaneous tasks).
- *   2. Runs adaptive I/O governor pre-check — waits if storage is too busy.
- *   3. Calls deleteSnapshot action which performs VM safety checks and executes
- *      the vCenter task.
- *   4. Captures pre/post I/O metrics for governor self-calibration.
- *   5. Appends a log entry to runLog for each outcome.
+ *   1. Starts with a single concurrent task, ramping up as storage permits.
+ *   2. Enforces one active task per VM at a time (hard constraint).
+ *   3. Runs adaptive I/O governor pre-check before each dispatch -- holds if
+ *      the worst-host latency on the candidate's datastores exceeds threshold.
+ *   4. Dispatches each deletion asynchronously via the wrapper workflow
+ *      (wrapperWf) which calls the _deleteSnapshot action in a child run.
+ *   5. Harvests completed slots, ramps concurrency, and dispatches new tasks
+ *      each cycle until the pending queue is empty.
+ *   6. Appends a log entry to runLog for each outcome.
  *
- * Governor calibration state (datastoreStateJson) is passed to ST-07 so the
- * powered-off fast lane inherits the observed impact deltas from this lane and
- * does not have to start calibrating from scratch on shared datastores.
+ * Snapshot candidates are identified by VM name + snapshot name only. No
+ * MoRefs are stored at scan time -- all resolution happens at deletion time
+ * inside _deleteSnapshot against the live vCenter inventory.
  *
- * ── INPUTS ───────────────────────────────────────────────────────────────────
- *   Name                     vRO Type  Source / Description
- *   ─────────────────────────────────────────────────────────────────────────────────────────────
- *   onCandidatesJson         string    Attribute: onCandidatesJson
- *                                      Chain-ordered list of powered-on/suspended VM snapshots
- *                                      from ST-05.
- *   runId                    string    Attribute: runId
- *                                      Included in each log entry so every action can be
- *                                      traced back to this specific run.
- *   runLog                   string    Attribute: runLog
- *                                      Accumulates one entry per snapshot processed.
- *                                      Passed forward to ST-07 and finally ST-09.
- *   dryRun                   boolean   Workflow Input: dryRun
- *                                      When true, deleteSnapshot logs [DRY-RUN] and returns
- *                                      immediately without submitting a vCenter task.
- *   latencyThresholdMs       number    Workflow Input: latencyThresholdMs
- *                                      VMFS/NFS governor ceiling. The governor projects
- *                                      current + observed delta; if projection exceeds this
- *                                      value the next task is held until I/O settles.
- *   vsanCongestionThresh     number    Workflow Input: vsanCongestionThresh
- *                                      vSAN congestion governor ceiling (0-255).
- *   vsanResyncThresholdBytes number    Attribute: vsanResyncThresholdBytes
- *                                      vSAN resync queue ceiling in bytes (converted by ST-01).
- *   govPollMs                number    Attribute: govPollMs
- *                                      Milliseconds between governor re-checks when a task
- *                                      is on hold (converted by ST-01).
- *   maxParallel              number    Attribute: maxParallel
- *                                      Maximum concurrent consolidation tasks per vCenter
- *                                      for powered-on VMs (validated by ST-01).
- *   taskTimeoutSeconds       number    Workflow Input: taskTimeoutSeconds
- *                                      Passed to deleteSnapshot. Maximum seconds to wait
- *                                      for the vCenter removal task to reach success or error.
+ * -- EXTERNALLY PROVIDED VALUES ------------------------------------------------
+ * All values below are injected by vRO at runtime from workflow inputs,
+ * workflow attributes, or workflow-level variable bindings. None are declared
+ * as JavaScript variables in this script -- vRO makes them available
+ * automatically in the script execution context.
  *
- * ── OUTPUTS ──────────────────────────────────────────────────────────────────
+ *   Name                     vRO Type   Source
+ *   --------------------------------------------------------------------------
+ *   WORKFLOW INPUTS (set by the operator when running the workflow):
+ *
+ *   dryRun                   boolean    Workflow Input
+ *                                       When true, logs [DRY-RUN] and skips the
+ *                                       actual vCenter task submission.
+ *   latencyThresholdMs       number     Workflow Input
+ *                                       VMFS/NFS governor ceiling in ms. Governor
+ *                                       uses worst-host (max) latency across all
+ *                                       hosts mounting the datastore.
+ *   vsanCongestionThresh     number     Workflow Input
+ *                                       vSAN congestion governor ceiling (0-255).
+ *   taskTimeoutSeconds       number     Workflow Input
+ *                                       Max seconds to wait for each vCenter
+ *                                       snapshot removal task to complete.
+ *
+ *   WORKFLOW ATTRIBUTES (set at design time or by earlier scriptable tasks):
+ *
+ *   onCandidatesJson         string     Attribute: onCandidatesJson
+ *                                       Newest-first ordered list of powered-on
+ *                                       and suspended VM snapshot candidates from
+ *                                       ST-05. Each entry contains vmMoRef,
+ *                                       vmName, snapshotName, snapshotCreatedMs,
+ *                                       and datastoreMoRefs.
+ *   runId                    string     Attribute: runId
+ *                                       Unique identifier for this workflow run.
+ *                                       Included in every log entry.
+ *   runLog                   string     Attribute: runLog
+ *                                       Accumulating JSON array of log entries.
+ *                                       Updated by this task and passed forward
+ *                                       to ST-07 and ST-09.
+ *   vsanResyncThresholdBytes number     Attribute: vsanResyncThresholdBytes
+ *                                       vSAN resync queue ceiling in bytes
+ *                                       (converted from GB by ST-01).
+ *   govPollMs                number     Attribute: govPollMs
+ *                                       Milliseconds between governor re-checks
+ *                                       when a task is held (converted by ST-01).
+ *   maxParallel              number     Attribute: maxParallel
+ *                                       Maximum concurrent deletion tasks per
+ *                                       vCenter. Concurrency ramps from 1 up to
+ *                                       this value as storage permits.
+ *
+ *   WORKFLOW-LEVEL VARIABLE BINDING (hardset in the vRO Designer):
+ *
+ *   wrapperWf                Workflow   Attribute: wrapperWf
+ *                                       Bound to the "Adaptive Snapshot Delete
+ *                                       Task" child workflow. ST-06 calls
+ *                                       wrapperWf.execute(props) to dispatch each
+ *                                       deletion asynchronously. The returned
+ *                                       token is polled for completion during each
+ *                                       harvest cycle. This attribute must be
+ *                                       hardset to the wrapper workflow object in
+ *                                       the vRO Designer -- it is never assigned
+ *                                       in script.
+ *
+ * -- OUTPUTS ------------------------------------------------------------------
  *   Name                vRO Type  Description
- *   ─────────────────────────────────────────────────────────────────────────────────────────────
- *   datastoreStateJson  string    JSON object keyed by datastore MoRef. Each entry holds
- *                                 lastPre and lastPost metric snapshots from the most recent
- *                                 consolidation on that datastore. Passed to ST-07 so the
- *                                 fast lane inherits calibration data from this lane.
- *   runLog              string    Updated JSON array. Contains one entry per snapshot
- *                                 processed, with action, success flag, skip reason,
+ *   --------------------------------------------------------------------------
+ *   datastoreStateJson  string    JSON object keyed by datastore MoRef. Holds
+ *                                 lastPre and lastPost metric snapshots from the
+ *                                 most recent deletion on each datastore. Passed
+ *                                 to ST-07 so the fast lane inherits governor
+ *                                 calibration data from this lane.
+ *   runLog              string    Updated JSON array with one entry per snapshot
+ *                                 processed: action, success flag, skip reason,
  *                                 duration, and any error message.
  */
 var LOG = {
@@ -98,7 +131,7 @@ if (onCands.length === 0) {
         }
         LOG.ok("PROCESSING","Processing " + queue.length + " powered-on snapshot(s) on " + vcKey);
 
-        // ── Adaptive dispatch ─────────────────────────────────────────────
+        // -- Adaptive dispatch ---------------------------------------------
         //
         // RULES (from spec):
         //   1. Only 1 snapshot cleanup per VM at a time (hard constraint, always).
@@ -107,14 +140,14 @@ if (onCands.length === 0) {
         //      baseline (pre-dispatch) and current (post-dispatch) datastore
         //      performance on the datastores the next candidate uses.
         //   4. If projected latency (current + observed delta) will stay within
-        //      threshold → ramp up by 1 and dispatch.
-        //   5. If projected latency would exceed threshold → hold until a slot
+        //      threshold -> ramp up by 1 and dispatch.
+        //   5. If projected latency would exceed threshold -> hold until a slot
         //      completes, then re-evaluate.
         //   6. Cap at maxParallel concurrent tasks.
         //
         // inFlightSlots:  active tokens { token, cand, label, startMs, vmMoRef }
         // vmInFlight:     set of vmMoRef values currently being processed
-        // currentConcurrency: current allowed concurrency level (ramps 1→maxParallel)
+        // currentConcurrency: current allowed concurrency level (ramps 1->maxParallel)
 
         var inFlightSlots      = [];
         var vmInFlight         = {};   // vmMoRef -> true if a task is active for that VM
@@ -151,15 +184,17 @@ if (onCands.length === 0) {
 
         while (pending.length > 0 || inFlightSlots.length > 0) {
 
-            // ── Harvest completed slots ───────────────────────────────────────
+            // -- Harvest completed slots ---------------------------------------
             var stillActive    = [];
             var completedCount = 0;
 
             for (var si = 0; si < inFlightSlots.length; si++) {
                 var slot  = inFlightSlots[si];
-                var state = slot.token.state;
+                // token.state is a WorkflowTokenState enum object in vRO 8.17
+                // Polyglot -- not a plain string. Use .value to get the string.
+                var state = slot.token.state ? String(slot.token.state.value || slot.token.state) : "unknown";
 
-                if (state === "running") {
+                if (state === "running" || state === "waiting") {
                     stillActive.push(slot);
                     continue;
                 }
@@ -187,8 +222,18 @@ if (onCands.length === 0) {
                 }
 
                 if (!res) {
+                    var tokenStateStr = slot.token.state
+                        ? String(slot.token.state.value || slot.token.state)
+                        : "unknown";
+                    var tokenErr = "";
+                    try {
+                        tokenErr = slot.token.globalException
+                            ? String(slot.token.globalException) : "";
+                    } catch(ge) { /* ignore */ }
                     res = { success: false, skipped: false,
-                            error: "Could not read workflow output",
+                            error: "Could not read workflow output" +
+                                   " (token state=" + tokenStateStr + ")" +
+                                   (tokenErr ? " error=" + tokenErr : ""),
                             durationMs: new Date().getTime() - slot.startMs,
                             preMetricsJson: "[]", postMetricsJson: "[]" };
                 }
@@ -217,7 +262,7 @@ if (onCands.length === 0) {
             }
             inFlightSlots = stillActive;
 
-            // ── After harvest: ramp concurrency if storage permits ────────────
+            // -- After harvest: ramp concurrency if storage permits ------------
             // Only ramp when slots just completed (we have real post-delete
             // metrics to evaluate), queue still has work, and we're below max.
             if (completedCount > 0 &&
@@ -252,7 +297,7 @@ if (onCands.length === 0) {
                 }
             }
 
-            // ── Dispatch tasks up to currentConcurrency ───────────────────────
+            // -- Dispatch tasks up to currentConcurrency -----------------------
             // Hard constraints:
             //   - Total in-flight <= currentConcurrency
             //   - Never dispatch a second task for a VM already in-flight
@@ -323,7 +368,6 @@ if (onCands.length === 0) {
                 var props = new Properties();
                 props.put("vcenterSdkConnection", vcConn);
                 props.put("vmMoRef",              cand.vmMoRef);
-                props.put("snapshotMoRef",        cand.snapshotMoRef);
                 props.put("snapshotName",         cand.snapshotName);
                 props.put("snapshotCreatedMs",    cand.snapshotCreatedMs || 0);
                 props.put("vmName",               cand.vmName);
@@ -358,7 +402,7 @@ if (onCands.length === 0) {
 datastoreStateJson = JSON.stringify(dsState);
 runLog = JSON.stringify(logArr);
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
     // Approve immediately if no datastores to check
@@ -383,7 +427,7 @@ function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
         var base = baseline[r];
         var baseAgg = (base && base.aggregate) ? base.aggregate : {};
 
-        // ── VMFS / NFS latency check ──────────────────────────────────────────
+        // -- VMFS / NFS latency check ------------------------------------------
         // maxWriteLatencyMs is the most sensitive signal -- write latency on
         // the busiest host. Fall back to avgWriteLatencyMs if max is null.
         var curW  = agg.maxWriteLatencyMs  !== null && agg.maxWriteLatencyMs  !== undefined
@@ -423,7 +467,7 @@ function checkGovernorDelta(vcConn, dsRefs, vmName, baseline) {
             return false;
         }
 
-        // ── vSAN congestion check ─────────────────────────────────────────────
+        // -- vSAN congestion check ---------------------------------------------
         if (agg.maxVsanCongestion !== null && agg.maxVsanCongestion !== undefined) {
             var curCong  = agg.maxVsanCongestion  || 0;
             var baseCong = baseAgg.maxVsanCongestion || 0;

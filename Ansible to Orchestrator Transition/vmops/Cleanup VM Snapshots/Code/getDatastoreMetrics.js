@@ -15,13 +15,13 @@
  *           each host in the vSAN cluster. Two snapshots 2 seconds apart
  *           provide delta-based rates per host.
  *
- * ── INPUTS ───────────────────────────────────────────────────────────────────
+ * -- INPUTS -------------------------------------------------------------------
  *   Name                  Type              Description
- *   ──────────────────────────────────────────────────────────────────────────
+ *   --------------------------------------------------------------------------
  *   vcenterSdkConnection  VC:SdkConnection  The vCenter connection to query
  *   datastoreMoRef        string            datastore.id (e.g. "datastore-18")
  *
- * ── RETURN TYPE ──────────────────────────────────────────────────────────────
+ * -- RETURN TYPE --------------------------------------------------------------
  *   string  JSON metrics object with perHost map and aggregate summary.
  *
  *   Shape:
@@ -83,7 +83,7 @@ var result = {
 };
 
 try {
-    // ── Locate the datastore ──────────────────────────────────────────────────
+    // -- Locate the datastore --------------------------------------------------
     var datastores = vcenterSdkConnection.getAllDatastores();
     var ds = null;
     for (var i = 0; i < datastores.length; i++) {
@@ -104,9 +104,9 @@ try {
     }
     result.datastoreType = dsType;
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // vSAN PATH — per-host DOM owner stats via vsanInternalSystem
-    // ══════════════════════════════════════════════════════════════════════════
+    // ==========================================================================
+    // vSAN PATH -- per-host DOM owner stats via vsanInternalSystem
+    // ==========================================================================
     if (dsType === "vsan") {
 
         // Find the vSAN-enabled cluster that owns this datastore.
@@ -132,7 +132,7 @@ try {
             return JSON.stringify(result);
         }
 
-        // Take two snapshots 2s apart — per-host granularity.
+        // Take two snapshots 2s apart -- per-host granularity.
         function sampleDomStatsPerHost(cl) {
             var hostData = {};
             for (var hi = 0; hi < cl.host.length; hi++) {
@@ -189,9 +189,9 @@ try {
             };
         }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // VMFS / NFS PATH — per-host PerformanceManager queries at real-time
-    // ══════════════════════════════════════════════════════════════════════════
+    // ==========================================================================
+    // VMFS / NFS PATH -- per-host PerformanceManager queries at real-time
+    // ==========================================================================
     } else {
 
         var perfMgr    = vcenterSdkConnection.performanceManager;
@@ -234,7 +234,7 @@ try {
             return JSON.stringify(result);
         }
 
-        // ── Resolve the datastore instance key for host-level queries ─────────
+        // -- Resolve the datastore instance key for host-level queries ---------
         // For VMFS/NFS datastore counters queried against a HOST entity, the
         // instance string is NOT the datastore display name. It is one of:
         //   1. The datastore URL path  e.g. "/vmfs/volumes/<uuid>"
@@ -322,7 +322,7 @@ try {
             }
         }
 
-        // ── Query each host individually at real-time resolution ──────────────
+        // -- Query each host individually at real-time resolution --------------
         var now = new Date();
 
         for (var hi = 0; hi < dsHosts.length; hi++) {
@@ -407,28 +407,28 @@ try {
                 if (intervalUsed === 20) {
                     System.log("getDatastoreMetrics: host " + hostName +
                                " sampled at real-time (20s) for " + datastoreMoRef +
-                               " — R:" + (hostMetrics.readLatencyMs !== null
+                               " -- R:" + (hostMetrics.readLatencyMs !== null
                                    ? hostMetrics.readLatencyMs.toFixed(1) : "null") +
                                "ms W:" + (hostMetrics.writeLatencyMs !== null
                                    ? hostMetrics.writeLatencyMs.toFixed(1) : "null") + "ms");
                 } else {
                     System.warn("getDatastoreMetrics: host " + hostName +
                                 " fell back to 300s rollup for " + datastoreMoRef +
-                                " — data may be stale");
+                                " -- data may be stale");
                 }
             } else {
                 System.warn("getDatastoreMetrics: no perf data from host " +
                             hostName + " for " + datastoreMoRef +
-                            " — host will be excluded from governor analysis");
+                            " -- host will be excluded from governor analysis");
             }
 
             result.perHost[hostId] = hostMetrics;
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // AGGREGATE COMPUTATION — runs for both vSAN and VMFS/NFS paths
-    // ══════════════════════════════════════════════════════════════════════════
+    // ==========================================================================
+    // AGGREGATE COMPUTATION -- runs for both vSAN and VMFS/NFS paths
+    // ==========================================================================
     var agg = result.aggregate;
     var hostIds = [];
     for (var hk in result.perHost) hostIds.push(hk);
@@ -491,7 +491,7 @@ try {
     }
 
     System.log("getDatastoreMetrics: completed for " + datastoreMoRef +
-               " — " + agg.hostsSampled + " hosts sampled (" +
+               " -- " + agg.hostsSampled + " hosts sampled (" +
                agg.hostsAtRealTime + " real-time, " +
                agg.hostsAtRollup + " rollup)" +
                " avgR=" + agg.avgReadLatencyMs + "ms" +

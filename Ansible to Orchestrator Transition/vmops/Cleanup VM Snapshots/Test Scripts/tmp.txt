@@ -1,20 +1,17 @@
- 
-PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> .\bulk_generate_DatastoreLatency.ps1 -CsvPath "iscsiservers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh"
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:281 char:29
-+ while ($pendingCount -gt 0) {
-+                             ~
-Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:108 char:39
-+         if ($attempt -lt $MaxRetries) {
-+                                       ~
-Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:93 char:38
-+     while ($attempt -lt $MaxRetries) {
-+                                      ~
-Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:80 char:30
-+ function Invoke-SshWithRetry {
-+                              ~
-Missing closing '}' in statement block or type definition.
-    + CategoryInfo          : ParserError: (:) [], ParseException
-    + FullyQualifiedErrorId : MissingEndCurlyBrace
+2026-04-29 09:43:52.223 -04:00INFO_deleteSnapshot INPUTS: vmMoRef=vm-1072 snapshotName=snapshot-1 snapshotCreatedMs=1800 vmName=1777466364912 datastoreMoRefsJson=snaptestds209 dryRun=["datastore-96"] taskTimeoutSeconds=false
+2026-04-29 09:43:52.225 -04:00ERROR(com.broadcom.pso.vc.vm.snapshots/_deleteSnapshot) Error in (Dynamic Script Module name : _deleteSnapshot#42) SyntaxError: Unexpected token: s
+2026-04-29 09:43:52.234 -04:00ERRORWorkflow execution stack:
+***
+item: '#Adaptive Snapshot Delete Task/item1', state: 'failed', business state: 'null', exception: 'SyntaxError: Unexpected token: s (Dynamic Script Module name : _deleteSnapshot#42)'
+workflow: '#Adaptive Snapshot Delete Task' (584d6306-c37a-4498-ae44-9802eea5c30e) 
+|  'input': name=vcenterSdkConnection type=VC:SdkConnection value=dunes://service.dunes.ch/CustomSDKObject?id='cvsd26vcfvc001.connect.lab'&dunesName='VC:SdkConnection'
+|  'input': name=vmMoRef type=string value=vm-1072
+|  'input': name=snapshotName type=string value=snapshot-1
+|  'input': name=vmName type=string value=snaptestds209
+|  'input': name=datastoreMoRefsJson type=string value=["datastore-96"]
+|  'input': name=dryRun type=boolean value=false
+|  'input': name=taskTimeoutSeconds type=number value=1800.0
+|  'input': name=snapshotCreatedMs type=number value=1.777466364912E12
+|  'output': name=resultJson type=string value=null
+|  'no attributes'
+*** End of execution stack.
