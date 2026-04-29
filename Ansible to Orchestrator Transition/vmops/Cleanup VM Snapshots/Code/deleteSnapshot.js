@@ -27,6 +27,17 @@
 
 var STORAGEMODULE = "com.broadcom.pso.vc.storage";
 var startMs       = new Date().getTime();
+
+// Diagnostic: log all inputs immediately so parse/type errors are visible
+System.log("_deleteSnapshot INPUTS:" +
+    " vmMoRef=" + vmMoRef +
+    " snapshotName=" + snapshotName +
+    " snapshotCreatedMs=" + snapshotCreatedMs +
+    " vmName=" + vmName +
+    " datastoreMoRefsJson=" + datastoreMoRefsJson +
+    " dryRun=" + dryRun +
+    " taskTimeoutSeconds=" + taskTimeoutSeconds);
+
 var timeout       = taskTimeoutSeconds || 1800;
 var dsRefs        = JSON.parse(datastoreMoRefsJson || "[]");
 
