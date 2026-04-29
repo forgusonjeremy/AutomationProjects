@@ -1,0 +1,217 @@
+---
+- name: Register RHEL 9 systems with Foreman/Satellite
+  hosts: all
+  become: yes
+  gather_facts: yes
+  vars:
+    # Foreman/Satellite server details
+    foreman_server: "sat.corp.local"
+    foreman_port: "9090"
+    foreman_protocol: "https"
+    
+    # Registration parameters
+    activation_keys: "ak_RHEL9.6"
+    hostgroup_id: "5"
+    location_id: "2"
+    operatingsystem_id: "3"
+    organization_id: "1"
+    update_packages: "false"
+    
+    # Authentication token (should be stored in vault)
+    bearer_token: "asdf"
+    
+    # SSL verification (set to false to match original command)
+    ssl_verify: false
+
+  pre_tasks:
+    - name: Verify this is RHEL 9
+      assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat"
+          - ansible_facts['distribution_major_version'] == "9"
+        fail_msg: "This playbook is designed for RHEL 9 systems only"
+        success_msg: "Confirmed RHEL 9 system"
+
+    - name: Check if system is already registered
+      command: subscription-manager status
+      register: subscription_status
+      failed_when: false
+      changed_when: false
+
+    - name: Display current subscription status
+      debug:
+        msg: "Current subscription status: {{ subscription_status.stdout_lines }}"
+
+    - name: Unregister subscription manager
+      command: subscription-manager unregister
+      ignore_errors: true
+
+    - name: Clean subscription manager data
+      command: subscription-manager clean
+      register: sub_clean_result
+      failed_when: false
+      changed_when: true
+
+    - name: Clean DNF cache
+      command: dnf clean all
+      register: dnf_clean_result
+      changed_when: true
+
+    - name: Remove YUM cache directories
+      file:
+        path: /var/cache/yum
+        state: absent
+      register: yum_clean_result
+
+    - name: Display cleanup results
+      debug:
+        msg:
+          - "Subscription manager clean: {{ 'SUCCESS' if sub_clean_result.rc == 0 else 'FAILED' }}"
+          - "DNF clean: {{ 'SUCCESS' if dnf_clean_result.rc == 0 else 'FAILED' }}"
+          - "YUM cache removal: {{ 'COMPLETED' if yum_clean_result.changed else 'NO ACTION NEEDED' }}"
+
+  tasks:
+    - name: Ensure curl is installed
+      package:
+        name: curl
+        state: present
+
+    - name: Build registration URL
+      set_fact:
+        registration_url: "{{ foreman_protocol }}://{{ foreman_server }}:{{ foreman_port }}/register?activation_keys={{ activation_keys }}&hostgroup_id={{ hostgroup_id }}&location_id={{ location_id }}&operatingsystem_id={{ operatingsystem_id }}&organization_id={{ organization_id }}&update_packages={{ update_packages }}"
+
+    - name: Debug registration URL
+      debug:
+        msg: "Registration URL: {{ registration_url }}"
+
+    - name: Test network connectivity to Foreman server
+      wait_for:
+        host: "{{ foreman_server }}"
+        port: "{{ foreman_port }}"
+        timeout: 10
+      register: connectivity_test
+      ignore_errors: yes
+
+    - name: Display connectivity test result
+      debug:
+        msg: "Foreman server connectivity: {{ 'SUCCESS - Port accessible' if connectivity_test is succeeded else 'FAILED - Cannot reach ' + foreman_server + ':' + foreman_port }}"
+
+    - name: Execute Foreman registration command
+      shell: |
+        set -o pipefail && curl -sS {{ '--insecure' if not ssl_verify else '' }} \
+        '{{ registration_url }}' \
+        -H 'Authorization: Bearer {{ bearer_token }}' | bash
+      args:
+        executable: /bin/bash
+      register: registration_result
+      failed_when: registration_result.rc != 0
+      changed_when: true
+      no_log: false  # Set to true in production to hide sensitive output
+
+    - name: Display registration output
+      debug:
+        msg: "{{ registration_result.stdout_lines }}"
+      when: 
+        - registration_result is defined
+        - registration_result.stdout_lines is defined
+
+    - name: Display registration errors if any
+      debug:
+        msg: "{{ registration_result.stderr_lines }}"
+      when: 
+        - registration_result is defined
+        - registration_result.stderr_lines is defined
+        - registration_result.stderr_lines | length > 0
+
+  post_tasks:
+    - name: Check all available repositories (enabled and disabled)
+      command: subscription-manager repos --list
+      register: all_repos_status
+      failed_when: false
+      changed_when: false
+
+    - name: Check currently enabled repositories
+      command: subscription-manager repos --list-enabled
+      register: enabled_repos_status
+      failed_when: false
+      changed_when: false
+
+    - name: Display registration summary
+      debug:
+        msg: 
+          - "=== REGISTRATION SUMMARY ==="
+          - "Enabled repositories: {{ enabled_repos_status.stdout_lines | length }} found"
+          - "Total available repositories: {{ (all_repos_status.stdout | regex_findall('Repo ID:')) | length }} found"
+
+    - name: Show enabled repositories (if any)
+      debug:
+        msg: "{{ enabled_repos_status.stdout_lines }}"
+      when: enabled_repos_status.stdout_lines | length > 1
+
+    - name: Verify registration to Foreman server
+      assert:
+        that:
+          - all_repos_status.rc == 0
+          - all_repos_status.stdout is search(foreman_server)
+        fail_msg: |
+          Registration verification failed:
+          - No repositories found from Foreman server {{ foreman_server }}
+          - Check activation key configuration in Satellite
+          - Verify activation key has repository sets enabled
+          - Confirm auto-attach is enabled on activation key
+        success_msg: "Registration successful - repositories are available from Foreman server {{ foreman_server }}"
+
+    # - name: Enable basic repositories if none are enabled
+    #   command: >
+    #     subscription-manager repos 
+    #     --enable=rhel-9-for-x86_64-baseos-rpms 
+    #     --enable=rhel-9-for-x86_64-appstream-rpms
+    #     --enable=satellite-client-6-for-rhel-9-x86_64-rpms
+    #   register: repo_enable_result
+    #   when: 
+    #     - enabled_repos_status.stdout_lines | length <= 1
+    #     - all_repos_status.stdout is search('rhel-9-for-x86_64-baseos-rpms')
+    #   failed_when: false
+    #   changed_when: repo_enable_result.rc == 0
+
+    # - name: Explain why repository enablement was skipped
+    #   debug:
+    #     msg: 
+    #       - "Repository enablement skipped because:"
+    #       - "{{ 'Repositories are already enabled (' + (enabled_repos_status.stdout_lines | length | string) + ' found)' if enabled_repos_status.stdout_lines | length > 1 else 'Required repositories not available from Foreman server' }}"
+    #   when: repo_enable_result is not defined
+
+    # - name: Display repository enablement result
+    #   debug:
+    #     msg: 
+    #       - "Enabled basic RHEL 9 repositories: {{ 'SUCCESS' if repo_enable_result.rc == 0 else 'FAILED' }}"
+    #       - "{{ repo_enable_result.stdout if repo_enable_result.stdout else '' }}"
+    #   when: 
+    #     - repo_enable_result is defined
+    #     - repo_enable_result.rc is defined
+
+    # - name: Final repository status check
+    #   command: subscription-manager repos --list-enabled
+    #   register: final_enabled_repos
+    #   failed_when: false
+    #   changed_when: false
+    #   when: 
+    #     - repo_enable_result is defined 
+    #     - repo_enable_result.rc is defined
+    #     - repo_enable_result.rc == 0
+
+    # - name: Display final enabled repositories
+    #   debug:
+    #     msg: 
+    #       - "=== FINAL ENABLED REPOSITORIES ==="
+    #       - "{{ final_enabled_repos.stdout_lines }}"
+    #   when: 
+    #     - final_enabled_repos is defined
+    #     - final_enabled_repos.stdout_lines is defined
+    #     - final_enabled_repos.stdout_lines | length > 0
+
+  handlers:
+    - name: restart subscription-manager
+      service:
+        name: rhsmcertd
+        state: restarted

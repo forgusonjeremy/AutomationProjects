@@ -1,0 +1,39 @@
+---
+- name: Playbook to add new user and key to N9k switch
+  hosts: "{{ _groups }}"
+  gather_facts: False
+  
+  vars:
+    new_pass: 'MyNotSecurePassword'
+  tasks:
+  # - name: Enable SCP for N9kv
+  #   ansible.netcommon.cli_config:
+  #     config: "feature scp-server"
+  #     commit: True
+
+  # - name: Fetch public key
+  #   ansible.builtin.fetch:
+  #     src: "{{ folder }}{{ pub_key }}"
+  #     dest: /tmp/
+  #   delegate_to: "{{ scp_server }}"
+  #   #run_once: true
+  #   vars:
+  #     ansible_user: "{{ cvs_username }}"
+  #     ansible_password: "{{ cvs_password }}"
+  #   become: "{{ become }}"
+  #   become_user: "{{ become_user }}"
+    
+
+  - name: Create a new user with Key
+    cisco.nxos.nxos_user:
+      name: "{{ localAccountname }}"
+      sshkey: "{{ lookup('file', '/tmp/{{ inventory_hostname }}{{ folder }}{{pub_key}}') }}"
+      sshkey: "{{ ssh_key }}"
+      #configured_password: "{{ new_pass }}"
+      state: present
+      role: "{{ role }}"
+
+  - name: Save config 
+    cisco.nxos.nxos_config:
+      save_when: always
+      
