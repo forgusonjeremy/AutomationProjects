@@ -1,0 +1,28 @@
+---
+- name: port test from the inventory list
+  hosts: localhost
+
+  vars:
+    # var_list_vm:
+    #     - 'vc.corp.local'
+    #     - 'ans11.corp.local'
+    #     - 'ans12.corp.local'
+    #     - 'ans13.corp.local'
+    #     - 'ans14.corp.local'
+    #     - git11.corp.local
+    #     - git12.corp.local
+    # var_test_port:
+    #     - 22
+    #     - 443
+    #     - 80
+
+  tasks:
+  # - name: Gather info about the cluster 
+  #   include_tasks: tasks/ping_check.yml
+  #   with_items: "{{ var_list_vm }}"
+
+  - name: Gather info about the cluster 
+    include_tasks: tasks/ports_check.yml
+    with_items: "{{ var_list_vm }}"
+    loop_control:
+      loop_var: port_task_item

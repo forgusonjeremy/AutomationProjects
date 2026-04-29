@@ -1,0 +1,72 @@
+---
+- name: Playbook to stage/scp to N9kv bootflash
+  hosts: "{{ _groups }}"
+  gather_facts: False
+  
+  tasks:
+  - name: "Set exec-timeout to 29 minutes on VTY lines"
+    cisco.nxos.nxos_config:
+      parents: "line vty"
+      lines:
+        # Sets the timeout to 29 minutes and 0 seconds
+        - "exec-timeout 29"
+
+  - name: Enable SCP for N9kv
+    ansible.netcommon.cli_config:
+      config: "feature scp-server"
+      commit: True
+    
+  - name: Check if image already exist in bootflash
+    cisco.nxos.nxos_command:
+      commands: 'dir bootflash: | include {{ new_image }}'
+    register: check_image
+   
+  - name: Copy from server to device
+    cisco.nxos.nxos_file_copy:
+      file_pull: true
+      file_pull_protocol: scp
+      file_pull_kstack: true
+      file_pull_timeout: 1600
+      local_file: "{{ new_image }}"
+      remote_file: "{{ remote_file }}"
+      remote_scp_server: "{{ remote_scp_server }}"
+      remote_scp_server_user: "{{ cvs_username }}"
+      remote_scp_server_password: '{{ cvs_password }}'
+      vrf: "{{ cisco_vrf }}"
+    when: check_image.stdout[0].find( new_image )  == -1
+    vars:
+     - ansible_connect_timeout: 1600
+     - ansible_command_timeout: 1600
+    changed_when: 
+      - transfer_status: 'Received: File copied/pulled to nxos device from remote scp server.'
+    register: result
+    failed_when:
+      - result == ''
+
+  - name: Reset connection
+    ansible.builtin.meta: reset_connection
+ 
+  - name: Verify SHA512 Hash of Image File
+    vars:
+     - ansible_connect_timeout: 600
+     - ansible_command_timeout: 600
+    cisco.nxos.nxos_command:
+      commands: 'sh file bootflash:{{ new_image }} sha512sum'
+    register: sha_hash_verification_results
+  
+  - name: Set SHA512_hash_verification to pass
+    ansible.builtin.set_fact:
+     sha_hash_verification: "pass"
+    when: sha_hash_verification_results.stdout[0] == sha_hash
+      
+  - name: Fail Task if SHA512 Hash Check Fails
+    fail:
+      msg: "SHA512 Hash Check Fails. Please check the uploaded image!"
+    when: sha_hash_verification_results.stdout[0] != sha_hash
+
+  - name: "Set exec-timeout to 9 minutes on VTY lines"
+    cisco.nxos.nxos_config:
+      parents: "line vty"
+      lines:
+        # Sets the timeout to 9 minutes and 0 seconds
+        - "exec-timeout 9"

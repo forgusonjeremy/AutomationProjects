@@ -1,0 +1,89 @@
+---
+# List All Credential Types - Shows actual API type names
+# Use this to discover the correct type names for filtering
+
+- name: List All PowerFlex Manager Credential Types
+  hosts: localhost
+  gather_facts: false
+  connection: local
+
+  vars:
+    # Set these in AAP survey
+    # pfm_host: ""
+    # pfm_username: ""
+    # pfm_password: ""
+
+  tasks:
+    - name: Authenticate to PowerFlex Manager
+      ansible.builtin.uri:
+        url: "https://{{ pfm_host }}/rest/auth/login"
+        method: POST
+        body_format: json
+        body:
+          username: "{{ pfm_username }}"
+          password: "{{ pfm_password }}"
+        validate_certs: false
+        timeout: 30
+        status_code: [200, 201]
+        return_content: true
+      register: auth_response
+      no_log: true
+      check_mode: false
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth_token: "{{ auth_response.json.access_token }}"
+      no_log: true
+
+    - name: Fetch all credentials
+      ansible.builtin.uri:
+        url: "https://{{ pfm_host }}/Api/V1/Credential"
+        method: GET
+        validate_certs: false
+        timeout: 30
+        status_code: 200
+        headers:
+          Accept: "application/json"
+          Content-Type: "application/json"
+          Authorization: "Bearer {{ auth_token }}"
+      register: credentials_response
+      no_log: true
+      check_mode: false
+
+    - name: Extract unique credential types
+      ansible.builtin.set_fact:
+        unique_types: "{{ credentials_response.json.credentialList | map(attribute='credential.type') | unique | sort | list }}"
+      check_mode: false
+
+    - name: Display all unique credential types
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Available Credential Types (API Names)
+          ========================================
+          {% for type in unique_types %}
+          {{ loop.index }}. {{ type }}
+          {% endfor %}
+          ========================================
+          
+          Use these EXACT names in the 
+          "Credential Type Filter" survey field
+          ========================================
+      check_mode: false
+
+    - name: Show detailed credential list with types
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Sample Credentials and Their Types
+          ========================================
+          {% for item in credentials_response.json.credentialList[:20] | sort(attribute='link.title') %}
+          {{ loop.index }}. {{ item.link.title }}
+             UI Display: (check PowerFlex Manager UI)
+             API Type: {{ item.credential.type }}
+          
+          {% endfor %}
+          ========================================
+          Use the "API Type" values for filtering
+          ========================================
+      check_mode: false

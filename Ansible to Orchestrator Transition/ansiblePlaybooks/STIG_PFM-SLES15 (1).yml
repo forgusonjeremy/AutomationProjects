@@ -1,0 +1,6 @@
+---
+- name: SUSE15-STIG-V2R5-Banner
+  hosts: all
+  gather_facts: no
+  roles:
+    - PowerFlex_SUSE15

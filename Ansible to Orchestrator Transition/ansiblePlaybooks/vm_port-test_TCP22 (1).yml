@@ -1,0 +1,25 @@
+---
+- name: port test from the inventory list
+  hosts: all
+  run_once: true
+
+  vars:
+    # var_list_vm:
+    #     - 'vc.corp.local'
+    #     - 'ans11.corp.local'
+    #     - 'ans12.corp.local'
+    #     - 'ans13.corp.local'
+    #     - 'ans14.corp.local'
+    #     - git11.corp.local
+    #     - git12.corp.local
+
+  tasks:
+  - name: "check if port 22 is accessible"
+    ignore_errors: true
+    wait_for:
+      host: "{{ item }}"
+      port: 22
+      state: started
+      delay: 0
+      timeout: 1
+    loop: "{{var_list_vm}}"

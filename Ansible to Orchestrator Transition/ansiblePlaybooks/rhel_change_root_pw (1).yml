@@ -1,0 +1,513 @@
+---
+# AAP 2.5 Enhanced Password Change Playbook
+# 
+# ============================== SURVEY VARIABLES ==============================
+#
+# REQUIRED VARIABLES:
+#   - target_username: User whose password will be changed
+#   - new_password: New password (must meet complexity requirements)  
+#   - confirm_password: Password confirmation (must match new_password)
+#
+# OPTIONAL VARIABLES - Password Requirements:
+#   - password_min_length: Minimum password length (default: 20)
+#   - password_require_uppercase: Require uppercase letters (default: true)
+#   - password_require_lowercase: Require lowercase letters (default: true)
+#   - password_require_numbers: Require numbers (default: true)
+#   - password_require_special: Require special characters (default: true)
+#   - password_max_age_days: Maximum password age in days (default: 90)
+#
+# OPTIONAL VARIABLES - General Settings:
+#   - confirmation_required: Require password confirmation (default: true)
+#   - force_password_change_on_next_login: Force password change on next login (default: false)
+#   - audit_logging: Enable audit logging (default: true)
+#   - backup_retention_hours: Backup file retention in hours (default: 24)
+#   - disable_no_log: Disable password protection for debugging (default: false)
+#   - password_self_lockout_protection: Enable self-lockout protection (default: true)
+#
+# ==============================================================================
+
+- name: Change user password (Enhanced Security)
+  hosts: all
+  become: true
+  gather_facts: false
+  
+  vars:   
+    # Security settings (configurable via survey)
+    backup_retention_hours_setting: "{{ backup_retention_hours | default(24) | int }}"
+    secure_backup_location: "/var/backups/ansible"
+    self_lockout_protection: "{{ (password_self_lockout_protection | default(true) | string | lower)  }}"
+    
+    # Logging control (can be overridden by survey)
+    enable_password_logging: "{{ disable_no_log | default(false) | bool }}"
+
+  pre_tasks:
+    - name: Collect Date and Time Information
+      shell: |
+        echo "iso8601=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "minute=$(date +%M)"
+        echo "hour=$(date +%H)"
+        echo "day=$(date +%d)"
+        echo "month=$(date +%m)"
+        echo "year=$(date +%Y)"
+        echo "epoch=$(date +%s)"
+        echo "hostname=$(hostname)"
+        echo "ipaddress=$(hostname -I | awk '{print $1}' || echo 'unknown')"
+      register: datetime_raw
+      changed_when: false
+
+    - name: Parse Date and Time Variables
+      set_fact:
+        current_datetime:
+          iso8601: "{{ datetime_raw.stdout_lines | select('match', '^iso8601=.*') | first | regex_replace('^iso8601=', '') }}"
+          minute: "{{ datetime_raw.stdout_lines | select('match', '^minute=.*') | first | regex_replace('^minute=', '') }}"
+          hour: "{{ datetime_raw.stdout_lines | select('match', '^hour=.*') | first | regex_replace('^hour=', '') }}"
+          day: "{{ datetime_raw.stdout_lines | select('match', '^day=.*') | first | regex_replace('^day=', '') }}"
+          month: "{{ datetime_raw.stdout_lines | select('match', '^month=.*') | first | regex_replace('^month=', '') }}"
+          year: "{{ datetime_raw.stdout_lines | select('match', '^year=.*') | first | regex_replace('^year=', '') }}"
+          epoch: "{{ datetime_raw.stdout_lines | select('match', '^epoch=.*') | first | regex_replace('^epoch=', '') }}"
+        current_hostname: "{{ datetime_raw.stdout_lines | select('match', '^hostname=.*') | first | regex_replace('^hostname=', '') }}"
+        current_ipaddress: "{{ datetime_raw.stdout_lines | select('match', '^ipaddress=.*') | first | regex_replace('^ipaddress=', '') }}"
+
+    - name: Create Secure Backup Directory
+      file:
+        path: "{{ secure_backup_location }}"
+        state: directory
+        mode: '0700'
+        owner: root
+        group: root
+
+    - name: Display Required Survey Variables
+      debug:
+        msg: |
+          ================================================================================
+          🔧 REQUIRED AAP SURVEY VARIABLES FOR THIS PLAYBOOK
+          ================================================================================
+          
+          Configure these variables in your AAP Job Template Survey:
+          
+          📋 REQUIRED VARIABLES:
+          ✅ target_username         (type: text)     - Username to change password for
+          ✅ new_password           (type: password)  - New password for the user  
+          ✅ confirm_password       (type: password)  - Password confirmation
+          
+          📋 OPTIONAL VARIABLES - Password Requirements:
+          ⚙️  password_min_length          (type: integer, default: 20)
+          ⚙️  password_require_uppercase   (type: boolean, default: true)
+          ⚙️  password_require_lowercase   (type: boolean, default: true)
+          ⚙️  password_require_numbers     (type: boolean, default: true)
+          ⚙️  password_require_special     (type: boolean, default: true)
+          ⚙️  password_max_age_days        (type: integer, default: 90)
+          
+          📋 OPTIONAL VARIABLES - General Settings:
+          ⚙️  confirmation_required                (type: boolean, default: true)
+          ⚙️  force_password_change_on_next_login (type: boolean, default: false)
+          ⚙️  audit_logging                       (type: boolean, default: true)
+          ⚙️  backup_retention_hours              (type: integer, default: 24)
+          ⚙️  disable_no_log                      (type: boolean, default: false)
+          ⚙️  password_self_lockout_protection    (type: boolean, default: true)
+          
+          💡 TIP: Set 'show_survey_variables: true' in survey to see current values
+          
+          ================================================================================
+      when: show_survey_variables | default(false) | bool
+
+    - name: Display Current Survey Variable Values
+      debug:
+        msg: |
+          ================================================================================
+          📊 CURRENT SURVEY VARIABLE VALUES
+          ================================================================================
+          
+          REQUIRED VARIABLES:
+          • target_username: {{ target_username | default('❌ NOT DEFINED') }}
+          • new_password: {{ '✅ DEFINED (' + (new_password | default('') | length | string) + ' characters)' if new_password is defined else '❌ NOT DEFINED' }}
+          • confirm_password: {{ '✅ DEFINED' if confirm_password is defined else '❌ NOT DEFINED' }}
+          
+          PASSWORD REQUIREMENTS:
+          • password_min_length: {{ password_min_length | default(20) }}
+          • password_require_uppercase: {{ password_require_uppercase | default(true) }}
+          • password_require_lowercase: {{ password_require_lowercase | default(true) }}
+          • password_require_numbers: {{ password_require_numbers | default(true) }}
+          • password_require_special: {{ password_require_special | default(true) }}
+          • password_max_age_days: {{ password_max_age_days | default(90) }}
+          
+          GENERAL SETTINGS:
+          • confirmation_required: {{ confirmation_required | default(true) }}
+          • force_password_change_on_next_login: {{ force_password_change_on_next_login | default(false) }}
+          • audit_logging: {{ audit_logging | default(true) }}
+          • backup_retention_hours: {{ backup_retention_hours | default(24) }}
+          • disable_no_log: {{ disable_no_log | default(false) }}
+          • password_self_lockout_protection: {{ password_self_lockout_protection | default(true) }}
+          
+          ================================================================================
+      when: show_survey_variables | default(false) | bool
+
+    - name: Debug Survey Variables (Optional)
+      debug:
+        msg: |
+          Survey Variables Debug:
+          • target_username defined: {{ target_username is defined }}
+          • target_username value: {{ target_username | default('NOT_DEFINED') }}
+          • new_password defined: {{ new_password is defined }}
+          • new_password length: {{ new_password | default('') | length }}
+          • confirm_password defined: {{ confirm_password is defined }}
+          • confirmation_required: {{ confirmation_required | default(true) }}
+          
+          Password Requirements (from survey):
+          • min_length: {{ password_min_length | default(20) }}
+          • require_uppercase: {{ password_require_uppercase | default(true) }}
+          • require_lowercase: {{ password_require_lowercase | default(true) }}
+          • require_numbers: {{ password_require_numbers | default(true) }}
+          • require_special: {{ password_require_special | default(true) }}
+          • max_age_days: {{ password_max_age_days | default(90) }}
+          
+          Other Settings:
+          • backup_retention_hours: {{ backup_retention_hours_setting }}
+          • audit_logging: {{ audit_logging | default(true) }}
+          • self_lockout_protection (raw): {{ password_self_lockout_protection | default('NOT_SET') }}
+          • self_lockout_protection (processed): {{ self_lockout_protection }}
+      when: enable_password_logging | default(false)
+
+    - name: Validate Survey Inputs
+      assert:
+        that:
+          - target_username is defined and target_username | length > 0
+          - new_password is defined and (new_password | length) >= (password_min_length | default(20) | int)
+          - confirmation_required | default(true) | bool == false or confirm_password is defined
+        fail_msg: |
+          Survey validation failed. Please check:
+          {{ '✗ Username must be provided and not empty (received: ' + (target_username | default('UNDEFINED')) + ')' if not (target_username is defined and target_username | length > 0) else '' }}
+          {{ '✗ Password must be at least ' + (password_min_length | default(20) | string) + ' characters (received length: ' + ((new_password | default('')) | length | string) + ')' if not (new_password is defined and (new_password | length) >= (password_min_length | default(20) | int)) else '' }}
+          {{ '✗ Password confirmation must be provided when required' if (confirmation_required | default(true) | bool) and not (confirm_password is defined) else '' }}
+          
+          Current settings:
+          • Required minimum length: {{ password_min_length | default(20) }}
+          • Confirmation required: {{ confirmation_required | default(true) }}
+        success_msg: "✅ Basic survey inputs validated successfully"
+
+    - name: Validate Password Confirmation
+      assert:
+        that:
+          - new_password == confirm_password
+        fail_msg: "✗ Password and confirmation do not match exactly"
+        success_msg: "✅ Password confirmation validated"
+      when: 
+        - confirmation_required | default(true) | bool
+        - confirm_password is defined
+      no_log: "{{ not enable_password_logging }}"
+
+    - name: Prevent Self-Lockout Protection
+      assert:
+        that:
+          - target_username != ansible_user
+          - target_username != ansible_ssh_user | default(ansible_user)
+        fail_msg: |
+          ✗ CRITICAL SECURITY BLOCK: Cannot change password for the user running this playbook
+          ✗ This would result in immediate lockout and loss of access
+          ✗ Current login user: {{ ansible_user }}
+          ✗ SSH user: {{ ansible_ssh_user | default('same as login') }}
+          ✗ Target user: {{ target_username }}
+          ✗ Changing your own password via Ansible could lock you out permanently
+          ✗ 
+          ✗ To override this protection, set 'password_self_lockout_protection: false' in survey
+          ✗ WARNING: Only do this in controlled environments with proper planning!
+          ✗ 
+          ✗ DEBUG INFO:
+          ✗ Survey value: {{ password_self_lockout_protection | default('NOT_SET') }}
+          ✗ Processed value: {{ self_lockout_protection }}
+        success_msg: "✅ Self-lockout protection validated"
+      when: self_lockout_protection == true
+
+    - name: Verify Administrative Privileges
+      command: id -u
+      register: current_uid
+      changed_when: false
+      failed_when: false
+
+    - name: Check Execution Permissions
+      assert:
+        that:
+          - current_uid.stdout == "0" or target_username == ansible_user
+        fail_msg: |
+          ✗ Insufficient privileges to change password for {{ target_username }}
+          ✗ Current UID: {{ current_uid.stdout }}
+          ✗ Either run as root or change your own password only
+        success_msg: "✅ Administrative privileges verified"
+
+    - name: Advanced Password Complexity Check
+      assert:
+        that:
+          - not (password_require_uppercase | default(true) | bool) or new_password | regex_search('[A-Z]')
+          - not (password_require_lowercase | default(true) | bool) or new_password | regex_search('[a-z]')
+          - not (password_require_numbers | default(true) | bool) or new_password | regex_search('[0-9]')
+          - not (password_require_special | default(true) | bool) or new_password | regex_search('[!@#$%^&*()_+\-=\[\]{}|;:,.<>?/~`]')
+          - new_password | regex_search('^(?!.*(.)\1{2,}).*$')
+        fail_msg: |
+          Password complexity requirements not met:
+          {{ '✗ Must contain at least one uppercase letter (A-Z)' if (password_require_uppercase | default(true) | bool) and not (new_password | regex_search('[A-Z]')) else '' }}
+          {{ '✗ Must contain at least one lowercase letter (a-z)' if (password_require_lowercase | default(true) | bool) and not (new_password | regex_search('[a-z]')) else '' }}
+          {{ '✗ Must contain at least one number (0-9)' if (password_require_numbers | default(true) | bool) and not (new_password | regex_search('[0-9]')) else '' }}
+          {{ '✗ Must contain at least one special character' if (password_require_special | default(true) | bool) and not (new_password | regex_search('[!@#$%^&*()_+\-=\[\]{}|;:,.<>?/~`]')) else '' }}
+          {{ '✗ Cannot contain more than 2 consecutive identical characters' if not (new_password | regex_search('^(?!.*(.)\1{2,}).*$')) else '' }}
+        success_msg: "✅ Password complexity requirements satisfied"
+      no_log: "{{ not enable_password_logging }}"
+
+    - name: Generate Secure Password Hash
+      set_fact:
+        hashed_password: "{{ new_password | password_hash('sha512') }}"
+      no_log: "{{ not enable_password_logging }}"
+
+    - name: Validate Target User Exists
+      getent:
+        database: passwd
+        key: "{{ target_username }}"
+      register: user_info
+      failed_when: user_info.ansible_facts.getent_passwd[target_username] is not defined
+
+    - name: Check User Account Status
+      command: passwd -S {{ target_username }}
+      register: initial_account_status
+      changed_when: false
+      failed_when: false
+
+  tasks:
+    - name: Password Change Operation
+      block:
+        - name: Create Secure Shadow Backup
+          shell: |
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            BACKUP_FILE="{{ secure_backup_location }}/shadow_backup_{{ target_username }}_${TIMESTAMP}"
+            cp /etc/shadow "${BACKUP_FILE}"
+            chmod 600 "${BACKUP_FILE}"
+            chown root:root "${BACKUP_FILE}"
+            echo "${BACKUP_FILE}"
+          register: backup_file_path
+          changed_when: false
+          no_log: "{{ not enable_password_logging }}"
+
+        - name: Record Pre-Change State
+          shell: |
+            getent shadow {{ target_username }} | cut -d: -f2,3,4,5,6,7,8,9
+          register: original_shadow_entry
+          changed_when: false
+          no_log: "{{ not enable_password_logging }}"
+
+        - name: Unlock User Account (if locked)
+          user:
+            name: "{{ target_username }}"
+            password_lock: false
+          register: unlock_result
+          when: "'L' in initial_account_status.stdout"
+
+        - name: Apply New Password
+          user:
+            name: "{{ target_username }}"
+            password: "{{ hashed_password }}"
+            update_password: always
+          no_log: "{{ not enable_password_logging }}"
+          register: password_change_result
+
+        - name: Set Password Aging Policy
+          command: >
+            chage -M {{ password_max_age_days | default(90) | int }}
+            -m 1
+            -W 7
+            {{ target_username }}
+          register: aging_result
+          when: password_max_age_days is defined
+
+        - name: Force Password Change on Next Login (Optional)
+          command: chage -d 0 {{ target_username }}
+          when: force_password_change_on_next_login | default(false) | bool
+
+        - name: Verify Password Change Success
+          shell: |
+            NEW_HASH=$(getent shadow {{ target_username }} | cut -d: -f2)
+            if [ "$NEW_HASH" != "{{ original_shadow_entry.stdout.split(':')[0] }}" ]; then
+              echo "SUCCESS"
+            else
+              echo "FAILED"
+              exit 1
+            fi
+          register: verification_result
+          changed_when: false
+          no_log: "{{ not enable_password_logging }}"
+
+        - name: Get Updated Account Status
+          command: passwd -S {{ target_username }}
+          register: final_account_status
+          changed_when: false
+
+        - name: Get Password Aging Information
+          command: chage -l {{ target_username }}
+          register: password_aging_info
+          changed_when: false
+          failed_when: false
+
+        - name: Create Audit Log Entry
+          lineinfile:
+            path: /var/log/ansible_password_changes.log
+            line: "{{ current_datetime.iso8601 }} | {{ ansible_user }}@{{ current_hostname }} | SUCCESS | {{ target_username }} | Password changed successfully | Session: {{ ansible_session_id | default('unknown') }}"
+            create: true
+            mode: '0600'
+          when: audit_logging | default(true) | bool
+
+        - name: Display Success Summary
+          debug:
+            msg: |
+              
+              ================================================================================
+              ✅ PASSWORD CHANGE COMPLETED SUCCESSFULLY
+              ================================================================================
+              
+              📋 SUMMARY
+              ────────────────────────────────────────────────────────────────────────────────
+                Account:    {{ target_username }}
+                System:     {{ current_hostname }} ({{ current_ipaddress }})
+                Date/Time:  {{ current_datetime.iso8601 }}
+                Status:     {{ 'ACTIVE ✅' if 'P' in final_account_status.stdout else 'INACTIVE ❌' }}
+              
+              🔐 SECURITY CONFIGURATION
+              ────────────────────────────────────────────────────────────────────────────────
+                • Password Algorithm: SHA512 with random salt
+                • Minimum Length: {{ password_min_length | default(20) }} characters
+                • Complexity Requirements: Mixed case, numbers, and symbols
+                • Password Max Age: {{ password_max_age_days | default(90) }} days
+                • Self-Lockout Protection: {{ 'ENABLED ✅' if self_lockout_protection == true else 'BYPASSED ⚠️' }}
+                • Backup Status: ✅ Created and secured
+              
+              📅 PASSWORD POLICY DETAILS
+              ────────────────────────────────────────────────────────────────────────────────
+                • Last Changed: Today ({{ current_datetime.iso8601.split('T')[0] }})
+                • Will Expire: In {{ password_max_age_days | default(90) }} days
+                • Warning Period: 7 days before expiration  
+                • Min Days Between Changes: 1 day
+              
+              🔍 ACCOUNT AGING INFORMATION
+              ────────────────────────────────────────────────────────────────────────────────
+              {{ password_aging_info.stdout | indent(2) }}
+              
+              ⚠️  IMPORTANT - IMMEDIATE ACTION REQUIRED
+              ────────────────────────────────────────────────────────────────────────────────
+              
+              🧪 TEST THE NEW PASSWORD NOW:
+                 1. Open a NEW terminal/SSH session (keep this one open!)
+                 2. Try logging in with the new password
+                 3. Verify access works before closing this session
+              
+              📝 NEXT STEPS:
+                 1. Update password managers and documentation
+                 2. Review any automation that uses this account  
+                 3. Notify users if this is a shared service account
+                 4. Set calendar reminder for password expiration
+              
+              🗂️  BACKUP INFORMATION
+              ────────────────────────────────────────────────────────────────────────────────
+                Location:   {{ backup_file_path.stdout }}
+                Retention:  {{ backup_retention_hours_setting }} hours  
+                Cleanup:    Automatically scheduled
+              
+              ================================================================================
+
+
+      rescue:
+        - name: Log Password Change Failure
+          lineinfile:
+            path: /var/log/ansible_password_changes.log
+            line: "{{ current_datetime.iso8601 }} | {{ ansible_user }}@{{ current_hostname }} | FAILURE | {{ target_username }} | Password change failed - initiating rollback | Session: {{ ansible_session_id | default('unknown') }}"
+            create: true
+            mode: '0600'
+          when: audit_logging | default(true) | bool
+
+        - name: Emergency Password Restoration
+          shell: |
+            if [ -f "{{ backup_file_path.stdout }}" ]; then
+              cp "{{ backup_file_path.stdout }}" /etc/shadow
+              echo "Password restored from backup"
+            else
+              echo "No backup file found for restoration"
+              exit 1
+            fi
+          register: restore_result
+          when: 
+            - backup_file_path is defined
+            - backup_file_path.stdout is defined
+
+        - name: Verify Restoration Success
+          command: passwd -S {{ target_username }}
+          register: restore_verification
+          when: restore_result is defined
+
+        - name: Display Restoration Status
+          debug:
+            msg: |
+              
+              ================================================================================
+              ⚠️  PASSWORD CHANGE FAILED - EMERGENCY RESTORATION
+              ================================================================================
+              
+              📊 RESTORATION STATUS
+              ────────────────────────────────────────────────────────────────────────────────
+                Account:        {{ target_username }}
+                System:         {{ current_hostname }}
+                Restoration:    {{ 'SUCCESS ✅' if restore_result.rc == 0 else 'FAILED ❌' }}
+                Current Status: {{ restore_verification.stdout | default('Unknown') }}
+              
+              🚨 IMMEDIATE ACTION REQUIRED
+              ────────────────────────────────────────────────────────────────────────────────
+              
+              CRITICAL STEPS TO TAKE RIGHT NOW:
+                1. 🔍 Verify account access manually in another session
+                2. 📄 Check system logs for detailed error information  
+                3. 👨‍💼 Contact system administrator if restoration failed
+                4. 🔐 DO NOT attempt another password change until issue is resolved
+              
+              🗂️  BACKUP INFORMATION
+              ────────────────────────────────────────────────────────────────────────────────
+                Location: {{ backup_file_path.stdout | default('Not created') }}
+                Status:   {{ 'Used for restoration' if restore_result.rc == 0 else 'Available for manual restore' }}
+              
+              ================================================================================
+
+        - name: Fail with Detailed Error
+          fail:
+            msg: |
+              Password change operation failed. Emergency restoration {{ 'completed' if restore_result.rc == 0 else 'FAILED' }}.
+              Check /var/log/ansible_password_changes.log for details.
+
+      always:
+        - name: Schedule Backup Cleanup
+          cron:
+            name: "Cleanup password backup {{ backup_file_path.stdout | basename }}"
+            minute: "{{ current_datetime.minute }}"
+            hour: "{{ (current_datetime.hour | int + backup_retention_hours_setting | int) % 24 }}"
+            day: "{{ current_datetime.day if (current_datetime.hour | int + backup_retention_hours_setting | int) < 24 else (current_datetime.day | int + 1) }}"
+            job: "rm -f {{ backup_file_path.stdout }} && crontab -l | grep -v '{{ backup_file_path.stdout | basename }}' | crontab -"
+            state: present
+          when: 
+            - backup_file_path is defined
+            - backup_file_path.stdout is defined
+          ignore_errors: true
+
+        - name: Set Secure Permissions on Logs
+          file:
+            path: /var/log/ansible_password_changes.log
+            mode: '0600'
+            owner: root
+            group: root
+          when: audit_logging | default(true) | bool
+          ignore_errors: true
+
+        - name: Clean Old Backup Files (7+ days)
+          find:
+            paths: "{{ secure_backup_location }}"
+            patterns: "shadow_backup_*"
+            age: "7d"
+          register: old_backups
+
+        - name: Remove Old Backup Files
+          file:
+            path: "{{ item.path }}"
+            state: absent
+          loop: "{{ old_backups.files }}"
+          ignore_errors: true
