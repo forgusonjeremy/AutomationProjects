@@ -1,8 +1,3 @@
-PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> .\bulk_scp.ps1 -CsvPath .\servers.csv 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\generate_datastore_latency.sh'
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_scp.ps1:113 char:38
-+ Write-Host "Method  : SSH pipe (cat >) - CRLF-safe" -ForegroundColor  ...
-+                                      ~
-Missing file specification after redirection operator.
 At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_scp.ps1:74 char:38
 +     while ($attempt -lt $MaxRetries) {
 +                                      ~
@@ -12,4 +7,6 @@ At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orche
 +                              ~
 Missing closing '}' in statement block or type definition.
     + CategoryInfo          : ParserError: (:) [], ParseException
-    + FullyQualifiedErrorId : MissingFileSpecification
+    + FullyQualifiedErrorId : MissingEndCurlyBrace
+ 
+PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> 
