@@ -1,20 +1,44 @@
- 
-PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> .\bulk_generate_DatastoreLatency.ps1 -CsvPath "iscsiservers.csv" -ScriptRemotePath "/tmp/generate_datastore_latency.sh"
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:281 char:29
-+ while ($pendingCount -gt 0) {
-+                             ~
-Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:108 char:39
+PS C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts> ./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 2 -ScriptDurationMinutes 15 -MaxParallelJobs 45
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:154 char:21
++ '$ScriptRemotePath' $scriptArgs > "`$OUTFILE" 2>&1 &
++                     ~~~~~~~~~~~
+Unexpected token '$scriptArgs' in expression or statement.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:154 char:52
++ '$ScriptRemotePath' $scriptArgs > "`$OUTFILE" 2>&1 &
++                                                    ~
+Unexpected token '&' in expression or statement.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:154 char:52
++ '$ScriptRemotePath' $scriptArgs > "`$OUTFILE" 2>&1 &
++                                                    ~
+Missing expression after '&' in pipeline element.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:105 char:39
 +         if ($attempt -lt $MaxRetries) {
 +                                       ~
 Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:93 char:38
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:165 char:3
++ if [ `$ELAPSED -lt $minimumRuntimeSeconds ]; then
++   ~
+Missing '(' after 'if' in if statement.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:165 char:5
++ if [ `$ELAPSED -lt $minimumRuntimeSeconds ]; then
++     ~
+Missing type name after '['.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:166 char:44
++     REMAINING=`$(( $minimumRuntimeSeconds - ELAPSED ))
++                                            ~
+You must provide a value expression following the '-' operator.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:166 char:45
++     REMAINING=`$(( $minimumRuntimeSeconds - ELAPSED ))
++                                             ~~~~~~~
+Unexpected token 'ELAPSED' in expression or statement.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:166 char:44
++     REMAINING=`$(( $minimumRuntimeSeconds - ELAPSED ))
++                                            ~
+Missing closing ')' in expression.
+At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1:90 char:38
 +     while ($attempt -lt $MaxRetries) {
 +                                      ~
 Missing closing '}' in statement block or type definition.
-At C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_DatastoreLatency.ps1:80 char:30
-+ function Invoke-SshWithRetry {
-+                              ~
-Missing closing '}' in statement block or type definition.
+Not all parse errors were reported.  Correct the reported errors and try again.
     + CategoryInfo          : ParserError: (:) [], ParseException
-    + FullyQualifiedErrorId : MissingEndCurlyBrace
+    + FullyQualifiedErrorId : UnexpectedToken
