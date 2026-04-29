@@ -15,7 +15,9 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$CsvPath,
 
-    [switch]$StopOnError
+    [switch]$StopOnError,
+
+    [int]$MaxRetries = 3           # Retry each transfer on failure (network resilience)
 )
 
 # --- Validate inputs ---
@@ -51,6 +53,53 @@ foreach ($col in $requiredCols) {
     }
 }
 
+
+# ── Resilience: SSH retry helper ─────────────────────────────────────────────
+# Retries any SSH command up to $MaxRetries times with exponential backoff.
+# Handles transient failures from network latency, packet drops, and
+# temporary disconnects without failing the entire run.
+function Invoke-SshWithRetry {
+    param(
+        [string[]]$SshArgs,
+        [string]$Command,
+        [int]$MaxRetries   = 3,
+        [int]$RetryDelayMs = 5000,   # Initial delay — doubles on each retry
+        [string]$InputData = $null   # Optional stdin to pipe
+    )
+
+    $attempt  = 0
+    $lastExit = -1
+    $output   = ""
+
+    while ($attempt -lt $MaxRetries) {
+        $attempt++
+        try {
+            if ($InputData) {
+                $output   = $InputData | & ssh @SshArgs $Command 2>&1
+            } else {
+                $output   = & ssh @SshArgs $Command 2>&1
+            }
+            $lastExit = $LASTEXITCODE
+            if ($lastExit -eq 0) { break }
+        } catch {
+            $lastExit = -1
+            $output   = $_.Exception.Message
+        }
+
+        if ($attempt -lt $MaxRetries) {
+            $delay = $RetryDelayMs * [math]::Pow(2, $attempt - 1)
+            Write-Host "    [RETRY] Attempt $attempt failed (exit $lastExit) — retrying in $([math]::Round($delay/1000,1))s..." -ForegroundColor DarkYellow
+            Start-Sleep -Milliseconds $delay
+        }
+    }
+
+    return [PSCustomObject]@{
+        Output   = ($output -join "`n")
+        ExitCode = $lastExit
+        Attempts = $attempt
+    }
+}
+
 # --- Read file content for piping ---
 $fileName    = Split-Path $FilePath -Leaf
 $fileContent = [System.IO.File]::ReadAllText($FilePath)
@@ -80,36 +129,35 @@ foreach ($row in $servers) {
     $sshArgs = @(
         "-o", "StrictHostKeyChecking=no",
         "-o", "BatchMode=yes",
-        "-o", "ConnectTimeout=10",
+        "-o", "ConnectTimeout=30",
+        "-o", "ServerAliveInterval=15",
+        "-o", "ServerAliveCountMax=4",
         "-p", $port,
         "${username}@${server}",
         "cat > '$remotePath'"
     )
 
-    $fileContent | & ssh @sshArgs
-    $exitCode = $LASTEXITCODE
+    # Transfer with retry — handles transient network issues
+    $transferResult = Invoke-SshWithRetry -SshArgs $sshArgs `
+        -Command "cat > '$remotePath'" `
+        -InputData $fileContent `
+        -MaxRetries $MaxRetries
+    $exitCode = $transferResult.ExitCode
 
-    # Strip \r bytes unconditionally - no-op if already clean
+    if ($transferResult.Attempts -gt 1) {
+        Write-Host "[$server] Transfer succeeded after $($transferResult.Attempts) attempts" -ForegroundColor DarkYellow
+    }
+
+    # Strip \r bytes unconditionally — retry on transient failure
     if ($exitCode -eq 0) {
-        $stripArgs = @(
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "BatchMode=yes",
-            "-o", "ConnectTimeout=10",
-            "-p", $port,
-            "${username}@${server}",
-            "sed -i 's/\r//' '$remotePath'"
-        )
-        & ssh @stripArgs 2>&1 | Out-Null
-
-        $verifyArgs = @(
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "BatchMode=yes",
-            "-o", "ConnectTimeout=10",
-            "-p", $port,
-            "${username}@${server}",
-            "grep -cP '\r' '$remotePath' 2>/dev/null || echo 0"
-        )
-        $crlfCount = (& ssh @verifyArgs 2>&1).Trim()
+        $stripResult = Invoke-SshWithRetry -SshArgs $sshArgs `
+            -Command "sed -i 's/\r//' '$remotePath'" `
+            -MaxRetries $MaxRetries
+        
+        $verifyResult = Invoke-SshWithRetry -SshArgs $sshArgs `
+            -Command "grep -cP '\r' '$remotePath' 2>/dev/null || echo 0" `
+            -MaxRetries $MaxRetries
+        $crlfCount = $verifyResult.Output.Trim()
 
         if ($crlfCount -eq "0") {
             Write-Host "[$server] Line endings OK (no CRLF bytes found)" -ForegroundColor DarkGray

@@ -36,7 +36,9 @@ param(
 
     [int]$JobTimeoutMinutes = 45,      # Kill any server still running beyond this (default 45 min)
 
-    [switch]$StopOnError               # Stop launching new jobs if one fails
+    [switch]$StopOnError,              # Stop launching new jobs if one fails
+
+    [int]$MaxRetries = 3               # Retry failed launches before giving up
 )
 
 # --- Validate inputs ---
@@ -67,6 +69,53 @@ foreach ($col in $requiredCols) {
     }
 }
 
+
+# ── Resilience: SSH retry helper ─────────────────────────────────────────────
+# Retries any SSH command up to $MaxRetries times with exponential backoff.
+# Handles transient failures from network latency, packet drops, and
+# temporary disconnects without failing the entire run.
+function Invoke-SshWithRetry {
+    param(
+        [string[]]$SshArgs,
+        [string]$Command,
+        [int]$MaxRetries   = 3,
+        [int]$RetryDelayMs = 5000,   # Initial delay — doubles on each retry
+        [string]$InputData = $null   # Optional stdin to pipe
+    )
+
+    $attempt  = 0
+    $lastExit = -1
+    $output   = ""
+
+    while ($attempt -lt $MaxRetries) {
+        $attempt++
+        try {
+            if ($InputData) {
+                $output   = $InputData | & ssh @SshArgs $Command 2>&1
+            } else {
+                $output   = & ssh @SshArgs $Command 2>&1
+            }
+            $lastExit = $LASTEXITCODE
+            if ($lastExit -eq 0) { break }
+        } catch {
+            $lastExit = -1
+            $output   = $_.Exception.Message
+        }
+
+        if ($attempt -lt $MaxRetries) {
+            $delay = $RetryDelayMs * [math]::Pow(2, $attempt - 1)
+            Write-Host "    [RETRY] Attempt $attempt failed (exit $lastExit) — retrying in $([math]::Round($delay/1000,1))s..." -ForegroundColor DarkYellow
+            Start-Sleep -Milliseconds $delay
+        }
+    }
+
+    return [PSCustomObject]@{
+        Output   = ($output -join "`n")
+        ExitCode = $lastExit
+        Attempts = $attempt
+    }
+}
+
 # --- Helper: Build SSH args ---
 function Get-SshArgs {
     param($username, $server, $port)
@@ -74,7 +123,9 @@ function Get-SshArgs {
     $args = @(
         "-o", "StrictHostKeyChecking=no",
         "-o", "BatchMode=yes",
-        "-o", "ConnectTimeout=10",
+        "-o", "ConnectTimeout=30",
+        "-o", "ServerAliveInterval=15",
+        "-o", "ServerAliveCountMax=4",
         "-p", $port
     )
     $args += "${username}@${server}"
@@ -168,14 +219,27 @@ foreach ($row in $servers) {
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Launching on $server..." -ForegroundColor Yellow
 
     $job = Start-Job -ScriptBlock {
-        param($sshExe, $sshArgList, $launchCmd, $srv)
-        $output = $launchCmd | & $sshExe @sshArgList "bash -s" 2>&1
+        param($sshExe, $sshArgList, $launchCmd, $srv, $maxRetries)
+        $attempt  = 0
+        $lastExit = -1
+        $output   = ""
+        while ($attempt -lt $maxRetries) {
+            $attempt++
+            $output   = $launchCmd | & $sshExe @sshArgList "bash -s" 2>&1
+            $lastExit = $LASTEXITCODE
+            if ($lastExit -eq 0) { break }
+            if ($attempt -lt $maxRetries) {
+                $delay = 5000 * [math]::Pow(2, $attempt - 1)
+                Start-Sleep -Milliseconds $delay
+            }
+        }
         return [PSCustomObject]@{
             Server   = $srv
             Output   = ($output -join "`n")
-            ExitCode = $LASTEXITCODE
+            ExitCode = $lastExit
+            Attempts = $attempt
         }
-    } -ArgumentList "ssh", $sshArgs, $remoteCommand, $server
+    } -ArgumentList "ssh", $sshArgs, $remoteCommand, $server, $MaxRetries
 
     $launchJobs[$job.Name] = $srvKey
     $serverMeta[$srvKey] = [PSCustomObject]@{
@@ -207,9 +271,10 @@ foreach ($jobName in $launchJobs.Keys) {
     $meta.Launched = ($result.ExitCode -eq 0)
 
     if ($result.ExitCode -eq 0) {
-        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Launched OK" -ForegroundColor Green
+        $attemptStr = if ($result.Attempts -gt 1) { " (after $($result.Attempts) attempts)" } else { "" }
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Launched OK${attemptStr}" -ForegroundColor Green
     } else {
-        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Launch FAILED (exit $($result.ExitCode))" -ForegroundColor Red
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Launch FAILED after $($result.Attempts) attempt(s) (exit $($result.ExitCode))" -ForegroundColor Red
         $meta.Done     = $true
         $meta.ExitCode = $result.ExitCode
     }
@@ -241,16 +306,25 @@ while ($pendingCount -gt 0) {
             continue
         }
 
-        # Poll for done file - use bash -c to keep || inside bash, not PowerShell
-        $pollCmd = 'bash -c "cat ~/.snapshot_io.done 2>/dev/null || echo RUNNING"'
-        $pollResult = & ssh @($meta.SshArgs) $pollCmd 2>&1
-        $pollText   = ($pollResult -join "").Trim()
+        # Poll for done file — retry on transient network failures
+        $pollResult = Invoke-SshWithRetry -SshArgs $meta.SshArgs `
+            -Command 'bash -c "cat ~/.snapshot_io.done 2>/dev/null || echo RUNNING"' `
+            -MaxRetries 3 -RetryDelayMs 3000
+        $pollText = $pollResult.Output.Trim()
+
+        # If SSH itself failed treat as still running — don't mark done on a network glitch
+        if ($pollResult.ExitCode -ne 0 -and $pollText -eq "") {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [$srvKey] Poll SSH failed — will retry next cycle" -ForegroundColor DarkYellow
+            continue
+        }
 
         if ($pollText -ne "RUNNING" -and $pollText -ne "") {
             try { $meta.ExitCode = [int]$pollText } catch { $meta.ExitCode = 1 }
-            $logCmd = 'bash -c "cat ~/.snapshot_io.out 2>/dev/null | tail -20"'
-            $remoteLog = & ssh @($meta.SshArgs) $logCmd 2>&1
-            $meta.Output  += "`n" + ($remoteLog -join "`n")
+            $logResult = Invoke-SshWithRetry -SshArgs $meta.SshArgs `
+                -Command 'bash -c "cat ~/.snapshot_io.out 2>/dev/null | tail -20"' `
+                -MaxRetries 3 -RetryDelayMs 3000
+            $remoteLog = $logResult.Output
+            $meta.Output  += "`n" + $remoteLog
             $meta.Done     = $true
             $pendingCount--
 
