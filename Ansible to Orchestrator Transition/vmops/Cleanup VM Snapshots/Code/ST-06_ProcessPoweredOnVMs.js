@@ -323,7 +323,6 @@ if (onCands.length === 0) {
                 var props = new Properties();
                 props.put("vcenterSdkConnection", vcConn);
                 props.put("vmMoRef",              cand.vmMoRef);
-                props.put("snapshotMoRef",        cand.snapshotMoRef);
                 props.put("snapshotName",         cand.snapshotName);
                 props.put("snapshotCreatedMs",    cand.snapshotCreatedMs || 0);
                 props.put("vmName",               cand.vmName);
