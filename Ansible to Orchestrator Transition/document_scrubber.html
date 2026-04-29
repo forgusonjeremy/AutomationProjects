@@ -683,47 +683,97 @@ body {
   }
 
   // ── Download ────────────────────────────────────────────────────────────
-  // Package all scrubbed files into a single .zip to avoid Edge SmartScreen
-  // blocking individual .ps1 / .sh / .py downloads.
+  // Package all scrubbed files into a .zip. Extensions that Edge SmartScreen
+  // blocks (.ps1, .bat, .cmd, .vbs, .sh, .py) are suffixed with _ inside the
+  // zip. A README and a restore script are included to rename them back.
+  const BLOCKED_EXTS = /\.(ps1|bat|cmd|vbs|vbe|wsf|wsh|sh|bash|py|pyw|rb|pl|exe|msi|js|jsx)$/i;
+
   downloadBtn.addEventListener('click', async () => {
     const withReplacements = findings.filter(f => f.replacement).length;
     const without = findings.length - withReplacements;
     const fileNames = Object.keys(files);
+    let renamedAny = false;
 
-    // If JSZip hasn't loaded yet, fall back to individual downloads
     if (typeof JSZip === 'undefined') {
+      // Fallback: individual .txt downloads
       for (const fname of fileNames) {
         const scrubbed = scrubContent(files[fname]);
-        const dotIdx = fname.lastIndexOf('.');
-        const outName = dotIdx > 0
-          ? fname.slice(0, dotIdx) + '_scrubbed' + fname.slice(dotIdx)
-          : fname + '_scrubbed';
-        downloadFile(outName, scrubbed);
+        downloadFile(scrubOutName(fname) + '.txt', scrubbed);
       }
-    } else {
-      const zip = new JSZip();
-      for (const fname of fileNames) {
-        const scrubbed = scrubContent(files[fname]);
-        const dotIdx = fname.lastIndexOf('.');
-        const outName = dotIdx > 0
-          ? fname.slice(0, dotIdx) + '_scrubbed' + fname.slice(dotIdx)
-          : fname + '_scrubbed';
-        zip.file(outName, scrubbed);
-      }
-      const blob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'scrubbed_files.zip';
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      let msg = `✅ ${fileNames.length} file(s) downloaded as .txt (rename manually).`;
+      if (without > 0) msg += ` ⚠️ ${without} finding(s) had no replacement.`;
+      statusBar.innerHTML = `<div class="status-bar warn">${msg}</div>`;
+      return;
     }
 
+    const zip = new JSZip();
+    const renames = [];
+
+    for (const fname of fileNames) {
+      const scrubbed = scrubContent(files[fname]);
+      let outName = scrubOutName(fname);
+
+      if (BLOCKED_EXTS.test(outName)) {
+        const safeName = outName + '_';
+        renames.push({ from: safeName, to: outName });
+        outName = safeName;
+        renamedAny = true;
+      }
+      zip.file(outName, scrubbed);
+    }
+
+    // If any files were renamed, add a restore script and README
+    if (renamedAny) {
+      // PowerShell restore script
+      const ps1Lines = [
+        '# Run this in the extracted folder to restore original extensions',
+        '# Usage: Right-click > Run with PowerShell  (or run from a PS terminal)',
+        ''
+      ];
+      for (const r of renames) {
+        ps1Lines.push(`if (Test-Path '${r.from}') { Rename-Item '${r.from}' '${r.to}' -Force; Write-Host "Restored: ${r.to}" }`);
+      }
+      ps1Lines.push('', 'Write-Host "`nDone. Press Enter to close." -ForegroundColor Green', 'Read-Host');
+      // The restore script itself gets .txt extension so it's not blocked
+      zip.file('_restore_extensions.ps1.txt', ps1Lines.join('\r\n'));
+
+      // README
+      zip.file('_README.txt', [
+        'SCRUBBED FILES — EXTENSION NOTICE',
+        '═'.repeat(50),
+        '',
+        'Some file extensions were changed to bypass Edge SmartScreen:',
+        ...renames.map(r => `  ${r.from}  →  rename to  →  ${r.to}`),
+        '',
+        'To restore all extensions at once:',
+        '  1. Rename _restore_extensions.ps1.txt to _restore_extensions.ps1',
+        '  2. Right-click it > Run with PowerShell',
+        '',
+        'Or rename the files manually in File Explorer.',
+      ].join('\r\n'));
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'scrubbed_files.zip';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
     let msg = `✅ ${fileNames.length} file(s) packaged into scrubbed_files.zip with ${withReplacements} replacement(s) applied.`;
+    if (renamedAny) msg += ` 📝 ${renames.length} file(s) had extensions neutralized for Edge — see _README.txt in the zip.`;
     if (without > 0) msg += ` ⚠️ ${without} finding(s) had no replacement and were left as-is.`;
     statusBar.innerHTML = `<div class="status-bar ${without > 0 ? 'warn' : ''}">${msg}</div>`;
   });
+
+  function scrubOutName(fname) {
+    const dotIdx = fname.lastIndexOf('.');
+    return dotIdx > 0
+      ? fname.slice(0, dotIdx) + '_scrubbed' + fname.slice(dotIdx)
+      : fname + '_scrubbed';
+  }
 
   function downloadFile(name, content) {
     const blob = new Blob([content], { type: 'text/plain' });
