@@ -1,4 +1,4 @@
-# ESXi Patching Workflow — Open Items & Customer Questions
+# ESXi Patching Workflow — Open Items & Customer Questions 
 
 > **Project:** Manual ESXi Patching Automation per Dell KB 000345284
 > **Platform:** VCF 9.x (Orchestrator + Automation, vSphere 8 on VxRail and PowerFlex)
