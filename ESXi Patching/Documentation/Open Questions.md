@@ -322,16 +322,16 @@ Pattern A or Pattern B?
 ## C-12 — Form section layout and two-tier check pattern
 
 **Why it matters:**
-Per the operational requirement that operators see all warnings/blockers/acknowledgements in the request form (no Awaiting User Interaction during execution), the form has multiple sections with dependent fields and external-value validations. Form-time external actions must be performant — connecting to all 7-10 vCenters synchronously while the operator fills the form would create a janky UX. The proposed solution is a two-tier check pattern: cheap checks at form time (HA, DRS, host count, host MM state), full checks at workflow start (cheap + vSAN resync + cluster-not-in-other-upgrade).
+Per the operational requirement that operators see all warnings/blockers/acknowledgements in the request form (no Awaiting User Interaction during execution), the form has multiple sections with dependent fields and external-value validations. With per-vCenter workflow scope, the vCenter selector becomes single-select, and form-time external actions are dramatically faster (one vCenter to query, not many).
 
-**Proposed form layout:**
+**Proposed form layout (updated for per-vCenter scope):**
 
 | Order | Section | Contents | Notes |
 |---|---|---|---|
 | 1 | Acknowledgement | Heading + mandatory checkbox: "I acknowledge this is manual patching outside vLCM/VxRail Manager and may trigger noncompliance alarms." | Required-checked to advance |
-| 2 | Scope Selection | vCenter multi-select. Cluster multi-select (dependent, with health labels). | Each cluster shown with `(READY)`, `(BLOCKED: reason)`, `(WARNING: reason)`. Blocked clusters not selectable. |
-| 3 | Patch Source | Content Library item picker (dependent on selected vCenters). Patch staging mode (Direct vs Stage-and-Clean). | Picker filtered to ESXi depot pattern. |
-| 4 | Execution Parameters | `maxParallelClustersPerVcenter` (default 3). `hostRebootTimeoutMinutes` (default 25). `bypassHardwareCheck` (default false, with warning text). | Operator parameters with sane defaults. |
+| 2 | Scope Selection | vCenter **single-select**. Cluster multi-select (dependent on vCenter, with health labels). | Each cluster shown with `(READY)`, `(BLOCKED: reason)`, `(WARNING: reason)`. Blocked clusters not selectable. |
+| 3 | Patch Source | Content Library item picker (dependent on selected vCenter). Patch staging mode (Direct vs Stage-and-Clean). | Picker filtered to ESXi depot pattern. |
+| 4 | Execution Parameters | `maxParallelClusters` (default 3). `hostRebootTimeoutMinutes` (default 25). `bypassHardwareCheck` (default false, with warning text). | Operator parameters with sane defaults. |
 | 5 | Notification | `notificationEmailRecipients` (text, comma-separated, required). | At least one recipient required. |
 | 6 | Advanced (collapsed) | `debugLogging` (default false). `ignorePreflightWarnings` (default false). `dryRun` (default true). | `dryRun` defaults to TRUE — operator must explicitly opt out. |
 
