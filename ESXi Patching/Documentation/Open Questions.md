@@ -310,8 +310,8 @@ Pattern A or Pattern B?
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received:5/4/25
+Response: Pattern B
 
 **Action if answer changes design:**
 - Pattern A: add a final cleanup step calling VCF Automation REST API DELETE.
@@ -346,8 +346,8 @@ Layout and two-tier pattern as above.
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Approved
 
 **Action if answer changes design:**
 Section layout adjustments are cheap. Check-tier rebalancing has implications for form performance and code structure.
@@ -370,8 +370,8 @@ Is it acceptable to reuse the inventory-registered vCenter SDK connection creden
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Reuse inventory connections
 
 **Action if answer changes design:**
 - Reuse: no extra work.
