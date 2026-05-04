@@ -31,6 +31,7 @@
 | C-12 | Confirm form section layout and two-tier check pattern | Internal (architect) | OPEN | MEDIUM |
 | C-13 | Credentials for form-time vCenter health-check actions | Internal (architect) | OPEN | MEDIUM |
 
+
 ---
 
 ## C-01 — Content Library backing strategy
@@ -70,7 +71,7 @@ With 7-10 vCenters, the depot ZIP needs to exist in a Content Library that is re
 Which pattern is in use today for distributing software bundles across vCenters? If neither is established, the Published+Subscriber pattern is recommended.
 
 **Default assumption (used until answered):**
-Workflow's depot picker matches by **item name**, not item ID, which means it works with either pattern. No code change required either way — but documentation should reflect the actual pattern.
+Workflow's depot picker matches by **item name**, not item ID, which means it works with either pattern. No code change required either way — but documentation should reflect the customer's actual pattern.
 
 **Status:** OPEN
 **Owner:** Customer infrastructure team
@@ -96,7 +97,7 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 3. If no, please confirm in writing that runtime SSH state changes are acceptable for this workflow.
 
 **Default assumption (used until answered):**
-**No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live if this in fact a security requirement..
+**No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live.
 
 **Status:** OPEN
 **Owner:** Customer security team
@@ -118,7 +119,10 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 The workflow uses the out-of-box `com.vmware.library.mail` action, which requires an SMTP host to be configured in vRO inventory. Without a working SMTP host, the workflow cannot send notification emails — and notifications are a hard requirement.
 
 **Question for the customer:**
-1. Can a single SMTP host/mail relay be used for all vCenters or is there a 1 to 1 mapping of vCenter to SMTP host/mail relay, or 1 to many mapping of SMTP hosts/mail relays per vCenter?
+1. Confirm an SMTP host is registered in the vRO inventory under **Inventory → Mail**.
+2. Confirm sender address is configured (e.g., `vro-noreply@<customer-domain>`).
+3. Confirm TLS / authentication method (typically TLS on port 587 with username/password).
+4. Confirm the sending account has authority to email the intended recipients (no relay restrictions blocking workflow-originated mail).
 
 **Default assumption (used until answered):**
 One SMTP host is registered in inventory and discoverable via `Server.findAllForType("Mail:SMTPClient")`. Sender address is preconfigured on the SMTP host record. TLS is in use.
@@ -173,7 +177,7 @@ A sibling workflow that runs the same pre-flight checks as the main workflow but
 Do operators want a "Validate ESXi Patching Prerequisites" workflow they can run separately, or is it sufficient that the request form's external validations surface the same information?
 
 **Default assumption (used until answered):**
-**YES, build it.** It's cheap and a separate validation tool is useful for operational reporting if required.
+**YES, build it.** It's cheap and operators usually appreciate a separate validation tool.
 
 **Status:** OPEN
 **Owner:** Customer ops team
@@ -306,15 +310,15 @@ Pattern A or Pattern B?
 **Priority:** MEDIUM
 
 **Architect response:**
--- Date received: 5/4/26
--- Response: Pattern B
+<!-- Date received: -->
+<!-- Response: -->
 
 **Action if answer changes design:**
 - Pattern A: add a final cleanup step calling VCF Automation REST API DELETE.
 - Pattern B: no extra code; document the lease policy as an Implementation Guide step.
 
 ---
- 
+
 ## C-12 — Form section layout and two-tier check pattern
 
 **Why it matters:**
