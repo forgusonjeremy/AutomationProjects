@@ -379,6 +379,7 @@ Is it acceptable to reuse the inventory-registered vCenter SDK connection creden
 
 ---
 
+
 ## Notes / scratchpad
 
 Use this space to jot down anything else that comes up during customer conversations.
