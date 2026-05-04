@@ -97,7 +97,7 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 3. If no, please confirm in writing that runtime SSH state changes are acceptable for this workflow.
 
 **Default assumption (used until answered):**
-**No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live.
+**No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live if this in fact a requirement.
 
 **Status:** OPEN
 **Owner:** Customer security team
