@@ -6,6 +6,9 @@ This guide explains how to use the **Ansible to Orchestrator Projects.xlsx** spr
 
 ---
 
+## Location
+The spreadsheet is named **Ansible to Orchestrator Projectx.xlsx** and is located on the **VMware Team** >> General channel on the **Shared** tab under the General >> Projects >> Automation >> CONUS folder
+
 ## Who This Is For
 
 Anyone assisting with the conversion of CONUS Ansible playbooks into Orchestrator workflows
