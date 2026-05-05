@@ -19,7 +19,7 @@ These are decisions made during discovery that are no longer up for debate but a
 
 ### AD-01 — Single procedure for both VxRail and PowerFlex hosts (Approach A)
 
-The workflow uses the **Dell KB 000345284 esxcli procedure** for **both VxRail and PowerFlex** clusters. The PowerFlex-native alternative (Single Component Upgrade via PowerFlex Management Platform / PFMP, documented in Dell KBs 000223004 and 000334907) was evaluated and explicitly rejected for v1 for the following reasons:
+The workflow uses the **Dell KB 000345284 esxcli procedure** for **VxRaile** clusters. The PowerFlex-native alternative (Single Component Upgrade via PowerFlex Management Platform / PFMP, documented in Dell KBs 000223004 and 000334907) was evaluated and explicitly rejected for v1 for the following reasons:
 
 1. **The customer's stated rationale for this project is that Dell management tools are unreliable in their environment.** SCU runs on top of PFMP — the very management plane the customer says is failing. Building on top of an unreliable substrate inherits the unreliability.
 2. **SCU's documented failure-handling guidance is "contact Dell Support for assistance."** This appears verbatim three times in KB 000223004 (steps 10, the ESXi Patch Depot section step 13, and the CloudLink section step 14). The customer's secondary complaint is that Dell Support response times are too slow. A workflow whose failure mode is "open a support ticket" inherits that pain.
@@ -69,11 +69,11 @@ ESXi root credentials are stored in encrypted Configuration Element entries. Cyb
 
 ---
 
-## Summary table — current open items
+## Summary table
 
 | # | Topic | Owner | Status | Priority |
 |---|---|---|---|---|
-| C-01 | Content Library backing (NFS in datacenter vs. stage-and-clean fallback) | Customer infra team | OPEN | HIGH |
+| C-01 | Content Library backing (NFS in each DC vs. stage-and-clean fallback) | Customer infra team | OPEN | HIGH |
 | C-02 | Single Published CL + Subscribers vs. independent CL per vCenter | Customer infra team | OPEN | MEDIUM |
 | C-03 | Security policy for runtime SSH enable/disable on ESXi hosts | Customer security team | OPEN | HIGH |
 | C-04 | SMTP plugin pre-configuration confirmation | Customer infra team | OPEN | MEDIUM |
@@ -86,7 +86,7 @@ ESXi root credentials are stored in encrypted Configuration Element entries. Cyb
 | C-11 | VCF Automation deployment lifecycle pattern (persist as job record vs. self-delete) | Internal (architect) | OPEN | MEDIUM |
 | C-12 | Confirm form section layout and two-tier check pattern | Internal (architect) | OPEN | MEDIUM |
 | C-13 | Credentials for form-time vCenter health-check actions | Internal (architect) | OPEN | MEDIUM |
-| C-14 | Confirm patches are within-major-version (ESXi 8.x → 8.x) and not crossing 8 → 9 boundary | Customer infra team | OPEN | HIGH |
+
 
 ---
 
@@ -106,8 +106,8 @@ Design supports **both modes** via a `patchStagingMode` input parameter with val
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Content Libraries are not currently in use in the environment.  It is possible to configure them, however firewall rule configurations are causing problems.
 
 **Action if answer changes design:**
 - If "yes, NFS-backed": simplify by removing the stage-and-clean code path entirely.
@@ -118,24 +118,24 @@ Design supports **both modes** via a `patchStagingMode` input parameter with val
 ## C-02 — Content Library distribution model
 
 **Why it matters:**
-With 7-10 vCenters and a per-vCenter workflow scope, the depot ZIP needs to exist in a Content Library on each vCenter where patching will occur. Two patterns work:
+With 7-10 vCenters, the depot ZIP needs to exist in a Content Library that is reachable from each vCenter. Two patterns work:
 
 - **Published + Subscriber:** One Published CL on a "master" vCenter; each downstream vCenter has a Subscriber CL that auto-syncs items. Operator uploads once; ZIP replicates everywhere. Item IDs differ between vCenters but item names match.
 - **Independent CLs:** Operator uploads the ZIP into a CL on each vCenter manually. More work, but each CL is independent.
 
 **Question for the customer:**
-Which pattern is in use today for distributing software bundles across vCenters? If neither is established, the Published+Subscriber pattern is recommended — it minimizes the per-event upload effort.
+Which pattern is in use today for distributing software bundles across vCenters? If neither is established, the Published+Subscriber pattern is recommended.
 
 **Default assumption (used until answered):**
-Workflow's depot picker matches by **item name** within the selected vCenter's CL, not by global item ID. This works with either pattern.
+Workflow's depot picker matches by **item name**, not item ID, which means it works with either pattern. No code change required either way — but documentation should reflect the customer's actual pattern.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: This is possible, however there are currently issues with firewall rules that are breaking management path connections between vCenter servers.  Firewall rules take weeks to get implemented.  Current approach will be to require manual upload of the patch file to each vCenter's patch content library
 
 **Action if answer changes design:**
 None — workflow is pattern-agnostic. Documentation will reflect the customer's actual setup.
@@ -153,15 +153,15 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 3. If no, please confirm in writing that runtime SSH state changes are acceptable for this workflow.
 
 **Default assumption (used until answered):**
-**No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live.
+**No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live if this in fact a requirement.
 
-**Status:** OPEN
-**Owner:** Customer security team
+**Status:** Closed
+**Owner:** Customer infrastructure team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: No formal process required for enabling SSH
 
 **Action if answer changes design:**
 - If CR is required: the workflow becomes a manual-trigger-only tool with a documented pre-execution checklist that includes CR approval. No code change, but operational model changes.
@@ -175,21 +175,19 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 The workflow uses the out-of-box `com.vmware.library.mail` action, which requires an SMTP host to be configured in vRO inventory. Without a working SMTP host, the workflow cannot send notification emails — and notifications are a hard requirement.
 
 **Question for the customer:**
-1. Confirm an SMTP host is registered in the vRO inventory under **Inventory → Mail**.
-2. Confirm sender address is configured (e.g., `vro-noreply@<customer-domain>`).
-3. Confirm TLS / authentication method (typically TLS on port 587 with username/password).
-4. Confirm the sending account has authority to email the intended recipients (no relay restrictions blocking workflow-originated mail).
+1. How many mail relays/smtp hosts are there in the environment?
+2. What is the mapping of SMTP relays/hosts to vCenter servers?
 
 **Default assumption (used until answered):**
 One SMTP host is registered in inventory and discoverable via `Server.findAllForType("Mail:SMTPClient")`. Sender address is preconfigured on the SMTP host record. TLS is in use.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: There is a single mail relay in the environment for use by all vCenters
 
 **Action if answer changes design:**
 None — but smoke testing the SMTP send is a Phase 6 prerequisite check.
@@ -209,13 +207,13 @@ The workflow needs to SSH to each ESXi host as root to run `esxcli software prof
 **Default assumption (used until answered):**
 **Shared root password per cluster.** One Configuration Element entry per cluster, keyed by `<vcenter-fqdn>/<cluster-moref>`, holding `{ sshUsername: "root", sshPassword: <encrypted-string> }`. Rotation requires manual update of the CE.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Each ESXi host has a unique root password.  Current capability in use which creates an identically named account on all ESXi hosts with the same password.  Assuming this is accomplished via vCenter using HostLocalAccountManager.createUser and AuthorizationManager.setEntityPermissions in vCenter API
 
 **Action if answer changes design:**
 - Per-host passwords: CE schema changes to keyed by `<vcenter-fqdn>/<host-fqdn>`.
@@ -235,13 +233,13 @@ Do operators want a "Validate ESXi Patching Prerequisites" workflow they can run
 **Default assumption (used until answered):**
 **YES, build it.** It's cheap and operators usually appreciate a separate validation tool.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer ops team
 **Priority:** LOW
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Yes, separate sibling workflow is requested
 
 **Action if answer changes design:**
 - If yes: add to Phase 4 code generation and Phase 5 assembly instructions.
@@ -310,13 +308,13 @@ What name will the Content Library hosting ESXi depot ZIPs use? The recommended 
 **Default assumption (used until answered):**
 **`ESXi-Patches`.** Stored in Configuration Element `esxiPatchContentLibraryName`. Easily changed post-deployment.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Content Library will contain the string "ESXi-Patches"
 
 **Action if answer changes design:**
 None — value is configurable. Just need the right default.
@@ -355,8 +353,6 @@ When the workflow is launched from VCF Automation, a Deployment record is create
 - **Pattern A — Ephemeral.** Workflow self-deletes its deployment on completion via REST API. Clean catalog, but history requires looking in vRO + log indexer + email archive.
 - **Pattern B — Persistent.** Deployment stays in place as a job record. Operators see "show me the last 90 days of patching" as a deployments-view filter. Outputs include full HTML report visible directly on the deployment detail page.
 
-With per-vCenter workflow scope, an estate-wide patch event creates 7-10 deployment records (one per vCenter run). This is fine under Pattern B because each run is independently auditable, but it's worth noting the volume.
-
 **Question for the architect (you):**
 Pattern A or Pattern B?
 
@@ -368,8 +364,8 @@ Pattern A or Pattern B?
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received:5/4/25
+Response: Pattern B
 
 **Action if answer changes design:**
 - Pattern A: add a final cleanup step calling VCF Automation REST API DELETE.
@@ -404,8 +400,8 @@ Layout and two-tier pattern as above.
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Approved
 
 **Action if answer changes design:**
 Section layout adjustments are cheap. Check-tier rebalancing has implications for form performance and code structure.
@@ -428,8 +424,8 @@ Is it acceptable to reuse the inventory-registered vCenter SDK connection creden
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Reuse inventory connections
 
 **Action if answer changes design:**
 - Reuse: no extra work.
@@ -451,13 +447,13 @@ This workflow is being designed for **patch updates within ESXi 8.x**. Cross-maj
 **Default assumption (used until answered):**
 **Within-major-version only (ESXi 8.x → 8.x).** Workflow does not handle SDC reinstall logic. If a patch attempt crosses the major-version boundary, behavior is undefined and likely to break PowerFlex storage on PowerFlex clusters.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+5/5/26Date received: 5/5/26
+Response: This is only for vSphere 8.  Any hosts being upgraded to ESXi 9 will be part of a migration into VCF 9 and at that time VxRail Manager will no longer be in the picture.
 
 **Action if answer changes design:**
 - If only within-major-version: no change. Document the constraint in the User Guide and Workflow input field help text.
