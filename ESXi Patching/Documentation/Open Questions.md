@@ -106,8 +106,8 @@ Design supports **both modes** via a `patchStagingMode` input parameter with val
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Content Libraries are not currently in use in the environment.  It is possible to configure them, however firewall rule configurations are causing problems.
 
 **Action if answer changes design:**
 - If "yes, NFS-backed": simplify by removing the stage-and-clean code path entirely.
@@ -129,13 +129,13 @@ Which pattern is in use today for distributing software bundles across vCenters?
 **Default assumption (used until answered):**
 Workflow's depot picker matches by **item name**, not item ID, which means it works with either pattern. No code change required either way — but documentation should reflect the customer's actual pattern.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: This is possible, however there are currently issues with firewall rules that are breaking management path connections between vCenter servers.  Firewall rules take weeks to get implemented.  Current approach will be to require manual upload of the patch file to each vCenter's patch content library
 
 **Action if answer changes design:**
 None — workflow is pattern-agnostic. Documentation will reflect the customer's actual setup.
@@ -155,13 +155,13 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 **Default assumption (used until answered):**
 **No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live if this in fact a requirement.
 
-**Status:** OPEN
-**Owner:** Customer security team
+**Status:** Closed
+**Owner:** Customer infrastructure team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: No formal process required for enabling SSH
 
 **Action if answer changes design:**
 - If CR is required: the workflow becomes a manual-trigger-only tool with a documented pre-execution checklist that includes CR approval. No code change, but operational model changes.
@@ -175,21 +175,19 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 The workflow uses the out-of-box `com.vmware.library.mail` action, which requires an SMTP host to be configured in vRO inventory. Without a working SMTP host, the workflow cannot send notification emails — and notifications are a hard requirement.
 
 **Question for the customer:**
-1. Confirm an SMTP host is registered in the vRO inventory under **Inventory → Mail**.
-2. Confirm sender address is configured (e.g., `vro-noreply@<customer-domain>`).
-3. Confirm TLS / authentication method (typically TLS on port 587 with username/password).
-4. Confirm the sending account has authority to email the intended recipients (no relay restrictions blocking workflow-originated mail).
+1. How many mail relays/smtp hosts are there in the environment?
+2. What is the mapping of SMTP relays/hosts to vCenter servers?
 
 **Default assumption (used until answered):**
 One SMTP host is registered in inventory and discoverable via `Server.findAllForType("Mail:SMTPClient")`. Sender address is preconfigured on the SMTP host record. TLS is in use.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: There is a single mail relay in the environment for use by all vCenters
 
 **Action if answer changes design:**
 None — but smoke testing the SMTP send is a Phase 6 prerequisite check.
@@ -209,13 +207,13 @@ The workflow needs to SSH to each ESXi host as root to run `esxcli software prof
 **Default assumption (used until answered):**
 **Shared root password per cluster.** One Configuration Element entry per cluster, keyed by `<vcenter-fqdn>/<cluster-moref>`, holding `{ sshUsername: "root", sshPassword: <encrypted-string> }`. Rotation requires manual update of the CE.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Each ESXi host has a unique root password.  Current capability in use which creates an identically named account on all ESXi hosts with the same password.  Assuming this is accomplished via vCenter using HostLocalAccountManager.createUser and AuthorizationManager.setEntityPermissions in vCenter API
 
 **Action if answer changes design:**
 - Per-host passwords: CE schema changes to keyed by `<vcenter-fqdn>/<host-fqdn>`.
@@ -235,13 +233,13 @@ Do operators want a "Validate ESXi Patching Prerequisites" workflow they can run
 **Default assumption (used until answered):**
 **YES, build it.** It's cheap and operators usually appreciate a separate validation tool.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer ops team
 **Priority:** LOW
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Yes, separate sibling workflow is requested
 
 **Action if answer changes design:**
 - If yes: add to Phase 4 code generation and Phase 5 assembly instructions.
@@ -310,13 +308,13 @@ What name will the Content Library hosting ESXi depot ZIPs use? The recommended 
 **Default assumption (used until answered):**
 **`ESXi-Patches`.** Stored in Configuration Element `esxiPatchContentLibraryName`. Easily changed post-deployment.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Content Library will contain the string "ESXi-Patches"
 
 **Action if answer changes design:**
 None — value is configurable. Just need the right default.
