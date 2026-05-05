@@ -1,4 +1,4 @@
-# ESXi Patching Workflow — Open Items & Customer Questions 
+# ESXi Patching Workflow — Open Items & Customer Questions
 
 > **Project:** Manual ESXi Patching Automation per Dell KB 000345284
 > **Platform:** VCF 9.x (Orchestrator + Automation, vSphere 8 on VxRail and PowerFlex)
@@ -10,6 +10,62 @@
 > - Each item has a `Status`, a `Default assumption` (what the design uses if no answer is received), and a `Customer response` block to fill in.
 > - Status values: `OPEN` (waiting on response), `ANSWERED` (response captured), `DEFERRED` (out of scope for v1), `BLOCKED` (cannot proceed without).
 > - When a customer responds, update the `Customer response` block, change `Status` to `ANSWERED`, and add the date.
+
+---
+
+## Architectural decisions already locked (not open items — for reference)
+
+These are decisions made during discovery that are no longer up for debate but are captured here so reviewers can see the rationale at a glance.
+
+### AD-01 — Single procedure for both VxRail and PowerFlex hosts (Approach A)
+
+The workflow uses the **Dell KB 000345284 esxcli procedure** for **VxRaile** clusters. The PowerFlex-native alternative (Single Component Upgrade via PowerFlex Management Platform / PFMP, documented in Dell KBs 000223004 and 000334907) was evaluated and explicitly rejected for v1 for the following reasons:
+
+1. **The customer's stated rationale for this project is that Dell management tools are unreliable in their environment.** SCU runs on top of PFMP — the very management plane the customer says is failing. Building on top of an unreliable substrate inherits the unreliability.
+2. **SCU's documented failure-handling guidance is "contact Dell Support for assistance."** This appears verbatim three times in KB 000223004 (steps 10, the ESXi Patch Depot section step 13, and the CloudLink section step 14). The customer's secondary complaint is that Dell Support response times are too slow. A workflow whose failure mode is "open a support ticket" inherits that pain.
+3. **SCU is a black-box orchestrator.** Manual esxcli is auditable line-by-line and operators can see exactly which step failed on which host. SCU gives you a job ID and a failure string.
+4. **SCU touches more systems on failure** (RCM modification state, Resource Group compliance flags, PFMP deployment state). Manual esxcli only touches the host — a failure leaves one host in a known state, not a multi-system half-state.
+5. **The KB 000345284 procedure works on PowerFlex hosts.** `esxcli software profile update` is platform-agnostic — it's an ESXi-level operation that doesn't care whether the storage stack is vSAN, PowerFlex, or anything else. The platform-specific safety concerns (vSAN FTT for VxRail) are already handled in the design.
+
+**Trade-off accepted:** Post-patch, both VxRail and PowerFlex stacks will report compliance deviations through their respective management UIs (VxRail Manager noncompliance alarm in vCenter; RCM "Modified" state in PFMP). Operators handle these as documented post-procedure manual reconciliation steps. The User Guide will include both reconciliation procedures.
+
+### AD-02 — Per-vCenter workflow scope
+
+The workflow is invoked **once per vCenter**. The operator selects exactly one vCenter and one or more clusters within that vCenter. Patching multiple vCenters in a single estate-wide patch event is done by submitting the workflow N times (once per vCenter), not by parallelizing across vCenters within a single workflow.
+
+**Rationale:**
+
+- Aligns with how vCenter itself scopes its tooling (vLCM, Skyline are per-vCenter).
+- Each per-vCenter run has its own deployment record, log marker, email, cluster locks. Failure blast radius is contained to one vCenter.
+- Form-time external validation actions are dramatically faster (one vCenter to query, not 7-10).
+- Cluster-scope locks (`ESXI_PATCH_<vcenter-fqdn>_<cluster-moref>`) naturally allow simultaneous runs against different vCenters without contention.
+
+**Future work captured:** A parent workflow in VCF Automation that loops over a list of vCenters and submits the per-vCenter workflow N times can be added later if estate-wide single-click patching becomes a requirement. Documented in the Design Document's Future Work section.
+
+### AD-03 — No automated rollback
+
+Per discussion in discovery batch 2, automated rollback is not implemented. ESXi's alt-bootbank rollback (Shift+R at bootloader) requires interactive console access and cannot be automated without an iDRAC/IPMI scripting layer that is out of scope for this project. Instead, the workflow implements **failure containment**:
+
+- Failed host → cluster halts (other hosts in that cluster are not patched).
+- Other clusters running in parallel continue unaffected.
+- Failed host left in a known state (in MM, post-attempt, vCenter-connected if possible).
+- Immediate notification email sent.
+- User Guide includes a manual recovery runbook section.
+
+### AD-04 — Strict vSAN cluster size policy
+
+For vSAN clusters (VxRail), the workflow enforces a strict 4-node minimum:
+- 2 nodes → block (would violate FTT=1 immediately).
+- 3 nodes → block (no headroom for any other failure during patch window).
+- 4+ nodes → proceed.
+
+No override flag. This is the conservative choice — patching can resume on 3-node clusters via manual procedure if absolutely needed.
+
+For PowerFlex clusters, the storage availability constraints come from PowerFlex's own data placement rules (MDM/SDS/SDC mesh), not from vSphere. The workflow trusts the operator on PowerFlex sizing and only enforces "more than 1 host in the cluster."
+
+### AD-05 — Credentials in encrypted Configuration Element (CyberArk CCP deferred)
+
+ESXi root credentials are stored in encrypted Configuration Element entries. CyberArk CCP integration was evaluated (the customer has CyberArk, but it requires MFA which is incompatible with unattended retrieval through standard CyberArk REST APIs). CCP would solve the MFA problem but is a separate integration project. Documented as Future Work.
 
 ---
 
