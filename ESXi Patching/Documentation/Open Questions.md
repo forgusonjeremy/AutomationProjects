@@ -67,6 +67,7 @@ For PowerFlex clusters, the storage availability constraints come from PowerFlex
 
 ESXi root credentials are stored in encrypted Configuration Element entries. CyberArk CCP integration was evaluated (the customer has CyberArk, but it requires MFA which is incompatible with unattended retrieval through standard CyberArk REST APIs). CCP would solve the MFA problem but is a separate integration project. Documented as Future Work.
 
+
 ---
 
 ## Summary table
