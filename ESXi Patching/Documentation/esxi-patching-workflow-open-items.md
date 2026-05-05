@@ -101,13 +101,13 @@ Can the Content Library hosting the ESXi depot ZIPs be backed by an **NFS datast
 **Default assumption (used until answered):**
 Design supports **both modes** via a `patchStagingMode` input parameter with values `CONTENT_LIBRARY_DIRECT` (the elegant case) or `CLUSTER_DATASTORE_STAGE` (the fallback). Workflow detects the CL backing at runtime and validates the operator's mode selection against it.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Content Library will be implemented for this effort using NFS datastore
 
 **Action if answer changes design:**
 - If "yes, NFS-backed": simplify by removing the stage-and-clean code path entirely.
@@ -129,13 +129,13 @@ Which pattern is in use today for distributing software bundles across vCenters?
 **Default assumption (used until answered):**
 Workflow's depot picker matches by **item name** within the selected vCenter's CL, not by global item ID. This works with either pattern.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Initially the patch file will need to be uploaded to each vCenter's content library manually.  Currently there are firewall issues preventing stable communication between vCenters.
 
 **Action if answer changes design:**
 None — workflow is pattern-agnostic. Documentation will reflect the customer's actual setup.
@@ -155,13 +155,13 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 **Default assumption (used until answered):**
 **No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer security team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: No CR required to enable SSH
 
 **Action if answer changes design:**
 - If CR is required: the workflow becomes a manual-trigger-only tool with a documented pre-execution checklist that includes CR approval. No code change, but operational model changes.
@@ -188,8 +188,8 @@ One SMTP host is registered in inventory and discoverable via `Server.findAllFor
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Single SMTP connection will be configured in Orchestrator.  There's a single SMTP relay server for all vCenters in the environment
 
 **Action if answer changes design:**
 None — but smoke testing the SMTP send is a Phase 6 prerequisite check.
@@ -209,13 +209,13 @@ The workflow needs to SSH to each ESXi host as root to run `esxcli software prof
 **Default assumption (used until answered):**
 **Shared root password per cluster.** One Configuration Element entry per cluster, keyed by `<vcenter-fqdn>/<cluster-moref>`, holding `{ sshUsername: "root", sshPassword: <encrypted-string> }`. Rotation requires manual update of the CE.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Each ESX host has a unique password for their root account.  Ephemeral accounts will be used to perform the patch installs
 
 **Action if answer changes design:**
 - Per-host passwords: CE schema changes to keyed by `<vcenter-fqdn>/<host-fqdn>`.
@@ -235,13 +235,13 @@ Do operators want a "Validate ESXi Patching Prerequisites" workflow they can run
 **Default assumption (used until answered):**
 **YES, build it.** It's cheap and operators usually appreciate a separate validation tool.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer ops team
 **Priority:** LOW
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/5/26
+Response: Yes, implement this
 
 **Action if answer changes design:**
 - If yes: add to Phase 4 code generation and Phase 5 assembly instructions.
@@ -260,13 +260,13 @@ Is there a fixed distribution list that should always receive a copy of the work
 **Default assumption (used until answered):**
 **Operator-supplied only.** No fixed cc list.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer ops team
 **Priority:** LOW
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/5/26
+Response: No additional email groups required for notification.  CC field is not required
 
 **Action if answer changes design:**
 - If yes: add a Configuration Element entry `notificationFixedCcList` and append to recipient list at email-send time.
@@ -290,8 +290,8 @@ Does CyberArk CCP exist in the environment? If yes, is it possible to provision 
 **Priority:** FUTURE
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: This will be a future integration
 
 **Action if answer changes design:**
 - For v1: no change — encrypted CE is the v1 pattern.
@@ -310,13 +310,13 @@ What name will the Content Library hosting ESXi depot ZIPs use? The recommended 
 **Default assumption (used until answered):**
 **`ESXi-Patches`.** Stored in Configuration Element `esxiPatchContentLibraryName`. Easily changed post-deployment.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/5/26
+Response: Content Library will contain "ESXi-Patches" in the name
 
 **Action if answer changes design:**
 None — value is configurable. Just need the right default.
@@ -334,13 +334,13 @@ Approximately how long does an ESXi host take to reboot in this environment, fro
 **Default assumption (used until answered):**
 **25 minutes.** This is the workflow input default. Operators can override per-run.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** MEDIUM
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/5/26
+Response: Hosts take anywhere from 11 to 20 minutes to complete a reboot and become available in vCenter
 
 **Action if answer changes design:**
 - If typical reboot time is significantly different: adjust default in workflow input definition.
@@ -363,13 +363,13 @@ Pattern A or Pattern B?
 **Default assumption (used until answered):**
 **Pattern B.** Recommendation: configure a 365-day VCF Automation lease policy on the catalog item so old job records auto-purge.
 
-**Status:** OPEN
+**Status:** Closed
 **Owner:** Internal (architect)
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Pattern B
 
 **Action if answer changes design:**
 - Pattern A: add a final cleanup step calling VCF Automation REST API DELETE.
@@ -399,13 +399,13 @@ Approve the section layout and the two-tier check pattern (form-time = cheap che
 **Default assumption (used until answered):**
 Layout and two-tier pattern as above.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Internal (architect)
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Switch 2 and 3 around.  Patch should be selected first and then you can update the object picker values with warnings if the selected patch is not compatible with the current version in the cluster
 
 **Action if answer changes design:**
 Section layout adjustments are cheap. Check-tier rebalancing has implications for form performance and code structure.
@@ -423,13 +423,13 @@ Is it acceptable to reuse the inventory-registered vCenter SDK connection creden
 **Default assumption (used until answered):**
 **Reuse inventory connections.** Same identity as workflow.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Internal (architect)
 **Priority:** MEDIUM
 
 **Architect response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received: 5/4/26
+Response: Reuse the inventory connections
 
 **Action if answer changes design:**
 - Reuse: no extra work.
@@ -451,13 +451,13 @@ This workflow is being designed for **patch updates within ESXi 8.x**. Cross-maj
 **Default assumption (used until answered):**
 **Within-major-version only (ESXi 8.x → 8.x).** Workflow does not handle SDC reinstall logic. If a patch attempt crosses the major-version boundary, behavior is undefined and likely to break PowerFlex storage on PowerFlex clusters.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** HIGH
 
 **Customer response:**
-<!-- Date received: -->
-<!-- Response: -->
+Date received 5/5/26
+Response: This solution will only apply to ESXi 8(and earlier) hosts.  ESXi 9 hosts will be part of VCF 9 which will not be managed by VxRail or PowerFlex managers
 
 **Action if answer changes design:**
 - If only within-major-version: no change. Document the constraint in the User Guide and Workflow input field help text.
