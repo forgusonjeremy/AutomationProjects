@@ -45,7 +45,7 @@ Can the Content Library hosting the ESXi depot ZIPs be backed by an **NFS datast
 **Default assumption (used until answered):**
 Design supports **both modes** via a `patchStagingMode` input parameter with values `CONTENT_LIBRARY_DIRECT` (the elegant case) or `CLUSTER_DATASTORE_STAGE` (the fallback). Workflow detects the CL backing at runtime and validates the operator's mode selection against it.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** HIGH
 
@@ -99,7 +99,7 @@ ESXi root SSH is the **only** way to run `esxcli software profile update`. There
 **Default assumption (used until answered):**
 **No CR required.** This assumption is flagged prominently in the Risks section and the Implementation Guide will require security team sign-off before go-live if this in fact a requirement.
 
-**Status:** Closed
+**Status:** CLOSED
 **Owner:** Customer infrastructure team
 **Priority:** HIGH
 
@@ -303,7 +303,7 @@ Pattern A or Pattern B?
 **Default assumption (used until answered):**
 **Pattern B.** Recommendation: configure a 365-day VCF Automation lease policy on the catalog item so old job records auto-purge.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Internal (architect)
 **Priority:** MEDIUM
 
@@ -339,7 +339,7 @@ Approve the section layout and the two-tier check pattern (form-time = cheap che
 **Default assumption (used until answered):**
 Layout and two-tier pattern as above.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Internal (architect)
 **Priority:** MEDIUM
 
@@ -363,7 +363,7 @@ Is it acceptable to reuse the inventory-registered vCenter SDK connection creden
 **Default assumption (used until answered):**
 **Reuse inventory connections.** Same identity as workflow.
 
-**Status:** OPEN
+**Status:** CLOSED
 **Owner:** Internal (architect)
 **Priority:** MEDIUM
 
