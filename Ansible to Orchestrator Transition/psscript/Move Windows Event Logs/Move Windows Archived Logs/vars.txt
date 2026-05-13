@@ -1,6 +1,0 @@
-var_ps_folder: ps_scripts
-var_ps_script_file: cvs_functions.ps1
-var_parameter_action: move-archived-logs
-var_DomainName: corp.local
-var_ADGroupMember: Security-Servers  #changes with ansible job
-var_FileShareTarget: \\fileserver.corp.local\mdcarchivelog$\Windows

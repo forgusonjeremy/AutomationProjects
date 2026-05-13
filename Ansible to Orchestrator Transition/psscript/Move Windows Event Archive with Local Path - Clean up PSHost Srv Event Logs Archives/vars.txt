@@ -1,4 +1,0 @@
-source_path: C:\Windows\System32\winevt\Logs
-target_path: \\fileserver.corp.local\mdcarchivelog$\Windows
-file_filter: Archive-*.evtx
-days_old: '-1'
