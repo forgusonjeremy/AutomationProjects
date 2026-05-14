@@ -1,0 +1,82 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Configuration Element Definition
+# VCF/WindowsLogManagement/WindowsLogManagement-Config
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Create this Configuration Element in the vRO Configuration tab before
+# deploying any workflow.  All four workflows bind their string/number input
+# defaults to attributes in this element.
+#
+# Path:    VCF/WindowsLogManagement/WindowsLogManagement-Config
+# (Create the folder structure VCF > WindowsLogManagement if it does not exist.)
+#
+# ───────────────────────────────────────────────────────────────────────────────
+# ATTRIBUTES
+# ───────────────────────────────────────────────────────────────────────────────
+#
+# Attribute Name            Type     Example Value                                      Description
+# ─────────────────────     ──────── ────────────────────────────────────────────────── ──────────────────────────────────────────────
+# defaultScriptPath         string   C:\PSO\Scripts\cvs_functions.ps1                   Full path to cvs_functions.ps1 on the PS host.
+#                                                                                        Must match the actual deployed path exactly.
+#
+# defaultFileShareTarget    string   \\fileserver.corp.local\mdcarchivelog$\Windows      Default UNC destination root for log moves.
+#                                                                                        Per-server subfolders are created below this path
+#                                                                                        by the script (e.g. \\server\share$\Windows\srv01).
+#
+# defaultDomainName         string   corp.local                                          Default AD domain name.  Used as -DomainName in
+#                                                                                        ByADGroupName and ByADGroupCN workflows and as
+#                                                                                        the -Server value for AD queries in ByCN.
+#
+# defaultLogRetentionDays   number   370                                                 Default age threshold for Remove-OldFiles-UNCShare.
+#                                                                                        Files older than this many days are candidates for
+#                                                                                        deletion (subject to whatIf setting).
+#                                                                                        370 = ~13 months.  Minimum enforced: 1.
+#
+# ───────────────────────────────────────────────────────────────────────────────
+# HOW TO CREATE IN vRO UI
+# ───────────────────────────────────────────────────────────────────────────────
+#
+# 1. Open vRO → Configuration tab
+# 2. Navigate to (or create) folder: VCF / WindowsLogManagement
+# 3. Click: New Configuration Element
+# 4. Name: WindowsLogManagement-Config
+# 5. Add each attribute using the table above:
+#    - Click "Add attribute"
+#    - Enter Name, select Type, enter Value
+#    - Repeat for all four attributes
+# 6. Save
+#
+# ───────────────────────────────────────────────────────────────────────────────
+# HOW TO BIND TO WORKFLOW INPUTS
+# ───────────────────────────────────────────────────────────────────────────────
+#
+# For each workflow input that has a Config Element default:
+# 1. Open the workflow in vRO
+# 2. Edit → Inputs tab → select the input (e.g. scriptPath)
+# 3. In the "Default value" field, click the binding icon
+# 4. Select: Configuration Element → VCF/WindowsLogManagement/WindowsLogManagement-Config
+# 5. Select the corresponding attribute (e.g. defaultScriptPath)
+# 6. Save
+#
+# The custom form will pre-populate the field with the Config Element value,
+# which the operator can override at run time if needed.
+#
+# ───────────────────────────────────────────────────────────────────────────────
+# WORKFLOW-TO-ATTRIBUTE MAPPING
+# ───────────────────────────────────────────────────────────────────────────────
+#
+# Workflow                       Input               Config Element Attribute
+# ─────────────────────────────  ──────────────────  ─────────────────────────────
+# Move-ArchivedLogs-LocalHost    scriptPath          defaultScriptPath
+# Move-ArchivedLogs-LocalHost    fileShareTarget     defaultFileShareTarget
+#
+# Move-ArchivedLogs-ByADGroupName scriptPath         defaultScriptPath
+# Move-ArchivedLogs-ByADGroupName domainName         defaultDomainName
+# Move-ArchivedLogs-ByADGroupName fileShareTarget    defaultFileShareTarget
+#
+# Move-ArchivedLogs-ByADGroupCN  scriptPath          defaultScriptPath
+# Move-ArchivedLogs-ByADGroupCN  domainName          defaultDomainName
+# Move-ArchivedLogs-ByADGroupCN  fileShareTarget     defaultFileShareTarget
+#
+# Remove-OldFiles-UNCShare       scriptPath          defaultScriptPath
+# Remove-OldFiles-UNCShare       olderThanDays       defaultLogRetentionDays
