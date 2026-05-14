@@ -2,42 +2,47 @@ $VcfaFqdn = "your-vcfa-fqdn"
 $Username  = "admin"
 $Password  = "your-password"
 
-# Ignore cert errors if needed
-[System.Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-if (-not ([System.Management.Automation.PSTypeName]'TrustAllCerts').Type) {
-    Add-Type @"
+# Skip cert validation
+add-type @"
     using System.Net;
     using System.Security.Cryptography.X509Certificates;
     public class TrustAllCerts : ICertificatePolicy {
         public bool CheckValidationResult(ServicePoint sp, X509Certificate cert, WebRequest req, int prob) { return true; }
     }
 "@
-    [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCerts
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCerts
+[System.Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# Auth - VCF Automation 9 uses Basic auth to get a bearer token
+$Bytes  = [System.Text.Encoding]::UTF8.GetBytes("${Username}@system:${Password}")
+$Base64 = [Convert]::ToBase64String($Bytes)
+$Headers = @{
+    "Authorization" = "Basic $Base64"
+    "Accept"        = "application/json;version=9.0.0"
+    "Content-Type"  = "application/json;version=9.0.0"
 }
 
-# Authenticate
-$LoginBody = @{ username = $Username; password = $Password } | ConvertTo-Json
-$LoginResponse = Invoke-RestMethod -Uri "https://$VcfaFqdn/csp/gateway/am/api/login" `
-    -Method POST -Body $LoginBody -ContentType "application/json"
-$Token = $LoginResponse.access_token
-$Headers = @{ Authorization = "Bearer $Token"; Accept = "application/json" }
+# Get session token
+$Session = Invoke-RestMethod -Uri "https://$VcfaFqdn/cloudapi/1.0.0/sessions/provider" `
+    -Method POST -Headers $Headers
+$Token = $Session.access_token
 
-# Check what supervisors VCFA can see
-Write-Host "`n--- Supervisors visible to VCF Automation ---" -ForegroundColor Cyan
-$Supervisors = Invoke-RestMethod -Uri "https://$VcfaFqdn/iaas/api/supervisors" `
-    -Method GET -Headers $Headers
-$Supervisors | ConvertTo-Json -Depth 5
-
-# Check vCenter connections
-Write-Host "`n--- vCenter Connections ---" -ForegroundColor Cyan
-$VCenters = Invoke-RestMethod -Uri "https://$VcfaFqdn/iaas/api/vcenters" `
-    -Method GET -Headers $Headers
-$VCenters | ConvertTo-Json -Depth 3
-
-# Trigger a vCenter data collection/sync to force Supervisor re-discovery
-Write-Host "`n--- Triggering vCenter Data Collection ---" -ForegroundColor Cyan
-foreach ($vc in $VCenters.content) {
-    Write-Host "Syncing vCenter: $($vc.name) ($($vc.id))"
-    Invoke-RestMethod -Uri "https://$VcfaFqdn/iaas/api/vcenters/$($vc.id)/dataCollection" `
-        -Method POST -Headers $Headers
+$AuthHeaders = @{
+    "Authorization" = "Bearer $Token"
+    "Accept"        = "application/json;version=9.0.0"
 }
+
+# Check Supervisors
+Write-Host "`n--- Supervisors ---" -ForegroundColor Cyan
+Invoke-RestMethod -Uri "https://$VcfaFqdn/cloudapi/1.0.0/supervisors" `
+    -Method GET -Headers $AuthHeaders | ConvertTo-Json -Depth 5
+
+# Check vCenters
+Write-Host "`n--- vCenters ---" -ForegroundColor Cyan
+Invoke-RestMethod -Uri "https://$VcfaFqdn/cloudapi/1.0.0/vcenters" `
+    -Method GET -Headers $AuthHeaders | ConvertTo-Json -Depth 5
+
+# Check Regions
+Write-Host "`n--- Regions ---" -ForegroundColor Cyan
+Invoke-RestMethod -Uri "https://$VcfaFqdn/cloudapi/1.0.0/regions" `
+    -Method GET -Headers $AuthHeaders | ConvertTo-Json -Depth 5
