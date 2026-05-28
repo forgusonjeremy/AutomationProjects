@@ -1,48 +1,33 @@
-$VcfaFqdn = "your-vcfa-fqdn"
-$Username  = "admin"
-$Password  = "your-password"
-
-# Skip cert validation
-add-type @"
-    using System.Net;
-    using System.Security.Cryptography.X509Certificates;
-    public class TrustAllCerts : ICertificatePolicy {
-        public bool CheckValidationResult(ServicePoint sp, X509Certificate cert, WebRequest req, int prob) { return true; }
-    }
-"@
-[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCerts
-[System.Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-# Auth - VCF Automation 9 uses Basic auth to get a bearer token
-$Bytes  = [System.Text.Encoding]::UTF8.GetBytes("${Username}@system:${Password}")
-$Base64 = [Convert]::ToBase64String($Bytes)
-$Headers = @{
-    "Authorization" = "Basic $Base64"
-    "Accept"        = "application/json;version=9.0.0"
-    "Content-Type"  = "application/json;version=9.0.0"
-}
-
-# Get session token
-$Session = Invoke-RestMethod -Uri "https://$VcfaFqdn/cloudapi/1.0.0/sessions/provider" `
-    -Method POST -Headers $Headers
-$Token = $Session.access_token
-
-$AuthHeaders = @{
-    "Authorization" = "Bearer $Token"
-    "Accept"        = "application/json;version=9.0.0"
-}
-
-# Check Supervisors
-Write-Host "`n--- Supervisors ---" -ForegroundColor Cyan
-Invoke-RestMethod -Uri "https://$VcfaFqdn/cloudapi/1.0.0/supervisors" `
-    -Method GET -Headers $AuthHeaders | ConvertTo-Json -Depth 5
-
-# Check vCenters
-Write-Host "`n--- vCenters ---" -ForegroundColor Cyan
-Invoke-RestMethod -Uri "https://$VcfaFqdn/cloudapi/1.0.0/vcenters" `
-    -Method GET -Headers $AuthHeaders | ConvertTo-Json -Depth 5
-
-# Check Regions
-Write-Host "`n--- Regions ---" -ForegroundColor Cyan
-Invoke-RestMethod -Uri "https://$VcfaFqdn/cloudapi/1.0.0/regions" `
-    -Method GET -Headers $AuthHeaders | ConvertTo-Json -Depth 5
+apiVersion: vmoperator.vmware.com/v1alpha3
+kind: VirtualMachine
+metadata:
+  name: ${env.deploymentName}
+  namespace: jeremy-dev-ncmcn
+  labels:
+    vm-selector: ${env.deploymentName}
+spec:
+  className: best-effort-small
+  # Friendly image name: win2022
+  imageName: vmi-9a9f080c2414ab32d
+  storageClass: mgmt-cl01-optimal-datastore-default-policy-raid5
+  powerState: PoweredOn
+  network:
+    interfaces:
+      - name: eth0
+        network:
+          name: public-static-vcfauto-ipam
+          kind: Subnet
+    hostName: ${env.deploymentName}
+    domainName: vcf.lab
+  bootstrap:
+    sysprep:
+      sysprep:
+        userData:
+          fullName: administrator
+          orgName: lab
+        identification:
+          joinDomain: vcf.lab
+          domainAdmin: administrator@vcf.lab
+          domainAdminPassword:
+            name: ${env.deploymentName}-bootstrap-secret
+            key: domainAdminPassword

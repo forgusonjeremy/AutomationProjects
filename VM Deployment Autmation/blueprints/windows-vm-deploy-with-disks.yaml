@@ -1,0 +1,116 @@
+name: windows-vm-deploy-with-disks
+version: 1.4
+formatVersion: 1
+
+###############################################################################
+# Blueprint: windows-vm-deploy-with-disks
+# OS:        Windows Server
+# Disks:     1–N additional data disks on SCSI Controller 1
+# Notes:     - Use this blueprint for VMs requiring additional data disks
+#            - Paired with catalog item "Windows VM - Deploy with Data Disks"
+#            - Extensibility POST_PROVISION subscription triggers
+#              workflow_VMDeployParent with additionalDisks JSON payload
+#            - OS disk remains on SCSI_Controller_0 (VCFA default)
+#            - All additional disks land on SCSI_Controller_1
+#            - unitNumber matches additionalDisks array index (count.index)
+#            - disk.EnableUUID must be TRUE on base image template (V3)
+#
+# Token replacement required before deployment (M1):
+#   {{projectId}}     - VCFA project ID
+#   {{imageMapping}}  - VCFA image mapping name for Windows base image
+#   {{flavor}}        - VCFA flavor / compute size name
+#   {{datacenter}}    - vCenter datacenter name
+#   {{cluster}}       - vCenter cluster name
+#   {{network}}       - DVPortgroup name
+#   {{folder}}        - Full VM folder path (e.g. Datacenter/vm/Production)
+###############################################################################
+
+inputs:
+  vmHostname:
+    type: string
+    title: VM Hostname
+    description: "VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars for Windows NetBIOS compatibility."
+    minLength: 1
+    maxLength: 15
+    pattern: '^[a-zA-Z0-9\-]+$'
+
+  osType:
+    type: string
+    title: OS Type
+    description: "Operating system type. Used by post-provision workflow."
+    default: windows
+    enum:
+      - windows
+    readOnly: true
+
+  vcpuCount:
+    type: integer
+    title: vCPU Count
+    default: 2
+    minimum: 1
+    maximum: 64
+
+  memoryMB:
+    type: integer
+    title: Memory (MB)
+    default: 4096
+    minimum: 1024
+    maximum: 524288
+
+  additionalDisks:
+    type: array
+    title: Additional Data Disks
+    description: "Define one entry per additional disk. Disks are provisioned in array order on SCSI Controller 1."
+    minItems: 1
+    items:
+      type: object
+      properties:
+        driveLetter:
+          type: string
+          title: Drive Letter
+          description: "Single letter D–Z. Do not include colon."
+          pattern: '^[D-Zd-z]$'
+        driveLabel:
+          type: string
+          title: Drive Label
+          description: "Volume label. Max 32 characters."
+          maxLength: 32
+        sizeGb:
+          type: integer
+          title: Size (GB)
+          description: "Disk size in GB. Disks >= 2048 GB use GPT partition table."
+          minimum: 1
+          maximum: 65536
+
+resources:
+  vm:
+    type: Cloud.vSphere.Machine
+    dependsOn:
+      - additionalDisk
+    properties:
+      name: '${input.vmHostname}'
+      image: '{{imageMapping}}'
+      flavor: '{{flavor}}'
+      cpuCount: '${input.vcpuCount}'
+      totalMemoryMB: '${input.memoryMB}'
+      datacenter: '{{datacenter}}'
+      resourceGroupName: '{{cluster}}'
+      folderName: '{{folder}}'
+      networks:
+        - network: '${resource.network.id}'
+          assignment: static
+
+  additionalDisk:
+    type: Cloud.vSphere.Disk
+    allocatePerInstance: true
+    count: '${length(input.additionalDisks)}'
+    properties:
+      capacityGb: '${input.additionalDisks[count.index].sizeGb}'
+      SCSIController: SCSI_Controller_1
+      unitNumber: '${count.index}'
+
+  network:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
+      name: '{{network}}'
