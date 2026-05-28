@@ -1,0 +1,126 @@
+name: linux-vm-deploy-with-disks
+version: 1.4
+formatVersion: 1
+
+###############################################################################
+# Blueprint: linux-vm-deploy-with-disks
+# OS:        RHEL Linux
+# Disks:     1–N additional data disks on SCSI Controller 1
+# Notes:
+#   - cloudConfig intentionally omitted — hostname via name: + VMware Tools (S4)
+#   - OS disk on SCSI_Controller_0 (VCFA default from image mapping)
+#   - Additional disks on SCSI_Controller_1; unitNumber matches count.index
+#   - disk.EnableUUID = TRUE required on base image template (V3)
+#   - Filesystem: ext4 < 2048 GB, xfs >= 2048 GB (handled in workflow)
+#   - POST_PROVISION extensibility subscription triggers workflow_VMDeployParent
+#   - imageRef: replace rhel-9/baseline with your image mapping name
+###############################################################################
+
+inputs:
+  vmHostname:
+    type: string
+    title: VM Hostname
+    description: "VM display name and guest hostname. Valid Linux hostname (RFC 1123). Max 63 characters."
+    minLength: 1
+    maxLength: 63
+    pattern: '^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$'
+
+  osType:
+    type: string
+    title: OS Type
+    description: "Operating system type. Used by post-provision workflow."
+    default: linux
+    enum:
+      - linux
+    readOnly: true
+
+  clusterName:
+    type: string
+    title: vSphere Cluster Name
+    description: "Name of the vSphere cluster where the VM is to be created."
+
+  networkName:
+    type: string
+    title: Network Name
+    description: "Name of the dvPortgroup to which the VM is to be connected."
+
+  folderName:
+    type: string
+    title: VM Folder Name
+    description: "Name of the VM folder where the VM is to be placed."
+
+  vcpuCount:
+    type: integer
+    title: vCPU Count
+    default: 2
+    minimum: 1
+    maximum: 64
+
+  memoryGB:
+    type: integer
+    title: Memory (GB)
+    default: 4
+    minimum: 1
+    maximum: 512
+
+  additionalDisks:
+    type: array
+    title: Additional Data Disks
+    description: "One entry per additional disk. Provisioned in array order on SCSI Controller 1. ext4 < 2048 GB; xfs >= 2048 GB."
+    minItems: 1
+    items:
+      type: object
+      properties:
+        mountPoint:
+          type: string
+          title: Mount Point
+          description: "Absolute mount path (e.g. /data, /logs). Must start with /."
+          pattern: '^\/[a-zA-Z0-9/_\-]+$'
+        driveLabel:
+          type: string
+          title: Filesystem Label
+          description: "Max 12 characters. No spaces. Safe for ext4 and xfs."
+          maxLength: 12
+          pattern: '^[a-zA-Z0-9_\-]+$'
+        sizeGb:
+          type: integer
+          title: Size (GB)
+          minimum: 1
+          maximum: 65536
+
+resources:
+  vm:
+    type: Cloud.vSphere.Machine
+    dependsOn:
+      - additionalDisk
+    properties:
+      name: '${input.vmHostname}'
+      imageRef: rhel-9/baseline
+      cpuCount: '${input.vcpuCount}'
+      totalMemoryMB: '${input.memoryGB * 1024}'
+      folderName: '${input.folderName}'
+      constraints:
+        - tag: 'clusterName:${input.clusterName}'
+      networks:
+        - network: '${resource.network.id}'
+          assignment: static
+          dns: '${resource.network.dns}'
+          gateway: '${resource.network.gateway}'
+          domain: '${resource.network.domain}'
+          dnsSearchDomains: '${resource.network.dnsSearchDomains}'
+
+  additionalDisk:
+    type: Cloud.vSphere.Disk
+    allocatePerInstance: true
+    count: '${length(input.additionalDisks)}'
+    properties:
+      capacityGb: '${input.additionalDisks[count.index].sizeGb}'
+      SCSIController: SCSI_Controller_1
+      unitNumber: '${count.index}'
+
+  network:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: 'networkName:${input.networkName}'

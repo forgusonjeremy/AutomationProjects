@@ -1,0 +1,88 @@
+name: windows-vm-deploy
+version: 1.4
+formatVersion: 1
+
+###############################################################################
+# Blueprint: windows-vm-deploy
+# OS:        Windows Server
+# Disks:     Zero additional disks
+# Notes:
+#   - Cluster and network selected at request time via capability tag constraints
+#   - Hostname set via name: property; inherited by guest via VMware Tools (S4)
+#   - POST_PROVISION extensibility subscription triggers workflow_VMDeployParent
+#     with additionalDisks = "" (zero-disk path)
+#   - imageRef: replace win-2025/baseline with your image mapping name
+###############################################################################
+
+inputs:
+  vmHostname:
+    type: string
+    title: VM Hostname
+    description: "VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars (Windows NetBIOS)."
+    minLength: 1
+    maxLength: 15
+    pattern: '^[a-zA-Z0-9\-]+$'
+
+  osType:
+    type: string
+    title: OS Type
+    description: "Operating system type. Used by post-provision workflow."
+    default: windows
+    enum:
+      - windows
+    readOnly: true
+
+  clusterName:
+    type: string
+    title: vSphere Cluster Name
+    description: "Name of the vSphere cluster where the VM is to be created."
+
+  networkName:
+    type: string
+    title: Network Name
+    description: "Name of the dvPortgroup to which the VM is to be connected."
+
+  folderName:
+    type: string
+    title: VM Folder Name
+    description: "Name of the VM folder where the VM is to be placed."
+
+  vcpuCount:
+    type: integer
+    title: vCPU Count
+    default: 2
+    minimum: 1
+    maximum: 64
+
+  memoryGB:
+    type: integer
+    title: Memory (GB)
+    default: 4
+    minimum: 1
+    maximum: 512
+
+resources:
+  vm:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: '${input.vmHostname}'
+      imageRef: win-2025/baseline
+      cpuCount: '${input.vcpuCount}'
+      totalMemoryMB: '${input.memoryGB * 1024}'
+      folderName: '${input.folderName}'
+      constraints:
+        - tag: 'clusterName:${input.clusterName}'
+      networks:
+        - network: '${resource.network.id}'
+          assignment: static
+          dns: '${resource.network.dns}'
+          gateway: '${resource.network.gateway}'
+          domain: '${resource.network.domain}'
+          dnsSearchDomains: '${resource.network.dnsSearchDomains}'
+
+  network:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: 'networkName:${input.networkName}'

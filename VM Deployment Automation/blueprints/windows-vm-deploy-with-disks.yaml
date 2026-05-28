@@ -6,30 +6,20 @@ formatVersion: 1
 # Blueprint: windows-vm-deploy-with-disks
 # OS:        Windows Server
 # Disks:     1–N additional data disks on SCSI Controller 1
-# Notes:     - Use this blueprint for VMs requiring additional data disks
-#            - Paired with catalog item "Windows VM - Deploy with Data Disks"
-#            - Extensibility POST_PROVISION subscription triggers
-#              workflow_VMDeployParent with additionalDisks JSON payload
-#            - OS disk remains on SCSI_Controller_0 (VCFA default)
-#            - All additional disks land on SCSI_Controller_1
-#            - unitNumber matches additionalDisks array index (count.index)
-#            - disk.EnableUUID must be TRUE on base image template (V3)
-#
-# Token replacement required before deployment (M1):
-#   {{projectId}}     - VCFA project ID
-#   {{imageMapping}}  - VCFA image mapping name for Windows base image
-#   {{flavor}}        - VCFA flavor / compute size name
-#   {{datacenter}}    - vCenter datacenter name
-#   {{cluster}}       - vCenter cluster name
-#   {{network}}       - DVPortgroup name
-#   {{folder}}        - Full VM folder path (e.g. Datacenter/vm/Production)
+# Notes:
+#   - OS disk on SCSI_Controller_0 (VCFA default from image mapping)
+#   - Additional disks on SCSI_Controller_1; unitNumber matches count.index
+#   - disk.EnableUUID = TRUE required on base image template (V3)
+#   - Filesystem logic (MBR/GPT, NTFS) handled in workflow_MountFormatDisks_Windows
+#   - POST_PROVISION extensibility subscription triggers workflow_VMDeployParent
+#   - imageRef: replace win-2025/baseline with your image mapping name
 ###############################################################################
 
 inputs:
   vmHostname:
     type: string
     title: VM Hostname
-    description: "VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars for Windows NetBIOS compatibility."
+    description: "VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars (Windows NetBIOS)."
     minLength: 1
     maxLength: 15
     pattern: '^[a-zA-Z0-9\-]+$'
@@ -43,6 +33,21 @@ inputs:
       - windows
     readOnly: true
 
+  clusterName:
+    type: string
+    title: vSphere Cluster Name
+    description: "Name of the vSphere cluster where the VM is to be created."
+
+  networkName:
+    type: string
+    title: Network Name
+    description: "Name of the dvPortgroup to which the VM is to be connected."
+
+  folderName:
+    type: string
+    title: VM Folder Name
+    description: "Name of the VM folder where the VM is to be placed."
+
   vcpuCount:
     type: integer
     title: vCPU Count
@@ -50,17 +55,17 @@ inputs:
     minimum: 1
     maximum: 64
 
-  memoryMB:
+  memoryGB:
     type: integer
-    title: Memory (MB)
-    default: 4096
-    minimum: 1024
-    maximum: 524288
+    title: Memory (GB)
+    default: 4
+    minimum: 1
+    maximum: 512
 
   additionalDisks:
     type: array
     title: Additional Data Disks
-    description: "Define one entry per additional disk. Disks are provisioned in array order on SCSI Controller 1."
+    description: "One entry per additional disk. Provisioned in array order on SCSI Controller 1. Disks >= 2048 GB use GPT partition table."
     minItems: 1
     items:
       type: object
@@ -73,12 +78,11 @@ inputs:
         driveLabel:
           type: string
           title: Drive Label
-          description: "Volume label. Max 32 characters."
+          description: "NTFS volume label. Max 32 characters."
           maxLength: 32
         sizeGb:
           type: integer
           title: Size (GB)
-          description: "Disk size in GB. Disks >= 2048 GB use GPT partition table."
           minimum: 1
           maximum: 65536
 
@@ -89,16 +93,19 @@ resources:
       - additionalDisk
     properties:
       name: '${input.vmHostname}'
-      image: '{{imageMapping}}'
-      flavor: '{{flavor}}'
+      imageRef: win-2025/baseline
       cpuCount: '${input.vcpuCount}'
-      totalMemoryMB: '${input.memoryMB}'
-      datacenter: '{{datacenter}}'
-      resourceGroupName: '{{cluster}}'
-      folderName: '{{folder}}'
+      totalMemoryMB: '${input.memoryGB * 1024}'
+      folderName: '${input.folderName}'
+      constraints:
+        - tag: 'clusterName:${input.clusterName}'
       networks:
         - network: '${resource.network.id}'
           assignment: static
+          dns: '${resource.network.dns}'
+          gateway: '${resource.network.gateway}'
+          domain: '${resource.network.domain}'
+          dnsSearchDomains: '${resource.network.dnsSearchDomains}'
 
   additionalDisk:
     type: Cloud.vSphere.Disk
@@ -113,4 +120,5 @@ resources:
     type: Cloud.vSphere.Network
     properties:
       networkType: existing
-      name: '{{network}}'
+      constraints:
+        - tag: 'networkName:${input.networkName}'
