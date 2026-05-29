@@ -57,8 +57,12 @@ System.log("workflow_RenameLocalAdmin: VM=" + vm.name + " OS=" + osTypeLower + "
 //   executionResult {string}
 // =========================================================================
 
+/*
+This is being removed because the parent workflow to this worklow will be evaluating the guest OS type and if !windows, this workflow will be skipped entirely.
+
 executionResult = "SKIPPED: workflow_RenameLocalAdmin does not run on OS type '" + osTypeLower + "'.";
 System.log(executionResult);
+*/
 
 // =========================================================================
 // [CANVAS ELEMENT 3b — Scriptable Task: uploadAndExecuteScript]  (TRUE branch)
@@ -142,8 +146,9 @@ System.log("workflow_RenameLocalAdmin: Script started. PID: " + pid);
 // [CANVAS ELEMENT 4 — Scriptable Task: pollForCompletion]
 // Inputs:
 //   vm            {VC:VirtualMachine}
-//   guestUsername {string}
-//   guestPassword {SecureString}
+//   guestUsername {string}       - Original account name (for process poll)
+//   guestPassword {SecureString} - Password (unchanged at this point)
+//   newAdminName  {string}       - Renamed account name (for post-rename ops)
 //   pid           {number}
 //   scriptPath    {string}
 // Outputs:
@@ -153,13 +158,14 @@ System.log("workflow_RenameLocalAdmin: Script started. PID: " + pid);
 var MAX_WAIT_MS = 60000;
 var POLL_MS     = 5000;
 
-var guestAuth2      = new VcNamePasswordAuthentication();
-guestAuth2.username = guestUsername;
-guestAuth2.password = guestPassword;
+var si = VcPlugin.getAllSdkConnections()[0].serviceInstance;
+var processManager = si.content.guestOperationsManager.processManager;
+var fileManager    = si.content.guestOperationsManager.fileManager;
 
-var si2            = VcPlugin.getAllSdkConnections()[0].serviceInstance;
-var processManager = si2.content.guestOperationsManager.processManager;
-var fileManager2   = si2.content.guestOperationsManager.fileManager;
+// Poll using original credentials — process was launched under this session
+var originalAuth      = new VcNamePasswordAuthentication();
+originalAuth.username = guestUsername;
+originalAuth.password = guestPassword;
 
 var elapsed  = 0;
 var exitCode = null;
@@ -170,7 +176,7 @@ while (elapsed < MAX_WAIT_MS) {
 
     var pids     = new java.util.ArrayList();
     pids.add(pid);
-    var procInfo = processManager.listProcessesInGuest(vm, guestAuth2, pids);
+    var procInfo = processManager.listProcessesInGuest(vm, originalAuth, pids);
 
     if (procInfo && procInfo.length > 0 && procInfo[0].exitCode !== null) {
         exitCode = procInfo[0].exitCode;
@@ -186,8 +192,13 @@ if (exitCode !== 0) {
     throw new Error("Script exited with code " + exitCode + " on VM: " + vm.name);
 }
 
+// Cleanup using renamed account credentials — original account no longer valid
+var renamedAuth      = new VcNamePasswordAuthentication();
+renamedAuth.username = newAdminName;
+renamedAuth.password = guestPassword;
+
 try {
-    fileManager2.deleteFileInGuest(vm, guestAuth2, scriptPath);
+    fileManager.deleteFileInGuest(vm, renamedAuth, scriptPath);
     System.log("workflow_RenameLocalAdmin: Temp script removed from guest.");
 } catch (cleanupErr) {
     System.warn("workflow_RenameLocalAdmin: Script cleanup warning: " + cleanupErr.message);
