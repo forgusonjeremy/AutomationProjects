@@ -5,18 +5,31 @@
  * Canvas elements:
  *   1. Scriptable Task: validateInputs
  *   2. Decision:        isWindows
- *   3a. Scriptable Task: skipNonWindows      (FALSE branch → End)
- *   3b. Scriptable Task: uploadAndExecuteScript (TRUE branch)
+ *   3a. Scriptable Task: skipNonWindows         (FALSE branch → End)
+ *   3b. Scriptable Task: uploadAndExecuteScript  (TRUE branch)
  *   4. Scriptable Task: pollForCompletion
  *
- * Inputs:  vm, osType, guestUsername, guestPassword, newAdminName
- * Outputs: executionResult {string}
+ * Workflow Inputs:
+ *   vm            {VC:VirtualMachine} - Target VM
+ *   osType        {string}            - "windows" or "linux"
+ *   guestUsername {string}            - Current admin username
+ *   guestPassword {SecureString}      - Current admin password
+ *   newAdminName  {string}            - Target administrator account name
+ *
+ * Workflow Outputs:
+ *   executionResult {string}          - Result message
  */
 
 // =========================================================================
 // [CANVAS ELEMENT 1 — Scriptable Task: validateInputs]
-// Inputs:  vm, osType, guestUsername, guestPassword, newAdminName
-// Outputs: osTypeLower {string}
+// Inputs:
+//   vm            {VC:VirtualMachine}
+//   osType        {string}
+//   guestUsername {string}
+//   guestPassword {SecureString}
+//   newAdminName  {string}
+// Outputs:
+//   osTypeLower   {string}
 // =========================================================================
 
 if (!vm)            throw new Error("Input 'vm' is required.");
@@ -38,8 +51,10 @@ System.log("workflow_RenameLocalAdmin: VM=" + vm.name + " OS=" + osTypeLower + "
 
 // =========================================================================
 // [CANVAS ELEMENT 3a — Scriptable Task: skipNonWindows]  (FALSE branch)
-// Inputs:  osTypeLower {string}
-// Outputs: executionResult {string}
+// Inputs:
+//   osTypeLower     {string}
+// Outputs:
+//   executionResult {string}
 // =========================================================================
 
 executionResult = "SKIPPED: workflow_RenameLocalAdmin does not run on OS type '" + osTypeLower + "'.";
@@ -47,8 +62,14 @@ System.log(executionResult);
 
 // =========================================================================
 // [CANVAS ELEMENT 3b — Scriptable Task: uploadAndExecuteScript]  (TRUE branch)
-// Inputs:  vm, guestUsername, guestPassword, newAdminName
-// Outputs: pid {number}
+// Inputs:
+//   vm            {VC:VirtualMachine}
+//   guestUsername {string}
+//   guestPassword {SecureString}
+//   newAdminName  {string}
+// Outputs:
+//   pid           {number}
+//   scriptPath    {string}
 // =========================================================================
 
 if (!/^[a-zA-Z0-9_\-\.]{1,20}$/.test(newAdminName)) {
@@ -63,10 +84,10 @@ guestAuth.username = guestUsername;
 guestAuth.password = guestPassword;
 
 var serviceInstance = VcPlugin.getAllSdkConnections()[0].serviceInstance;
-var guestOps        = serviceInstance.content.guestOperationsManager;
-var fileManager     = guestOps.fileManager;
+var fileManager     = serviceInstance.content.guestOperationsManager.fileManager;
 
-var scriptPath    = "C:\\Windows\\Temp\\vcf_rename_admin.ps1";
+scriptPath = "C:\\Windows\\Temp\\vcf_rename_admin.ps1";
+
 var scriptContent = [
     "$ErrorActionPreference = 'Stop'",
     "$newName = '" + newAdminName.replace(/'/g, "") + "'",
@@ -119,8 +140,14 @@ System.log("workflow_RenameLocalAdmin: Script started. PID: " + pid);
 
 // =========================================================================
 // [CANVAS ELEMENT 4 — Scriptable Task: pollForCompletion]
-// Inputs:  vm, guestUsername, guestPassword, pid {number}
-// Outputs: executionResult {string}
+// Inputs:
+//   vm            {VC:VirtualMachine}
+//   guestUsername {string}
+//   guestPassword {SecureString}
+//   pid           {number}
+//   scriptPath    {string}
+// Outputs:
+//   executionResult {string}
 // =========================================================================
 
 var MAX_WAIT_MS = 60000;
