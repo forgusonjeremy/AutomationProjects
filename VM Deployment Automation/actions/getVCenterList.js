@@ -1,6 +1,6 @@
 /**
  * Action: getVCenterList
- * Module: com.vcf.guestcustomization
+ * Module: com.broadcom.pso.vcfa.customForms
  *
  * Purpose:
  *   Returns a list of all vCenter Server instances currently connected to
@@ -39,26 +39,21 @@ try {
     for (var i = 0; i < connections.length; i++) {
         var conn = connections[i];
 
-        var name       = null;
-        var url        = null;
-        var version    = null;
-        var apiVersion = null;
+        var vcName = null;
 
-        try { name       = conn.name;                                          } catch (e) { System.warn("getVCenterList[" + i + "]: Could not read name: "       + e.message); }
-        try { url        = conn.url;                                           } catch (e) { System.warn("getVCenterList[" + i + "]: Could not read url: "        + e.message); }
-        try { version    = conn.serviceInstance.content.about.version;         } catch (e) { System.warn("getVCenterList[" + i + "]: Could not read version: "    + e.message); }
-        try { apiVersion = conn.serviceInstance.content.about.apiVersion;      } catch (e) { System.warn("getVCenterList[" + i + "]: Could not read apiVersion: " + e.message); }
+        try { 
+            vcName = conn.sdkId;
+        } 
+        catch (e) { 
+            System.warn("getVCenterList[" + i + "]: Could not read name: " + e.message);
+        }
 
-        vcenterList.push({
-            name:       name,
-            url:        url,
-            version:    version,
-            apiVersion: apiVersion
-        });
+        vcenterList.push(vcName)
     }
 
     System.log("getVCenterList: Returned " + vcenterList.length + " vCenter connection(s).");
-    return JSON.stringify(vcenterList);
+
+    return vcenterList;
 
 } catch (e) {
     System.error("getVCenterList FAILED: " + e.message);

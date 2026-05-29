@@ -1,7 +1,6 @@
 name: windows-vm-deploy
 version: 1.4
 formatVersion: 1
-
 ###############################################################################
 # Blueprint: windows-vm-deploy
 # OS:        Windows Server
@@ -13,76 +12,67 @@ formatVersion: 1
 #     with additionalDisks = "" (zero-disk path)
 #   - imageRef: replace win-2025/baseline with your image mapping name
 ###############################################################################
-
 inputs:
   vmHostname:
     type: string
     title: VM Hostname
-    description: "VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars (Windows NetBIOS)."
+    description: VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars (Windows NetBIOS).
     minLength: 1
     maxLength: 15
-    pattern: '^[a-zA-Z0-9\-]+$'
-
-  osType:
+    pattern: ^[a-zA-Z0-9\-]+$
+  vcenterName:
     type: string
-    title: OS Type
-    description: "Operating system type. Used by post-provision workflow."
-    default: windows
-    enum:
-      - windows
-    readOnly: true
-
+    title: vCenter to which to deploy the VM
+    description: Name of the vCenter server where the VM will be deployed
   clusterName:
     type: string
     title: vSphere Cluster Name
-    description: "Name of the vSphere cluster where the VM is to be created."
-
+    description: Name of the vSphere cluster where the VM is to be created.
   networkName:
     type: string
     title: Network Name
-    description: "Name of the dvPortgroup to which the VM is to be connected."
-
+    description: Name of the dvPortgroup to which the VM is to be connected.
   folderName:
     type: string
     title: VM Folder Name
-    description: "Name of the VM folder where the VM is to be placed."
-
+    description: Name of the VM folder where the VM is to be placed.
   vcpuCount:
     type: integer
     title: vCPU Count
     default: 2
     minimum: 1
     maximum: 64
-
   memoryGB:
     type: integer
     title: Memory (GB)
     default: 4
     minimum: 1
     maximum: 512
-
 resources:
   vm:
     type: Cloud.vSphere.Machine
     properties:
-      name: '${input.vmHostname}'
+      name: ${input.vmHostname}
       imageRef: win-2025/baseline
-      cpuCount: '${input.vcpuCount}'
-      totalMemoryMB: '${input.memoryGB * 1024}'
-      folderName: '${input.folderName}'
+      cpuCount: ${input.vcpuCount}
+      totalMemoryMB: ${input.memoryGB * 1024}
+      folderName: ${input.folderName}
+      defaultAdminName: ${secret.windows-default-local-admin}
+      defaultAdminPw: ${secret.windows-default-local-admin-pw}
+      defaultAdminNewName: ${secret.windows-default-admin-new-name}
+      osType: windows
       constraints:
-        - tag: 'clusterName:${input.clusterName}'
+        - tag: clusterName:${input.clusterName}
       networks:
-        - network: '${resource.network.id}'
+        - network: ${resource.network.id}
           assignment: static
-          dns: '${resource.network.dns}'
-          gateway: '${resource.network.gateway}'
-          domain: '${resource.network.domain}'
-          dnsSearchDomains: '${resource.network.dnsSearchDomains}'
-
+          dns: ${resource.network.dns}
+          gateway: ${resource.network.gateway}
+          domain: ${resource.network.domain}
+          dnsSearchDomains: ${resource.network.dnsSearchDomains}
   network:
     type: Cloud.vSphere.Network
     properties:
       networkType: existing
       constraints:
-        - tag: 'networkName:${input.networkName}'
+        - tag: networkName:${input.networkName}
