@@ -21,64 +21,61 @@
 
 // =========================================================================
 // [CANVAS ELEMENT 1 — Scriptable Task: validateAndParseInputs]
-// Inputs:
-//   inputProperties {Properties}
-// Outputs:
-//   vmName          {string}
-//   osTypeLower     {string}
-//   vcenterFqdn     {string}
-//   guestUsername   {string}
-//   guestPassword   {SecureString}
-//   newAdminName    {string}
-//   newPassword     {SecureString}
-//   disks           {string}
-//   hasDisks        {boolean}
-//   diskCount       {number}
-// =========================================================================
+/*==========================================
+Inputs: 
+inputProperties {properties}
 
-// --- Extract from payload ---
-var resourceNames   = inputProperties.get("resourceNames");
-vmName              = resourceNames[0];
+Outputs: 
+disks               {string}
+diskCounts          {number}
+guestPassword       {SecureString}
+guestUsername       {string}
+hasDisks            {boolean}
+newAdminName        {string}
+newAdminPassword    {SecureString}
+ostype          {string}
+vmExtId         {string}
+*/
 
-var customProps     = inputProperties.get("customProperties");
-var osType          = customProps.get("osType");
-vcenterFqdn         = customProps.get("vcenterFqdn");
-guestUsername       = customProps.get("guestUsername");
-guestPassword       = customProps.get("guestPassword");
-newAdminName        = customProps.get("newAdminName");
-newPassword         = customProps.get("newPassword");
-var rawDisks        = customProps.get("additionalDisks");
+osType = inputProperties.customProperties.osType
+vmExtId = inputProperties.customProperties.externalIds[0]
 
-// --- Validate ---
-if (!vmName)        throw new Error("resourceNames[0] is empty or missing.");
-if (!osType)        throw new Error("customProperties missing 'osType'.");
-if (!vcenterFqdn)   throw new Error("customProperties missing 'vcenterFqdn'.");
-if (!guestUsername) throw new Error("customProperties missing 'guestUsername'.");
-if (!guestPassword) throw new Error("customProperties missing 'guestPassword'.");
-if (!newAdminName)  throw new Error("customProperties missing 'newAdminName'.");
-if (!newPassword)   throw new Error("customProperties missing 'newPassword'.");
+if (osType.toLowerCase() == 'windows'){
+    var adminActConfigElemeName = inputProperties.customProperties.adminActConfigElemName;
 
-osTypeLower = osType.toLowerCase().trim();
-if (osTypeLower !== "windows" && osTypeLower !== "linux") {
-    throw new Error("'osType' must be 'windows' or 'linux'. Received: '" + osType + "'");
-}
+    //Get the values needed to update the default admin account within the Windows guest OS
+    var configElems = Server.findAllForType("ConfigurationElement")
 
-// --- Parse additionalDisks ---
-var parsedDisks = [];
-if (rawDisks && rawDisks.trim() !== "" && rawDisks.trim() !== "[]") {
-    try {
-        parsedDisks = JSON.parse(rawDisks);
-    } catch (e) {
-        throw new Error("Failed to parse additionalDisks JSON: " + e.message);
+    for each (var configElem in configElems){
+        if (configElem.name == adminActConfigElementName){
+            adminActConfigElement = configElem;
+            break;
+        }
     }
+
+    guestPassword = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminPwAttr).value;
+    guestUsername = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminAttr).value;
+    newAdminName = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewNameAttr).value;
+    newAdminPassword = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewPwAttr).value;
 }
 
-disks     = JSON.stringify(parsedDisks);
-hasDisks  = (parsedDisks && parsedDisks.length > 0);
-diskCount = parsedDisks.length;
+try{
+    var rawDisks = inputProperties.customProperties.additionalDisks
+}
+catch (err){
+    System.warn("No additional disks being added to the VM '" + inputProperties.resourceNames[0] + "'")
+}
 
-System.log("workflow_VMDeployParent: Starting — VM=" + vmName +
-           " OS=" + osTypeLower + " AdditionalDisks=" + diskCount);
+if (rawDisks){
+    disks     = JSON.stringify(parsedDisks);
+    hasDisks  = (parsedDisks && parsedDisks.length > 0);
+    diskCount = parsedDisks.length;
+
+    System.log("workflow_VMDeployParent: Starting — VM=" + vmName +
+            " OS=" + osTypeLower + " AdditionalDisks=" + diskCount);
+}
+
+
 
 // =========================================================================
 // [CANVAS ELEMENT 2 — Scriptable Task: resolveVM]
