@@ -87,8 +87,14 @@ var guestAuth      = new VcNamePasswordAuthentication();
 guestAuth.username = guestUsername;
 guestAuth.password = guestPassword;
 
-var serviceInstance = VcPlugin.getAllSdkConnections()[0].serviceInstance;
-var fileManager     = serviceInstance.content.guestOperationsManager.fileManager;
+// --- Resolve the SDK connection from the VM --- //
+var sdkConnection = vm.sdkConnection;           // VC:SdkConnection owning this VM
+if (!sdkConnection) {
+    throw new Error("Unable to resolve sdkConnection from VM '" + vm.name + "'.");
+}
+
+var guestOpsManager = sdkConnection.guestOperationsManager;  // VcGuestOperationsManager
+var fileManager     = guestOpsManager.fileManager;           // VcGuestFileManager
 
 scriptPath = "C:\\Windows\\Temp\\vcf_rename_admin.ps1";
 
@@ -139,8 +145,10 @@ progSpec.programPath      = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\pow
 progSpec.arguments        = "-NonInteractive -ExecutionPolicy Bypass -File \"" + scriptPath + "\"";
 progSpec.workingDirectory = "C:\\Windows\\Temp";
 
-pid = serviceInstance.content.guestOperationsManager.processManager.startProgram(vm, guestAuth, progSpec);
+var processManager = guestOpsManager.processManager;         // VcGuestProcessManager
+pid = processManager.startProgramInGuest(vm, guestAuth, progSpec);
 System.log("workflow_RenameLocalAdmin: Script started. PID: " + pid);
+
 
 // =========================================================================
 // [CANVAS ELEMENT 4 — Scriptable Task: pollForCompletion]
@@ -158,9 +166,14 @@ System.log("workflow_RenameLocalAdmin: Script started. PID: " + pid);
 var MAX_WAIT_MS = 60000;
 var POLL_MS     = 5000;
 
-var si = VcPlugin.getAllSdkConnections()[0].serviceInstance;
-var processManager = si.content.guestOperationsManager.processManager;
-var fileManager    = si.content.guestOperationsManager.fileManager;
+// --- Resolve the SDK connection from the VM (not getAllSdkConnections()[0]) ---
+var sdkConnection = vm.sdkConnection;                        // VC:SdkConnection owning this VM
+if (!sdkConnection) {
+    throw new Error("Unable to resolve sdkConnection from VM '" + vm.name + "'.");
+}
+
+var processManager = guestOpsManager.processManager;
+var fileManager     = guestOpsManager.fileManager;           // VcGuestFileManager
 
 // Poll using original credentials — process was launched under this session
 var originalAuth      = new VcNamePasswordAuthentication();
