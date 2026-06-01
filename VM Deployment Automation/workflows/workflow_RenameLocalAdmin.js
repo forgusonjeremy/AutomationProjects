@@ -95,7 +95,6 @@ if (!sdkConnection) {
 
 var guestOpsManager = sdkConnection.guestOperationsManager;  // VcGuestOperationsManager
 var fileManager     = guestOpsManager.fileManager;           // VcGuestFileManager
-var fileManager     = serviceInstance.content.guestOperationsManager.fileManager;
 
 scriptPath = "C:\\Windows\\Temp\\vcf_rename_admin.ps1";
 
