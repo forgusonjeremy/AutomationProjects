@@ -91,49 +91,6 @@ function utf8ByteLength(str) {
 
 
 /* ----------------------------------------------------------------------------
- * ACTION: buildDiskPartitionScript
- * IN:  diskUuid {string}, driveLetter {string}, driveLabel {string},
- *      partitionStyle {string}
- * OUT: {string}  PowerShell script body
- * -------------------------------------------------------------------------- */
-function buildDiskPartitionScript(diskUuid, driveLetter, driveLabel, partitionStyle) {
-    return [
-        "$ErrorActionPreference = 'Stop'",
-        "$targetUuid   = '" + diskUuid.replace(/'/g, "") + "'",
-        "$driveLetter  = '" + driveLetter + "'",
-        "$driveLabel   = '" + driveLabel.replace(/'/g, "") + "'",
-        "$partStyle    = '" + partitionStyle + "'",
-        "",
-        "# Locate disk by serial number (VMware exposes VMDK UUID as serial)",
-        "$disk = Get-Disk | Where-Object { $_.SerialNumber -eq $targetUuid }",
-        "if (-not $disk) {",
-        "    Write-Error \"Disk with serial '$targetUuid' not found.\"",
-        "    exit 1",
-        "}",
-        "",
-        "# Safety check: skip non-RAW disks to prevent data loss",
-        "if ($disk.PartitionStyle -ne 'RAW') {",
-        "    Write-Output \"INFO: Disk '$targetUuid' is not RAW (PartitionStyle=$($disk.PartitionStyle)). Skipping.\"",
-        "    exit 2",
-        "}",
-        "",
-        "# Guard: fail clearly if the requested drive letter is already in use",
-        "if (Get-Volume -DriveLetter $driveLetter -ErrorAction SilentlyContinue) {",
-        "    Write-Error \"Drive letter '${driveLetter}:' is already in use.\"",
-        "    exit 3",
-        "}",
-        "",
-        "Initialize-Disk -Number $disk.Number -PartitionStyle $partStyle -Confirm:$false",
-        "New-Partition -DiskNumber $disk.Number -UseMaximumSize -DriveLetter $driveLetter | Out-Null",
-        "Format-Volume -DriveLetter $driveLetter -FileSystem NTFS -NewFileSystemLabel $driveLabel -Confirm:$false -Force | Out-Null",
-        "",
-        "Write-Output \"SUCCESS: UUID=$targetUuid formatted NTFS ($partStyle), Letter=${driveLetter}:, Label=$driveLabel\"",
-        "exit 0"
-    ].join("\r\n");
-}
-
-
-/* ----------------------------------------------------------------------------
  * ACTION: uploadGuestScript
  * IN:  vm {VC:VirtualMachine}, transferUrl {string}, content {string}, tag {string}
  * OUT: void  (throws on failure; both REST hosts created+destroyed here, null-guarded)
@@ -233,6 +190,43 @@ fileManager         = guestOps.fileManager;
  *      SCRIPT_THRESHOLD_GB
  * OUT: curScriptPath, curUuid, curDriveLetter, curDriveLabel, curSizeGb, curPartStyle
  * ==========================================================================*/
+
+function buildDiskPartitionScript(diskUuid, driveLetter, driveLabel, partitionStyle) {
+    return [
+        "$ErrorActionPreference = 'Stop'",
+        "$targetUuid   = '" + diskUuid.replace(/'/g, "") + "'",
+        "$driveLetter  = '" + driveLetter + "'",
+        "$driveLabel   = '" + driveLabel.replace(/'/g, "") + "'",
+        "$partStyle    = '" + partitionStyle + "'",
+        "",
+        "# Locate disk by serial number (VMware exposes VMDK UUID as serial)",
+        "$disk = Get-Disk | Where-Object { $_.SerialNumber -eq $targetUuid }",
+        "if (-not $disk) {",
+        "    Write-Error \"Disk with serial '$targetUuid' not found.\"",
+        "    exit 1",
+        "}",
+        "",
+        "# Safety check: skip non-RAW disks to prevent data loss",
+        "if ($disk.PartitionStyle -ne 'RAW') {",
+        "    Write-Output \"INFO: Disk '$targetUuid' is not RAW (PartitionStyle=$($disk.PartitionStyle)). Skipping.\"",
+        "    exit 2",
+        "}",
+        "",
+        "# Guard: fail clearly if the requested drive letter is already in use",
+        "if (Get-Volume -DriveLetter $driveLetter -ErrorAction SilentlyContinue) {",
+        "    Write-Error \"Drive letter '${driveLetter}:' is already in use.\"",
+        "    exit 3",
+        "}",
+        "",
+        "Initialize-Disk -Number $disk.Number -PartitionStyle $partStyle -Confirm:$false",
+        "New-Partition -DiskNumber $disk.Number -UseMaximumSize -DriveLetter $driveLetter | Out-Null",
+        "Format-Volume -DriveLetter $driveLetter -FileSystem NTFS -NewFileSystemLabel $driveLabel -Confirm:$false -Force | Out-Null",
+        "",
+        "Write-Output \"SUCCESS: UUID=$targetUuid formatted NTFS ($partStyle), Letter=${driveLetter}:, Label=$driveLabel\"",
+        "exit 0"
+    ].join("\r\n");
+}
+
 var disks   = JSON.parse(additionalDisks);
 var uuidMap = JSON.parse(diskUuidMapJson);
 var disk      = disks[diskIndex];

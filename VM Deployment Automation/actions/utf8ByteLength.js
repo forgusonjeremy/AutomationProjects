@@ -1,0 +1,15 @@
+/* ----------------------------------------------------------------------------
+ * ACTION: utf8ByteLength
+ * IN:  str {string}
+ * OUT: {number}  true UTF-8 byte length (java.lang.String is not constructable
+ *                 in this Rhino context, so this is pure JS)
+ * -------------------------------------------------------------------------- */
+var len = 0;
+for (var i = 0; i < str.length; i++) {
+    var c = str.charCodeAt(i);
+    if (c < 0x80) len += 1;
+    else if (c < 0x800) len += 2;
+    else if (c >= 0xD800 && c <= 0xDBFF) { len += 4; i++; } // surrogate pair
+    else len += 3;
+}
+return len;
