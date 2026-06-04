@@ -1,6 +1,6 @@
 /**
  * Action: extractDiskUUIDs
- * Module: com.vcf.guestcustomization
+ * Module: com.broadcom.pso.vcfa.vm.diskManagement
  *
  * Purpose:
  *   Queries VM hardware configuration and returns a UUID-ordered array of
