@@ -128,7 +128,7 @@ System.error("Unable to perform guest customizations on VM: " + vm.name +
 
 
 /* ============================================================================
- * item11 — [Decision] VM Ready for Guest Operations?
+ * DE2 — [Decision] VM Ready for Guest Operations?
  * IN:  vmProcessList
  *   true  (vmProcessList.length > 0) -> item23 (Set CD-ROM Drive Letter to Y)   *** rewired ***
  *   false                            -> item16 (Sleep)
@@ -137,7 +137,7 @@ System.error("Unable to perform guest customizations on VM: " + vm.name +
 
 
 /* ============================================================================
- * item16 — Sleep   (Library) -> item17
+ * S1 — Sleep   (Library) -> item17
  * IN: sleepTime <- guestCustCheckSleepSeconds
  * ============================================================================
  * item17 — Increase counter   (Library) -> item13
@@ -146,37 +146,34 @@ System.error("Unable to perform guest customizations on VM: " + vm.name +
 
 
 /* ============================================================================
- * item23 — Set CD-ROM Drive Letter to Y   (Workflow link)   *** NEW ***
+ * WF1 — Set CD-ROM Drive Letter to Y   (Workflow link)   *** NEW ***
  * linked-workflow-id: workflow_SetCdromDriveLetter_Windows
  * IN:  vm            <- vm
  *      guestUsername <- guestUsername     (ORIGINAL bootstrap account; pre-rename)
  *      guestPassword <- guestPassword     (ORIGINAL bootstrap password)
  * OUT: executionResult -> executionResult
- * NEXT: item2 (Rename Local Admin Account)
  * ==========================================================================*/
 
 
 /* ============================================================================
- * item2 — Rename Local Admin Account   (Workflow link)
+ * WF2 — Rename Local Admin Account   (Workflow link)
  * IN:  newAdminName<-newAdminName, vm<-vm, osType<-osType,
  *      guestUsername<-guestUsername, guestPassword<-guestPassword, vcenter<-vcenter
  * OUT: executionResult -> executionResult
- * NEXT: item20 (Change Local Admin Password)
  * ==========================================================================*/
 
 
 /* ============================================================================
- * item20 — Change Local Admin Password   (Workflow link)
+ * WF3 — Change Local Admin Password   (Workflow link)
  * IN:  vm<-vm, osType<-osType, guestUsername<-newAdminName (post-rename),
  *      guestPassword<-guestPassword (still original pw), newPassword<-newAdminPassword,
  *      vcenter<-vcenter
- * OUT: executionResult -> executionResult
- * NEXT: item24 (Additional Disks?)                          *** rewired ***
+ * OUT: executionResult -> executionResult                         *** rewired ***
  * ==========================================================================*/
 
 
 /* ============================================================================
- * item24 — [Decision] Additional Disks?                     *** NEW ***
+ * DE3 — [Decision] Additional Disks?                     *** NEW ***
  * IN:  hasDisks
  *   true  -> item22 (Mount Drives in Windows Guest)
  *   false -> item0  (End)
@@ -185,7 +182,7 @@ System.error("Unable to perform guest customizations on VM: " + vm.name +
 
 
 /* ============================================================================
- * item22 — Mount Drives in Windows Guest   (Workflow link)
+ * WF4 — Mount Drives in Windows Guest   (Workflow link)
  * IN:  vm<-vm, guestUsername<-newAdminName (post-rename),
  *      guestPassword<-newAdminPassword (post-rotation), additionalDisks<-attachedDisks
  * OUT: executionSummary -> executionSummary
