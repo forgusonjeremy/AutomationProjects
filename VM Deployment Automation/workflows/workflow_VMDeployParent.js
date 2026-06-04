@@ -1,271 +1,193 @@
 /**
- * Workflow: workflow_VMDeployParent
- * Module: com.vcf.guestcustomization
+ * Workflow: Customize Guest OS (parent)
+ * Module:   com.broadcom.pso.vcfa.vm  (parent)
  *
- * Workflow Inputs:
- *   inputProperties {Properties} - VCFA Compute Post Provision extensibility payload
+ * Inputs:   inputProperties {Properties} - VCFA compute.provision.post payload
+ * Outputs:  executionResult {string}, executionSummary {string}
  *
- * Workflow Outputs:
- *   deploymentSummary {string}
- *
- * inputProperties keys used:
- *   resourceNames[0]                    - VM name
- *   customProperties.osType             - "windows" or "linux"
- *   customProperties.vcenterFqdn        - vCenter FQDN
- *   customProperties.guestUsername      - Pre-rename admin account name
- *   customProperties.guestPassword      - Pre-update password
- *   customProperties.newAdminName       - Target admin account name
- *   customProperties.newPassword        - New password
- *   customProperties.additionalDisks    - JSON array or empty string
+ * CANVAS FLOW:
+ *   Start -> Set Log Marker (item5) -> Get Properties from VM Request (item1)
+ *         -> Get VM for ID (item4) -> Initialize Guest Ops Check Counter (item9)
+ *         -> [D] Guest Ops Check Threshold Exceeded (item13)
+ *               true  -> Log Readiness Error (item14) -> End (item15)
+ *               false -> Get processes from guest (item21)
+ *         -> [D] VM Ready for Guest Operations? (item11)
+ *               false -> Sleep (item16) -> Increase counter (item17) -> item13
+ *               true  -> Set CD-ROM Drive Letter to Y (item23)   *** NEW ***
+ *         -> Rename Local Admin Account (item2)
+ *         -> Change Local Admin Password (item20)
+ *         -> [D] Additional Disks? (item24)                       *** NEW ***
+ *               true  -> Mount Drives in Windows Guest (item22) -> End (item0)
+ *               false -> End (item0)
  */
 
-// =========================================================================
-// [CANVAS ELEMENT 1 — Scriptable Task: validateAndParseInputs]
-/*==========================================
-Inputs: 
-inputProperties {properties}
 
-Outputs: 
-disks               {string}
-diskCounts          {number}
-guestPassword       {SecureString}
-guestUsername       {string}
-hasDisks            {boolean}
-newAdminName        {string}
-newAdminPassword    {SecureString}
-ostype          {string}
-vmExtId         {string}
-*/
+/* ============================================================================
+ * ST1 — Set Log Marker   (Scriptable Task)
+ * ==========================================================================*/
+System.setLogMarker("Workflow Name:" + workflow.name + "-Workflow Run ID:" + workflow.id);
+System.log("Begin Workflow Execution");
 
-osType = inputProperties.customProperties.osType
-vmExtId = inputProperties.customProperties.externalIds[0]
 
-if (osType.toLowerCase() == 'windows'){
-    var adminActConfigElemeName = inputProperties.customProperties.adminActConfigElemName;
+/* ============================================================================
+ * ST2 — Get Properties from VM Request   (Scriptable Task)
+ * IN:  inputProperties
+ * OUT: guestPassword, guestUsername, newAdminName, osType, vmExtId,
+ *      newAdminPassword, hasDisks, diskCount, attachedDisks
+ * ==========================================================================*/
+osType  = inputProperties.customProperties.osType;
+vmExtId = inputProperties.externalIds[0];
 
-    //Get the values needed to update the default admin account within the Windows guest OS
-    var configElems = Server.findAllForType("ConfigurationElement")
+if (osType.toLowerCase() == 'windows') {
+    var adminActConfigElementName = inputProperties.customProperties.adminActConfigElemName;
 
-    for each (var configElem in configElems){
-        if (configElem.name == adminActConfigElementName){
-            adminActConfigElement = configElem;
+    // Get the values needed to update the default admin account within the Windows guest OS
+    var configElems = Server.findAllForType("ConfigurationElement");
+    var adminActConfigElement = null;
+    for (var i = 0; i < configElems.length; i++) {
+        if (configElems[i].name == adminActConfigElementName) {
+            adminActConfigElement = configElems[i];
             break;
         }
     }
 
-    guestPassword = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminPwAttr).value;
-    guestUsername = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminAttr).value;
-    newAdminName = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewNameAttr).value;
+    guestPassword    = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminPwAttr).value;
+    guestUsername    = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminAttr).value;
+    newAdminName     = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewNameAttr).value;
     newAdminPassword = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewPwAttr).value;
 }
 
-try{
-    var rawDisks = inputProperties.customProperties.additionalDisks
-}
-catch (err){
-    System.warn("No additional disks being added to the VM '" + inputProperties.resourceNames[0] + "'")
-}
-
-if (rawDisks){
-    disks     = JSON.stringify(parsedDisks);
-    hasDisks  = (parsedDisks && parsedDisks.length > 0);
-    diskCount = parsedDisks.length;
-
-    System.log("workflow_VMDeployParent: Starting — VM=" + vmName +
-            " OS=" + osTypeLower + " AdditionalDisks=" + diskCount);
+var rawDisks = null;
+try {
+    rawDisks = inputProperties.customProperties.dataDisks;
+} catch (err) {
+    System.warn("No additional disks for VM '" + inputProperties.resourceNames[0] + "'");
 }
 
+if (rawDisks) {
+    // Peel to the actual array (handles single- or double-encoded JSON)
+    var parsedDisks = JSON.parse(rawDisks);
+    if (typeof parsedDisks === "string") { parsedDisks = JSON.parse(parsedDisks); }
+
+    diskCount     = parsedDisks.length;
+    hasDisks      = diskCount > 0;
+    attachedDisks = JSON.stringify(parsedDisks);   // single-encoded for child/action
+} else {
+    diskCount     = 0;
+    hasDisks      = false;
+    attachedDisks = "[]";
+}
+
+System.log("Starting guest customization of VM: " + inputProperties.resourceNames[0] +
+           ", OS=" + osType.toLowerCase() + ", AdditionalDisks=" + diskCount);
 
 
-// =========================================================================
-// [CANVAS ELEMENT 2 — Scriptable Task: resolveVM]
-// Inputs:
-//   vmName  {string}
-// Outputs:
-//   vm      {VC:VirtualMachine}
-//   summary {Array}
-// =========================================================================
-
-vm      = null;
-summary = [];
-
-var allVMs = VcPlugin.getAllVirtualMachines();
-for (var v = 0; v < allVMs.length; v++) {
-    if (allVMs[v].name === vmName) {
-        vm = allVMs[v];
+/* ============================================================================
+ * ST3 — Get VM for ID   (Scriptable Task)
+ * IN:  vmExtId
+ * OUT: vm, summary, vcenter
+ * ==========================================================================*/
+var allVMs = Server.findAllForType("VC:Virtualmachine");
+for (var i = 0; i < allVMs.length; i++) {
+    if (allVMs[i].instanceId == vmExtId) {
+        vm = allVMs[i];
         break;
     }
 }
+vcenter = vm.sdkConnection;
 
-if (!vm) {
-    throw new Error(
-        "VM '" + vmName + "' not found in vCenter inventory. " +
-        "Verify VM name matches the 'name' property in the VCFA blueprint " +
-        "and that provisioning completed successfully."
-    );
-}
 
-System.log("workflow_VMDeployParent: VM resolved — " + vm.name + " (" + vm.reference.value + ")");
-summary.push("VM resolved: " + vm.name);
+/* ============================================================================
+ * ST4 — Initialize Guest Ops Check Counter   (Scriptable Task)
+ * OUT: guestOpsCheckCounter
+ * ==========================================================================*/
+guestOpsCheckCounter = 0;
 
-// =========================================================================
-// [CANVAS ELEMENT 3 — Scriptable Task: waitForTools]
-// Inputs:
-//   vm      {VC:VirtualMachine}
-//   summary {Array}
-// Outputs:
-//   summary {Array}
-// =========================================================================
 
-var TOOLS_WAIT_MAX_MS = 300000;
-var TOOLS_POLL_MS     = 10000;
-var elapsed           = 0;
-var toolsRunning      = false;
+/* ============================================================================
+ * DE1 — [Decision] Guest Ops Check Threshold Exceeded
+ * IN:  guestOpsCheckCounter, guestOpsCheckThreshold
+ *   true  (counter > threshold) -> item14 (Log Readiness Error)
+ *   false                        -> item21 (Get processes from guest)
+ * ==========================================================================*/
+// if (guestOpsCheckCounter > guestOpsCheckThreshold) return true; else return false;
 
-while (elapsed < TOOLS_WAIT_MAX_MS) {
-    var toolsStatus = null;
-    try {
-        toolsStatus = vm.guest.toolsRunningStatus;
-    } catch (statusErr) {
-        System.warn("workflow_VMDeployParent: Could not read toolsRunningStatus: " + statusErr.message);
-    }
 
-    if (toolsStatus === "guestToolsRunning") {
-        toolsRunning = true;
-        break;
-    }
+/* ============================================================================
+ * ST5 — Log Guest Customization Readiness error   (Scriptable Task)  -> item15 (End)
+ * ==========================================================================*/
+System.error("Unable to perform guest customizations on VM: " + vm.name +
+    ".  VM failed to enter 'guest customization ready' state.  Please check VMware tools running status");
 
-    System.log("workflow_VMDeployParent: Tools status=" + toolsStatus + " — waiting... " + elapsed + "ms");
-    System.sleep(TOOLS_POLL_MS);
-    elapsed += TOOLS_POLL_MS;
-}
 
-if (!toolsRunning) {
-    throw new Error(
-        "VMware Tools not running on VM '" + vm.name + "' after " +
-        TOOLS_WAIT_MAX_MS + "ms. " +
-        "Verify Tools is installed and the VM has fully booted."
-    );
-}
+/* ============================================================================
+ * WF1 — Get processes from guest   (Library Workflow link)
+ * IN:  vmUsername<-guestUsername, vmPassword<-guestPassword, vm<-vm
+ * OUT: result -> vmProcessList
+ * ==========================================================================*/
 
-System.log("workflow_VMDeployParent: VMware Tools running on " + vm.name);
-summary.push("VMware Tools: running");
 
-// =========================================================================
-// [CANVAS ELEMENT 4 — Decision: hasDisks?]
-// Condition: hasDisks === true
-//   TRUE  → extractDiskUUIDs (Element 5)
-//   FALSE → workflow_RenameLocalAdmin (Element 6)
-// =========================================================================
+/* ============================================================================
+ * item11 — [Decision] VM Ready for Guest Operations?
+ * IN:  vmProcessList
+ *   true  (vmProcessList.length > 0) -> item23 (Set CD-ROM Drive Letter to Y)   *** rewired ***
+ *   false                            -> item16 (Sleep)
+ * ==========================================================================*/
+// if (vmProcessList.length > 0) return true; else return false;
 
-// =========================================================================
-// [CANVAS ELEMENT 5 — Action: extractDiskUUIDs]             (TRUE branch)
-// Module: com.vcf.guestcustomization
-// Inputs:
-//   vm        {VC:VirtualMachine}
-//   diskCount {number}
-// Outputs:
-//   diskUuidMapJson {string}
-// =========================================================================
 
-diskUuidMapJson = System.getModule("com.vcf.guestcustomization")
-                        .extractDiskUUIDs(vm, diskCount);
+/* ============================================================================
+ * item16 — Sleep   (Library) -> item17
+ * IN: sleepTime <- guestCustCheckSleepSeconds
+ * ============================================================================
+ * item17 — Increase counter   (Library) -> item13
+ * IN/OUT: counter <- guestOpsCheckCounter
+ * ==========================================================================*/
 
-System.log("workflow_VMDeployParent: Disk UUIDs extracted: " + diskUuidMapJson);
-summary.push("Disk UUIDs extracted: " + diskCount + " disk(s)");
 
-// =========================================================================
-// [CANVAS ELEMENT 6 — Workflow: workflow_RenameLocalAdmin]
-// In vRO editor: nested Workflow element
-// Inputs:
-//   vm            {VC:VirtualMachine}
-//   osType        {string}            - bind osTypeLower
-//   guestUsername {string}
-//   guestPassword {SecureString}
-//   newAdminName  {string}
-// Outputs:
-//   executionResult {string}          → renameResult
-// =========================================================================
+/* ============================================================================
+ * item23 — Set CD-ROM Drive Letter to Y   (Workflow link)   *** NEW ***
+ * linked-workflow-id: workflow_SetCdromDriveLetter_Windows
+ * IN:  vm            <- vm
+ *      guestUsername <- guestUsername     (ORIGINAL bootstrap account; pre-rename)
+ *      guestPassword <- guestPassword     (ORIGINAL bootstrap password)
+ * OUT: executionResult -> executionResult
+ * NEXT: item2 (Rename Local Admin Account)
+ * ==========================================================================*/
 
-System.log("workflow_VMDeployParent: Invoking workflow_RenameLocalAdmin.");
-summary.push("RenameLocalAdmin: completed");
 
-// =========================================================================
-// [CANVAS ELEMENT 7 — Workflow: workflow_UpdateLocalAdminPassword]
-// In vRO editor: nested Workflow element
-// IMPORTANT: guestUsername binds to newAdminName  (post-rename account)
-//            guestPassword binds to guestPassword (pre-update — current password)
-// Inputs:
-//   vm            {VC:VirtualMachine}
-//   osType        {string}            - bind osTypeLower
-//   guestUsername {string}            - bind newAdminName
-//   guestPassword {SecureString}      - bind guestPassword
-//   newPassword   {SecureString}
-// Outputs:
-//   executionResult {string}          → passwordResult
-// =========================================================================
+/* ============================================================================
+ * item2 — Rename Local Admin Account   (Workflow link)
+ * IN:  newAdminName<-newAdminName, vm<-vm, osType<-osType,
+ *      guestUsername<-guestUsername, guestPassword<-guestPassword, vcenter<-vcenter
+ * OUT: executionResult -> executionResult
+ * NEXT: item20 (Change Local Admin Password)
+ * ==========================================================================*/
 
-System.log("workflow_VMDeployParent: Invoking workflow_UpdateLocalAdminPassword (username=" + newAdminName + ").");
-summary.push("UpdateLocalAdminPassword: completed");
 
-// =========================================================================
-// [CANVAS ELEMENT 8 — Decision: hasDisks?]
-// Condition: hasDisks === true
-//   TRUE  → Decision: isWindows? (Element 9)
-//   FALSE → logSummary (Element 12)
-// =========================================================================
+/* ============================================================================
+ * item20 — Change Local Admin Password   (Workflow link)
+ * IN:  vm<-vm, osType<-osType, guestUsername<-newAdminName (post-rename),
+ *      guestPassword<-guestPassword (still original pw), newPassword<-newAdminPassword,
+ *      vcenter<-vcenter
+ * OUT: executionResult -> executionResult
+ * NEXT: item24 (Additional Disks?)                          *** rewired ***
+ * ==========================================================================*/
 
-// =========================================================================
-// [CANVAS ELEMENT 9 — Decision: isWindows?]                 (TRUE branch)
-// Condition: osTypeLower === "windows"
-//   TRUE  → workflow_MountFormatDisks_Windows (Element 10)
-//   FALSE → workflow_MountFormatDisks_Linux   (Element 11)
-// =========================================================================
 
-// =========================================================================
-// [CANVAS ELEMENT 10 — Workflow: workflow_MountFormatDisks_Windows]
-// In vRO editor: nested Workflow element
-// IMPORTANT: guestUsername binds to newAdminName (post-rename)
-//            guestPassword binds to newPassword  (post-update)
-// Inputs:
-//   vm              {VC:VirtualMachine}
-//   guestUsername   {string}           - bind newAdminName
-//   guestPassword   {SecureString}     - bind newPassword
-//   additionalDisks {string}           - bind disks
-//   diskUuidMapJson {string}
-// Outputs:
-//   executionSummary {string}          → diskResult
-// =========================================================================
+/* ============================================================================
+ * item24 — [Decision] Additional Disks?                     *** NEW ***
+ * IN:  hasDisks
+ *   true  -> item22 (Mount Drives in Windows Guest)
+ *   false -> item0  (End)
+ * ==========================================================================*/
+// if (hasDisks == true) return true; else return false;
 
-System.log("workflow_VMDeployParent: Invoking workflow_MountFormatDisks_Windows.");
-summary.push("MountFormatDisks_Windows: completed (" + diskCount + " disk(s))");
 
-// =========================================================================
-// [CANVAS ELEMENT 11 — Workflow: workflow_MountFormatDisks_Linux]
-// In vRO editor: nested Workflow element
-// IMPORTANT: guestUsername binds to newAdminName (post-rename)
-//            guestPassword binds to newPassword  (post-update)
-// Inputs:
-//   vm              {VC:VirtualMachine}
-//   guestUsername   {string}           - bind newAdminName
-//   guestPassword   {SecureString}     - bind newPassword
-//   additionalDisks {string}           - bind disks
-//   diskUuidMapJson {string}
-// Outputs:
-//   executionSummary {string}          → diskResult
-// =========================================================================
-
-System.log("workflow_VMDeployParent: Invoking workflow_MountFormatDisks_Linux.");
-summary.push("MountFormatDisks_Linux: completed (" + diskCount + " disk(s))");
-
-// =========================================================================
-// [CANVAS ELEMENT 12 — Scriptable Task: logSummary]
-// Inputs:
-//   vm      {VC:VirtualMachine}
-//   summary {Array}
-// Outputs:
-//   deploymentSummary {string}
-// =========================================================================
-
-deploymentSummary = "VM: " + vm.name + "\n" + summary.join("\n");
-System.log("workflow_VMDeployParent: COMPLETED.\n" + deploymentSummary);
+/* ============================================================================
+ * item22 — Mount Drives in Windows Guest   (Workflow link)
+ * IN:  vm<-vm, guestUsername<-newAdminName (post-rename),
+ *      guestPassword<-newAdminPassword (post-rotation), additionalDisks<-attachedDisks
+ * OUT: executionSummary -> executionSummary
+ * NEXT: item0 (End)
+ * ==========================================================================*/
