@@ -23,7 +23,7 @@
 /* ============================================================================
  * E1 — Prepare Guest Ops   (Scriptable Task)
  * IN:  vm, guestUsername, guestPassword
- * OUT: guestAuth, processManager, fileManager
+ * OUT: guestAuth (any), processManager (VC:GuestProcessManager), fileManager (VC:GuestFileManager)
  * ==========================================================================*/
 if (!vm)            throw new Error("Input 'vm' is required.");
 if (!guestUsername) throw new Error("Input 'guestUsername' is required.");
@@ -42,34 +42,41 @@ System.log("workflow_SetCdromDriveLetter_Windows: VM = " + vm.name);
 
 
 /* ============================================================================
- * E2 — Set CD-ROM to Y:   (Scriptable Task)
- * IN:  vm, guestAuth, processManager, fileManager, MAX_WAIT_MS, POLL_MS
+ * E2 — Set CD-ROM to <cdDriveLetter>:   (Scriptable Task)
+ * IN:  vm, cdDriveLetter, guestAuth, processManager, fileManager, MAX_WAIT_MS, POLL_MS
  * OUT: pid, curScriptPath, executionResult
  * ==========================================================================*/
+if (!cdDriveLetter) throw new Error("Input 'cdDriveLetter' is required.");
+var cdLetter = cdDriveLetter.replace(":", "").trim().toUpperCase();
+if (cdLetter.length !== 1 || !/[D-Z]/.test(cdLetter)) {
+    throw new Error("Invalid cdDriveLetter '" + cdDriveLetter + "'. Must be a single letter D-Z.");
+}
+
 var psCdrom = [
     "$ErrorActionPreference = 'Stop'",
+    "$cdLetter = '" + cdLetter + "'",
     "$cd = Get-WmiObject -Class Win32_Volume -Filter \"DriveType = 5\"",
     "if (-not $cd) { Write-Output 'INFO: No CD-ROM volume present. Skipping.'; exit 0 }",
     "if ($cd -is [array]) { $cd = $cd[0] }",
-    "if ($cd.DriveLetter -eq 'Y:') { Write-Output 'INFO: CD-ROM already Y:.'; exit 0 }",
-    "$conflict = Get-WmiObject -Class Win32_Volume -Filter \"DriveLetter = 'Y:'\"",
-    "if ($conflict) { Write-Error 'Y: is already in use by another volume.'; exit 1 }",
-    "$cd.DriveLetter = 'Y:'",
+    "if ($cd.DriveLetter -eq \"${cdLetter}:\") { Write-Output \"INFO: CD-ROM already ${cdLetter}:.\"; exit 0 }",
+    "$conflict = Get-WmiObject -Class Win32_Volume -Filter \"DriveLetter = '${cdLetter}:'\"",
+    "if ($conflict) { Write-Error \"${cdLetter}: is already in use by another volume.\"; exit 1 }",
+    "$cd.DriveLetter = \"${cdLetter}:\"",
     "$cd.Put() | Out-Null",
     "$check = Get-WmiObject -Class Win32_Volume -Filter \"DriveType = 5\"",
     "if ($check -is [array]) { $check = $check[0] }",
-    "if ($check.DriveLetter -ne 'Y:') { Write-Error 'CD-ROM did not move to Y:.'; exit 2 }",
-    "Write-Output 'SUCCESS: CD-ROM set to Y:'",
+    "if ($check.DriveLetter -ne \"${cdLetter}:\") { Write-Error \"CD-ROM did not move to ${cdLetter}:.\"; exit 2 }",
+    "Write-Output \"SUCCESS: CD-ROM set to ${cdLetter}:\"",
     "exit 0"
 ].join("\r\n");
 
 var mod       = System.getModule("com.broadcom.pso.vcfa.vm.guestScripting");
-curScriptPath = "C:\\Windows\\Temp\\vcf_set_cdrom_Y.ps1";
+curScriptPath = "C:\\Windows\\Temp\\vcf_set_cdrom_" + cdLetter + ".ps1";
 
 var winFileAttr = new VcGuestWindowsFileAttributes();
 var byteLen     = mod.utf8ByteLength(psCdrom);
 var transferUrl = fileManager.initiateFileTransferToGuest(vm, guestAuth, curScriptPath, winFileAttr, byteLen, true);
-mod.uploadGuestScript(vm, transferUrl, psCdrom, "CDROM-Y");
+mod.uploadGuestScript(vm, transferUrl, psCdrom, "CDROM-" + cdLetter);
 
 var progSpec              = new VcGuestProgramSpec();
 progSpec.programPath      = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
@@ -77,7 +84,7 @@ progSpec.arguments        = "-NonInteractive -ExecutionPolicy Bypass -File \"" +
 progSpec.workingDirectory = "C:\\Windows\\Temp";
 
 pid = processManager.startProgramInGuest(vm, guestAuth, progSpec);
-System.log("CD-ROM relabel started on " + vm.name + ". PID: " + pid);
+System.log("CD-ROM relabel to " + cdLetter + ": started on " + vm.name + ". PID: " + pid);
 
 var elapsed  = 0;
 var exitCode = null;
@@ -92,8 +99,8 @@ while (elapsed < MAX_WAIT_MS) {
     System.log("CD-ROM relabel: Waiting... " + elapsed + "ms elapsed.");
 }
 
-if (exitCode === null) throw new Error("Set CD-ROM Y: timed out after " + MAX_WAIT_MS + "ms. PID: " + pid);
-if (exitCode !== 0)    throw new Error("Set CD-ROM Y: failed on " + vm.name + ", exit code " + exitCode);
+if (exitCode === null) throw new Error("Set CD-ROM " + cdLetter + ": timed out after " + MAX_WAIT_MS + "ms. PID: " + pid);
+if (exitCode !== 0)    throw new Error("Set CD-ROM " + cdLetter + ": failed on " + vm.name + ", exit code " + exitCode);
 
-executionResult = "SUCCESS: CD-ROM set to Y: on " + vm.name;
+executionResult = "SUCCESS: CD-ROM set to " + cdLetter + ": on " + vm.name;
 System.log(executionResult);
