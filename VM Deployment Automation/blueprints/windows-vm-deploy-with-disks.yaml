@@ -1,124 +1,126 @@
-name: windows-vm-deploy-with-disks
-version: 1.4
 formatVersion: 1
-
-###############################################################################
-# Blueprint: windows-vm-deploy-with-disks
-# OS:        Windows Server
-# Disks:     1–N additional data disks on SCSI Controller 1
-# Notes:
-#   - OS disk on SCSI_Controller_0 (VCFA default from image mapping)
-#   - Additional disks on SCSI_Controller_1; unitNumber matches count.index
-#   - disk.EnableUUID = TRUE required on base image template (V3)
-#   - Filesystem logic (MBR/GPT, NTFS) handled in workflow_MountFormatDisks_Windows
-#   - POST_PROVISION extensibility subscription triggers workflow_VMDeployParent
-#   - imageRef: replace win-2025/baseline with your image mapping name
-###############################################################################
-
 inputs:
   vmHostname:
     type: string
     title: VM Hostname
-    description: "VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars (Windows NetBIOS)."
+    description: VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars (Windows NetBIOS).
     minLength: 1
     maxLength: 15
-    pattern: '^[a-zA-Z0-9\-]+$'
-
-  osType:
+    pattern: ^[a-zA-Z0-9\-]+$
+  vcenterName:
     type: string
-    title: OS Type
-    description: "Operating system type. Used by post-provision workflow."
-    default: windows
-    enum:
-      - windows
-    readOnly: true
-
+    title: vCenter to which to deploy the VM
+    description: Name of the vCenter server where the VM will be deployed
   clusterName:
     type: string
     title: vSphere Cluster Name
-    description: "Name of the vSphere cluster where the VM is to be created."
-
+    description: Name of the vSphere cluster where the VM is to be created.
   networkName:
     type: string
     title: Network Name
-    description: "Name of the dvPortgroup to which the VM is to be connected."
-
+    description: Name of the dvPortgroup to which the VM is to be connected.
   folderName:
     type: string
     title: VM Folder Name
-    description: "Name of the VM folder where the VM is to be placed."
-
+    description: Name of the VM folder where the VM is to be placed.
   vcpuCount:
     type: integer
     title: vCPU Count
     default: 2
     minimum: 1
     maximum: 64
-
   memoryGB:
     type: integer
     title: Memory (GB)
     default: 4
     minimum: 1
     maximum: 512
-
-  additionalDisks:
+  dataDisks:
     type: array
     title: Additional Data Disks
-    description: "One entry per additional disk. Provisioned in array order on SCSI Controller 1. Disks >= 2048 GB use GPT partition table."
+    description: One entry per additional disk. Choose a size and a SCSI controller.
     minItems: 1
+    maxItems: 10 # confirm the real ceiling
     items:
       type: object
       properties:
-        driveLetter:
-          type: string
-          title: Drive Letter
-          description: "Single letter D–Z. Do not include colon."
-          pattern: '^[D-Zd-z]$'
-        driveLabel:
-          type: string
-          title: Drive Label
-          description: "NTFS volume label. Max 32 characters."
-          maxLength: 32
         sizeGb:
           type: integer
           title: Size (GB)
           minimum: 1
-          maximum: 65536
-
+        SCSIController:
+          type: string
+          title: SCSI Controller
+          default: SCSI_Controller_1
+          enum:
+            - SCSI_Controller_1
+            - SCSI_Controller_2
+            - SCSI_Controller_3
+        driveLetter:
+          type: string
+          pattern: ^[E-XZ]$
+          description: Single letter E through Z
+        driveLabel:
+          type: string
+#Hidden inputs
+  adminAcctConfigElemName:
+    type: string
+    title: Local Admin Configuration Element Name
+    description: Name of the configuration element in Orchestrator containing the administrator account information used in updating the local admin account username and password
+  defaultAdminNameAttrName:
+    type: string
+    title: Default Admin Name Attribute Name
+    description: Name of configuration element attribute containing the default administrator account name
+  defaultAdminPasswordAttrName:
+    type: string
+    title: Default Admin Password Attribute Name
+    description: Name of the configuration element attribute containing the default administrator account password
+  defaultAdminNewNameAttrName:
+    type: string
+    title: New Default Admin Name Attribute Name
+    description: Name of the configuration element attribute containing the new default admin name
+  defaultAdminNewPasswordAttrName:
+    type: string
+    title: New Default Admin Password Attribute Name
+    description: Name of the configuration element attribute containing the new password for the default admin account
 resources:
   vm:
     type: Cloud.vSphere.Machine
-    dependsOn:
-      - additionalDisk
     properties:
-      name: '${input.vmHostname}'
+      name: ${input.vmHostname}
       imageRef: win-2025/baseline
-      cpuCount: '${input.vcpuCount}'
-      totalMemoryMB: '${input.memoryGB * 1024}'
-      folderName: '${input.folderName}'
+      customizationSpec: win-2025
+      cpuCount: ${input.vcpuCount}
+      totalMemoryMB: ${input.memoryGB * 1024}
+      folderName: ${input.folderName}
+      adminActConfigElemName: ${input.adminAcctConfigElemName}
+      defaultAdminAttr: ${input.defaultAdminNameAttrName}
+      defaultAdminPwAttr: ${input.defaultAdminPasswordAttrName}
+      defaultAdminNewNameAttr: ${input.defaultAdminNewNameAttrName}
+      defaultAdminNewPwAttr: ${input.defaultAdminNewPasswordAttrName}
+      dataDisks: ${input.dataDisks}
+      osType: windows
       constraints:
-        - tag: 'clusterName:${input.clusterName}'
+        - tag: clusterName:${input.clusterName}
+      attachedDisks: ${map_to_object(resource.DataDisk[*].id, "source")}
       networks:
-        - network: '${resource.network.id}'
+        - network: ${resource.network.id}
           assignment: static
-          dns: '${resource.network.dns}'
-          gateway: '${resource.network.gateway}'
-          domain: '${resource.network.domain}'
-          dnsSearchDomains: '${resource.network.dnsSearchDomains}'
-
-  additionalDisk:
-    type: Cloud.vSphere.Disk
-    allocatePerInstance: true
-    count: '${length(input.additionalDisks)}'
-    properties:
-      capacityGb: '${input.additionalDisks[count.index].sizeGb}'
-      SCSIController: SCSI_Controller_1
-      unitNumber: '${count.index}'
-
+          dns: ${resource.network.dns}
+          gateway: ${resource.network.gateway}
+          domain: ${resource.network.domain}
+          dnsSearchDomains: ${resource.network.dnsSearchDomains}
   network:
     type: Cloud.vSphere.Network
     properties:
       networkType: existing
       constraints:
-        - tag: 'networkName:${input.networkName}'
+        - tag: networkName:${input.networkName}
+  DataDisk:
+    type: Cloud.vSphere.Disk
+    allocatePerInstance: true
+    properties:
+      capacityGb: ${input.dataDisks[count.index].sizeGb}
+      SCSIController: ${input.dataDisks[count.index].SCSIController}
+      count: ${length(input.dataDisks)}
+      provisioningType: thin

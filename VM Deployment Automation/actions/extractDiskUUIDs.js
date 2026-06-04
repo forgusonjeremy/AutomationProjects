@@ -1,108 +1,62 @@
 /**
- * Action: extractDiskUUIDs
+ * Action: extractDiskUUIDs (multi-controller)
  * Module: com.broadcom.pso.vcfa.vm.diskManagement
- *
- * Purpose:
- *   Queries VM hardware configuration and returns a UUID-ordered array of
- *   additional disks attached to SCSI Controller 1 (busNumber === 1).
- *   Output is matched positionally to the additionalDisks input array.
- *
- * Prerequisites:
- *   - vCenter Server plugin configured in Orchestrator
- *   - disk.EnableUUID = TRUE on base image template VM
- *   - Disks provisioned on SCSI Controller 1 via blueprint (SCSIController: SCSI_Controller_1)
- *
- * Inputs:
- *   vm        {VC:VirtualMachine} - Target VM object
- *   diskCount {number}            - Expected number of additional disks (length of additionalDisks array)
- *
- * Output:
- *   {string} JSON array: [{index, uuid, unitNumber}] sorted by unitNumber ascending
- *
- * Error conditions:
- *   - No hardware devices on VM
- *   - Disk count on Controller 1 does not match diskCount input
- *   - disk.EnableUUID not set (UUID will be undefined/null)
+ * IN:  vm {VC:VirtualMachine}
+ *      additionalDisksJson {string}  request-order JSON:
+ *        [{ sizeGb, SCSIController:"SCSI_Controller_1..3", driveLetter, driveLabel }]
+ * OUT: {string}  SAME order as input:
+ *        [{ index, uuid, unitNumber, scsiController }]
  */
+if (!vm) throw new Error("Input 'vm' is required.");
+if (!additionalDisksJson) throw new Error("Input 'additionalDisksJson' is required.");
 
-var additionalVmdks = [];
+var requested = JSON.parse(additionalDisksJson);
+if (typeof requested === "string") requested = JSON.parse(requested); // defensive double-decode
+if (!requested || requested.length === 0) throw new Error("additionalDisksJson is empty.");
 
-try {
-    if (!vm) {
-        throw new Error("Input 'vm' is required.");
-    }
-    if (diskCount === null || diskCount === undefined || diskCount < 1) {
-        throw new Error("Input 'diskCount' must be a positive integer. Received: " + diskCount);
-    }
-
-    var devices = vm.config.hardware.device;
-
-    if (!devices || devices.length === 0) {
-        throw new Error("No hardware devices found on VM: " + vm.name);
-    }
-
-    System.log("extractDiskUUIDs: Scanning " + devices.length + " hardware device(s) on VM: " + vm.name);
-
-    for (var d = 0; d < devices.length; d++) {
-        var device = devices[d];
-
-        // Skip devices without disk backing (not a VMDK)
-        if (!device.backing || device.backing.uuid === undefined || device.backing.uuid === null) {
-            continue;
-        }
-
-        // Find the controller this device is attached to
-        var ctrl = null;
-        for (var c = 0; c < devices.length; c++) {
-            if (devices[c].key === device.controllerKey) {
-                ctrl = devices[c];
-                break;
-            }
-        }
-
-        // Filter: Controller 1 only (additional disks)
-        if (!ctrl || ctrl.busNumber !== 1) {
-            continue;
-        }
-
-        System.log(
-            "extractDiskUUIDs: Found disk on Controller 1 — " +
-            "unitNumber=" + device.unitNumber +
-            " uuid=" + device.backing.uuid
-        );
-
-        additionalVmdks.push({
-            index:      additionalVmdks.length, // temporary; re-indexed after sort
-            unitNumber: device.unitNumber,
-            uuid:       device.backing.uuid
-        });
-    }
-
-    // Sort ascending by unitNumber to match blueprint count.index ordering
-    additionalVmdks.sort(function(a, b) { return a.unitNumber - b.unitNumber; });
-
-    // Re-index after sort to reflect final array position
-    for (var i = 0; i < additionalVmdks.length; i++) {
-        additionalVmdks[i].index = i;
-    }
-
-    // Validate count matches expectation
-    if (additionalVmdks.length !== diskCount) {
-        throw new Error(
-            "Disk count mismatch on VM '" + vm.name + "'. " +
-            "Expected: " + diskCount + " disk(s) on SCSI Controller 1. " +
-            "Found: " + additionalVmdks.length + ". " +
-            "Verify: (1) disk.EnableUUID=TRUE on base image, " +
-            "(2) Blueprint assigns SCSIController: SCSI_Controller_1, " +
-            "(3) VM provisioning completed successfully."
-        );
-    }
-
-    var result = JSON.stringify(additionalVmdks);
-    System.log("extractDiskUUIDs: Success. Result: " + result);
-    return result;
-
-} catch (e) {
-    System.error("extractDiskUUIDs FAILED: " + e.message);
-    throw e;
+function busFromEnum(s) {
+    var m = s ? String(s).match(/SCSI_Controller_([1-3])$/) : null;
+    if (!m) throw new Error("Unsupported SCSIController '" + s + "'. Expected SCSI_Controller_1..3.");
+    return parseInt(m[1], 10);
 }
+
+var devices = vm.config.hardware.device;
+if (!devices || devices.length === 0) throw new Error("No hardware devices on VM: " + vm.name);
+
+// Group data-disk VMDKs by controller busNumber, skipping bus 0 (OS/boot)
+var byBus = {};
+for (var d = 0; d < devices.length; d++) {
+    var device = devices[d];
+    if (!device.backing || device.backing.uuid === undefined || device.backing.uuid === null) continue;
+    var ctrl = null;
+    for (var c = 0; c < devices.length; c++) {
+        if (devices[c].key === device.controllerKey) { ctrl = devices[c]; break; }
+    }
+    if (!ctrl || ctrl.busNumber === undefined || ctrl.busNumber === null) continue;
+    if (ctrl.busNumber === 0) continue; // OS disk
+    if (!byBus[ctrl.busNumber]) byBus[ctrl.busNumber] = [];
+    byBus[ctrl.busNumber].push({ unitNumber: device.unitNumber, uuid: device.backing.uuid });
+}
+for (var b in byBus) {
+    if (byBus.hasOwnProperty(b)) byBus[b].sort(function(a, z) { return a.unitNumber - z.unitNumber; });
+}
+
+// Consume per controller in request order
+var cursor = {}, result = [];
+for (var r = 0; r < requested.length; r++) {
+    var bus = busFromEnum(requested[r].SCSIController);
+    var group = byBus[bus] || [];
+    var idx = cursor[bus] || 0;
+    if (idx >= group.length) {
+        throw new Error("Disk count mismatch on bus " + bus + " (" + requested[r].SCSIController +
+            ") for VM '" + vm.name + "'. Requested more than found. Verify disk.EnableUUID=TRUE and provisioning completed.");
+    }
+    var phys = group[idx];
+    cursor[bus] = idx + 1;
+    if (!phys.uuid) throw new Error("Disk[" + r + "] bus " + bus + " has no UUID — disk.EnableUUID likely FALSE.");
+    result.push({ index: r, uuid: phys.uuid, unitNumber: phys.unitNumber, scsiController: requested[r].SCSIController });
+}
+
+var out = JSON.stringify(result);
+System.log("extractDiskUUIDs: " + out);
+return out;

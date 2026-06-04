@@ -1,17 +1,4 @@
-name: windows-vm-deploy
-version: 1.4
 formatVersion: 1
-###############################################################################
-# Blueprint: windows-vm-deploy
-# OS:        Windows Server
-# Disks:     Zero additional disks
-# Notes:
-#   - Cluster and network selected at request time via capability tag constraints
-#   - Hostname set via name: property; inherited by guest via VMware Tools (S4)
-#   - POST_PROVISION extensibility subscription triggers workflow_VMDeployParent
-#     with additionalDisks = "" (zero-disk path)
-#   - imageRef: replace win-2025/baseline with your image mapping name
-###############################################################################
 inputs:
   vmHostname:
     type: string
@@ -48,18 +35,42 @@ inputs:
     default: 4
     minimum: 1
     maximum: 512
+#Hidden inputs
+  adminAcctConfigElemName:
+    type: string
+    title: Local Admin Configuration Element Name
+    description: Name of the configuration element in Orchestrator containing the administrator account information used in updating the local admin account username and password
+  defaultAdminNameAttrName:
+    type: string
+    title: Default Admin Name Attribute Name
+    description: Name of configuration element attribute containing the default administrator account name
+  defaultAdminPasswordAttrName:
+    type: string
+    title: Default Admin Password Attribute Name
+    description: Name of the configuration element attribute containing the default administrator account password
+  defaultAdminNewNameAttrName:
+    type: string
+    title: New Default Admin Name Attribute Name
+    description: Name of the configuration element attribute containing the new default admin name
+  defaultAdminNewPasswordAttrName:
+    type: string
+    title: New Default Admin Password Attribute Name
+    description: Name of the configuration element attribute containing the new password for the default admin account
 resources:
   vm:
     type: Cloud.vSphere.Machine
     properties:
       name: ${input.vmHostname}
       imageRef: win-2025/baseline
+      customizationSpec: win-2025
       cpuCount: ${input.vcpuCount}
       totalMemoryMB: ${input.memoryGB * 1024}
       folderName: ${input.folderName}
-      defaultAdminName: ${secret.windows-default-local-admin}
-      defaultAdminPw: ${secret.windows-default-local-admin-pw}
-      defaultAdminNewName: ${secret.windows-default-admin-new-name}
+      adminActConfigElemName: ${input.adminAcctConfigElemName}
+      defaultAdminAttr: ${input.defaultAdminNameAttrName}
+      defaultAdminPwAttr: ${input.defaultAdminPasswordAttrName}
+      defaultAdminNewNameAttr: ${input.defaultAdminNewNameAttrName}
+      defaultAdminNewPwAttr: ${input.defaultAdminNewPasswordAttrName}
       osType: windows
       constraints:
         - tag: clusterName:${input.clusterName}
