@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------------
  * ACTION: uploadGuestScript
  * IN:  vm {VC:VirtualMachine}, transferUrl {string}, content {string}, tag {string}
- * OUT: void  (throws on failure; both REST hosts created+destroyed here, null-guarded)
+ * OUT: string  (success contains a log entry, throws on failure; both REST hosts created+destroyed here, null-guarded)
  * -------------------------------------------------------------------------- */
 var baseUrl       = transferUrl.substring(0, transferUrl.indexOf("/", 8));
 var uploadHost    = null;
@@ -14,13 +14,15 @@ try {
     transientHost.url              = baseUrl;
     transientHost.hostVerification = false;
 
-    var req = transientHost.createRequest("PUT", transferUrl, "application/octet-stream");
-    req.setContent(content);
+    var req = transientHost.createRequest("PUT", transferUrl, content);
+    req.setHeader("Content-Type", "application/octet-stream");
     var resp = req.execute();
     if (resp.statusCode !== 200) {
         throw new Error("Script upload failed [" + tag + "]. HTTP " + resp.statusCode + ": " + resp.contentAsString);
     }
-    System.log("Script uploaded [" + tag + "].");
+    result = "Script uploaded [" + tag + "].";
+    System.log(result);
+
 } finally {
     if (transientHost) {
         try { RESTHostManager.removeHost(transientHost); }
@@ -31,3 +33,5 @@ try {
         catch (err) { System.warn("Upload host cleanup [" + tag + "]: " + err.message); }
     }
 }
+
+return result;

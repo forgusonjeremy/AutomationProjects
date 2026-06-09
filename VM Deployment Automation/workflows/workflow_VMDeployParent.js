@@ -1,61 +1,94 @@
 /**
- * Workflow: Customize Guest OS (parent)
- * Module:   com.broadcom.pso.vcfa.vm  (parent)
+ * Workflow: Customize Windows VM Guest   (parent)
+ * Module:   com.broadcom.pso.vcfa.vm
+ * WF ID:    7f97799b-9aff-49a5-9cd1-3a75ec6a6c89
  *
  * Inputs:   inputProperties {Properties} - VCFA compute.provision.post payload
- * Outputs:  executionResult {string}, executionSummary {string}
+ * Outputs:  (none declared on the workflow)
  *
- * CANVAS FLOW:
- *   Start -> Set Log Marker (item5) -> Get Properties from VM Request (item1)
- *         -> Get VM for ID (item4) -> Initialize Guest Ops Check Counter (item9)
- *         -> [D] Guest Ops Check Threshold Exceeded (item13)
- *               true  -> Log Readiness Error (item14) -> End (item15)
- *               false -> Get processes from guest (item21)
- *         -> [D] VM Ready for Guest Operations? (item11)
- *               false -> Sleep (item16) -> Increase counter (item17) -> item13
- *               true  -> Set CD-ROM Drive Letter to Y (item23)   *** NEW ***
- *         -> Rename Local Admin Account (item2)
- *         -> Change Local Admin Password (item20)
- *         -> [D] Additional Disks? (item24)                       *** NEW ***
- *               true  -> Mount Drives in Windows Guest (item22) -> End (item0)
- *               false -> End (item0)
+ * Error handler: item20 (User interaction -> item19 End)
+ *
+ * CANVAS FLOW (root = item1):
+ *   item1 (Set Log Marker)
+ *     -> item2 (Get Properties from VM Request)
+ *     -> item3 (Get VM for ID)
+ *     -> item4 (Initialize Guest Ops Check Counter)
+ *     -> item6 [Decision: Guest Ops Check Threshold Exceeded?]
+ *           true  -> item7 (Log Readiness error) -> item0 (End)
+ *           false -> item8 (Get processes from guest  [LIBRARY link])
+ *     -> item10 [Decision: VM Ready for Guest Ops?]
+ *           true  -> item13 (Configure CD Drive Letter)
+ *           false -> item12 (Sleep) -> item11 (Increase counter) -> item6
+ *     -> item13 (Configure CD Drive Letter  [link])
+ *     -> item14 (Rename Windows Local Admin  [link])
+ *     -> item15 (Change Local Account Password  [link])
+ *     -> item17 [Decision: Has Data Disks?]
+ *           true  -> item18 (Format Disks (Windows) [link]) -> item5 (End)
+ *           false -> item16 (End)
+ *
+ * ATTRIBUTES:
+ *   guestPassword          {SecureString}
+ *   guestUsername          {string}
+ *   newAdminName           {string}
+ *   vmExtId                {string}
+ *   newAdminPassword       {SecureString}
+ *   hasDisks               {boolean} = false
+ *   diskCount              {number}
+ *   attachedDisks          {string}
+ *   vm                     {VC:VirtualMachine}
+ *   vcenter                {VC:SdkConnection}
+ *   guestOpsCheckCounter   {number}
+ *   guestOpsCheckThreshold {number} = 10
+ *   vmProcessList          {Array/CompositeType...:GuestProcessInfoType} = []
+ *   guestOpsCheckSleep     {number} = 60
+ *   cdDriveLetter          {string} = "Y"
+ *   executionResult        {string}
  */
 
 
 /* ============================================================================
- * ST1 — Set Log Marker   (Scriptable Task)
+ * item1 — Set Log Marker   (Scriptable Task)   [ROOT]
+ * NEXT: item2
  * ==========================================================================*/
 System.setLogMarker("Workflow Name:" + workflow.name + "-Workflow Run ID:" + workflow.id);
 System.log("Begin Workflow Execution");
 
 
 /* ============================================================================
- * ST2 — Get Properties from VM Request   (Scriptable Task)
+ * item2 — Get Properties from VM Request   (Scriptable Task)
  * IN:  inputProperties
- * OUT: guestPassword, guestUsername, newAdminName, osType, vmExtId,
- *      newAdminPassword, hasDisks, diskCount, attachedDisks
+ * OUT: guestPassword, guestUsername, newAdminName, vmExtId, newAdminPassword,
+ *      hasDisks, diskCount, attachedDisks
+ * NEXT: item3
+ *
+ * WARNING (carried verbatim from the deployed artifact): this element logs the
+ * bootstrap username and password in clear text via System.log. Remove the two
+ * "current password"/"current admin user" System.log lines before production —
+ * see notes accompanying this sync.
  * ==========================================================================*/
-osType  = inputProperties.customProperties.osType;
 vmExtId = inputProperties.externalIds[0];
 
-if (osType.toLowerCase() == 'windows') {
-    var adminActConfigElementName = inputProperties.customProperties.adminActConfigElemName;
+var adminActConfigElementName = inputProperties.customProperties.adminActConfigElemName;
 
-    // Get the values needed to update the default admin account within the Windows guest OS
-    var configElems = Server.findAllForType("ConfigurationElement");
-    var adminActConfigElement = null;
-    for (var i = 0; i < configElems.length; i++) {
-        if (configElems[i].name == adminActConfigElementName) {
-            adminActConfigElement = configElems[i];
-            break;
-        }
+// Get the values needed to update the default admin account within the Windows guest OS
+var configElems = Server.findAllForType("ConfigurationElement");
+var adminActConfigElement = null;
+for (var i = 0; i < configElems.length; i++) {
+    if (configElems[i].name == adminActConfigElementName) {
+        adminActConfigElement = configElems[i];
+        break;
     }
-
-    guestPassword    = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminPwAttr).value;
-    guestUsername    = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminAttr).value;
-    newAdminName     = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewNameAttr).value;
-    newAdminPassword = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewPwAttr).value;
 }
+
+System.log("config element: " + adminActConfigElement)
+
+guestPassword    = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminPwAttr).value;
+guestUsername    = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminAttr).value;
+newAdminName     = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewNameAttr).value;
+newAdminPassword = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminNewPwAttr).value;
+
+System.log("current admin user: " + guestUsername)
+System.log("current password: " + guestPassword)
 
 var rawDisks = null;
 try {
@@ -79,13 +112,14 @@ if (rawDisks) {
 }
 
 System.log("Starting guest customization of VM: " + inputProperties.resourceNames[0] +
-           ", OS=" + osType.toLowerCase() + ", AdditionalDisks=" + diskCount);
+           ", AdditionalDisks=" + diskCount);
 
 
 /* ============================================================================
- * ST3 — Get VM for ID   (Scriptable Task)
+ * item3 — Get VM for ID   (Scriptable Task)
  * IN:  vmExtId
- * OUT: vm, summary, vcenter
+ * OUT: vm, vcenter
+ * NEXT: item4
  * ==========================================================================*/
 var allVMs = Server.findAllForType("VC:Virtualmachine");
 for (var i = 0; i < allVMs.length; i++) {
@@ -98,93 +132,138 @@ vcenter = vm.sdkConnection;
 
 
 /* ============================================================================
- * ST4 — Initialize Guest Ops Check Counter   (Scriptable Task)
+ * item4 — Initialize Guest Ops Check Counter   (Scriptable Task)
  * OUT: guestOpsCheckCounter
+ * NEXT: item6
  * ==========================================================================*/
 guestOpsCheckCounter = 0;
 
 
 /* ============================================================================
- * DE1 — [Decision] Guest Ops Check Threshold Exceeded
+ * item6 — Guest Ops Check Threshold Exceeded?   (Decision / custom-condition)
  * IN:  guestOpsCheckCounter, guestOpsCheckThreshold
- *   true  (counter > threshold) -> item14 (Log Readiness Error)
- *   false                        -> item21 (Get processes from guest)
+ *   true  -> item7  (Log Readiness error)
+ *   false -> item8  (Get processes from guest)
  * ==========================================================================*/
-// if (guestOpsCheckCounter > guestOpsCheckThreshold) return true; else return false;
+if (guestOpsCheckCounter > guestOpsCheckThreshold) {
+    return true;
+}
+else {
+    return false;
+}
 
 
 /* ============================================================================
- * ST5 — Log Guest Customization Readiness error   (Scriptable Task)  -> item15 (End)
+ * item7 — Log Guest Customization Readiness error   (Scriptable Task)
+ * IN:  vm
+ * NEXT: item0 (End)
  * ==========================================================================*/
 System.error("Unable to perform guest customizations on VM: " + vm.name +
     ".  VM failed to enter 'guest customization ready' state.  Please check VMware tools running status");
 
 
 /* ============================================================================
- * WF1 — Get processes from guest   (Library Workflow link)
- * IN:  vmUsername<-guestUsername, vmPassword<-guestPassword, vm<-vm
+ * item8 — Get processes from guest   (LIBRARY Workflow link)
+ * linked-workflow-id: C98080808080808080808080808080800180808001322751030482b80adf61e7c
+ * IN:  vmUsername <- guestUsername, vmPassword <- guestPassword, vm <- vm
  * OUT: result -> vmProcessList
+ * NEXT: item10
+ * (No scriptable body — standard library workflow link.)
  * ==========================================================================*/
 
 
 /* ============================================================================
- * DE2 — [Decision] VM Ready for Guest Operations?
+ * item10 — VM Ready for Guest Ops?   (Decision / custom-condition)
  * IN:  vmProcessList
- *   true  (vmProcessList.length > 0) -> item23 (Set CD-ROM Drive Letter to Y)   *** rewired ***
- *   false                            -> item16 (Sleep)
+ *   true  (vmProcessList.length > 0) -> item13 (Configure CD Drive Letter)
+ *   false                            -> item12 (Sleep)
  * ==========================================================================*/
-// if (vmProcessList.length > 0) return true; else return false;
+if (vmProcessList.length > 0){
+    return true;
+}
+else {
+    return false;
+}
 
 
 /* ============================================================================
- * S1 — Sleep   (Library) -> item17
- * IN: sleepTime <- guestCustCheckSleepSeconds
- * ============================================================================
- * item17 — Increase counter   (Library) -> item13
- * IN/OUT: counter <- guestOpsCheckCounter
+ * item12 — Sleep   (Library)
+ * IN: sleepTime <- guestOpsCheckSleep
+ * NEXT: item11
  * ==========================================================================*/
+//Auto-generated script
+if ( sleepTime !== null )  {
+    System.sleep(sleepTime * 1000);
+} else  {
+    throw "'sleepTime' is NULL";
+}
 
 
 /* ============================================================================
- * WF1 — Set CD-ROM Drive Letter to Y   (Workflow link)   *** NEW ***
- * linked-workflow-id: workflow_SetCdromDriveLetter_Windows
- * IN:  vm            <- vm
- *      guestUsername <- guestUsername     (ORIGINAL bootstrap account; pre-rename)
- *      guestPassword <- guestPassword     (ORIGINAL bootstrap password)
+ * item11 — Increase counter   (Library: increase-counter)
+ * IN/OUT: counter <- guestOpsCheckCounter ; counter -> guestOpsCheckCounter
+ * NEXT: item6  (loop back to threshold decision)
+ * ==========================================================================*/
+//Auto-generated script
+counter = counter + 1;
+
+
+/* ============================================================================
+ * item13 — Configure CD Drive Letter   (Workflow link)
+ * linked-workflow-id: 36328d1b-186d-460c-ad00-d667323d3384
+ * IN:  vm <- vm, guestUsername <- guestUsername (bootstrap, pre-rename),
+ *      guestPassword <- guestPassword (bootstrap), cdDriveLetter <- cdDriveLetter
  * OUT: executionResult -> executionResult
+ * NEXT: item14
  * ==========================================================================*/
 
 
 /* ============================================================================
- * WF2 — Rename Local Admin Account   (Workflow link)
- * IN:  newAdminName<-newAdminName, vm<-vm, osType<-osType,
- *      guestUsername<-guestUsername, guestPassword<-guestPassword, vcenter<-vcenter
+ * item14 — Rename Windows Local Admin   (Workflow link)
+ * linked-workflow-id: f0be1eb7-54c3-4be7-a41d-05de7854671d
+ * IN:  vm <- vm, guestUsername <- guestUsername, guestPassword <- guestPassword,
+ *      newAdminName <- newAdminName
  * OUT: executionResult -> executionResult
+ * NEXT: item15
  * ==========================================================================*/
 
 
 /* ============================================================================
- * WF3 — Change Local Admin Password   (Workflow link)
- * IN:  vm<-vm, osType<-osType, guestUsername<-newAdminName (post-rename),
- *      guestPassword<-guestPassword (still original pw), newPassword<-newAdminPassword,
- *      vcenter<-vcenter
- * OUT: executionResult -> executionResult                         *** rewired ***
+ * item15 — Change Local Account Password   (Workflow link)
+ * linked-workflow-id: c20a1766-1780-4fe2-a4e6-d553fc4bd1b4
+ * IN:  vm <- vm, guestUsername <- newAdminName (post-rename),
+ *      guestPassword <- guestPassword (still bootstrap pw),
+ *      newPassword <- newAdminPassword
+ * OUT: executionResult -> executionResult
+ * NEXT: item17
  * ==========================================================================*/
 
 
 /* ============================================================================
- * DE3 — [Decision] Additional Disks?                     *** NEW ***
+ * item17 — Has Data Disks?   (Decision / custom-condition)
  * IN:  hasDisks
- *   true  -> item22 (Mount Drives in Windows Guest)
- *   false -> item0  (End)
+ *   true  -> item18 (Format Disks (Windows))
+ *   false -> item16 (End)
  * ==========================================================================*/
-// if (hasDisks == true) return true; else return false;
+return hasDisks;
 
 
 /* ============================================================================
- * WF4 — Mount Drives in Windows Guest   (Workflow link)
- * IN:  vm<-vm, guestUsername<-newAdminName (post-rename),
- *      guestPassword<-newAdminPassword (post-rotation), additionalDisks<-attachedDisks
- * OUT: executionSummary -> executionSummary
- * NEXT: item0 (End)
+ * item18 — Format Disks (Windows)   (Workflow link)
+ * linked-workflow-id: 2114fa72-0162-4928-8016-3ab0002472b6
+ * IN:  vm <- vm, guestUsername <- newAdminName (post-rename),
+ *      guestPassword <- newAdminPassword (post-rotation),
+ *      additionalDisks <- attachedDisks
+ * OUT: executionSummary -> executionResult
+ * NEXT: item5 (End)
+ * ==========================================================================*/
+
+
+/* ============================================================================
+ * Terminal / housekeeping elements (no scriptable body):
+ *   item0  — End  (reached from item7)
+ *   item5  — End  (reached from item18)
+ *   item16 — End  (reached from item17 false branch)
+ *   item19 — End  (reached from item20)
+ *   item20 — User interaction  (workflow error-handler) -> item19
  * ==========================================================================*/

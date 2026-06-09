@@ -1,11 +1,19 @@
 /* ============================================================================
- * WORKFLOW: workflow_SetCdromDriveLetter_Windows
+ * WORKFLOW: Configure CD Drive Letter   (workflow_SetCdromDriveLetter_Windows)
  * MODULE:   com.broadcom.pso.vcfa.vm.guestScripting
+ * WF ID:    36328d1b-186d-460c-ad00-d667323d3384
  *
- * Child workflow. Sets the guest CD-ROM drive letter to Y: via VMware Tools.
- * Reuses actions utf8ByteLength + uploadGuestScript. Idempotent.
+ * Child workflow. Sets the guest CD-ROM drive letter (default Y:) via VMware
+ * Tools. Reuses actions utf8ByteLength + uploadGuestScript. Idempotent.
  *
- * INPUTS:  vm {VC:VirtualMachine}, guestUsername {string}, guestPassword {SecureString}
+ * Runs BEFORE the rename, so it authenticates with the bootstrap
+ * guestUsername / guestPassword.
+ *
+ * CANVAS FLOW (root = item1):
+ *   item1 (Prepare Guest Ops) -> item2 (Set CD-Rom Drive Letter) -> item0 (End)
+ *
+ * INPUTS:  vm {VC:VirtualMachine}, guestUsername {string},
+ *          guestPassword {SecureString}, cdDriveLetter {string}
  * OUTPUT:  executionResult {string}
  * ATTRIBUTES:
  *   guestAuth      {Any}
@@ -13,23 +21,20 @@
  *   fileManager    {VC:GuestFileManager}
  *   MAX_WAIT_MS    {number} = 60000
  *   POLL_MS        {number} = 2000
- *   pid            {number}
- *   curScriptPath  {string}
- *
- * CANVAS FLOW: Start -> E1 -> E2 -> End
  * ==========================================================================*/
 
 
 /* ============================================================================
- * E1 — Prepare Guest Ops   (Scriptable Task)
+ * item1 — Prepare Guest Ops   (Scriptable Task)
  * IN:  vm, guestUsername, guestPassword
- * OUT: guestAuth (any), processManager (VC:GuestProcessManager), fileManager (VC:GuestFileManager)
+ * OUT: guestAuth, processManager, fileManager
+ * NEXT: item2
  * ==========================================================================*/
 if (!vm)            throw new Error("Input 'vm' is required.");
 if (!guestUsername) throw new Error("Input 'guestUsername' is required.");
 if (!guestPassword) throw new Error("Input 'guestPassword' is required.");
 
-guestAuth          = new VcNamePasswordAuthentication();
+guestAuth = new VcNamePasswordAuthentication();
 guestAuth.username = guestUsername;
 guestAuth.password = guestPassword;
 guestAuth.interactiveSession = false;
@@ -42,9 +47,10 @@ System.log("workflow_SetCdromDriveLetter_Windows: VM = " + vm.name);
 
 
 /* ============================================================================
- * E2 — Set CD-ROM to <cdDriveLetter>:   (Scriptable Task)
- * IN:  vm, cdDriveLetter, guestAuth, processManager, fileManager, MAX_WAIT_MS, POLL_MS
- * OUT: pid, curScriptPath, executionResult
+ * item2 — Set CD-Rom Drive Letter   (Scriptable Task)
+ * IN:  cdDriveLetter, fileManager, guestAuth, MAX_WAIT_MS, POLL_MS, vm, processManager
+ * OUT: executionResult
+ * NEXT: item0 (End)
  * ==========================================================================*/
 if (!cdDriveLetter) throw new Error("Input 'cdDriveLetter' is required.");
 var cdLetter = cdDriveLetter.replace(":", "").trim().toUpperCase();
@@ -71,7 +77,7 @@ var psCdrom = [
 ].join("\r\n");
 
 var mod       = System.getModule("com.broadcom.pso.vcfa.vm.guestScripting");
-curScriptPath = "C:\\Windows\\Temp\\vcf_set_cdrom_" + cdLetter + ".ps1";
+var curScriptPath = "C:\\Windows\\Temp\\vcf_set_cdrom_" + cdLetter + ".ps1";
 
 var winFileAttr = new VcGuestWindowsFileAttributes();
 var byteLen     = mod.utf8ByteLength(psCdrom);
@@ -83,7 +89,7 @@ progSpec.programPath      = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\pow
 progSpec.arguments        = "-NonInteractive -ExecutionPolicy Bypass -File \"" + curScriptPath + "\"";
 progSpec.workingDirectory = "C:\\Windows\\Temp";
 
-pid = processManager.startProgramInGuest(vm, guestAuth, progSpec);
+var pid = processManager.startProgramInGuest(vm, guestAuth, progSpec);
 System.log("CD-ROM relabel to " + cdLetter + ": started on " + vm.name + ". PID: " + pid);
 
 var elapsed  = 0;

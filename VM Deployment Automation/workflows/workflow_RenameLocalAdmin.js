@@ -1,100 +1,80 @@
 /**
- * Workflow: workflow_RenameLocalAdmin
- * Module: com.vcf.guestcustomization
+ * Workflow: Rename Windows Local Admin   (workflow_RenameLocalAdmin)
+ * Module:   com.vcf.guestcustomization
+ * WF ID:    f0be1eb7-54c3-4be7-a41d-05de7854671d
  *
- * Canvas elements:
- *   1. Scriptable Task: validateInputs
- *   2. Decision:        isWindows
- *   3a. Scriptable Task: skipNonWindows         (FALSE branch → End)
- *   3b. Scriptable Task: uploadAndExecuteScript  (TRUE branch)
- *   4. Scriptable Task: pollForCompletion
+ * Renames the built-in Administrator account (SID -500) inside a Windows guest
+ * via VMware Tools. The password is NOT changed here, so the renamed account
+ * keeps the original password — that is the credential the password-change
+ * child consumes next.
  *
- * Workflow Inputs:
+ * CANVAS FLOW (root = item1):
+ *   item1 (Validate Inputs) -> item4 (Prepare Guest Ops)
+ *     -> item2 (Upload and Execute Script) -> item3 (Poll for Completion) -> item0 (End)
+ *
+ * WORKFLOW INPUTS:
  *   vm            {VC:VirtualMachine} - Target VM
- *   osType        {string}            - "windows" or "linux"
  *   guestUsername {string}            - Current admin username
  *   guestPassword {SecureString}      - Current admin password
  *   newAdminName  {string}            - Target administrator account name
  *
- * Workflow Outputs:
- *   executionResult {string}          - Result message
+ * WORKFLOW OUTPUT:
+ *   executionResult {string}
+ *
+ * WORKFLOW ATTRIBUTES:
+ *   pid            {number}
+ *   scriptPath     {string}
+ *   MAX_WAIT_MS    {number} = 60000
+ *   POLL_MS        {number} = 5000
+ *   guestAuth      {Any}
+ *   fileManager    {VC:GuestFileManager}
+ *   processManager {VC:GuestProcessManager}
  */
 
-// =========================================================================
-// [CANVAS ELEMENT 1 — Scriptable Task: validateInputs]
-// Inputs:
-//   vm            {VC:VirtualMachine}
-//   osType        {string}
-//   guestUsername {string}
-//   guestPassword {SecureString}
-//   newAdminName  {string}
-// Outputs:
-//   osTypeLower   {string}
-// =========================================================================
 
+// =========================================================================
+// item1 — Validate Inputs   (Scriptable Task)
+// IN : vm, guestUsername, guestPassword, newAdminName
+// NEXT: item4
+// =========================================================================
 if (!vm)            throw new Error("Input 'vm' is required.");
-if (!osType)        throw new Error("Input 'osType' is required.");
 if (!guestUsername) throw new Error("Input 'guestUsername' is required.");
 if (!guestPassword) throw new Error("Input 'guestPassword' is required.");
 if (!newAdminName)  throw new Error("Input 'newAdminName' is required.");
 
-osTypeLower = osType.toLowerCase().trim();
+System.log("workflow_RenameLocalAdmin: VM=" + vm.name + " NewName=" + newAdminName);
 
-System.log("workflow_RenameLocalAdmin: VM=" + vm.name + " OS=" + osTypeLower + " NewName=" + newAdminName);
-
-// =========================================================================
-// [CANVAS ELEMENT 2 — Decision: isWindows]
-// Condition: osTypeLower === "windows"
-//   TRUE  → uploadAndExecuteScript
-//   FALSE → skipNonWindows
-// =========================================================================
 
 // =========================================================================
-// [CANVAS ELEMENT 3a — Scriptable Task: skipNonWindows]  (FALSE branch)
-// Inputs:
-//   osTypeLower     {string}
-// Outputs:
-//   executionResult {string}
+// item4 — Prepare Guest Ops   (Scriptable Task)
+// IN : vm, guestPassword, guestUsername
+// OUT: guestAuth {Any}, fileManager {VC:GuestFileManager}, processManager {VC:GuestProcessManager}
+// NEXT: item2
+//
+// NOTE: managers resolved from vm.sdkConnection.guestOperationsManager.
 // =========================================================================
+guestAuth      = new VcNamePasswordAuthentication();
+guestAuth.username = guestUsername;
+guestAuth.password = guestPassword;
+guestAuth.interactiveSession = false;
 
-/*
-This is being removed because the parent workflow to this worklow will be evaluating the guest OS type and if !windows, this workflow will be skipped entirely.
+var guestOpsManager = vm.sdkConnection.guestOperationsManager;  // VcGuestOperationsManager
+fileManager    = guestOpsManager.fileManager;                   // VcGuestFileManager
+processManager = guestOpsManager.processManager;                // VcGuestProcessManager
 
-executionResult = "SKIPPED: workflow_RenameLocalAdmin does not run on OS type '" + osTypeLower + "'.";
-System.log(executionResult);
-*/
 
 // =========================================================================
-// [CANVAS ELEMENT 3b — Scriptable Task: uploadAndExecuteScript]  (TRUE branch)
-// Inputs:
-//   vm            {VC:VirtualMachine}
-//   guestUsername {string}
-//   guestPassword {SecureString}
-//   newAdminName  {string}
-// Outputs:
-//   pid           {number}
-//   scriptPath    {string}
+// item2 — Upload and Execute Script   (Scriptable Task)
+// IN : newAdminName, vm, processManager, fileManager, guestAuth
+// OUT: pid {number}, scriptPath {string}
+// NEXT: item3
 // =========================================================================
-
 if (!/^[a-zA-Z0-9_\-\.]{1,20}$/.test(newAdminName)) {
     throw new Error(
         "Input 'newAdminName' contains invalid characters or exceeds 20 characters. " +
         "Received: '" + newAdminName + "'"
     );
 }
-
-var guestAuth      = new VcNamePasswordAuthentication();
-guestAuth.username = guestUsername;
-guestAuth.password = guestPassword;
-
-// --- Resolve the SDK connection from the VM --- //
-var sdkConnection = vm.sdkConnection;           // VC:SdkConnection owning this VM
-if (!sdkConnection) {
-    throw new Error("Unable to resolve sdkConnection from VM '" + vm.name + "'.");
-}
-
-var guestOpsManager = sdkConnection.guestOperationsManager;  // VcGuestOperationsManager
-var fileManager     = guestOpsManager.fileManager;           // VcGuestFileManager
 
 scriptPath = "C:\\Windows\\Temp\\vcf_rename_admin.ps1";
 
@@ -112,73 +92,47 @@ var scriptContent = [
     "exit 0"
 ].join("\r\n");
 
+var mod = System.getModule("com.broadcom.pso.vcfa.vm.guestScripting");
 var winFileAttr = new VcGuestWindowsFileAttributes();
+var byteLen     = mod.utf8ByteLength(scriptContent);
 var transferUrl = fileManager.initiateFileTransferToGuest(
-    vm, guestAuth, scriptPath, winFileAttr, scriptContent.length, true
+    vm, guestAuth, scriptPath, winFileAttr, byteLen, true
 );
+mod.uploadGuestScript(vm, transferUrl, scriptContent, "RenameAdmin");
 
-var baseUrl       = transferUrl.substring(0, transferUrl.indexOf("/", 8));
-var uploadHost    = RESTHostManager.createHost("upload-RenameAdmin-" + vm.name);
-var transientHost = RESTHostManager.createTransientHostFrom(uploadHost);
-RESTHostManager.reloadConfiguration();
-transientHost.url              = baseUrl;
-transientHost.hostVerification = false;
-
-try {
-    var req = transientHost.createRequest("PUT", transferUrl, "application/octet-stream");
-    req.setContent(scriptContent);
-    var resp = req.execute();
-    if (resp.statusCode !== 200) {
-        throw new Error("Script upload failed. HTTP " + resp.statusCode + ": " + resp.contentAsString);
-    }
-    System.log("workflow_RenameLocalAdmin: Script uploaded.");
-} finally {
-    try {
-        RESTHostManager.removeHost(transientHost);
-    } catch (err) {
-        System.warn("Upload host cleanup: " + err.message);
-    }
-}
+System.log("workflow_RenameLocalAdmin: Script uploaded.");
 
 var progSpec              = new VcGuestProgramSpec();
 progSpec.programPath      = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
 progSpec.arguments        = "-NonInteractive -ExecutionPolicy Bypass -File \"" + scriptPath + "\"";
 progSpec.workingDirectory = "C:\\Windows\\Temp";
 
-var processManager = guestOpsManager.processManager;         // VcGuestProcessManager
 pid = processManager.startProgramInGuest(vm, guestAuth, progSpec);
 System.log("workflow_RenameLocalAdmin: Script started. PID: " + pid);
 
 
 // =========================================================================
-// [CANVAS ELEMENT 4 — Scriptable Task: pollForCompletion]
-// Inputs:
-//   vm            {VC:VirtualMachine}
-//   guestUsername {string}       - Original account name (for process poll)
-//   guestPassword {SecureString} - Password (unchanged at this point)
-//   newAdminName  {string}       - Renamed account name (for post-rename ops)
-//   pid           {number}
-//   scriptPath    {string}
-// Outputs:
-//   executionResult {string}
+// item3 — Poll for Completion   (Scriptable Task)
+// IN : newAdminName, pid, scriptPath, vm, POLL_MS, processManager,
+//      fileManager, guestUsername, guestPassword, MAX_WAIT_MS
+// OUT: executionResult {string}
+// NEXT: item0 (End)
+//
+// Dual-credential poll: the account NAME changes mid-flight, so the original
+// session credentials may stop authenticating once the rename commits. Try
+// originalAuth (guestUsername) first, then renamedAuth (newAdminName); the
+// password is unchanged by a rename. Poll with a null filter and match PID
+// in JS.
 // =========================================================================
-
-var MAX_WAIT_MS = 60000;
-var POLL_MS     = 5000;
-
-// --- Resolve the SDK connection from the VM (not getAllSdkConnections()[0]) ---
-var sdkConnection = vm.sdkConnection;                        // VC:SdkConnection owning this VM
-if (!sdkConnection) {
-    throw new Error("Unable to resolve sdkConnection from VM '" + vm.name + "'.");
-}
-
-var processManager = guestOpsManager.processManager;
-var fileManager     = guestOpsManager.fileManager;           // VcGuestFileManager
-
-// Poll using original credentials — process was launched under this session
 var originalAuth      = new VcNamePasswordAuthentication();
 originalAuth.username = guestUsername;
 originalAuth.password = guestPassword;
+originalAuth.interactiveSession = false;
+
+var renamedAuth      = new VcNamePasswordAuthentication();
+renamedAuth.username = newAdminName;
+renamedAuth.password = guestPassword;        // password unchanged by the rename
+renamedAuth.interactiveSession = false;
 
 var elapsed  = 0;
 var exitCode = null;
@@ -187,14 +141,27 @@ while (elapsed < MAX_WAIT_MS) {
     System.sleep(POLL_MS);
     elapsed += POLL_MS;
 
-    var pids     = new java.util.ArrayList();
-    pids.add(pid);
-    var procInfo = processManager.listProcessesInGuest(vm, originalAuth, pids);
-
-    if (procInfo && procInfo.length > 0 && procInfo[0].exitCode !== null) {
-        exitCode = procInfo[0].exitCode;
-        break;
+    var procInfo;
+    try {
+        procInfo = processManager.listProcessesInGuest(vm, originalAuth, null);
+    } catch (e1) {
+        try {
+            procInfo = processManager.listProcessesInGuest(vm, renamedAuth, null);
+        } catch (e2) {
+            throw new Error("listProcessesInGuest failed with both credentials. Original: " + e1.message + " | Renamed: " + e2.message);
+        }
     }
+
+    if (procInfo && procInfo.length > 0) {
+        for (var i = 0; i < procInfo.length; i++) {
+            if (procInfo[i].pid == pid) {
+                if (procInfo[i].exitCode !== null) { exitCode = procInfo[i].exitCode; }
+                break;
+            }
+        }
+    }
+
+    if (exitCode !== null) { break; }
     System.log("workflow_RenameLocalAdmin: Waiting... " + elapsed + "ms elapsed.");
 }
 
@@ -204,11 +171,6 @@ if (exitCode === null) {
 if (exitCode !== 0) {
     throw new Error("Script exited with code " + exitCode + " on VM: " + vm.name);
 }
-
-// Cleanup using renamed account credentials — original account no longer valid
-var renamedAuth      = new VcNamePasswordAuthentication();
-renamedAuth.username = newAdminName;
-renamedAuth.password = guestPassword;
 
 try {
     fileManager.deleteFileInGuest(vm, renamedAuth, scriptPath);
