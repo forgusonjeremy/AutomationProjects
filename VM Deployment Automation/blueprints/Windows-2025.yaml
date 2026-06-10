@@ -23,9 +23,9 @@ inputs:
     type: string
     title: VM Folder Name
     description: Name of the VM folder where the VM is to be placed.
-  vcpuCount:
+  cpuCount:
     type: integer
-    title: vCPU Count
+    title: CPU Count
     default: 2
     minimum: 1
     maximum: 64
@@ -59,11 +59,15 @@ inputs:
 resources:
   vm:
     type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
     properties:
       name: ${input.vmHostname}
       imageRef: win-2025/baseline
       customizationSpec: win-2025
-      cpuCount: ${input.vcpuCount}
+      cpuCount: ${input.cpuCount}
       totalMemoryMB: ${input.memoryGB * 1024}
       folderName: ${input.folderName}
       adminActConfigElemName: ${input.adminAcctConfigElemName}
@@ -83,6 +87,10 @@ resources:
           dnsSearchDomains: ${resource.network.dnsSearchDomains}
   network:
     type: Cloud.vSphere.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
     properties:
       networkType: existing
       constraints:

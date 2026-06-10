@@ -57,7 +57,7 @@ layout:
               signpostPosition: right-middle
         - id: section_vcpuCount
           fields:
-            - id: vcpuCount
+            - id: cpuCount
               display: integerField
               state:
                 visible: true
@@ -164,12 +164,12 @@ schema:
     type:
       dataType: string
       isMultiple: false
+    valueList:
+      id: com.broadcom.pso.vcfa.customforms/getVCenterList
+      type: scriptAction
+      parameters: []
     constraints:
       required: true
-    valueList:
-      type: scriptAction
-      id: com.broadcom.pso.vcfa.customforms/getVCenterList
-      parameters: []
   clusterName:
     label: vSphere Cluster Name
     description: Name of the vSphere cluster where the VM is to be created.
@@ -177,16 +177,16 @@ schema:
     type:
       dataType: string
       isMultiple: false
-    constraints:
-      required: true
     valueList:
-      type: scriptAction
       id: com.broadcom.pso.vcfa.customforms/getClusterList
+      type: scriptAction
       parameters:
-        - vcenterName: vcenterName
-          $type:
+        - $type:
             dataType: string
             isMultiple: false
+          vcenterName: vcenterName
+    constraints:
+      required: true
   networkName:
     label: Network Name
     description: Name of the dvPortgroup to which the VM is to be connected.
@@ -194,20 +194,20 @@ schema:
     type:
       dataType: string
       isMultiple: false
+    valueList:
+      id: com.broadcom.pso.vcfa.customforms/getNetworkList
+      type: scriptAction
+      parameters:
+        - $type:
+            dataType: string
+            isMultiple: false
+          vcenterName: vcenterName
+        - $type:
+            dataType: string
+            isMultiple: false
+          clusterName: clusterName
     constraints:
       required: true
-    valueList:
-      type: scriptAction
-      id: com.broadcom.pso.vcfa.customforms/getNetworkList
-      parameters:
-        - vcenterName: vcenterName
-          $type:
-            dataType: string
-            isMultiple: false
-        - clusterName: clusterName
-          $type:
-            dataType: string
-            isMultiple: false
   folderName:
     label: VM Folder Name
     description: Name of the VM folder where the VM is to be placed.
@@ -215,18 +215,18 @@ schema:
     type:
       dataType: string
       isMultiple: false
-    constraints:
-      required: true
     valueList:
-      type: scriptAction
       id: com.broadcom.pso.vcfa.customforms/getFolderList
+      type: scriptAction
       parameters:
-        - vcenterName: vcenterName
-          $type:
+        - $type:
             dataType: string
             isMultiple: false
-  vcpuCount:
-    label: vCPU Count
+          vcenterName: vcenterName
+    constraints:
+      required: true
+  cpuCount:
+    label: CPU Count
     type:
       dataType: integer
       isMultiple: false

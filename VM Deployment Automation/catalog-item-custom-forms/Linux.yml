@@ -55,6 +55,14 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
+        - id: section_04165e03
+          fields:
+            - id: osVersion
+              display: dropDown
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
         - id: section_vcpuCount
           fields:
             - id: cpuCount
@@ -71,60 +79,15 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_e6d89a32
+        - id: section_3053b54e
           fields:
-            - id: dataDisks
-              display: datagrid
+            - id: isoPath
+              display: dropDown
               state:
                 visible: true
                 read-only: false
-                hidden-fields: []
               signpostPosition: right-middle
       title: General
-    - id: page_7e3a3faa
-      sections:
-        - id: section_fc41d381
-          fields:
-            - id: adminAcctConfigElemName
-              display: textField
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_45c4d162
-          fields:
-            - id: defaultAdminNameAttrName
-              display: textField
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_92fae8f9
-          fields:
-            - id: defaultAdminPasswordAttrName
-              display: textField
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_4391fbc3
-          fields:
-            - id: defaultAdminNewNameAttrName
-              display: textField
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_6ed7c0e0
-          fields:
-            - id: defaultAdminNewPasswordAttrName
-              display: textField
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-      title: Hidden Inputs
-      state: {}
 schema:
   project:
     label: Project
@@ -234,6 +197,20 @@ schema:
           vcenterName: vcenterName
     constraints:
       required: true
+  osVersion:
+    label: OS Version
+    description: Linux OS version / image to deploy
+    signpost: Linux OS version / image to deploy
+    type:
+      dataType: string
+      isMultiple: false
+    valueList:
+      - value: centos
+        label: centos
+      - value: ubuntu
+        label: ubuntu
+    constraints:
+      required: true
   cpuCount:
     label: CPU Count
     type:
@@ -252,137 +229,31 @@ schema:
     constraints:
       min-value: 1
       max-value: 512
-  dataDisks:
-    label: Additional Data Disks
-    description: One entry per additional disk. Choose a size and a SCSI controller.
-    signpost: One entry per additional disk. Choose a size and a SCSI controller.
+  isoPath:
+    label: ISO Image
+    description: >-
+      ISO to attach and boot from. List is sourced from all datastores reachable
+      by the selected cluster's hosts, sorted by datastore, folder, then file.
+      Value is the full datastore path, e.g. "[ds-iso] ISOs/rhel9.iso".
+    signpost: >-
+      ISO to attach and boot from. List is sourced from all datastores reachable
+      by the selected cluster's hosts, sorted by datastore, folder, then file.
+      Value is the full datastore path, e.g. "[ds-iso] ISOs/rhel9.iso".
     type:
-      dataType: complex
-      fields:
-        - label: Size (GB)
-          type:
-            dataType: integer
-            isMultiple: false
-          constraints:
-            min-value: 1
-          id: sizeGb
-        - label: SCSI Controller
-          type:
+      dataType: string
+      isMultiple: false
+    valueList:
+      id: com.broadcom.pso.vcfa.customforms/getIsoList
+      type: dynamic
+      parameters:
+        - $type:
             dataType: string
             isMultiple: false
-          default: SCSI_Controller_1
-          valueList:
-            - value: SCSI_Controller_1
-              label: SCSI_Controller_1
-            - value: SCSI_Controller_2
-              label: SCSI_Controller_2
-            - value: SCSI_Controller_3
-              label: SCSI_Controller_3
-          id: SCSIController
-        - label: driveLetter
-          description: Single letter E through Z
-          type:
+          vcenterName: vcenterName
+        - $type:
             dataType: string
             isMultiple: false
-          constraints:
-            pattern:
-              value: ^[E-XZ]$
-              message: >-
-                Constraint Description: must be compliant with ^[E-XZ]$ regular
-                expression.
-          id: driveLetter
-        - label: driveLabel
-          type:
-            dataType: string
-            isMultiple: false
-          id: driveLabel
-        - label: provisionType
-          type:
-            dataType: string
-            isMultiple: false
-          valueList:
-            - value: thin
-              label: thin
-            - value: thick
-              label: thick
-            - value: eagerZeroedThick
-              label: eagerZeroedThick
-          id: provisionType
-      isMultiple: true
-    constraints:
-      required: true
-      min-value: 1
-      max-value: 10
-  adminAcctConfigElemName:
-    label: Local Admin Configuration Element Name
-    description: >-
-      Name of the configuration element in Orchestrator containing the
-      administrator account information used in updating the local admin account
-      username and password
-    signpost: >-
-      Name of the configuration element in Orchestrator containing the
-      administrator account information used in updating the local admin account
-      username and password
-    type:
-      dataType: string
-      isMultiple: false
-    default: Windows Guest Admin Account Info
-    constraints:
-      required: true
-  defaultAdminNameAttrName:
-    label: Default Admin Name Attribute Name
-    description: >-
-      Name of configuration element attribute containing the default
-      administrator account name
-    signpost: >-
-      Name of configuration element attribute containing the default
-      administrator account name
-    type:
-      dataType: string
-      isMultiple: false
-    default: defaultAdminName
-    constraints:
-      required: true
-  defaultAdminPasswordAttrName:
-    label: Default Admin Password Attribute Name
-    description: >-
-      Name of the configuration element attribute containing the default
-      administrator account password
-    signpost: >-
-      Name of the configuration element attribute containing the default
-      administrator account password
-    type:
-      dataType: string
-      isMultiple: false
-    default: defaultAdminPassword
-    constraints:
-      required: true
-  defaultAdminNewNameAttrName:
-    label: New Default Admin Name Attribute Name
-    description: >-
-      Name of the configuration element attribute containing the new default
-      admin name
-    signpost: >-
-      Name of the configuration element attribute containing the new default
-      admin name
-    type:
-      dataType: string
-      isMultiple: false
-    default: newDefaultAdminName
-    constraints:
-      required: true
-  defaultAdminNewPasswordAttrName:
-    label: New Default Admin Password Attribute Name
-    description: >-
-      Name of the configuration element attribute containing the new password
-      for the default admin account
-    signpost: >-
-      Name of the configuration element attribute containing the new password
-      for the default admin account
-    type:
-      dataType: string
-      isMultiple: false
-    default: newDefaultAdminPassword
+          clusterName: clusterName
     constraints:
       required: true
 options:

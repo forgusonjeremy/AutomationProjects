@@ -1,0 +1,94 @@
+# ============================================================================
+#  VCFA Cloud Template: Linux Shell VM (ISO attach)
+# ----------------------------------------------------------------------------
+#  Mirrors the Windows zero-disk template inputs and adds one input: isoPath,
+#  a dynamic dropdown driven by the getIsoList custom-form action (keyed on the
+#  selected cluster, exactly as VM Network is). The selected value is the FULL
+#  datastore path of the ISO and is passed through to the
+#  compute.provision.post "Attach ISO to Linux VM" workflow as a custom property.
+#
+#  Placeholder tokens (document-level, same convention as Windows):
+#    {{VM_CPU_MIN}}, {{VM_CPU_MAX}}, {{VM_MEMORY_MIN_GB}}, {{VM_MEMORY_MAX_GB}}
+#
+#  LAB vs PROD switchover (unchanged from Windows guidance):
+#    - imageRef: (linked clone, lab)  ->  image: (full clone, prod)
+#    - getClusterList resource-pool vs cluster resolution handled in the action
+# ============================================================================
+formatVersion: 1
+inputs:
+  vmHostname:
+    type: string
+    title: VM Hostname
+    description: VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars (Windows NetBIOS).
+    minLength: 1
+    maxLength: 15
+    pattern: ^[a-zA-Z0-9\-]+$
+  vcenterName:
+    type: string
+    title: vCenter to which to deploy the VM
+    description: Name of the vCenter server where the VM will be deployed
+  clusterName:
+    type: string
+    title: vSphere Cluster Name
+    description: Name of the vSphere cluster where the VM is to be created.
+  networkName:
+    type: string
+    title: Network Name
+    description: Name of the dvPortgroup to which the VM is to be connected.
+  folderName:
+    type: string
+    title: VM Folder Name
+    description: Name of the VM folder where the VM is to be placed.
+  cpuCount:
+    type: integer
+    title: CPU Count
+    default: 2
+    minimum: 1
+    maximum: 64
+  memoryGB:
+    type: integer
+    title: Memory (GB)
+    default: 4
+    minimum: 1
+    maximum: 512
+  osVersion:
+    type: string
+    title: OS Version
+    description: Linux OS version / image to deploy
+    enum:
+      - centos
+      - ubuntu
+  isoPath:
+    type: string
+    title: ISO Image
+    description: ISO to attach and boot from. List is sourced from all datastores reachable by the selected cluster's hosts, sorted by datastore, folder, then file. Value is the full datastore path, e.g. "[ds-iso] ISOs/rhel9.iso".
+    $dynamicEnum: /data/vco/actions/com.broadcom.pso.vcfa.customForms/getIsoList
+resources:
+  LinuxVM:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      imageRef: ${input.osVersion}/baseline
+      cpuCount: ${input.cpuCount}
+      totalMemoryMB: ${input.memoryGB * 1024}
+      folderName: ${input.folderName}
+      isoPath: ${input.isoPath}
+      osType: linux
+      constraints:
+        - tag: clusterName:${input.clusterName}
+      networks:
+        - network: ${resource.network.id}
+          assignment: static
+  network:
+    type: Cloud.vSphere.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: networkName:${input.networkName}
