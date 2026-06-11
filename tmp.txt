@@ -1,186 +1,206 @@
-root [ /home/vmware-system-user ]# find / -name '*.conf' -path '*kube*' ! -size 0 2>/dev/null
-/etc/modules-load.d/kubernetes.conf
-/etc/systemd/system/kubelet.service.d/11-resource-sizing.conf
-/etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-/etc/kubernetes/node-agent.conf
-/etc/kubernetes/kubelet.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/a5b9fc578509e37933fe3ff7bee832aca84dfff3badbd57b2cd5213f93a5f5b9/globalmount/pgroot/data/postgresql.auto.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/a5b9fc578509e37933fe3ff7bee832aca84dfff3badbd57b2cd5213f93a5f5b9/globalmount/pgroot/data/pg_hba.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/a5b9fc578509e37933fe3ff7bee832aca84dfff3badbd57b2cd5213f93a5f5b9/globalmount/pgroot/data/pg_ident.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/a5b9fc578509e37933fe3ff7bee832aca84dfff3badbd57b2cd5213f93a5f5b9/globalmount/pgroot/data/postgresql.base.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/a5b9fc578509e37933fe3ff7bee832aca84dfff3badbd57b2cd5213f93a5f5b9/globalmount/pgroot/data/postgresql.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/e7b78805817d320169693f8452b918ca7763cd982349ba5dd2fc27b70a437325/globalmount/pgroot/data/postgresql.auto.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/e7b78805817d320169693f8452b918ca7763cd982349ba5dd2fc27b70a437325/globalmount/pgroot/data/pg_hba.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/e7b78805817d320169693f8452b918ca7763cd982349ba5dd2fc27b70a437325/globalmount/pgroot/data/pg_ident.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/e7b78805817d320169693f8452b918ca7763cd982349ba5dd2fc27b70a437325/globalmount/pgroot/data/postgresql.base.conf
-/var/lib/kubelet/plugins/kubernetes.io/csi/csi.vsphere.vmware.com/e7b78805817d320169693f8452b918ca7763cd982349ba5dd2fc27b70a437325/globalmount/pgroot/data/postgresql.conf
-/var/lib/kubelet/pods/3f1000bc-9515-41d7-987a-223efa8a4040/volumes/kubernetes.io~secret/config/fluent-bit.conf
-/var/lib/kubelet/pods/3f1000bc-9515-41d7-987a-223efa8a4040/volumes/kubernetes.io~secret/config/..2026_06_10_17_30_40.2752445950/fluent-bit.conf
-/var/lib/kubelet/pods/3d59344e-2f13-4132-8c83-6d1d049a25df/volumes/kubernetes.io~configmap/kube-proxy/..2026_06_10_17_13_46.1470390212/kubeconfig.conf
-/var/lib/kubelet/pods/3d59344e-2f13-4132-8c83-6d1d049a25df/volumes/kubernetes.io~configmap/kube-proxy/..2026_06_10_17_13_46.1470390212/config.conf
-/var/lib/kubelet/pods/3d59344e-2f13-4132-8c83-6d1d049a25df/volumes/kubernetes.io~configmap/kube-proxy/kubeconfig.conf
-/var/lib/kubelet/pods/3d59344e-2f13-4132-8c83-6d1d049a25df/volumes/kubernetes.io~configmap/kube-proxy/config.conf
-/var/lib/kubelet/pods/6b085969-c13a-48ed-a42e-74539164780f/volumes/kubernetes.io~secret/config/fluent-bit.conf
-/var/lib/kubelet/pods/6b085969-c13a-48ed-a42e-74539164780f/volumes/kubernetes.io~secret/config/..2026_06_10_17_30_29.3076913400/fluent-bit.conf
-/var/lib/kubelet/pods/38727543-56ac-41f0-871b-8440ed615454/volumes/kubernetes.io~secret/config/fluent-bit.conf
-/var/lib/kubelet/pods/38727543-56ac-41f0-871b-8440ed615454/volumes/kubernetes.io~secret/config/..2026_06_10_17_30_39.829718116/fluent-bit.conf
-/var/lib/kubelet/pods/de94ea7a-881a-48eb-a5de-3a393a9c9979/volumes/kubernetes.io~csi/pvc-cb0356b2-dbed-471f-bfde-a910e6c63284/mount/pgroot/data/postgresql.auto.conf
-/var/lib/kubelet/pods/de94ea7a-881a-48eb-a5de-3a393a9c9979/volumes/kubernetes.io~csi/pvc-cb0356b2-dbed-471f-bfde-a910e6c63284/mount/pgroot/data/pg_hba.conf
-/var/lib/kubelet/pods/de94ea7a-881a-48eb-a5de-3a393a9c9979/volumes/kubernetes.io~csi/pvc-cb0356b2-dbed-471f-bfde-a910e6c63284/mount/pgroot/data/pg_ident.conf
-/var/lib/kubelet/pods/de94ea7a-881a-48eb-a5de-3a393a9c9979/volumes/kubernetes.io~csi/pvc-cb0356b2-dbed-471f-bfde-a910e6c63284/mount/pgroot/data/postgresql.base.conf
-/var/lib/kubelet/pods/de94ea7a-881a-48eb-a5de-3a393a9c9979/volumes/kubernetes.io~csi/pvc-cb0356b2-dbed-471f-bfde-a910e6c63284/mount/pgroot/data/postgresql.conf
-/var/lib/kubelet/pods/ce4624cc-d04e-4775-9dba-2033be1ea159/volumes/kubernetes.io~configmap/antrea-config/..2026_06_10_17_13_46.3545096190/antrea-agent.conf
-/var/lib/kubelet/pods/ce4624cc-d04e-4775-9dba-2033be1ea159/volumes/kubernetes.io~configmap/antrea-config/..2026_06_10_17_13_46.3545096190/antrea-controller.conf
-/var/lib/kubelet/pods/ce4624cc-d04e-4775-9dba-2033be1ea159/volumes/kubernetes.io~configmap/antrea-config/antrea-agent.conf
-/var/lib/kubelet/pods/ce4624cc-d04e-4775-9dba-2033be1ea159/volumes/kubernetes.io~configmap/antrea-config/antrea-controller.conf
-/var/lib/kubelet/pods/7b7a56bb-8875-44c8-a8ba-976e7b390436/volumes/kubernetes.io~csi/pvc-1c4b211d-2c65-455e-b382-803e4a31ca5d/mount/pgroot/data/postgresql.auto.conf
-/var/lib/kubelet/pods/7b7a56bb-8875-44c8-a8ba-976e7b390436/volumes/kubernetes.io~csi/pvc-1c4b211d-2c65-455e-b382-803e4a31ca5d/mount/pgroot/data/pg_hba.conf
-/var/lib/kubelet/pods/7b7a56bb-8875-44c8-a8ba-976e7b390436/volumes/kubernetes.io~csi/pvc-1c4b211d-2c65-455e-b382-803e4a31ca5d/mount/pgroot/data/pg_ident.conf
-/var/lib/kubelet/pods/7b7a56bb-8875-44c8-a8ba-976e7b390436/volumes/kubernetes.io~csi/pvc-1c4b211d-2c65-455e-b382-803e4a31ca5d/mount/pgroot/data/postgresql.base.conf
-/var/lib/kubelet/pods/7b7a56bb-8875-44c8-a8ba-976e7b390436/volumes/kubernetes.io~csi/pvc-1c4b211d-2c65-455e-b382-803e4a31ca5d/mount/pgroot/data/postgresql.conf
-/var/lib/kubelet/pods/7edc6c44-c292-4432-a00c-bfff0a90f24a/volumes/kubernetes.io~configmap/config/..2026_06_10_17_30_36.657905415/fluent-bit.conf
-/var/lib/kubelet/pods/7edc6c44-c292-4432-a00c-bfff0a90f24a/volumes/kubernetes.io~configmap/config/fluent-bit.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/config/input.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/config/fluentlog.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/config/fluent.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/config/devnull.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/config/..2026_06_10_18_29_27.340365334/fluentlog.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/config/..2026_06_10_18_29_27.340365334/fluent.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/config/..2026_06_10_18_29_27.340365334/devnull.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/config/..2026_06_10_18_29_27.340365334/input.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/app-config/..2026_06_10_20_43_09.1675521273/fluentd.conf
-/var/lib/kubelet/pods/43d7cc1e-7c03-4b20-a321-9be5038c784a/volumes/kubernetes.io~secret/app-config/fluentd.conf
-/run/systemd/transient/kubepods-pod243fb2c5_8c7f_4fa2_b5d2_69ec2c25a267.slice.d/50-CPUQuota.conf
-/run/systemd/transient/kubepods-pod243fb2c5_8c7f_4fa2_b5d2_69ec2c25a267.slice.d/50-CPUQuotaPeriodSec.conf
-/run/systemd/transient/kubepods-pod243fb2c5_8c7f_4fa2_b5d2_69ec2c25a267.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-pod243fb2c5_8c7f_4fa2_b5d2_69ec2c25a267.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod43d7cc1e_7c03_4b20_a321_9be5038c784a.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod6ed3d4ea_f9fd_441a_976d_02660fe68962.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod6ed3d4ea_f9fd_441a_976d_02660fe68962.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod04b38685_9d5e_4deb_a1e0_cc006f7ab14a.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod04b38685_9d5e_4deb_a1e0_cc006f7ab14a.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-poda9ae0407_1ee0_4c05_b40f_1278c802501c.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-poda9ae0407_1ee0_4c05_b40f_1278c802501c.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod59d6c5ee_c11c_41e3_85af_1893128d3ba4.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod59d6c5ee_c11c_41e3_85af_1893128d3ba4.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod7b7a56bb_8875_44c8_a8ba_976e7b390436.slice.d/50-CPUQuota.conf
-/run/systemd/transient/kubepods-burstable-pod7b7a56bb_8875_44c8_a8ba_976e7b390436.slice.d/50-CPUQuotaPeriodSec.conf
-/run/systemd/transient/kubepods-burstable-pod7b7a56bb_8875_44c8_a8ba_976e7b390436.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod7b7a56bb_8875_44c8_a8ba_976e7b390436.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-podde94ea7a_881a_48eb_a5de_3a393a9c9979.slice.d/50-CPUQuota.conf
-/run/systemd/transient/kubepods-burstable-podde94ea7a_881a_48eb_a5de_3a393a9c9979.slice.d/50-CPUQuotaPeriodSec.conf
-/run/systemd/transient/kubepods-burstable-podde94ea7a_881a_48eb_a5de_3a393a9c9979.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podde94ea7a_881a_48eb_a5de_3a393a9c9979.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod0573265c_86dc_44bd_9794_61a167e4cd0a.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod0573265c_86dc_44bd_9794_61a167e4cd0a.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod8fd7e056_8fd6_45d6_9339_59e6dd7cc93e.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod8fd7e056_8fd6_45d6_9339_59e6dd7cc93e.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod3f1000bc_9515_41d7_987a_223efa8a4040.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod3f1000bc_9515_41d7_987a_223efa8a4040.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod38727543_56ac_41f0_871b_8440ed615454.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod38727543_56ac_41f0_871b_8440ed615454.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-podae27fff0_5559_4915_97da_1f10b8188753.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podd435f897_fdf3_4cc3_95c9_1b8fda8513de.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podd435f897_fdf3_4cc3_95c9_1b8fda8513de.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-podd341a873_84fb_41f8_ab13_9e9107eb9c83.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podd341a873_84fb_41f8_ab13_9e9107eb9c83.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod8ac4af80_ce67_4d19_8e02_1b664eb546b6.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod8ac4af80_ce67_4d19_8e02_1b664eb546b6.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod7edc6c44_c292_4432_a00c_bfff0a90f24a.slice.d/50-CPUQuota.conf
-/run/systemd/transient/kubepods-burstable-pod7edc6c44_c292_4432_a00c_bfff0a90f24a.slice.d/50-CPUQuotaPeriodSec.conf
-/run/systemd/transient/kubepods-burstable-pod7edc6c44_c292_4432_a00c_bfff0a90f24a.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod7edc6c44_c292_4432_a00c_bfff0a90f24a.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-poda4d0e1d4_fc94_431a_a048_6e553d25c1c0.slice.d/50-CPUQuota.conf
-/run/systemd/transient/kubepods-burstable-poda4d0e1d4_fc94_431a_a048_6e553d25c1c0.slice.d/50-CPUQuotaPeriodSec.conf
-/run/systemd/transient/kubepods-burstable-poda4d0e1d4_fc94_431a_a048_6e553d25c1c0.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-poda4d0e1d4_fc94_431a_a048_6e553d25c1c0.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod6b085969_c13a_48ed_a42e_74539164780f.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod6b085969_c13a_48ed_a42e_74539164780f.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod698ebdee_1d27_45ca_b616_418897d6e3e7.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod698ebdee_1d27_45ca_b616_418897d6e3e7.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pode1a8b9d8_19e6_4aa2_a744_d90da9379a46.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pode1a8b9d8_19e6_4aa2_a744_d90da9379a46.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-podd75463b5_a95f_4711_a439_033deb390f81.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podd75463b5_a95f_4711_a439_033deb390f81.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-poddf7c22d7_ee67_4b46_9402_a210fc36ff7d.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-poddf7c22d7_ee67_4b46_9402_a210fc36ff7d.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pode555d5a0_8a3e_4e3c_ba25_b6beab4b8412.slice.d/50-CPUQuota.conf
-/run/systemd/transient/kubepods-burstable-pode555d5a0_8a3e_4e3c_ba25_b6beab4b8412.slice.d/50-CPUQuotaPeriodSec.conf
-/run/systemd/transient/kubepods-burstable-pode555d5a0_8a3e_4e3c_ba25_b6beab4b8412.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pode555d5a0_8a3e_4e3c_ba25_b6beab4b8412.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod92470964_74ea_4a99_a15b_39b73ff70f8f.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod05ad20d3_5286_4609_b075_adf47c104fdc.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod0221cf9e_7d6c_4433_9e28_366cba264f07.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod2c9ca474_12a6_494b_857f_00e9d79873ed.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod5dea4310_00cd_4075_a057_1d4fd21d63ec.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod5dea4310_00cd_4075_a057_1d4fd21d63ec.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod868a3cb7_4a0c_478a_85fc_2dc60efdcb5e.slice.d/50-CPUQuota.conf
-/run/systemd/transient/kubepods-burstable-pod868a3cb7_4a0c_478a_85fc_2dc60efdcb5e.slice.d/50-CPUQuotaPeriodSec.conf
-/run/systemd/transient/kubepods-burstable-pod868a3cb7_4a0c_478a_85fc_2dc60efdcb5e.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod868a3cb7_4a0c_478a_85fc_2dc60efdcb5e.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod74064b71_a71b_48c2_9fce_acdaadc94543.slice.d/50-CPUQuota.conf
-/run/systemd/transient/kubepods-burstable-pod74064b71_a71b_48c2_9fce_acdaadc94543.slice.d/50-CPUQuotaPeriodSec.conf
-/run/systemd/transient/kubepods-burstable-pod74064b71_a71b_48c2_9fce_acdaadc94543.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod74064b71_a71b_48c2_9fce_acdaadc94543.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-besteffort-podbb014aee_afd0_45c2_86b1_31fc45a76b42.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod9ad94fc8_c6de_404b_b5bd_e9c59bc37731.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod9ad94fc8_c6de_404b_b5bd_e9c59bc37731.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-pod0dbcfbbf_1c1d_4a6a_b5f9_d795aa60a99e.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-pod0dbcfbbf_1c1d_4a6a_b5f9_d795aa60a99e.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-podea28e2fa_1fd7_4c51_9be8_8cf5062b9e38.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podea28e2fa_1fd7_4c51_9be8_8cf5062b9e38.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-burstable-podca1adc9c_3ac2_457f_becf_a673b1566092.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podca1adc9c_3ac2_457f_becf_a673b1566092.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-besteffort-pode477d681_3d12_4004_9f3a_d0d4b29b2f43.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podf8c8cab5_faf8_463f_b2fd_c2ffae3a0fd4.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podf8c8cab5_faf8_463f_b2fd_c2ffae3a0fd4.slice.d/50-MemoryMax.conf
-/run/systemd/transient/kubepods-besteffort-pod3d59344e_2f13_4132_8c83_6d1d049a25df.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable-podce4624cc_d04e_4775_9dba_2033be1ea159.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-burstable.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods-besteffort.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods.slice.d/50-AllowedCPUs.conf
-/run/systemd/transient/kubepods.slice.d/50-TasksMax.conf
-/run/systemd/transient/kubepods.slice.d/50-CPUWeight.conf
-/run/systemd/transient/kubepods.slice.d/50-MemoryMax.conf
-root [ /home/vmware-system-user ]# find / -name 'kubeconfig' ! -size 0 2>/dev/null
-root [ /home/vmware-system-user ]# ls -la /etc/kubernetes/
-total 28
-drwxr-xr-x   5 root root 4096 Jun 10 17:18 .
-drwxr-xr-x. 61 root root 4096 Jun 11 22:18 ..
--rw-r--r--   1 root root    0 Jun 10 17:15 admin.conf
--rw-------   1 root root 1899 Jun 10 17:13 kubelet.conf
-drwxr-xr-x   2 root root 4096 Nov 15  2025 manifests
--rw-r--r--   1 root root 1794 Jun 10 17:18 node-agent.conf
-drwxr-xr-x   2 root root 4096 Apr 18 19:32 patches
-drwxr-xr-x   2 root root 4096 Jun 10 17:13 pki
-root [ /home/vmware-system-user ]# ls -la /var/lib/kubelet/
-total 104
-drwx------   9 root root  4096 Jun 11 22:26 .
-drwxr-xr-x. 28 root root  4096 Jun 11 03:43 ..
--rw-------   1 root root 18466 Jun 11 22:26 actuated_pods_state
--rw-------   1 root root 15696 Jun 11 22:26 allocated_pods_state
-drwx------   2 root root  4096 Jun 10 17:13 checkpoints
--rw-r--r--   1 root root  1166 Jun 10 17:13 config.yaml
--rw-------   1 root root    62 Jun 10 17:13 cpu_manager_state
-drwxr-xr-x   2 root root  4096 Jun 10 17:13 device-plugins
--rw-------   1 root root   139 Jun 11 22:26 dra_manager_state
--rw-r--r--   1 root root    71 Jun 10 17:13 instance-config.yaml
--rw-r--r--   1 root root   713 Jun 10 17:13 kubeadm-flags.env
--rw-------   1 root root    61 Jun 10 17:13 memory_manager_state
-drwxr-xr-x   2 root root  4096 Jun 10 17:13 pki
-drwxr-x---   4 root root  4096 Jun 10 17:19 plugins
-drwxr-x---   2 root root  4096 Jun 10 17:14 plugins_registry
-drwxr-x---   2 root root  4096 Jun 10 17:13 pod-resources
-drwxr-x---  77 root root 12288 Jun 11 22:26 pods
-root [ /home/vmware-system-user ]# grep -i kubeconfig /etc/systemd/system/kubelet.service.d/*.conf /var/lib/kubelet/kubeadm-flags.env 2>/dev/null
-/etc/systemd/system/kubelet.service.d/10-kubeadm.conf:Environment="KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf"
-/etc/systemd/system/kubelet.service.d/10-kubeadm.conf:ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
-root [ /home/vmware-system-user ]# cat /etc/kubernetes/kubelet.conf 2>/dev/null | grep -iE 'server|certificate'
-    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM2akNDQWRLZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJMk1EWXhNREUzTURVek0xb1hEVE0yTURZd056RTNNVEF6TTFvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTE5DClhjT29RNGNmc2NIQ3JDbURRNGRQNFJzOGx6cGgvQldMUG8rUmFjTlFKcXVHZFJTRWVvMThsNHpmd2NtSE1xMVMKMmdjL2xwVGE3dlNDNGtCTWNaQnpQZC93MXJsd01STWN1dEsxcE1STXpMVlRIL0cyOWpuNTgwMjZHOHFRZEZZawpHSGFIelNBVDl6bWVBSEk1eVN6b2w3cmw1UWtCQVRMYkU0UEZ2WHdkQlFiNU9VY0toSCsyVU1VRlAzUjF1N2szCktJamJEamZvVERFMnVJS2RBZUQ4RXRrQ1RZWDN6OFFEY1h3UE9BMlF5eFUydk1zNmFrYkh0dlJEcEx5ZTRlUloKMmpkWFgwMmR0ZmxBZ3VkL3NnS0gzK2xIeTBWb0hYWTVtSmtmWlRTb1pqcGdWalhKenNkYmpnWHlyRkN0NTk5ZwpVRlp6QnRIeGJKSy9VajF1RGljQ0F3RUFBYU5GTUVNd0RnWURWUjBQQVFIL0JBUURBZ0trTUJJR0ExVWRFd0VCCi93UUlNQVlCQWY4Q0FRQXdIUVlEVlIwT0JCWUVGQUxnRVZ5ek9mSEdQNmhmS2FqNEhFaFMrN3FvTUEwR0NTcUcKU0liM0RRRUJDd1VBQTRJQkFRQ1VUVmdYMVlkNzl1dUp3RGRnbEVvZDREaXF3ZEh4MExqRG12YmhqQ3VqamhFVApOQlJwR05BUkQyNjNHb211RW9zUW5MeEZQN3dyeHJkM3F3bEpreUZPSi85ZW11K1lPZ3dieTdOZDA3SmQ2NUhUCklzQTZObm04TXQ0QkwrbVBvSDU1cUJCL1J3MTBYWUpnMkJCQWNTWEltUVhEZjFIQUxOSEI0TDJGZnVUNHZOWWcKdm9ub244ckh0VVVBbVpjTjdXRDRFTDZVWVAwZU5Nckp0b045VDFGcnE1RlNHd2tNdEVsdmV2ZVVmRDFoMzFscAoySnhYOUFPT0xRRm9YV2VnODBQTWdJNDhEZFlzVklLU0M1U3BiVFExdmxXNDl1QURoNUJYU2ZiMkZBSzVkblhxCllUdDlDdmVuVUpWYWIyMmQ1Ulc2NHpYcnJmOXIrd2tBYnNrS2piRnAKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
-    server: https://10.111.101.162:6443
-    client-certificate: /var/lib/kubelet/pki/kubelet-client-current.pem
-root [ /home/vmware-system-user ]# ls -la /etc/kubernetes/manifests/
-total 8
-drwxr-xr-x 2 root root 4096 Nov 15  2025 .
-drwxr-xr-x 5 root root 4096 Jun 10 17:18 ..
+root [ /home/vmware-system-user ]# kubectl get pods -A | grep -iE 'vidb|migrat|backup'
+root [ /home/vmware-system-user ]# kubectl get jobs -A | grep -iE 'vidb|backup'
+root [ /home/vmware-system-user ]# kubectl get pods -A
+NAMESPACE         NAME                                                                               READY   STATUS      RESTARTS      AGE
+kube-system       antrea-agent-5gqnx                                                                 2/2     Running     3 (29h ago)   29h
+kube-system       antrea-agent-lx2c2                                                                 2/2     Running     0             29h
+kube-system       antrea-agent-ps7pz                                                                 2/2     Running     2 (29h ago)   29h
+kube-system       antrea-agent-ws6xc                                                                 2/2     Running     3 (29h ago)   29h
+kube-system       antrea-controller-78975945b4-tfdk8                                                 1/1     Running     0             29h
+kube-system       coredns-5496b74c4-krb26                                                            1/1     Running     0             26h
+kube-system       coredns-5496b74c4-xt4nx                                                            1/1     Running     0             29h
+kube-system       etcd-cvsd26vcfmgt-vlwh7                                                            1/1     Running     0             29h
+kube-system       kube-apiserver-cvsd26vcfmgt-vlwh7                                                  1/1     Running     0             29h
+kube-system       kube-controller-manager-cvsd26vcfmgt-vlwh7                                         1/1     Running     0             29h
+kube-system       kube-proxy-2mr8w                                                                   1/1     Running     0             29h
+kube-system       kube-proxy-djz92                                                                   1/1     Running     0             29h
+kube-system       kube-proxy-tnnxb                                                                   1/1     Running     0             29h
+kube-system       kube-proxy-xvm8p                                                                   1/1     Running     0             29h
+kube-system       kube-scheduler-cvsd26vcfmgt-vlwh7                                                  1/1     Running     0             29h
+kube-system       kube-vip-cvsd26vcfmgt-vlwh7                                                        1/1     Running     0             29h
+kube-system       vsphere-cpi-2v5qr                                                                  1/1     Running     0             29h
+kube-system       vsphere-csi-controller-c8679dbc5-l264v                                             6/6     Running     0             29h
+kube-system       vsphere-csi-node-4dv9v                                                             3/3     Running     3 (29h ago)   29h
+kube-system       vsphere-csi-node-d76z6                                                             3/3     Running     1 (29h ago)   29h
+kube-system       vsphere-csi-node-mh8w2                                                             3/3     Running     4 (29h ago)   29h
+kube-system       vsphere-csi-node-r7c7n                                                             3/3     Running     2 (29h ago)   29h
+salt-raas         pgdatabase-0                                                                       3/3     Running     0             26h
+salt-raas         raas-5d5676b59c-vwtxg                                                              1/1     Running     0             26h
+salt-raas         redis-b595c9d44-f8ktc                                                              1/1     Running     0             26h
+salt              salt-master-589445c9fc-5v6v2                                                       1/1     Running     0             25h
+salt              salt-minion-b677f7c65-5b4nq                                                        1/1     Running     0             24h
+telemetry         telemetry-acceptor-6bbb64b66f-mnqzs                                                1/1     Running     0             26h
+vcf-fleet-depot   depot-service-6b65d47655-62hxl                                                     3/3     Running     0             28h
+vcf-fleet-depot   distribution-service-86cf6456df-dmpvg                                              1/1     Running     0             28h
+vcf-fleet-lcm     vcf-fleet-build-service-fleetbuild-7d866fff97-mn4td                                1/1     Running     0             28h
+vcf-fleet-lcm     vcf-fleet-lcm-db-0                                                                 3/3     Running     0             28h
+vcf-fleet-lcm     vcf-fleet-lcm-db-1                                                                 3/3     Running     0             28h
+vcf-fleet-lcm     vcf-fleet-lcm-db-2                                                                 3/3     Running     0             28h
+vcf-fleet-lcm     vcf-fleet-upgrade-service-fleetupgrade-dcfdfcbc9-jvdmr                             1/1     Running     0             28h
+vcf-sddc-lcm      vcf-sddc-build-service-sddcbuild-5dd5cfd4c5-qq9wd                                  1/1     Running     0             28h
+vcf-sddc-lcm      vcf-sddc-lcm-db-0                                                                  3/3     Running     0             28h
+vcf-sddc-lcm      vcf-sddc-lcm-db-1                                                                  3/3     Running     0             28h
+vcf-sddc-lcm      vcf-sddc-lcm-db-2                                                                  3/3     Running     0             28h
+vcf-sddc-lcm      vcf-sddc-upgrade-service-sddcupgrade-ddcfdffb4-r9msl                               1/1     Running     0             28h
+vmsp-platform     alertmanager-kube-prometheus-stack-alertmanager-0                                  2/2     Running     0             29h
+vmsp-platform     argo-workflows-workflow-controller-57bbc66676-nq2xv                                1/1     Running     0             29h
+vmsp-platform     capi-controller-manager-d55798b89-2hl5d                                            1/1     Running     0             29h
+vmsp-platform     capi-controller-manager-d55798b89-4mvjx                                            1/1     Running     0             29h
+vmsp-platform     capi-ipam-in-cluster-controller-manager-5dc6c6b847-2mq67                           1/1     Running     0             29h
+vmsp-platform     capi-ipam-in-cluster-controller-manager-5dc6c6b847-z74tt                           1/1     Running     0             29h
+vmsp-platform     capi-kubeadm-bootstrap-controller-manager-5fb45864db-2fcbp                         1/1     Running     0             29h
+vmsp-platform     capi-kubeadm-bootstrap-controller-manager-5fb45864db-7nknm                         1/1     Running     0             29h
+vmsp-platform     capi-kubeadm-control-plane-controller-manager-ffd8fc9f-rf27k                       1/1     Running     0             29h
+vmsp-platform     capi-kubeadm-control-plane-controller-manager-ffd8fc9f-zkpsd                       1/1     Running     0             29h
+vmsp-platform     capv-controller-manager-7cd6655bff-m5k98                                           1/1     Running     0             29h
+vmsp-platform     capv-controller-manager-7cd6655bff-rfp5h                                           1/1     Running     0             29h
+vmsp-platform     cert-manager-58d87667b-ldzz9                                                       1/1     Running     0             29h
+vmsp-platform     cert-manager-cainjector-967cc9898-zlxc9                                            1/1     Running     0             29h
+vmsp-platform     cert-manager-webhook-68987786cf-dd5lv                                              1/1     Running     0             29h
+vmsp-platform     cluster-autoscaler-clusterapi-cluster-autoscaler-65479976dzxffw                    1/1     Running     0             29h
+vmsp-platform     component-action-import-connectivity-pzcts-execute-script-3470958639               0/2     Error       0             8h
+vmsp-platform     component-action-import-connectivity-pzcts-execute-script-3942705702               0/2     Error       0             8h
+vmsp-platform     component-action-import-connectivity-pzcts-execute-script-4151638736               0/2     Error       0             8h
+vmsp-platform     component-action-import-connectivity-pzcts-execute-script-794241757                0/2     Error       0             8h
+vmsp-platform     envoy-gateway-5bb66999-r2nq2                                                       1/1     Running     0             29h
+vmsp-platform     etcd-defrag-manual-vfb27                                                           0/1     Completed   0             28h
+vmsp-platform     event-tailer-event-tailer-0                                                        1/1     Running     0             29h
+vmsp-platform     helm-controller-577d87cc94-772c9                                                   1/1     Running     0             29h
+vmsp-platform     hooks-server-synthetic-checker-5b9dfdd649-mf22w                                    2/2     Running     0             28h
+vmsp-platform     import-component-dezl4rdgzresng7l2lfup2cm7a-submit-workflow-3852711536             0/1     Error       0             8h
+vmsp-platform     kube-prometheus-stack-kube-state-metrics-f87d55467-k4wq2                           1/1     Running     0             29h
+vmsp-platform     kube-prometheus-stack-operator-776b689c68-hptn6                                    1/1     Running     0             29h
+vmsp-platform     kube-prometheus-stack-prometheus-node-exporter-2tgqf                               1/1     Running     0             29h
+vmsp-platform     kube-prometheus-stack-prometheus-node-exporter-c5rn2                               1/1     Running     0             29h
+vmsp-platform     kube-prometheus-stack-prometheus-node-exporter-mxnbc                               1/1     Running     0             29h
+vmsp-platform     kube-prometheus-stack-prometheus-node-exporter-tqzzx                               1/1     Running     0             29h
+vmsp-platform     kube-vip-69l9n                                                                     1/1     Running     0             29h
+vmsp-platform     kube-vip-7x494                                                                     1/1     Running     0             29h
+vmsp-platform     kube-vip-mmd4c                                                                     1/1     Running     0             29h
+vmsp-platform     logging-operator-cc6f9f696-2x64s                                                   1/1     Running     0             29h
+vmsp-platform     logging-operator-filelogs-fluentbit-7dcvm                                          1/1     Running     0             29h
+vmsp-platform     logging-operator-filelogs-fluentbit-dqhl8                                          1/1     Running     0             29h
+vmsp-platform     logging-operator-filelogs-fluentbit-ljhvd                                          1/1     Running     0             29h
+vmsp-platform     logging-operator-filelogs-fluentbit-sk8bq                                          1/1     Running     0             29h
+vmsp-platform     logging-operator-fluentbit-96kmh                                                   1/1     Running     0             29h
+vmsp-platform     logging-operator-fluentbit-dvz2k                                                   1/1     Running     0             29h
+vmsp-platform     logging-operator-fluentbit-tg6r5                                                   1/1     Running     0             29h
+vmsp-platform     logging-operator-fluentbit-tkspc                                                   1/1     Running     0             29h
+vmsp-platform     logging-operator-fluentd-0                                                         2/2     Running     0             28h
+vmsp-platform     logging-operator-fluentd-configcheck-9996ad                                        0/1     Completed   0             25h
+vmsp-platform     logging-operator-systemlogs-fluentbit-42cjc                                        1/1     Running     0             29h
+vmsp-platform     logging-operator-systemlogs-fluentbit-74bw7                                        1/1     Running     0             29h
+vmsp-platform     logging-operator-systemlogs-fluentbit-b4gwp                                        1/1     Running     0             29h
+vmsp-platform     logging-operator-systemlogs-fluentbit-p4rpl                                        1/1     Running     0             29h
+vmsp-platform     logging-operator-volumes-resize-brmkz                                              0/1     Completed   0             28h
+vmsp-platform     logs-tailer-host-tailer-9w57g                                                      1/1     Running     0             29h
+vmsp-platform     logs-tailer-host-tailer-h5t4f                                                      1/1     Running     0             29h
+vmsp-platform     logs-tailer-host-tailer-lcgpb                                                      1/1     Running     0             29h
+vmsp-platform     logs-tailer-host-tailer-zgbmb                                                      1/1     Running     0             29h
+vmsp-platform     metadata-service-7v4gj                                                             1/1     Running     0             29h
+vmsp-platform     metadata-service-8sg49                                                             1/1     Running     0             29h
+vmsp-platform     metadata-service-k5v8t                                                             1/1     Running     0             29h
+vmsp-platform     metrics-server-c77f6c7f8-xzzm7                                                     1/1     Running     0             29h
+vmsp-platform     ndc-controller-manager-7547fdf4bf-h2fv6                                            1/1     Running     0             29h
+vmsp-platform     ndc-controller-manager-7547fdf4bf-pdwrw                                            1/1     Running     0             29h
+vmsp-platform     node-problem-detector-c6hnc                                                        1/1     Running     0             29h
+vmsp-platform     node-problem-detector-gjvmg                                                        1/1     Running     0             29h
+vmsp-platform     node-problem-detector-klxkh                                                        1/1     Running     0             29h
+vmsp-platform     node-problem-detector-l8bk4                                                        1/1     Running     0             29h
+vmsp-platform     platform-trust-vsphere-certificate-update-cronjob-296869209trr8                    0/1     Completed   0             31m
+vmsp-platform     platform-trust-vsphere-certificate-update-cronjob-29686950s5ph2                    0/1     Completed   0             108s
+vmsp-platform     prometheus-kube-prometheus-stack-prometheus-0                                      2/2     Running     0             29h
+vmsp-platform     proxy-service-778f9cb5f9-7r68p                                                     1/1     Running     0             29h
+vmsp-platform     seaweedfs-cleanup-54787b956c-jb2mc                                                 1/1     Running     0             29h
+vmsp-platform     seaweedfs-filer-0                                                                  1/1     Running     0             28h
+vmsp-platform     seaweedfs-master-0                                                                 1/1     Running     0             28h
+vmsp-platform     seaweedfs-volume-0                                                                 1/1     Running     0             28h
+vmsp-platform     seaweedfs-volume-1                                                                 1/1     Running     0             28h
+vmsp-platform     seaweedfs-volume-2                                                                 1/1     Running     0             28h
+vmsp-platform     seaweedfs-volume-resize-zsg4g                                                      0/1     Completed   0             29h
+vmsp-platform     service-account-rotation-cronjob-29685600-j7p7m                                    0/1     Completed   0             22h
+vmsp-platform     source-controller-755f68b474-45pp7                                                 1/1     Running     0             29h
+vmsp-platform     strimzi-cluster-operator-f7bf56558-smsk4                                           1/1     Running     0             29h
+vmsp-platform     support-bundle-559464db69-mfnxq                                                    2/2     Running     0             29h
+vmsp-platform     support-bundle-cleanup-nodes-78dj7                                                 1/1     Running     0             29h
+vmsp-platform     support-bundle-cleanup-nodes-jngnt                                                 1/1     Running     0             29h
+vmsp-platform     support-bundle-cleanup-nodes-pjzvs                                                 1/1     Running     0             29h
+vmsp-platform     support-bundle-cleanup-nodes-z7rtz                                                 1/1     Running     0             29h
+vmsp-platform     support-bundle-cluster-info-dump-29685600-v2lwf                                    0/1     Completed   0             22h
+vmsp-platform     support-bundle-cluster-info-dump-29686320-lfkr5                                    0/1     Completed   0             10h
+vmsp-platform     support-bundle-collect-metrics-29686800-n9pcc                                      0/1     Completed   0             151m
+vmsp-platform     support-bundle-collect-metrics-29686860-77nq9                                      0/1     Completed   0             91m
+vmsp-platform     support-bundle-collect-metrics-29686920-jpjl2                                      0/1     Completed   0             31m
+vmsp-platform     support-bundle-logcopier-c74fs                                                     1/1     Running     0             29h
+vmsp-platform     support-bundle-logcopier-event-tailer-597448947b-ntn4w                             1/1     Running     0             29h
+vmsp-platform     support-bundle-logcopier-fndpc                                                     1/1     Running     0             29h
+vmsp-platform     support-bundle-logcopier-jbnbl                                                     1/1     Running     0             29h
+vmsp-platform     support-bundle-logcopier-q2g58                                                     1/1     Running     0             29h
+vmsp-platform     support-bundle-logoffloader-6qrq7                                                  1/1     Running     0             29h
+vmsp-platform     support-bundle-logoffloader-7kfc8                                                  1/1     Running     0             29h
+vmsp-platform     support-bundle-logoffloader-9w4g2                                                  1/1     Running     0             29h
+vmsp-platform     support-bundle-logoffloader-whcnx                                                  1/1     Running     0             29h
+vmsp-platform     synthetic-checker-757798879-wb85z                                                  2/2     Running     0             8h
+vmsp-platform     system-add-cacert-ii2woclzdnbinly52ac3y3tm4m-execute-script-3620252556             0/2     Completed   0             27m
+vmsp-platform     trust-manager-5476545759-f8bhb                                                     1/1     Running     0             29h
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-discover-template-2494675190          0/2     Completed   0             6h39m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-discover-template-3158836776          0/2     Completed   0             6h40m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-discover-template-3290064380          0/2     Completed   0             6h41m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-1483262075             0/2     Error       0             6h39m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-1565878136             0/2     Completed   0             4h36m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-1757946738             0/2     Completed   0             6h39m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-2332816517             0/2     Completed   0             6h40m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-255240252              0/2     Completed   0             6h40m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-3978554943             0/2     Completed   0             6h41m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-825568348              0/2     Completed   0             6h41m
+vmsp-platform     upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-936301171              0/2     Completed   0             6h40m
+vmsp-platform     upgrade-precheck-component-vbhc3rli4jhw3njxtvpmhqx6ym-execute-script-3954067837    0/2     Error       0             8h
+vmsp-platform     upgrade-precheck-component-vbhc3rli4jhw3njxtvpmhqx6ym-execute-script-4037294981    0/2     Error       0             8h
+vmsp-platform     upgrade-precheck-component-vbhc3rli4jhw3njxtvpmhqx6ym-submit-workflow-1886031679   0/1     Error       0             8h
+vmsp-platform     vcenter-path-sync-cronjob-29686860-vbzvz                                           0/1     Completed   0             91m
+vmsp-platform     vcenter-path-sync-cronjob-29686920-nzpwd                                           0/1     Completed   0             31m
+vmsp-platform     velero-6b9655b487-vmwkp                                                            1/1     Running     0             29h
+vmsp-platform     vmsp-agent-6d477cb66b-wrtqt                                                        1/1     Running     0             29h
+vmsp-platform     vmsp-agent-configure-node-267jr                                                    1/1     Running     0             29h
+vmsp-platform     vmsp-agent-configure-node-ll9dj                                                    1/1     Running     0             29h
+vmsp-platform     vmsp-agent-configure-node-mvchb                                                    1/1     Running     0             29h
+vmsp-platform     vmsp-etcd-0                                                                        1/1     Running     0             29h
+vmsp-platform     vmsp-gateway-744df867c5-gwj5s                                                      2/2     Running     0             29h
+vmsp-platform     vmsp-identity-7cb9c67db8-gkncg                                                     1/1     Running     0             29h
+vmsp-platform     vmsp-identity-7cb9c67db8-rdh4c                                                     1/1     Running     0             29h
+vmsp-platform     vmsp-operator-77f8cdf65d-gvxl4                                                     1/1     Running     0             29h
+vmsp-platform     zalando-postgres-operator-9cb977978-w595g                                          1/1     Running     0             29h
+vmsp-platform     zot-1-0                                                                            1/1     Running     0             29h
+vmsp-platform     zot-1-configure-node-5c94q                                                         1/1     Running     0             29h
+vmsp-platform     zot-1-configure-node-72dcf                                                         1/1     Running     0             29h
+vmsp-platform     zot-1-configure-node-vzgxt                                                         1/1     Running     0             29h
+vmsp-platform     zot-1-configure-node-x9mrn                                                         1/1     Running     0             29h
+vmsp-platform     zot-volumes-resize-r7r8m                                                           0/1     Completed   0             29h
+vmsp-policies     kyverno-admission-controller-558cd4c545-d95lk                                      1/1     Running     0             29h
+vmsp-policies     kyverno-admission-controller-558cd4c545-nwbl7                                      1/1     Running     0             29h
+vmsp-policies     kyverno-admission-controller-558cd4c545-z8cbf                                      1/1     Running     0             29h
+vmsp-policies     kyverno-background-controller-67966cc6d8-kgmlg                                     1/1     Running     0             29h
+vmsp-policies     kyverno-cleanup-controller-6c946746c7-t5l67                                        1/1     Running     0             29h
+root [ /home/vmware-system-user ]# kubectl get jobs -A
+NAMESPACE       NAME                                                         STATUS     COMPLETIONS   DURATION   AGE
+vmsp-platform   etcd-defrag-manual                                           Complete   1/1           15s        28h
+vmsp-platform   logging-operator-volumes-resize                              Complete   1/1           4s         28h
+vmsp-platform   platform-trust-vsphere-certificate-update-cronjob-29686920   Complete   1/1           4s         31m
+vmsp-platform   platform-trust-vsphere-certificate-update-cronjob-29686950   Complete   1/1           4s         113s
+vmsp-platform   seaweedfs-volume-resize                                      Complete   1/1           3s         29h
+vmsp-platform   service-account-rotation-cronjob-29685600                    Complete   1/1           5s         22h
+vmsp-platform   support-bundle-cluster-info-dump-29685600                    Complete   1/1           3m19s      22h
+vmsp-platform   support-bundle-cluster-info-dump-29686320                    Complete   1/1           3m24s      10h
+vmsp-platform   support-bundle-collect-metrics-29686800                      Complete   1/1           4s         151m
+vmsp-platform   support-bundle-collect-metrics-29686860                      Complete   1/1           5s         91m
+vmsp-platform   support-bundle-collect-metrics-29686920                      Complete   1/1           4s         31m
+vmsp-platform   vcenter-path-sync-cronjob-29686860                           Complete   1/1           5s         91m
+vmsp-platform   vcenter-path-sync-cronjob-29686920                           Complete   1/1           5s         31m
+vmsp-platform   zot-volumes-resize                                           Complete   1/1           3s         29h
+root [ /home/vmware-system-user ]# kubectl get nodes
+NAME                 STATUS   ROLES           AGE   VERSION
+cvsd26vcfmgt-l4ljw   Ready    <none>          29h   v1.34.2+vmware.1
+cvsd26vcfmgt-pkkqk   Ready    <none>          29h   v1.34.2+vmware.1
+cvsd26vcfmgt-rrhzx   Ready    <none>          29h   v1.34.2+vmware.1
+cvsd26vcfmgt-vlwh7   Ready    control-plane   29h   v1.34.2+vmware.1
 root [ /home/vmware-system-user ]#
