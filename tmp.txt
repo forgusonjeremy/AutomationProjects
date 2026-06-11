@@ -1,24 +1,6 @@
-root [ /home/vmware-system-user ]# kubectl -n vmsp-platform get workflows --sort-by=.metadata.creationTimestamp
-NAME                                                    STATUS      AGE   MESSAGE
-upgrade-precheck-component-vbhc3rli4jhw3njxtvpmhqx6ym   Failed      8h    retryStrategy.expression evaluated to false
-import-component-dezl4rdgzresng7l2lfup2cm7a             Failed      8h    retryStrategy.expression evaluated to false
-component-action-import-connectivity-pzcts              Failed      8h    No more retries left
-wal-s3-cleanup-1781215200                               Succeeded   49m
-system-add-cacert-ii2woclzdnbinly52ac3y3tm4m            Succeeded   44m
-system-add-cacert-m67xzz7izzfdflf45z3nktaydq            Succeeded   10m
-upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm            Running     28s
-root [ /home/vmware-system-user ]#
-root [ /home/vmware-system-user ]# kubectl -n vmsp-platform get pods --sort-by=.metadata.creationTimestamp | tail -10
-vcenter-path-sync-cronjob-29686860-vbzvz                                           0/1     Completed   0          109m
-support-bundle-collect-metrics-29686860-77nq9                                      0/1     Completed   0          109m
-vcenter-path-sync-cronjob-29686920-nzpwd                                           0/1     Completed   0          49m
-platform-trust-vsphere-certificate-update-cronjob-296869209trr8                    0/1     Completed   0          49m
-support-bundle-collect-metrics-29686920-jpjl2                                      0/1     Completed   0          49m
-system-add-cacert-ii2woclzdnbinly52ac3y3tm4m-execute-script-3620252556             0/2     Completed   0          44m
-platform-trust-vsphere-certificate-update-cronjob-29686950s5ph2                    0/1     Completed   0          19m
-system-add-cacert-m67xzz7izzfdflf45z3nktaydq-execute-script-3371872003             0/2     Completed   0          10m
-upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-3978554943             0/2     Completed   0          35s
-upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-discover-template-3290064380          0/2     Completed   0          15s
-root [ /home/vmware-system-user ]# kubectl -n vmsp-platform logs <new-upgrade-component-execute-script-pod> --all-containers -f
-bash: new-upgrade-component-execute-script-pod: No such file or directory
-root [ /home/vmware-system-user ]#
+kubectl -n vmsp-platform get pods --sort-by=.metadata.creationTimestamp | grep 7uphph | tail -5
+
+kubectl -n vmsp-platform logs <that-pod-name> --all-containers -f
+
+
+kubectl -n vmsp-platform get workflows -w | grep 7uphph
