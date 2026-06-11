@@ -55,15 +55,7 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_04165e03
-          fields:
-            - id: osVersion
-              display: dropDown
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_vcpuCount
+        - id: section_cpuCount
           fields:
             - id: cpuCount
               display: integerField
@@ -79,7 +71,15 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_3053b54e
+        - id: section_osVersion
+          fields:
+            - id: osVersion
+              display: dropDown
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_99ceb9b3
           fields:
             - id: isoPath
               display: dropDown
@@ -197,20 +197,6 @@ schema:
           vcenterName: vcenterName
     constraints:
       required: true
-  osVersion:
-    label: OS Version
-    description: Linux OS version / image to deploy
-    signpost: Linux OS version / image to deploy
-    type:
-      dataType: string
-      isMultiple: false
-    valueList:
-      - value: centos
-        label: centos
-      - value: ubuntu
-        label: ubuntu
-    constraints:
-      required: true
   cpuCount:
     label: CPU Count
     type:
@@ -229,22 +215,30 @@ schema:
     constraints:
       min-value: 1
       max-value: 512
+  osVersion:
+    label: OS Version
+    description: Linux OS version / image to deploy
+    signpost: Linux OS version / image to deploy
+    type:
+      dataType: string
+      isMultiple: false
+    valueList:
+      - value: centos
+        label: centos
+      - value: ubuntu
+        label: ubuntu
+    constraints:
+      required: true
   isoPath:
     label: ISO Image
-    description: >-
-      ISO to attach and boot from. List is sourced from all datastores reachable
-      by the selected cluster's hosts, sorted by datastore, folder, then file.
-      Value is the full datastore path, e.g. "[ds-iso] ISOs/rhel9.iso".
-    signpost: >-
-      ISO to attach and boot from. List is sourced from all datastores reachable
-      by the selected cluster's hosts, sorted by datastore, folder, then file.
-      Value is the full datastore path, e.g. "[ds-iso] ISOs/rhel9.iso".
+    description: ISO to attach and boot from.
+    signpost: ISO to attach and boot from.
     type:
       dataType: string
       isMultiple: false
     valueList:
       id: com.broadcom.pso.vcfa.customforms/getIsoList
-      type: dynamic
+      type: scriptAction
       parameters:
         - $type:
             dataType: string
