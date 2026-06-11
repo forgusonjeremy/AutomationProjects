@@ -1,0 +1,42 @@
+apiVersion: vmoperator.vmware.com/v1alpha3
+kind: VirtualMachine
+metadata:
+  name: ${env.deploymentName}
+  namespace: jeremy-dev-ncmcn
+  labels:
+    vm-selector: ${env.deploymentName}
+spec:
+  className: best-effort-small
+  # Friendly image name: win2022
+  imageName: vmi-9a9f080c2414ab32d
+  storageClass: mgmt-cl01-optimal-datastore-default-policy-raid5
+  powerState: PoweredOn
+  network:
+    interfaces:
+      - name: eth0
+        network:
+          name: public-static-vcfauto-ipam
+          kind: Subnet
+    hostName: ${env.deploymentName}
+    domainName: vcf.lab
+  bootstrap:
+    sysprep:
+      sysprep:
+        userData:
+          fullName: administrator
+          orgName: lab
+        identification:
+          joinDomain: vcf.lab
+          domainAdmin: administrator@vcf.lab
+          domainAdminPassword:
+            name: ${env.deploymentName}-bootstrap-secret
+            key: domainAdminPassword
+root [ /home/vmware-system-user ]# export KUBECONFIG=/etc/kubernetes/admin.conf
+root [ /home/vmware-system-user ]# kubectl get pods -A
+E0611 22:15:37.710526 2866946 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://localhost:8080/api?timeout=32s\": dial tcp 127.0.0.1:8080: connect: connection refused"
+E0611 22:15:37.710936 2866946 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://localhost:8080/api?timeout=32s\": dial tcp 127.0.0.1:8080: connect: connection refused"
+E0611 22:15:37.712401 2866946 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://localhost:8080/api?timeout=32s\": dial tcp 127.0.0.1:8080: connect: connection refused"
+E0611 22:15:37.712649 2866946 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://localhost:8080/api?timeout=32s\": dial tcp 127.0.0.1:8080: connect: connection refused"
+E0611 22:15:37.714150 2866946 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://localhost:8080/api?timeout=32s\": dial tcp 127.0.0.1:8080: connect: connection refused"
+The connection to the server localhost:8080 was refused - did you specify the right host or port?
+root [ /home/vmware-system-user ]#
