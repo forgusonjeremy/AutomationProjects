@@ -1,6 +1,29 @@
-kubectl -n vmsp-platform get pods --sort-by=.metadata.creationTimestamp | grep 7uphph | tail -5
+root [ /home/vmware-system-user ]# kubectl -n vmsp-platform logs upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-1483262075 --all-containers -f
+time="2026-06-11T22:50:56.914Z" level=info msg="Starting Workflow Executor" version=v0.0.0+unknown
+time="2026-06-11T22:50:56.918Z" level=info msg="Using executor retry strategy" Duration=1s Factor=1.6 Jitter=0.5 Steps=5
+time="2026-06-11T22:50:56.918Z" level=info msg="Executor initialized" deadline="2026-06-12 04:48:43 +0000 UTC" includeScriptOutput=false namespace=vmsp-platform podName=upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-1483262075 templateName=execute-script version="&Version{Version:v0.0.0+unknown,BuildDate:1970-01-01T00:00:00Z,GitCommit:,GitTag:,GitTreeState:,GoVersion:go1.24.11 X:boringcrypto,Compiler:gc,Platform:linux/amd64,}"
+time="2026-06-11T22:50:57.344Z" level=info msg="Loading script source to /argo/staging/script"
+time="2026-06-11T22:50:57.344Z" level=info msg="Start loading input artifacts..."
+time="2026-06-11T22:50:57.344Z" level=info msg="Alloc=10481 TotalAlloc=15331 Sys=23893 NumGC=4 Goroutines=4"
+time="2026-06-11T22:50:57.975Z" level=info msg="Starting Workflow Executor" version=v0.0.0+unknown
+2026/06/11 22:50:58 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm UPGRADE: Preparing for full component backup
+2026/06/11 22:50:59 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm Attempting to update env in secret task-7uphph3ftvaxpoxa6pqb4j2pfm (resourceVersion: 1173047, attempt: 1/10)
+2026/06/11 22:50:59 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm Successfully updated env in secret task-7uphph3ftvaxpoxa6pqb4j2pfm
+2026/06/11 22:50:59 releases.vmsp.vmware.com/v1alpha1, Kind=PackageDeployment/vmsp-platform/vmsp-platform: unchanged
+2026/06/11 22:51:00 Deployment succeeded
+time="2026-06-11T22:50:57.979Z" level=info msg="Using executor retry strategy" Duration=1s Factor=1.6 Jitter=0.5 Steps=5
+time="2026-06-11T22:50:57.979Z" level=info msg="Executor initialized" deadline="2026-06-12 04:48:43 +0000 UTC" includeScriptOutput=false namespace=vmsp-platform podName=upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm-execute-script-1483262075 templateName=execute-script version="&Version{Version:v0.0.0+unknown,BuildDate:1970-01-01T00:00:00Z,GitCommit:,GitTag:,GitTreeState:,GoVersion:go1.24.11 X:boringcrypto,Compiler:gc,Platform:linux/amd64,}"
+2026/06/11 22:51:01 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm All backup cronjobs and their jobs have been cleaned up
+2026/06/11 22:51:01 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm UPGRADE: Backup Job started. Polling /webhooks/vmsp-platform/br/backup...
+2026/06/11 22:51:31 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm UPGRADE: Attempt 1: statusCode=218, running=false, elapsed=0s
+2026/06/11 22:52:01 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm UPGRADE: Attempt 2: statusCode=218, running=false, elapsed=30s
+2026/06/11 22:52:31 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm UPGRADE: Attempt 3: statusCode=218, running=false, elapsed=60s
+2026/06/11 22:53:01 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm UPGRADE: Attempt 4: statusCode=218, running=false, elapsed=90s
+time="2026-06-11T22:50:57.994Z" level=info msg="Starting deadline monitor"
+2026/06/11 22:53:31 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm UPGRADE: Attempt 5: statusCode=218, running=false, elapsed=120s
+2026/06/11 22:54:02 INFO : 7uphph3ftvaxpoxa6pqb4j2pfm UPGRADE: Attempt 6: statusCode=218, running=false, elapsed=150s
 
-kubectl -n vmsp-platform logs <that-pod-name> --all-containers -f
 
 
-kubectl -n vmsp-platform get workflows -w | grep 7uphph
+root [ /home/vmware-system-user ]# kubectl -n vmsp-platform get workflows -w | grep 7uphph
+upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm            Running     5m23s
