@@ -1,18 +1,3 @@
-root [ /home/vmware-system-user ]# ls -la /etc/kubernetes/admin.conf /etc/kubeconfig/admin.conf 2>/dev/null
--rw-r--r-- 1 root root 0 Jun 10 17:15 /etc/kubernetes/admin.conf
-root [ /home/vmware-system-user ]# echo $KUBECONFIG
-/etc/kubernetes/admin.conf
-root [ /home/vmware-system-user ]# find /etc /var/lib /opt -name 'admin.conf' -o -name '*.kubeconfig' 2>/dev/null
-/etc/kubernetes/admin.conf
-root [ /home/vmware-system-user ]# ls -la /etc/vmware/wcp/ 2>/dev/null
--la ~/.root [ /home/vmware-system-user ]# ls -la ~/.kube/config 2>/dev/null
-root [ /home/vmware-system-user ]# ls -la /etc/vmware/wcp/ 2>/dev/null
-root [ /home/vmware-system-user ]# ls -la ~/.kube/config 2>/dev/null
-root [ /home/vmware-system-user ]# crictl ps 2>/dev/null | grep -i apiserver
-root [ /home/vmware-system-user ]# systemctl status kubelet 2>/dev/null | head -5
-● kubelet.service - kubelet: The Kubernetes Node Agent
-     Loaded: loaded (/etc/systemd/system/kubelet.service; enabled; preset: enabled)
-    Drop-In: /etc/systemd/system/kubelet.service.d
-             └─10-kubeadm.conf, 11-resource-sizing.conf
-     Active: active (running) since Wed 2026-06-10 17:13:44 UTC; 1 day 5h ago
-root [ /home/vmware-system-user ]#
+ip addr | grep -A2 -iE 'vip|eth'
+crictl ps -a 2>/dev/null | grep -iE 'kube-vip|haproxy|envoy|keepalived'
+cat /etc/kubernetes/manifests/*vip* 2>/dev/null
