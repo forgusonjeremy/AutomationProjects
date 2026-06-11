@@ -1,0 +1,10 @@
+ls -la /etc/kubernetes/admin.conf /etc/kubeconfig/admin.conf 2>/dev/null
+echo $KUBECONFIG
+
+find /etc /var/lib /opt -name 'admin.conf' -o -name '*.kubeconfig' 2>/dev/null
+
+ls -la /etc/vmware/wcp/ 2>/dev/null
+ls -la ~/.kube/config 2>/dev/null
+
+crictl ps 2>/dev/null | grep -i apiserver
+systemctl status kubelet 2>/dev/null | head -5
