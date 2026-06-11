@@ -1,2 +1,12 @@
-kubectl -n vmsp-platform get workflows --sort-by=.metadata.creationTimestamp
-kubectl -n vmsp-platform get secret task-7uphph3ftvaxpoxa6pqb4j2pfm -o jsonpath='{.data.messages}' | base64 -d 2>/dev/null; echo
+root [ /home/vmware-system-user ]# kubectl -n vmsp-platform get workflows --sort-by=.metadata.creationTimestamp
+NAME                                                    STATUS      AGE     MESSAGE
+upgrade-precheck-component-vbhc3rli4jhw3njxtvpmhqx6ym   Failed      8h      retryStrategy.expression evaluated to false
+import-component-dezl4rdgzresng7l2lfup2cm7a             Failed      8h      retryStrategy.expression evaluated to false
+component-action-import-connectivity-pzcts              Failed      8h      No more retries left
+upgrade-component-7uphph3ftvaxpoxa6pqb4j2pfm            Failed      6h56m   retryStrategy.expression evaluated to false
+wal-s3-cleanup-1781215200                               Succeeded   46m
+system-add-cacert-ii2woclzdnbinly52ac3y3tm4m            Succeeded   42m
+system-add-cacert-m67xzz7izzfdflf45z3nktaydq            Succeeded   8m19s
+root [ /home/vmware-system-user ]# kubectl -n vmsp-platform get secret task-7uphph3ftvaxpoxa6pqb4j2pfm -o jsonpath='{.data.messages}' | base64 -d 2>/dev/null; echo
+
+root [ /home/vmware-system-user ]#
