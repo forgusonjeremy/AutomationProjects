@@ -1,2 +1,27 @@
-kubectl -n vmsp-platform logs hooks-server-synthetic-checker-5b9dfdd649-mf22w --all-containers --tail=150 | grep -iE 'backup|br|vidb|error'
-kubectl -n vmsp-platform describe defaultbackupconfiguration vmsp-default
+root [ /home/vmware-system-user ]# kubectl -n vmsp-platform logs hooks-server-synthetic-checker-5b9dfdd649-mf22w --all-containers --tail=150 | grep -iE 'backup|br|vidb|error'
+root [ /home/vmware-system-user ]# kubectl -n vmsp-platform describe defaultbackupconfiguration vmsp-default
+Name:         vmsp-default
+Namespace:    vmsp-platform
+Labels:       app.kubernetes.io/managed-by=Helm
+              helm.toolkit.fluxcd.io/name=vmsp-backup
+              helm.toolkit.fluxcd.io/namespace=vmsp-platform
+Annotations:  meta.helm.sh/release-name: vmsp-backup
+              meta.helm.sh/release-namespace: vmsp-platform
+API Version:  backuprestore.vmsp.vmware.com/v1alpha1
+Kind:         DefaultBackupConfiguration
+Metadata:
+  Creation Timestamp:  2026-06-10T17:32:29Z
+  Finalizers:
+    backuprestore.vmsp.vmware.com/finalizer
+  Generation:        1
+  Resource Version:  19654
+  UID:               f8b6e74a-b7fa-4f29-bf63-534890757ce3
+Spec:
+  Backup Configuration:
+    Fallback To Full:            false
+    Full Schedule:
+    Incremental Backup Enabled:  false
+    Incremental Schedule:
+    Scheduled Backup Enabled:    false
+Events:                          <none>
+root [ /home/vmware-system-user ]#
