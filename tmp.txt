@@ -1,38 +1,5 @@
-[root@sfo01-m01-r01-esx02:~] esxcli vsan storage list
-naa.58ce38ee20a44831
-   Device: naa.58ce38ee20a44831
-   Display Name: naa.58ce38ee20a44831
-   Is SSD: true
-   VSAN UUID: 52c5d6bb-fe6e-83be-c562-e5b94fc5565a
-   VSAN Disk Group UUID: 52c5d6bb-fe6e-83be-c562-e5b94fc5565a
-   VSAN Disk Group Name: naa.58ce38ee20a44831
-   Used by this host: false
-   In CMMDS: false
-   On-disk format version: 22
-   Deduplication: false
-   Compression: false
-   Checksum: 12582888538726919348
-   Checksum OK: true
-   Is Capacity Tier: false
-   Encryption Metadata Checksum OK: true
-   Encryption: false
-   DiskKeyLoaded: false
-   Is Mounted: false
-   Creation Time: Wed Mar  4 16:28:22 2026
-[root@sfo01-m01-r01-esx02:~] esxcli vsan storage remove -u 52c5d6bb-fe6e-83be-c562-e5b94fc5565a
-Unable to remove device: Disk mapping is not mounted on this host: naa.58ce38ee20a44831
-[root@sfo01-m01-r01-esx02:~] esxcli vsan storage diskgroup unmount -u 52c5d6bb-fe6e-83be-c562-e5b94fc5565a
-Unable to unmount: Disk mapping is not mounted on this host: naa.58ce38ee20a44831
-[root@sfo01-m01-r01-esx02:~] esxcli vsan storage remove -u 52c5d6bb-fe6e-83be-c562-e5b94fc5565a
-Unable to remove device: Disk mapping is not mounted on this host: naa.58ce38ee20a44831
-[root@sfo01-m01-r01-esx02:~] partedutil delete /vmfs/devices/disks/naa.58ce38ee20a44831 2
--sh: partedutil: not found
-[root@sfo01-m01-r01-esx02:~] partedUtil delete /vmfs/devices/disks/naa.58ce38ee20a44831 2
-Error: Read-only file system during write on /dev/disks/naa.58ce38ee20a44831
-Unable to delete partition 2 from device /vmfs/devices/disks/naa.58ce38ee20a44831
-
-[root@sfo01-m01-r01-esx02:~] partedUtil delete /vmfs/devices/disks/naa.58ce38ee20a44831 1
-Error: Read-only file system during write on /dev/disks/naa.58ce38ee20a44831
-Unable to delete partition 1 from device /vmfs/devices/disks/naa.58ce38ee20a44831
-
+[root@sfo01-m01-r01-esx02:~] esxcli storage core device world list -d naa.58ce38ee20a44831
+Device                World ID  Open Count  World Name
+--------------------  --------  ----------  ----------
+naa.58ce38ee20a44831   2098905           1  hostd
 [root@sfo01-m01-r01-esx02:~]
