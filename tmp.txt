@@ -1,27 +1,120 @@
-root [ /home/vmware-system-user ]# kubectl -n vmsp-platform logs hooks-server-synthetic-checker-5b9dfdd649-mf22w --all-containers --tail=150 | grep -iE 'backup|br|vidb|error'
-root [ /home/vmware-system-user ]# kubectl -n vmsp-platform describe defaultbackupconfiguration vmsp-default
-Name:         vmsp-default
-Namespace:    vmsp-platform
-Labels:       app.kubernetes.io/managed-by=Helm
-              helm.toolkit.fluxcd.io/name=vmsp-backup
-              helm.toolkit.fluxcd.io/namespace=vmsp-platform
-Annotations:  meta.helm.sh/release-name: vmsp-backup
-              meta.helm.sh/release-namespace: vmsp-platform
-API Version:  backuprestore.vmsp.vmware.com/v1alpha1
-Kind:         DefaultBackupConfiguration
-Metadata:
-  Creation Timestamp:  2026-06-10T17:32:29Z
-  Finalizers:
-    backuprestore.vmsp.vmware.com/finalizer
-  Generation:        1
-  Resource Version:  19654
-  UID:               f8b6e74a-b7fa-4f29-bf63-534890757ce3
-Spec:
-  Backup Configuration:
-    Fallback To Full:            false
-    Full Schedule:
-    Incremental Backup Enabled:  false
-    Incremental Schedule:
-    Scheduled Backup Enabled:    false
-Events:                          <none>
-root [ /home/vmware-system-user ]#
+[root@sfo01-m01-r01-esx02:~] esxcli vsan cluster get
+vSAN Clustering is not enabled on this host
+[root@sfo01-m01-r01-esx02:~] esxcli vsan storage list
+naa.58ce38ee20a44831
+   Device: naa.58ce38ee20a44831
+   Display Name: naa.58ce38ee20a44831
+   Is SSD: true
+   VSAN UUID: 52c5d6bb-fe6e-83be-c562-e5b94fc5565a
+   VSAN Disk Group UUID: 52c5d6bb-fe6e-83be-c562-e5b94fc5565a
+   VSAN Disk Group Name: naa.58ce38ee20a44831
+   Used by this host: false
+   In CMMDS: false
+   On-disk format version: 22
+   Deduplication: false
+   Compression: false
+   Checksum: 12582888538726919348
+   Checksum OK: true
+   Is Capacity Tier: false
+   Encryption Metadata Checksum OK: true
+   Encryption: false
+   DiskKeyLoaded: false
+   Is Mounted: false
+   Creation Time: Wed Mar  4 16:28:22 2026
+[root@sfo01-m01-r01-esx02:~] partedUtil getptbl /vmfs/devices/disks/naa.58ce38ee20a44831
+gpt
+97281 255 63 1562824368
+1 2048 6143 381CFCCC728811E092EE000C2911D0B2 vsan 0
+2 6144 1562824334 77719A0CA4A011E3A47E000C29745A24 virsto 0
+[root@sfo01-m01-r01-esx02:~] esxcli storage core device list -d naa.58ce38ee20a44831
+naa.58ce38ee20a44831
+   Display Name: Local TOSHIBA Disk (naa.58ce38ee20a44831)
+   Has Settable Display Name: true
+   Size: 763097
+   Device Type: Direct-Access
+   Multipath Plugin: HPP
+   Devfs Path: /vmfs/devices/disks/naa.58ce38ee20a44831
+   Vendor: TOSHIBA
+   Model: KPM5XMUG800G
+   Revision: B026
+   SCSI Level: 6
+   Is Pseudo: false
+   Status: on
+   Is RDM Capable: true
+   Is Local: true
+   Is Removable: false
+   Is SSD: true
+   Is VVOL PE: false
+   Is Offline: false
+   Is Perennially Reserved: false
+   Queue Full Sample Size: 0
+   Queue Full Threshold: 0
+   Thin Provisioning Status: yes
+   Attached Filters:
+   VAAI Status: unsupported
+   Other UIDs: vml.020000000058ce38ee20a448314b504d35584d
+   Is Shared Clusterwide: false
+   Is SAS: true
+   Is USB: false
+   Is Boot Device: false
+   Device Max Queue Depth: 254
+   No of outstanding IOs with competing worlds: 254
+   Drive Type: physical
+   RAID Level: NA
+   Number of Physical Drives: 1
+   Protection Enabled: false
+   PI Activated: false
+   PI Type: 0
+   PI Protection Mask: NO PROTECTION
+   Supported Guard Types: NO GUARD SUPPORT
+   DIX Enabled: false
+   DIX Guard Type: NO GUARD SUPPORT
+   Emulated DIX/DIF Enabled: false
+[root@sfo01-m01-r01-esx02:~] esxcli storage core device list | grep -i "Is Boot Device"
+   Is Boot Device: false
+   Is Boot Device: false
+   Is Boot Device: true
+   Is Boot Device: false
+   Is Boot Device: false
+   Is Boot Device: false
+   Is Boot Device: false
+   Is Boot Device: false
+[root@sfo01-m01-r01-esx02:~] ls -lh /vmfs/devices/disks | grep naa.58ce38ee20a44831
+-rw-------    1 root     root      745.2G Jun 12 20:30 naa.58ce38ee20a44831
+-rw-------    1 root     root        2.0M Jun 12 20:30 naa.58ce38ee20a44831:1
+-rw-------    1 root     root      745.2G Jun 12 20:30 naa.58ce38ee20a44831:2
+lrwxrwxrwx    1 root     root          20 Jun 12 20:30 vml.020000000058ce38ee20a448314b504d35584d -> naa.58ce38ee20a44831
+lrwxrwxrwx    1 root     root          22 Jun 12 20:30 vml.020000000058ce38ee20a448314b504d35584d:1 -> naa.58ce38ee20a44831:1
+lrwxrwxrwx    1 root     root          22 Jun 12 20:30 vml.020000000058ce38ee20a448314b504d35584d:2 -> naa.58ce38ee20a44831:2
+[root@sfo01-m01-r01-esx02:~] partedUtil mklabel /vmfs/devices/disks/naa.58ce38ee20a44831 gpt
+Error: Read-only file system during write on /dev/disks/naa.58ce38ee20a44831
+WriteNewPtable: Unable to commit to device /vmfs/devices/disks/naa.58ce38ee20a44831
+
+[root@sfo01-m01-r01-esx02:~] dd if=/dev/zero of=/vmfs/devices/disks/naa.58ce38ee20a44831 ms=1M count=10 conv=notrunc
+BusyBox v1.29.3 (2026-02-05 05:45:34 PST) multi-call binary.
+
+Usage: dd [if=FILE] [of=FILE] [ibs=N] [obs=N] [bs=N] [count=N] [skip=N]
+        [seek=N] [conv=notrunc|noerror|sync|fsync] [iflag=skip_bytes|fullblock]
+
+Copy a file with converting and formatting
+
+        if=FILE         Read from FILE instead of stdin
+        of=FILE         Write to FILE instead of stdout
+        bs=N            Read and write N bytes at a time
+        ibs=N           Read N bytes at a time
+        obs=N           Write N bytes at a time
+        count=N         Copy only N input blocks
+        skip=N          Skip N input blocks
+        seek=N          Skip N output blocks
+        conv=notrunc    Don't truncate output file
+        conv=noerror    Continue after read errors
+        conv=sync       Pad blocks with zeros
+        conv=fsync      Physically write data out before finishing
+        conv=swab       Swap every pair of bytes
+        iflag=skip_bytes        skip=N is in bytes
+        iflag=fullblock Read full blocks
+        status=noxfer   Suppress rate output
+        status=none     Suppress all output
+
+N may be suffixed by c (1), w (2), b (512), kB (1000), k (1024), MB, M, GB, G
+[root@sfo01-m01-r01-esx02:~]
