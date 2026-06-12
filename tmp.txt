@@ -1,5 +1,6 @@
-[root@sfo01-m01-r01-esx02:~] esxcli storage core device world list -d naa.58ce38ee20a44831
-Device                World ID  Open Count  World Name
---------------------  --------  ----------  ----------
-naa.58ce38ee20a44831   2098905           1  hostd
+[root@sfo01-m01-r01-esx02:~] mv /etc/vmware/ssl/rui.crt /etc/vmware/ssl/rui.crt.old
+[root@sfo01-m01-r01-esx02:~] mv /etc/vmware/ssl/rui.key /etc/vmware/ssl/ui.key.old
+[root@sfo01-m01-r01-esx02:~] /sbin/generate-certificates
+[root@sfo01-m01-r01-esx02:~] openssl x509 -in /etc/vmware/ssl/rui.crt -noout -subject
+subject=C = US, ST = California, L = Palo Alto, O = "VMware, Inc", OU = VMware ESX Server Default Certificate, emailAddress = ssl-certificates@vmware.com, CN = sfo01-m01-r01-esx02.connect.lab, unstructuredName = "1781300706,564d7761726520496e632e"
 [root@sfo01-m01-r01-esx02:~]
