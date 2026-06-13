@@ -1,6 +1,16 @@
-[root@sfo01-m01-r01-esx02:~] mv /etc/vmware/ssl/rui.crt /etc/vmware/ssl/rui.crt.old
-[root@sfo01-m01-r01-esx02:~] mv /etc/vmware/ssl/rui.key /etc/vmware/ssl/ui.key.old
-[root@sfo01-m01-r01-esx02:~] /sbin/generate-certificates
-[root@sfo01-m01-r01-esx02:~] openssl x509 -in /etc/vmware/ssl/rui.crt -noout -subject
-subject=C = US, ST = California, L = Palo Alto, O = "VMware, Inc", OU = VMware ESX Server Default Certificate, emailAddress = ssl-certificates@vmware.com, CN = sfo01-m01-r01-esx02.connect.lab, unstructuredName = "1781300706,564d7761726520496e632e"
-[root@sfo01-m01-r01-esx02:~]
+root [ /home/vmware-system-user ]# kubectl get pods -A | grep -iE 'lcm|fleet|locker|password'
+vcf-fleet-depot   depot-service-776767d5df-mvdsk                                           3/3     Running     0             12h
+vcf-fleet-depot   distribution-service-5f48b47cd7-bmqnk                                    1/1     Running     0             12h
+vcf-fleet-lcm     vcf-fleet-build-service-fleetbuild-7d866fff97-9d5qd                      1/1     Running     0             12h
+vcf-fleet-lcm     vcf-fleet-lcm-db-0                                                       3/3     Running     0             12h
+vcf-fleet-lcm     vcf-fleet-lcm-db-1                                                       3/3     Running     0             12h
+vcf-fleet-lcm     vcf-fleet-lcm-db-2                                                       3/3     Running     0             12h
+vcf-fleet-lcm     vcf-fleet-upgrade-service-fleetupgrade-dcfdfcbc9-6l8k2                   1/1     Running     0             12h
+vcf-sddc-lcm      vcf-sddc-build-service-sddcbuild-5dd5cfd4c5-8rjlq                        1/1     Running     0             12h
+vcf-sddc-lcm      vcf-sddc-lcm-db-0                                                        3/3     Running     0             12h
+vcf-sddc-lcm      vcf-sddc-lcm-db-1                                                        3/3     Running     0             12h
+vcf-sddc-lcm      vcf-sddc-lcm-db-2                                                        3/3     Running     0             12h
+vcf-sddc-lcm      vcf-sddc-upgrade-service-sddcupgrade-ddcfdffb4-cxbkv                     1/1     Running     0             12h
+root [ /home/vmware-system-user ]# kubectl get pods -A | grep -v Running | grep -v Completed
+NAMESPACE         NAME                                                                     READY   STATUS      RESTARTS      AGE
+root [ /home/vmware-system-user ]#
