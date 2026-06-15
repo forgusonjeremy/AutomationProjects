@@ -1,64 +1,85 @@
-root [ /home/vmware-system-user ]# kubectl get pods -n vmsp-platform | grep -iE 'configure-component|deploy' | sort -k5
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-762402581      0/2     Error       0               4h13m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-561218248      0/2     Error       0               4h16m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-2942921223     0/2     Completed   0               4h17m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-2708209027     0/2     Error       0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-1192215152    0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-2501682523    0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-2798048800    0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-2844988965    0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-3093037017    0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-3348582163    0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-3515733688    0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-390797739     0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-474827563     0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-submit-workflow-959744541     0/1     Completed   0               4h18m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-discover-template-279134613   0/2     Completed   0               4h19m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-3287082500     0/2     Completed   0               4h19m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-381506476      0/2     Completed   0               4h19m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-91150726       0/2     Error       0               4h19m
-configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-795379416      0/2     Completed   0               4h20m
-root [ /home/vmware-system-user ]# kubectl get events -n vmsp-platform --sort-by=.lastTimestamp | tail -30
-80s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-gatewayconfiguration                                 artifact up-to-date with remote revision: '9.1.1865'
-75s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-metadata-service                                     artifact up-to-date with remote revision: '9.1.1865'
-72s         Normal   Created                 pod/platform-vmsp-platform-control-plane-vm-placement-check-8czwt            Created container: check
-72s         Normal   SuccessfulCreate        job/platform-vmsp-platform-control-plane-vm-placement-check                  Created pod: platform-vmsp-platform-control-plane-vm-placement-check-8czwt
-72s         Normal   Scheduled               pod/platform-vmsp-platform-control-plane-vm-placement-check-8czwt            Successfully assigned vmsp-platform/platform-vmsp-platform-control-plane-vm-placement-check-8czwt to cvsd26vcfmgt-c7kzc
-72s         Normal   Started                 pod/platform-vmsp-platform-control-plane-vm-placement-check-8czwt            Started container check
-72s         Normal   Pulled                  pod/platform-vmsp-platform-control-plane-vm-placement-check-8czwt            Container image "registry.vmsp-platform.svc.cluster.local:5000/images/debug:v1.0.8" already present on machine
-69s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-vmsp-agent                                           artifact up-to-date with remote revision: '9.1.1865'
-69s         Normal   Completed               job/platform-vmsp-platform-control-plane-vm-placement-check                  Job completed
-65s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-logging-operator                                     artifact up-to-date with remote revision: '4.11.4-5'
-56s         Normal   ArtifactUpToDate        helmchart/salt-raas-raas                                                     artifact up-to-date with remote revision: '9.1.0-25434834'
-56s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-namespace-config-salt                                artifact up-to-date with remote revision: '0.1.10'
-55s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-support-bundle                                       artifact up-to-date with remote revision: '9.1.1865'
-53s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-cluster-autoscaler                                   artifact up-to-date with remote revision: '9.5.1'
-52s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-vmsp-cluster-cvsd26vcfmgt                            artifact up-to-date with remote revision: '9.1.1865'
-52s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-vmsp-scripts                                         artifact up-to-date with remote revision: '9.1.1865'
-49s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-vmsp-etcd                                            artifact up-to-date with remote revision: '3.6.5-3'
-49s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-trust-manager                                        artifact up-to-date with remote revision: 'v0.20.3'
-47s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-reloader                                             artifact up-to-date with remote revision: 'v1.4.12'
-30s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-vmsp-backup                                          artifact up-to-date with remote revision: '9.1.1865'
-29s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-node-problem-detector                                artifact up-to-date with remote revision: '2.3.15-5'
-24s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-vmsp-kyverno-policies                                artifact up-to-date with remote revision: '0.0.113'
-23s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-namespace-config-salt-raas                           artifact up-to-date with remote revision: '0.1.10'
-22s         Normal   ArtifactUpToDate        helmchart/salt-salt-master                                                   artifact up-to-date with remote revision: '9.1.0-25434834'
-17s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-namespace-config-vidb-external                       artifact up-to-date with remote revision: '0.1.10'
-10s         Normal   ArtifactUpToDate        helmchart/vmsp-platform-proxy-service                                        artifact up-to-date with remote revision: '9.1.1865'
-7s          Normal   ArtifactUpToDate        helmchart/vmsp-platform-zot-2                                                artifact up-to-date with remote revision: '0.1.68-34'
-6s          Normal   ArtifactUpToDate        helmchart/vmsp-platform-vmsp-configs                                         artifact up-to-date with remote revision: '9.1.1865'
-2s          Normal   ArtifactUpToDate        helmchart/salt-salt-metrics                                                  artifact up-to-date with remote revision: '9.1.0-25434834'
-2s          Normal   ArtifactUpToDate        helmchart/vmsp-platform-namespace-config-default                             artifact up-to-date with remote revision: '0.1.10'
+Install components: VCF Operations for networks [SDDC LCM ca931ac4-7db6-45d5-99c9-b977e46cbd25]
+Task status:
+Failed
+Retry
+Last updated:
+6/15/26, 5:01 PM
+Initiator:
+admin
+Start time:
+6/15/26, 4:56 PM
+Task ID:
+019ecd12-3552-7f56-9c23-a23ba95689d9
+Completion time:
+6/15/26, 5:01 PM
 
-root [ /home/vmware-system-user ]# kubectl logs -n vmsp-platform configure-component-q6yfxvaxxvh3jaqxglh7ffv2te-execute-script-762402581 --all-containers --tail=60 | grep -iE 'error|fail|not enough|exit code|status code|wrong resource'
-time="2026-06-15T17:22:24.394Z" level=info msg="Main container completed" error="<nil>"
-time="2026-06-15T17:22:24.394Z" level=info msg="Copying /tmp/error.txt from volume mount"
-2026/06/15 17:22:20 INFO : q6yfxvaxxvh3jaqxglh7ffv2te Synthetic health check completed with curl exit code 0 and status code 503
-2026/06/15 17:22:20 ERROR : q6yfxvaxxvh3jaqxglh7ffv2te Synthetic health check failed due to curl exit code 0: https://synthetic-checker.vmsp-platform.svc.cluster.local/status?selector=group%3Dcompute%2Ccomponent%3Dvsp platform-control-plane-nodes-core : not enough resources found, expected 3, got 1
-2026/06/15 17:22:20 ERROR : q6yfxvaxxvh3jaqxglh7ffv2te Synthetic health check failed due to curl exit code 0: https://synthetic-checker.vmsp-platform.svc.cluster.local/status?selector=group%3Dcompute%2Ccomponent%3Dvsp platform-vmsp-platform-platform-control-plane-core : 1 of 1 resources are not ok: cvsd26vcfmgt-8lmtt: wrong resource state: InProgress - Rolling 1 replicas with outdated spec (1 replicas up to date);
-2026/06/15 17:22:21 ERROR : q6yfxvaxxvh3jaqxglh7ffv2te Synthetic health check failed due to curl exit code 0: https://synthetic-checker.vmsp-platform.svc.cluster.local/status?selector=group%3Dcompute%2Ccomponent%3Dvsp platform-vmsp-platform-platform-machines-core : 1 of 7 resources are not ok: cvsd26vcfmgt-8lmtt-lh556: wrong resource state: InProgress - 1 of 2 completed;
-2026/06/15 17:22:22 ERROR : q6yfxvaxxvh3jaqxglh7ffv2te Script exited unexpectedly at line 1 with exit code 247
-time="2026-06-15T17:22:23.562Z" level=info msg="sub-process exited" argo=true error="<nil>"
-time="2026-06-15T17:22:23.562Z" level=info msg="no need to save parameter - on overlapping volume: /tmp/error.txt" argo=true
-Error: exit status 247
-root [ /home/vmware-system-user ]#
+Quick Filter
+Quick Filter
+Enter value
+Toggle more row content
+Subtask
+
+Prepare components dependencies
+
+Validate component specifications before installation
+
+Resolve SDDC lifecycle services
+
+Install components using SDDC lifecycle service
+
+Resolve components binaries
+
+Start component installation using SDDC lifecycle service
+
+Prepare parallel install tasks for each component
+
+Validate component specifications before installation
+
+Parallel installation of components
+
+Prepare certificate requests for VCF Operations for networks nodes
+
+Deploy VCF Operations for networks platform nodes
+
+Deploy VCF Operations for networks platform nodes
+
+Deploy VCF Operations for networks platform nodes
+
+Deploy VCF Operations for networks platform nodes
+
+Wait for all component installations to complete
+1-15 / 15
+Previous Page
+1
+Next Page
+Start of row details
+Install components using SDDC lifecycle service
+
+Subtask status:
+Failed
+Last updated:
+6/15/26, 5:00 PM
+Start time:
+6/15/26, 4:56 PM
+Completion time:
+6/15/26, 5:01 PM
+Messages:
+Severity
+Use left or right key to resize the column
+Message
+Use left or right key to resize the column
+Timestamp
+Error
+Failed to deploy VCF Operations for networks platform node. Verify vCenter has sufficient resources and check vCenter tasks for errors.
+6/15/26, 5:01 PM
+Error
+Failed to deploy VCF Operations for networks platform node. Verify vCenter has sufficient resources and check vCenter tasks for errors.
+6/15/26, 5:01 PM
+Error
+Failed to deploy VCF Operations for networks platform node. Verify vCenter has sufficient resources and check vCenter tasks for errors.
+6/15/26, 5:01 PM
+Error
+Failed to deploy VCF Operations for networks platform node. Verify vCenter has sufficient resources and check vCenter tasks for errors.
+6/15/26, 5:01 PM
+Manage Columns
+Items per page
