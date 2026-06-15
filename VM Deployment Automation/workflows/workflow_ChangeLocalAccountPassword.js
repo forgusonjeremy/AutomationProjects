@@ -1,4 +1,4 @@
-/**
+/* ============================================================================
  * Workflow: Change Local Account Password   (workflow_UpdateLocalAdminPassword)
  * Module:   com.vcf.guestcustomization
  * WF ID:    c20a1766-1780-4fe2-a4e6-d553fc4bd1b4
@@ -50,18 +50,17 @@
  *   the original credentials (guestPassword) become invalid. Any poll cycle
  *   running after the change must use newPassword. item3 tries originalAuth
  *   first, then falls back to newAuth.
- */
+ * ==========================================================================*/
 
 
-// =============================================================================
-// item1 — Validate Inputs   (Scriptable Task)
-// IN : vm {VC:VirtualMachine}, guestUsername {string}, guestPassword {SecureString},
-//      newPassword {SecureString}
-// NEXT: item4
-// =============================================================================
+/* ============================================================================
+ * item1 — Validate Inputs   (Scriptable Task   [ROOT])
+ * IN:  guestPassword, guestUsername, newPassword, vm
+ * NEXT: item4
+ * ==========================================================================*/
 if (!vm){
     throw new Error("Input 'vm' is required.");
-}
+}      
 
 if (newPassword === null || newPassword === undefined){
     throw new Error("Input 'newPassword' is required.");
@@ -73,20 +72,17 @@ if (!guestUsername){
 
 if (!guestPassword){
     throw new Error("Input 'guestPassword' is required.");
-}
+} 
 
 System.log("workflow_UpdateLocalAdminPassword [item1]: VM=" + vm.name);
 
 
-// =============================================================================
-// item4 — Prepare Guest Ops   (Scriptable Task)
-// IN : vm, guestPassword, guestUsername
-// OUT: guestAuth {Any}, fileManager {VC:GuestFileManager}, processManager {VC:GuestProcessManager}
-// NEXT: item2
-//
-// NOTE: managers resolved from vm.sdkConnection.guestOperationsManager —
-//       NEVER getAllSdkConnections()[0].
-// =============================================================================
+/* ============================================================================
+ * item4 — Prepare Guest Ops   (Scriptable Task)
+ * IN:  vm, guestPassword, guestUsername
+ * OUT: fileManager, processManager, guestAuth
+ * NEXT: item2
+ * ==========================================================================*/
 guestAuth      = new VcNamePasswordAuthentication();
 guestAuth.username = guestUsername;
 guestAuth.password = guestPassword;
@@ -97,12 +93,12 @@ var fileManager    = guestOps.fileManager;
 var processManager = guestOps.processManager;
 
 
-// =============================================================================
-// item2 — Upload and Execute Script   (Scriptable Task)
-// IN : newPassword, vm, guestAuth, fileManager, processManager, guestUsername
-// OUT: pid {number}, scriptPath {string}
-// NEXT: item3
-// =============================================================================
+/* ============================================================================
+ * item2 — Upload and Execute Script   (Scriptable Task)
+ * IN:  newPassword, vm, guestAuth, fileManager, processManager, guestUsername
+ * OUT: pid, scriptPath
+ * NEXT: item3
+ * ==========================================================================*/
 try {
     scriptPath      = "C:\\Windows\\Temp\\vcf_setpwd.ps1";
     var programPath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
@@ -156,13 +152,12 @@ try {
 }
 
 
-// =============================================================================
-// item3 — Poll for Completion   (Scriptable Task)
-// IN : guestPassword, guestUsername, newPassword, pid, scriptPath, vm,
-//      POLL_MS, processManager, fileManager, MAX_WAIT_MS
-// OUT: executionResult {string}
-// NEXT: item0 (End)
-// =============================================================================
+/* ============================================================================
+ * item3 — Poll for Completion   (Scriptable Task)
+ * IN:  guestPassword, guestUsername, newPassword, pid, scriptPath, vm, POLL_MS, processManager, fileManager, MAX_WAIT_MS
+ * OUT: executionResult
+ * NEXT: item0
+ * ==========================================================================*/
 try {
 
     // Both credential objects declared BEFORE the poll loop.
@@ -172,21 +167,21 @@ try {
     originalAuth.username = guestUsername;
     originalAuth.password = guestPassword;
     originalAuth.interactiveSession = false;
-
+ 
     var newAuth      = new VcNamePasswordAuthentication();
     newAuth.username = guestUsername;
     newAuth.password = newPassword;
     newAuth.interactiveSession = false;
-
+ 
     var elapsed  = 0;
     var exitCode = null;
-
+ 
     while (elapsed < MAX_WAIT_MS) {
         System.sleep(POLL_MS);
         elapsed += POLL_MS;
-
+ 
         // null pids => return all processes; filter by PID in JS.
-        // (pids is long[] in the vSphere API; ArrayList coercion fails.)
+        // (pids is long[] in the vSphere API; ArrayList/JS-array coercion fail.)
         var procInfo = null;
         try {
             procInfo = processManager.listProcessesInGuest(vm, originalAuth, null);
@@ -198,7 +193,7 @@ try {
                     "Original: " + e1.message + " | New: " + e2.message);
             }
         }
-
+ 
         for (var i = 0; i < procInfo.length; i++) {
             if (procInfo[i].pid == pid) {
                 if (procInfo[i].exitCode != null) {
@@ -207,12 +202,12 @@ try {
                 break;   // matched; exitCode null means still running
             }
         }
-
+ 
         if (exitCode != null) { break; }
         System.log("workflow_UpdateLocalAdminPassword [item3a]: Waiting... " +
                    elapsed + "ms elapsed (PID=" + pid + ").");
     }
-
+ 
     if (exitCode == null) {
         throw new Error("Script timed out after " + MAX_WAIT_MS + "ms. PID=" + pid +
                         " VM=" + vm.name);
@@ -221,7 +216,7 @@ try {
         throw new Error("Script exited with code " + exitCode + " on VM " + vm.name +
                         " (username '" + guestUsername + "').");
     }
-
+ 
     // --- Cleanup: password has changed, so prefer newAuth; fall back to original ---
     try {
         try {
@@ -234,11 +229,12 @@ try {
         System.warn("workflow_UpdateLocalAdminPassword [item3a]: Script cleanup warning: " +
                     cleanupErr.message);   // non-fatal
     }
-
+ 
     executionResult = "SUCCESS: Password updated for '" + guestUsername + "' on VM " + vm.name + " (Windows)";
     System.log(executionResult);
-
+ 
 } catch (e) {
     System.error("workflow_UpdateLocalAdminPassword [item3a] FAILED: " + e.message);
     throw e;
 }
+

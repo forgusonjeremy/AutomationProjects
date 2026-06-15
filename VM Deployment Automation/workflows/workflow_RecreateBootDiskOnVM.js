@@ -1,5 +1,4 @@
-/**
- * ============================================================================
+/* ============================================================================
  *  WORKFLOW: Recreate Boot Disk
  *  PATH:     Library / Production / VCF Automation / VM Deployments / Helpers
  *  DISPLAY:  Recreate Boot Disk
@@ -35,8 +34,11 @@
  *
  *  API VALIDATION (vroapi.com / official; cross-checked vs. Cody Hosterman vRO
  *  disk-create example and VMTN reconfigVM_Task threads)
- *    - vm.config.hardware.device[] -> devices; VcVirtualDisk for disks,
- *      VcVirtualSCSIController (instanceof) for controllers.
+ *    - vm.config.hardware.device[] -> devices; VcVirtualDisk for disks.
+ *      Controllers: instanceof against the four CONCRETE SCSI subclasses
+ *      (VcParaVirtualSCSIController, VcVirtualLsiLogicSASController,
+ *      VcVirtualLsiLogicController, VcVirtualBusLogicController) — the abstract
+ *      VcVirtualSCSIController base does not match in the Rhino/plugin context.
  *    - Controller bus<->disk link: disk.controllerKey == controller.key,
  *      controller.busNumber == 0 for the first SCSI controller.
  *    - Delete: VcVirtualDeviceConfigSpec.operation = remove,
@@ -44,30 +46,29 @@
  *    - Create: new VcVirtualDisk + VcVirtualDiskFlatVer2BackingInfo,
  *      operation = add, fileOperation = create.
  *    - vm.reconfigVM_Task(spec) -> VcTask; wait via vim3WaitTaskEnd.
- * ============================================================================
- */
+ * ==========================================================================*/
 
 
 /* ============================================================================
- *  item1  —  Validate & Find Boot Disk   [task, ROOT]
- *  IN  : vm : VC:VirtualMachine
- *  OUT : capacityInKB, controllerKey, diskMode, thinProvisioned,
- *        eagerlyScrub, datastoreName, targetUnit, busNumber
- *  NEXT: item2
- * ----------------------------------------------------------------------------
- *  Find the SCSI controller on bus 0, then the disk on that controller at
- *  unitNumber 0, and capture every detail needed to recreate it identically.
- * ============================================================================ */
-// --- item1 body ---
+ * item1 — Validate and Find Boot Disk   (Scriptable Task   [ROOT])
+ * IN:  vm
+ * OUT: controllerKey, diskMode, thinProvisioned, eagerlyScrub, datastoreName, targetUnit, busNumber, capacityInKB
+ * NEXT: item2
+ * ==========================================================================*/
 if (vm === null || vm === undefined) {
     throw "Recreate Boot Disk: vm input is null.";
 }
 
-// Defensive: VM must be powered off for a destroy/recreate of the boot disk.
-var powerState = vm.runtime.powerState.value; // "poweredOff" | "poweredOn" | "suspended"
+// VM must be powered off for a destroy/recreate of the boot disk.
+// FIX: wait for the power-off task to complete before continuing,
+// otherwise the later destroy runs against a still-powering-off VM.
+var basic = System.getModule("com.vmware.library.vc.basic");
+var powerState = vm.runtime.powerState.value; // poweredOff|poweredOn|suspended
 if (powerState !== "poweredOff") {
-    throw "Recreate Boot Disk: VM '" + vm.name + "' is '" + powerState
-        + "'. Power it off before recreating the boot disk.";
+    System.log("Recreate Boot Disk: VM '" + vm.name + "' is '" + powerState
+        + "'; powering off and waiting.");
+    var offTask = vm.powerOffVM_Task();
+    basic.vim3WaitTaskEnd(offTask, true, 2); // wait for power-off
 }
 
 var busNumber = 0;   // first SCSI controller
@@ -79,20 +80,25 @@ if (devices === null || devices === undefined || devices.length === 0) {
 }
 
 // 1) Find the SCSI controller on bus 0 -> its device key.
+// FIX: VcVirtualSCSIController is the ABSTRACT base; instanceof against
+// it does not match the concrete subtype the VM actually uses (PVSCSI,
+// LSI Logic SAS, etc.). Match the four concrete SCSI subclasses.
 var i;
 var scsiControllerKey = null;
 for (i = 0; i < devices.length; i++) {
-    if (devices[i] instanceof VcVirtualSCSIController) {
-        if (devices[i].busNumber === busNumber) {
-            scsiControllerKey = devices[i].key;
-            break;
-        }
+    var dev = devices[i];
+    var isScsi = (dev instanceof VcParaVirtualSCSIController)
+        || (dev instanceof VcVirtualLsiLogicSASController)
+        || (dev instanceof VcVirtualLsiLogicController)
+        || (dev instanceof VcVirtualBusLogicController);
+    if (isScsi && dev.busNumber === busNumber) {
+        scsiControllerKey = dev.key;
+        break;
     }
 }
 if (scsiControllerKey === null) {
     throw "Recreate Boot Disk: no SCSI controller found on bus " + busNumber + ".";
 }
-
 // 2) Find the disk on that controller at unitNumber 0.
 var bootDisk = null;
 for (i = 0; i < devices.length; i++) {
@@ -140,18 +146,15 @@ System.log("Recreate Boot Disk: found boot disk on VM '" + vm.name
     + ", datastore=" + datastoreName + ").");
 
 
+
 /* ============================================================================
- *  item2  —  Delete Boot Disk   [task]
- *  IN  : vm, controllerKey, targetUnit
- *  NEXT: item3
- * ----------------------------------------------------------------------------
- *  Remove the disk WITH fileOperation = destroy so the VMDK file is deleted,
- *  not merely detached. One reconfigVM_Task; waited to completion.
- * ============================================================================ */
-// --- item2 body ---
-// Re-resolve the exact device object to remove (avoids a stale reference).
+ * item2 — Delete Boot Disk   (Scriptable Task)
+ * IN:  vm, controllerKey, targetUnit
+ * NEXT: item3
+ * ==========================================================================*/
 var devs2 = vm.config.hardware.device;
 var diskToRemove = null;
+var i;
 for (i = 0; i < devs2.length; i++) {
     if (devs2[i] instanceof VcVirtualDisk
             && devs2[i].controllerKey === controllerKey
@@ -180,15 +183,10 @@ System.log("Recreate Boot Disk: deleted original boot disk (VMDK destroyed).");
 
 
 /* ============================================================================
- *  item3  —  Create Replacement Disk   [task]
- *  IN  : vm, capacityInKB, controllerKey, targetUnit, diskMode,
- *        thinProvisioned, eagerlyScrub, datastoreName
- *  NEXT: item0
- * ----------------------------------------------------------------------------
- *  Add a new disk with identical geometry/placement. fileName "[datastore]"
- *  lets vCenter auto-generate the VMDK path/name in that datastore.
- * ============================================================================ */
-// --- item3 body ---
+ * item3 — Create New Boot Disk   (Scriptable Task)
+ * IN:  vm, busNumber, controllerKey, datastoreName, diskMode, eagerlyScrub, targetUnit, thinProvisioned, capacityInKB
+ * NEXT: item0
+ * ==========================================================================*/
 var newBacking = new VcVirtualDiskFlatVer2BackingInfo();
 newBacking.diskMode = diskMode;
 newBacking.fileName = "[" + datastoreName + "]"; // vCenter auto-names the VMDK
@@ -219,19 +217,3 @@ System.log("Recreate Boot Disk: created replacement boot disk (controllerKey="
     + controllerKey + ", unit=" + targetUnit + ", capacityKB=" + capacityInKB
     + ") on datastore '" + datastoreName + "'.");
 
-
-/* ============================================================================
- *  item0  —  End (success)
- * ============================================================================ */
-// (no body)
-
-
-/* ============================================================================
- *  item5  —  Log error (error handler)  -> item4
- * ============================================================================ */
-// System.error("Recreate Boot Disk failed: " + errorCode);
-
-/* ============================================================================
- *  item4  —  End (error)
- * ============================================================================ */
-// (no body)

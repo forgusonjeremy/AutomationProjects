@@ -13,7 +13,7 @@
  *   vcenterName {string} - name of the vCenter from which to get a list of vSphere clusters
  *
  * Output:
- *   {string} JSON array: [{name, moRef, totalCpuMhz, totalMemoryMB, numHosts}]
+ *   {string} (array) Cluster Names
  *
  * Notes:
  *   - vimType values must be validated for your vCenter SDK version (V4 validation item)

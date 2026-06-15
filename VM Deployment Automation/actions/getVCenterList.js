@@ -16,7 +16,7 @@
  *   (none)
  *
  * Output:
- *   {string} JSON array: [{name, url, version, apiVersion}]
+ *   {string} (array) vCenter Names
  *
  * Notes:
  *   - Returns all registered connections regardless of connectivity state.

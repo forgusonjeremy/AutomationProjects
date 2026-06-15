@@ -25,8 +25,8 @@
 
 
 /* ============================================================================
- * item1 — Prepare Guest Ops   (Scriptable Task)
- * IN:  vm, guestUsername, guestPassword
+ * item1 — Prepare Guest Ops   (Scriptable Task   [ROOT])
+ * IN:  vm, guestPassword, guestUsername
  * OUT: guestAuth, processManager, fileManager
  * NEXT: item2
  * ==========================================================================*/
@@ -50,7 +50,7 @@ System.log("workflow_SetCdromDriveLetter_Windows: VM = " + vm.name);
  * item2 — Set CD-Rom Drive Letter   (Scriptable Task)
  * IN:  cdDriveLetter, fileManager, guestAuth, MAX_WAIT_MS, POLL_MS, vm, processManager
  * OUT: executionResult
- * NEXT: item0 (End)
+ * NEXT: item0
  * ==========================================================================*/
 if (!cdDriveLetter) throw new Error("Input 'cdDriveLetter' is required.");
 var cdLetter = cdDriveLetter.replace(":", "").trim().toUpperCase();
@@ -110,3 +110,4 @@ if (exitCode !== 0)    throw new Error("Set CD-ROM " + cdLetter + ": failed on "
 
 executionResult = "SUCCESS: CD-ROM set to " + cdLetter + ": on " + vm.name;
 System.log(executionResult);
+

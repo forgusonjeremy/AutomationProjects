@@ -1,4 +1,4 @@
-/**
+/* ============================================================================
  * Workflow: Rename Windows Local Admin   (workflow_RenameLocalAdmin)
  * Module:   com.vcf.guestcustomization
  * WF ID:    f0be1eb7-54c3-4be7-a41d-05de7854671d
@@ -29,52 +29,52 @@
  *   guestAuth      {Any}
  *   fileManager    {VC:GuestFileManager}
  *   processManager {VC:GuestProcessManager}
- */
+ * ==========================================================================*/
 
 
-// =========================================================================
-// item1 — Validate Inputs   (Scriptable Task)
-// IN : vm, guestUsername, guestPassword, newAdminName
-// NEXT: item4
-// =========================================================================
+/* ============================================================================
+ * item1 — Validate Inputs   (Scriptable Task   [ROOT])
+ * IN:  guestPassword, guestUsername, vm, newAdminName
+ * NEXT: item4
+ * ==========================================================================*/
 if (!vm)            throw new Error("Input 'vm' is required.");
 if (!guestUsername) throw new Error("Input 'guestUsername' is required.");
 if (!guestPassword) throw new Error("Input 'guestPassword' is required.");
 if (!newAdminName)  throw new Error("Input 'newAdminName' is required.");
 
+
 System.log("workflow_RenameLocalAdmin: VM=" + vm.name + " NewName=" + newAdminName);
 
 
-// =========================================================================
-// item4 — Prepare Guest Ops   (Scriptable Task)
-// IN : vm, guestPassword, guestUsername
-// OUT: guestAuth {Any}, fileManager {VC:GuestFileManager}, processManager {VC:GuestProcessManager}
-// NEXT: item2
-//
-// NOTE: managers resolved from vm.sdkConnection.guestOperationsManager.
-// =========================================================================
+/* ============================================================================
+ * item4 — Prepare Guest Ops   (Scriptable Task)
+ * IN:  guestPassword, guestUsername, vm
+ * OUT: guestAuth, fileManager, processManager
+ * NEXT: item2
+ * ==========================================================================*/
 guestAuth      = new VcNamePasswordAuthentication();
 guestAuth.username = guestUsername;
 guestAuth.password = guestPassword;
-guestAuth.interactiveSession = false;
 
 var guestOpsManager = vm.sdkConnection.guestOperationsManager;  // VcGuestOperationsManager
-fileManager    = guestOpsManager.fileManager;                   // VcGuestFileManager
-processManager = guestOpsManager.processManager;                // VcGuestProcessManager
+fileManager = guestOpsManager.fileManager;           // VcGuestFileManager
+processManager = guestOpsManager.processManager
 
 
-// =========================================================================
-// item2 — Upload and Execute Script   (Scriptable Task)
-// IN : newAdminName, vm, processManager, fileManager, guestAuth
-// OUT: pid {number}, scriptPath {string}
-// NEXT: item3
-// =========================================================================
+
+/* ============================================================================
+ * item2 — Upload and Execute Script   (Scriptable Task)
+ * IN:  newAdminName, vm, processManager, fileManager, guestAuth
+ * OUT: pid, scriptPath
+ * NEXT: item3
+ * ==========================================================================*/
 if (!/^[a-zA-Z0-9_\-\.]{1,20}$/.test(newAdminName)) {
     throw new Error(
         "Input 'newAdminName' contains invalid characters or exceeds 20 characters. " +
         "Received: '" + newAdminName + "'"
     );
 }
+
 
 scriptPath = "C:\\Windows\\Temp\\vcf_rename_admin.ps1";
 
@@ -92,15 +92,24 @@ var scriptContent = [
     "exit 0"
 ].join("\r\n");
 
-var mod = System.getModule("com.broadcom.pso.vcfa.vm.guestScripting");
-var winFileAttr = new VcGuestWindowsFileAttributes();
-var byteLen     = mod.utf8ByteLength(scriptContent);
-var transferUrl = fileManager.initiateFileTransferToGuest(
-    vm, guestAuth, scriptPath, winFileAttr, byteLen, true
-);
-mod.uploadGuestScript(vm, transferUrl, scriptContent, "RenameAdmin");
 
-System.log("workflow_RenameLocalAdmin: Script uploaded.");
+try {
+    var mod = System.getModule("com.broadcom.pso.vcfa.vm.guestScripting");
+    var winFileAttr = new VcGuestWindowsFileAttributes();
+    var byteLen     = mod.utf8ByteLength(scriptContent);
+    var transferUrl = fileManager.initiateFileTransferToGuest(
+        vm, guestAuth, scriptPath, winFileAttr, byteLen, true
+    );
+    mod.uploadGuestScript(vm, transferUrl, scriptContent, "RenameAdmin");
+
+    System.log("workflow_RenameLocalAdmin: Script uploaded.");
+} finally {
+    try {
+        RESTHostManager.removeHost(transientHost);
+    } catch (err) {
+        System.warn("Upload host cleanup: " + err.message);
+    }
+}
 
 var progSpec              = new VcGuestProgramSpec();
 progSpec.programPath      = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
@@ -111,19 +120,17 @@ pid = processManager.startProgramInGuest(vm, guestAuth, progSpec);
 System.log("workflow_RenameLocalAdmin: Script started. PID: " + pid);
 
 
-// =========================================================================
-// item3 — Poll for Completion   (Scriptable Task)
-// IN : newAdminName, pid, scriptPath, vm, POLL_MS, processManager,
-//      fileManager, guestUsername, guestPassword, MAX_WAIT_MS
-// OUT: executionResult {string}
-// NEXT: item0 (End)
-//
-// Dual-credential poll: the account NAME changes mid-flight, so the original
-// session credentials may stop authenticating once the rename commits. Try
-// originalAuth (guestUsername) first, then renamedAuth (newAdminName); the
-// password is unchanged by a rename. Poll with a null filter and match PID
-// in JS.
-// =========================================================================
+/* ============================================================================
+ * item3 — Poll for Completion   (Scriptable Task)
+ * IN:  newAdminName, pid, scriptPath, vm, POLL_MS, processManager, fileManager, guestUsername, guestPassword, MAX_WAIT_MS
+ * OUT: executionResult
+ * NEXT: item0
+ * ==========================================================================*/
+var sdkConnection = vm.sdkConnection;
+if (!sdkConnection) {
+    throw new Error("Unable to resolve sdkConnection from VM '" + vm.name + "'.");
+}
+
 var originalAuth      = new VcNamePasswordAuthentication();
 originalAuth.username = guestUsername;
 originalAuth.password = guestPassword;
@@ -181,3 +188,4 @@ try {
 
 executionResult = "SUCCESS: Local admin account renamed to '" + newAdminName + "' on VM: " + vm.name;
 System.log(executionResult);
+

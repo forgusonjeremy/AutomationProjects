@@ -1,4 +1,4 @@
-/**
+/* ============================================================================
  * Workflow: Customize Windows VM Guest   (parent)
  * Module:   com.broadcom.pso.vcfa.vm
  * WF ID:    7f97799b-9aff-49a5-9cd1-3a75ec6a6c89
@@ -43,11 +43,11 @@
  *   guestOpsCheckSleep     {number} = 60
  *   cdDriveLetter          {string} = "Y"
  *   executionResult        {string}
- */
+ * ==========================================================================*/
 
 
 /* ============================================================================
- * item1 — Set Log Marker   (Scriptable Task)   [ROOT]
+ * item1 — Set Log Marker   (Scriptable Task   [ROOT])
  * NEXT: item2
  * ==========================================================================*/
 System.setLogMarker("Workflow Name:" + workflow.name + "-Workflow Run ID:" + workflow.id);
@@ -57,14 +57,8 @@ System.log("Begin Workflow Execution");
 /* ============================================================================
  * item2 — Get Properties from VM Request   (Scriptable Task)
  * IN:  inputProperties
- * OUT: guestPassword, guestUsername, newAdminName, vmExtId, newAdminPassword,
- *      hasDisks, diskCount, attachedDisks
+ * OUT: guestPassword, guestUsername, newAdminName, vmExtId, newAdminPassword, hasDisks, diskCount, attachedDisks
  * NEXT: item3
- *
- * WARNING (carried verbatim from the deployed artifact): this element logs the
- * bootstrap username and password in clear text via System.log. Remove the two
- * "current password"/"current admin user" System.log lines before production —
- * see notes accompanying this sync.
  * ==========================================================================*/
 vmExtId = inputProperties.externalIds[0];
 
@@ -79,7 +73,6 @@ for (var i = 0; i < configElems.length; i++) {
         break;
     }
 }
-
 System.log("config element: " + adminActConfigElement)
 
 guestPassword    = adminActConfigElement.getAttributeWithKey(inputProperties.customProperties.defaultAdminPwAttr).value;
@@ -111,8 +104,7 @@ if (rawDisks) {
     attachedDisks = "[]";
 }
 
-System.log("Starting guest customization of VM: " + inputProperties.resourceNames[0] +
-           ", AdditionalDisks=" + diskCount);
+System.log("Starting guest customization of VM: " + inputProperties.resourceNames[0] + ", AdditionalDisks=" + diskCount);
 
 
 /* ============================================================================
@@ -142,8 +134,8 @@ guestOpsCheckCounter = 0;
 /* ============================================================================
  * item6 — Guest Ops Check Threshold Exceeded?   (Decision / custom-condition)
  * IN:  guestOpsCheckCounter, guestOpsCheckThreshold
- *   true  -> item7  (Log Readiness error)
- *   false -> item8  (Get processes from guest)
+ *   true  -> item7
+ *   false -> item18
  * ==========================================================================*/
 if (guestOpsCheckCounter > guestOpsCheckThreshold) {
     return true;
@@ -156,114 +148,111 @@ else {
 /* ============================================================================
  * item7 — Log Guest Customization Readiness error   (Scriptable Task)
  * IN:  vm
- * NEXT: item0 (End)
+ * NEXT: item0
  * ==========================================================================*/
 System.error("Unable to perform guest customizations on VM: " + vm.name +
     ".  VM failed to enter 'guest customization ready' state.  Please check VMware tools running status");
 
 
 /* ============================================================================
- * item8 — Get processes from guest   (LIBRARY Workflow link)
- * linked-workflow-id: C98080808080808080808080808080800180808001322751030482b80adf61e7c
- * IN:  vmUsername <- guestUsername, vmPassword <- guestPassword, vm <- vm
+ * item18 — Format Disks (Windows)   (Workflow link)
+ * IN:  vm, guestUsername <- newAdminName, guestPassword <- newAdminPassword, additionalDisks <- attachedDisks
+ * OUT: executionSummary -> executionResult
+ * NEXT: item5
+ * linked-workflow-id: 2114fa72-0162-4928-8016-3ab0002472b6
+ * ==========================================================================*/
+/* (No scriptable body — workflow link.) */
+
+
+/* ============================================================================
+ * item8 — Get processes from guest   (Workflow link)
+ * IN:  vmUsername <- guestUsername, vmPassword <- guestPassword, vm
  * OUT: result -> vmProcessList
  * NEXT: item10
- * (No scriptable body — standard library workflow link.)
+ * linked-workflow-id: C98080808080808080808080808080800180808001322751030482b80adf61e7c
  * ==========================================================================*/
+/* (No scriptable body — workflow link.) */
 
 
 /* ============================================================================
  * item10 — VM Ready for Guest Ops?   (Decision / custom-condition)
  * IN:  vmProcessList
- *   true  (vmProcessList.length > 0) -> item13 (Configure CD Drive Letter)
- *   false                            -> item12 (Sleep)
+ *   true  -> item13
+ *   false -> item12
  * ==========================================================================*/
 if (vmProcessList.length > 0){
     return true;
 }
 else {
     return false;
-}
+} 
 
 
 /* ============================================================================
- * item12 — Sleep   (Library)
- * IN: sleepTime <- guestOpsCheckSleep
- * NEXT: item11
- * ==========================================================================*/
-//Auto-generated script
-if ( sleepTime !== null )  {
-    System.sleep(sleepTime * 1000);
-} else  {
-    throw "'sleepTime' is NULL";
-}
-
-
-/* ============================================================================
- * item11 — Increase counter   (Library: increase-counter)
- * IN/OUT: counter <- guestOpsCheckCounter ; counter -> guestOpsCheckCounter
- * NEXT: item6  (loop back to threshold decision)
+ * item11 — Increase counter   (Scriptable Task)
+ * IN:  counter <- guestOpsCheckCounter
+ * OUT: counter -> guestOpsCheckCounter
+ * NEXT: item6
  * ==========================================================================*/
 //Auto-generated script
 counter = counter + 1;
 
 
 /* ============================================================================
- * item13 — Configure CD Drive Letter   (Workflow link)
- * linked-workflow-id: 36328d1b-186d-460c-ad00-d667323d3384
- * IN:  vm <- vm, guestUsername <- guestUsername (bootstrap, pre-rename),
- *      guestPassword <- guestPassword (bootstrap), cdDriveLetter <- cdDriveLetter
- * OUT: executionResult -> executionResult
- * NEXT: item14
+ * item12 — Sleep   (Scriptable Task)
+ * IN:  sleepTime <- guestOpsCheckSleep
+ * NEXT: item11
  * ==========================================================================*/
+//Auto-generated script
+if ( sleepTime !== null )  {
+	System.sleep(sleepTime * 1000);
+}else  {
+	throw "'sleepTime' is NULL"; 
+}
+
+
+/* ============================================================================
+ * item13 — Configure CD Drive Letter   (Workflow link)
+ * IN:  vm, guestUsername, guestPassword, cdDriveLetter
+ * OUT: executionResult
+ * NEXT: item14
+ * linked-workflow-id: 36328d1b-186d-460c-ad00-d667323d3384
+ * ==========================================================================*/
+/* (No scriptable body — workflow link.) */
 
 
 /* ============================================================================
  * item14 — Rename Windows Local Admin   (Workflow link)
- * linked-workflow-id: f0be1eb7-54c3-4be7-a41d-05de7854671d
- * IN:  vm <- vm, guestUsername <- guestUsername, guestPassword <- guestPassword,
- *      newAdminName <- newAdminName
- * OUT: executionResult -> executionResult
+ * IN:  vm, guestUsername, guestPassword, newAdminName
+ * OUT: executionResult
  * NEXT: item15
+ * linked-workflow-id: f0be1eb7-54c3-4be7-a41d-05de7854671d
  * ==========================================================================*/
+/* (No scriptable body — workflow link.) */
 
 
 /* ============================================================================
  * item15 — Change Local Account Password   (Workflow link)
- * linked-workflow-id: c20a1766-1780-4fe2-a4e6-d553fc4bd1b4
- * IN:  vm <- vm, guestUsername <- newAdminName (post-rename),
- *      guestPassword <- guestPassword (still bootstrap pw),
- *      newPassword <- newAdminPassword
- * OUT: executionResult -> executionResult
+ * IN:  vm, guestUsername <- newAdminName, guestPassword, newPassword <- newAdminPassword
+ * OUT: executionResult
  * NEXT: item17
+ * linked-workflow-id: c20a1766-1780-4fe2-a4e6-d553fc4bd1b4
  * ==========================================================================*/
+/* (No scriptable body — workflow link.) */
 
 
 /* ============================================================================
  * item17 — Has Data Disks?   (Decision / custom-condition)
  * IN:  hasDisks
- *   true  -> item18 (Format Disks (Windows))
- *   false -> item16 (End)
+ *   true  -> item18
+ *   false -> item16
  * ==========================================================================*/
 return hasDisks;
 
 
 /* ============================================================================
- * item18 — Format Disks (Windows)   (Workflow link)
- * linked-workflow-id: 2114fa72-0162-4928-8016-3ab0002472b6
- * IN:  vm <- vm, guestUsername <- newAdminName (post-rename),
- *      guestPassword <- newAdminPassword (post-rotation),
- *      additionalDisks <- attachedDisks
- * OUT: executionSummary -> executionResult
- * NEXT: item5 (End)
+ * item20 — User interaction   (User Interaction)
+ * IN:  security.group, security.assignees, security.assignee.groups, timeout.date
+ * NEXT: item19
  * ==========================================================================*/
 
-
-/* ============================================================================
- * Terminal / housekeeping elements (no scriptable body):
- *   item0  — End  (reached from item7)
- *   item5  — End  (reached from item18)
- *   item16 — End  (reached from item17 false branch)
- *   item19 — End  (reached from item20)
- *   item20 — User interaction  (workflow error-handler) -> item19
- * ==========================================================================*/

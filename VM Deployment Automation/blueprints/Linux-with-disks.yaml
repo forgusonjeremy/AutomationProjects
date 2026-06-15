@@ -62,6 +62,33 @@ inputs:
     type: string
     title: ISO Image
     description: ISO to attach and boot from.
+  dataDisks:
+    type: array
+    title: Additional Data Disks
+    description: One entry per additional disk. Choose a size and a SCSI controller.
+    minItems: 1
+    maxItems: 10 # confirm the real ceiling
+    items:
+      type: object
+      properties:
+        sizeGb:
+          type: integer
+          title: Size (GB)
+          minimum: 1
+        SCSIController:
+          type: string
+          title: SCSI Controller
+          default: SCSI_Controller_1
+          enum:
+            - SCSI_Controller_1
+            - SCSI_Controller_2
+            - SCSI_Controller_3
+        provisionType:
+          type: string
+          enum:
+            - thin
+            - thick
+            - eagerZeroedThick
 resources:
   LinuxVM:
     type: Cloud.vSphere.Machine
@@ -80,6 +107,7 @@ resources:
       osType: linux
       constraints:
         - tag: clusterName:${input.clusterName}
+      attachedDisks: ${map_to_object(resource.DataDisk[*].id, "source")}
       networks:
         - network: ${resource.network.id}
           assignment: dynamic
@@ -93,3 +121,15 @@ resources:
       networkType: existing
       constraints:
         - tag: networkName:${input.networkName}
+  DataDisk:
+    type: Cloud.vSphere.Disk
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    allocatePerInstance: true
+    properties:
+      capacityGb: ${input.dataDisks[count.index].sizeGb}
+      SCSIController: ${input.dataDisks[count.index].SCSIController}
+      count: ${length(input.dataDisks)}
+      provisioningType: ${input.dataDisks[count.index].provisionType}

@@ -59,14 +59,14 @@
 
 
 /* ============================================================================
- * item2 — extractDiskUUIDs   (Action call: com.broadcom.pso.vcfa.vm.diskManagement/extractDiskUUIDs)
- * ROOT element. Auto-generated; cannot be modified in the editor.
- * IN-binding:  vm <- vm ; additionalDisksJson <- additionalDisks
- * OUT-binding: actionResult -> diskUuidMapJson
+ * item2 — extractDiskUUIDs   (Scriptable Task   [ROOT])
+ * IN:  vm, additionalDisksJson <- additionalDisks
+ * OUT: actionResult -> diskUuidMapJson
  * NEXT: item1
  * ==========================================================================*/
 //Auto generated script, cannot be modified !
-actionResult = System.getModule("com.broadcom.pso.vcfa.vm.diskManagement").extractDiskUUIDs(vm, additionalDisksJson);
+actionResult = System.getModule("com.broadcom.pso.vcfa.vm.diskManagement").extractDiskUUIDs(vm,additionalDisksJson);
+
 
 
 /* ============================================================================
@@ -115,8 +115,8 @@ fileManager    = guestOps.fileManager;
 /* ============================================================================
  * item5 — More Disks?   (Decision / custom-condition)
  * IN:  diskIndex, diskCount
- *   true  (diskIndex < diskCount) -> item6
- *   false                          -> item9
+ *   true  -> item6
+ *   false -> item9
  * ==========================================================================*/
 if (diskIndex < diskCount) {
     return true;
@@ -126,15 +126,12 @@ else {
 }
 
 
+
 /* ============================================================================
  * item6 — Build & Upload Current Disk   (Scriptable Task)
- * IN:  vm, guestAuth, fileManager, additionalDisks, diskUuidMapJson, diskIndex,
- *      SCRIPT_THRESHOLD_GB
- * OUT: curScriptPath, curUuid, curDriveLetter, curDriveLabel, curSizeGb, curPartStyle
+ * IN:  vm, guestAuth, fileManager, additionalDisks, diskUuidMapJson, diskIndex, SCRIPT_THRESHOLD_GB
+ * OUT: curScriptPath, curSizeGb, curUuid, curPartStyle, curDriveLetter, curDriveLabel
  * NEXT: item7
- *
- * NOTE: the in-guest UUID match normalizes BOTH sides — Get-Disk SerialNumber
- *       exposes the VMDK UUID without dashes and lowercase.
  * ==========================================================================*/
 function buildDiskPartitionScript(diskUuid, driveLetter, driveLabel, partitionStyle) {
     return [
@@ -213,8 +210,7 @@ curPartStyle   = partitionStyle;
 
 /* ============================================================================
  * item7 — Execute & Poll Current Disk   (Scriptable Task)
- * IN:  vm, guestAuth, processManager, curScriptPath, curUuid, curDriveLabel,
- *      curDriveLetter, curPartStyle, curSizeGb, MAX_WAIT_MS, POLL_MS, diskIndex, summary
+ * IN:  vm, guestAuth, processManager, curScriptPath, curUuid, curDriveLabel, curDriveLetter, curPartStyle, curSizeGb, MAX_WAIT_MS, POLL_MS, diskIndex, summary
  * OUT: summary
  * NEXT: item8
  * ==========================================================================*/
@@ -255,9 +251,10 @@ summary.push(diskResult);
 
 
 /* ============================================================================
- * item8 — Increase counter   (Library: increase-counter)
- * IN/OUT: counter <- diskIndex ; counter -> diskIndex
- * NEXT: item5  (loop back to the decision)
+ * item8 — Increase counter   (Scriptable Task)
+ * IN:  counter <- diskIndex
+ * OUT: counter -> diskIndex
+ * NEXT: item5
  * ==========================================================================*/
 //Auto-generated script
 counter = counter + 1;
@@ -267,7 +264,8 @@ counter = counter + 1;
  * item9 — Compile Results   (Scriptable Task)
  * IN:  summary
  * OUT: executionSummary
- * NEXT: item4 (End)
+ * NEXT: item4
  * ==========================================================================*/
 executionSummary = summary.join("\n");
 System.log("workflow_MountFormatDisks_Windows: Completed.\n" + executionSummary);
+
