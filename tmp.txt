@@ -1,10 +1,8 @@
-kubectl get kcp -A
-kubectl get machines -A -o wide
-kubectl get machines -A | grep -iv running        # the non-Running ones
-kubectl describe machine cvsd26vcfmgt-8lmtt-lh556 -n vmsp-platform | tail -40
+# newest configure-component pods, any state
+kubectl get pods -n vmsp-platform | grep -iE 'configure-component|deploy' | sort -k5
 
-# CAPI controller — why the roll is stalled
-kubectl logs -n vmsp-platform deploy/capi-kubeadm-control-plane-controller-manager --tail=80 | grep -iE 'error|fail|wait|stuck|etcd'
+# events from the last few minutes
+kubectl get events -n vmsp-platform --sort-by=.lastTimestamp | tail -30
 
-# is it an etcd-health gate? KCP blocks rollout if etcd quorum isn't healthy
-kubectl logs -n vmsp-platform vmsp-etcd-0 --tail=40
+
+kubectl logs -n vmsp-platform <newest-error-pod> --all-containers --tail=60 | grep -iE 'error|fail|not enough|exit code|status code|wrong resource'
