@@ -1,0 +1,61 @@
+root [ /home/vmware-system-user ]# kubectl describe nodes | grep -A5 Allocatable
+Allocatable:
+  cpu:                11900m
+  ephemeral-storage:  91798234905
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             20774044Ki
+--
+Allocatable:
+  cpu:                3920m
+  ephemeral-storage:  91798234905
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             8004740Ki
+--
+Allocatable:
+  cpu:                11900m
+  ephemeral-storage:  91798234905
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             20774040Ki
+--
+Allocatable:
+  cpu:                11900m
+  ephemeral-storage:  91798234905
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             20774036Ki
+--
+Allocatable:
+  cpu:                3920m
+  ephemeral-storage:  91798234905
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             8004740Ki
+--
+Allocatable:
+  cpu:                3920m
+  ephemeral-storage:  91798234905
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             8004736Ki
+--
+Allocatable:
+  cpu:                11900m
+  ephemeral-storage:  91798234905
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             20774036Ki
+--
+Allocatable:
+  cpu:                11900m
+  ephemeral-storage:  91798234905
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             20774036Ki
+root [ /home/vmware-system-user ]#
+
+
+root [ /home/vmware-system-user ]# kubectl get pods -A | grep -i network
+root [ /home/vmware-system-user ]#
