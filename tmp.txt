@@ -1,2 +1,12 @@
-# on the control-plane node — find the CURRENT task's deploy attempts
-kubectl get pods -n vmsp-platform | grep configure-component | grep -v q6yfx
+root [ /home/vmware-system-user ]# kubectl get pods -A | grep -iE 'sddc-lcm|fleet-lcm|lcm'
+vcf-fleet-lcm     vcf-fleet-build-service-fleetbuild-7d866fff97-9d5qd                          1/1     Running     0               2d21h
+vcf-fleet-lcm     vcf-fleet-lcm-db-0                                                           3/3     Running     0               4h35m
+vcf-fleet-lcm     vcf-fleet-lcm-db-1                                                           3/3     Running     0               4h38m
+vcf-fleet-lcm     vcf-fleet-lcm-db-2                                                           3/3     Running     0               4h37m
+vcf-fleet-lcm     vcf-fleet-upgrade-service-fleetupgrade-dcfdfcbc9-6l8k2                       1/1     Running     0               2d21h
+vcf-sddc-lcm      vcf-sddc-build-service-sddcbuild-5dd5cfd4c5-8rjlq                            1/1     Running     0               2d21h
+vcf-sddc-lcm      vcf-sddc-lcm-db-0                                                            3/3     Running     0               4h37m
+vcf-sddc-lcm      vcf-sddc-lcm-db-1                                                            3/3     Running     0               4h38m
+vcf-sddc-lcm      vcf-sddc-lcm-db-2                                                            3/3     Running     0               4h37m
+vcf-sddc-lcm      vcf-sddc-upgrade-service-sddcupgrade-ddcfdffb4-cxbkv                         1/1     Running     0               2d21h
+root [ /home/vmware-system-user ]#
