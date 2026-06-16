@@ -64,10 +64,12 @@ inputs:
           type: string
         provisionType:
           type: string
+          title: Provisioning Type
           enum:
             - thin
             - thick
             - eagerZeroedThick
+          default: thin
 #Hidden inputs
   adminAcctConfigElemName:
     type: string

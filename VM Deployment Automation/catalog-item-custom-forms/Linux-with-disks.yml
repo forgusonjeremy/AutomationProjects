@@ -285,10 +285,11 @@ schema:
             - value: SCSI_Controller_3
               label: SCSI_Controller_3
           id: SCSIController
-        - label: provisionType
+        - label: Provisioning Type
           type:
             dataType: string
             isMultiple: false
+          default: thin
           valueList:
             - value: thin
               label: thin

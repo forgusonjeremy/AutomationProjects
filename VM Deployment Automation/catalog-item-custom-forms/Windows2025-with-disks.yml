@@ -71,14 +71,13 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_e6d89a32
+        - id: section_59abf97b
           fields:
             - id: dataDisks
               display: datagrid
               state:
                 visible: true
                 read-only: false
-                hidden-fields: []
               signpostPosition: right-middle
       title: General
     - id: page_7e3a3faa
@@ -296,10 +295,11 @@ schema:
             dataType: string
             isMultiple: false
           id: driveLabel
-        - label: provisionType
+        - label: Provisioning Type
           type:
             dataType: string
             isMultiple: false
+          default: thin
           valueList:
             - value: thin
               label: thin

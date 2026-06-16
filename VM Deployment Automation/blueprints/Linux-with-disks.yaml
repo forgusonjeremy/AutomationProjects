@@ -85,10 +85,12 @@ inputs:
             - SCSI_Controller_3
         provisionType:
           type: string
+          title: Provisioning Type
           enum:
             - thin
             - thick
             - eagerZeroedThick
+          default: thin
 resources:
   LinuxVM:
     type: Cloud.vSphere.Machine
