@@ -36,7 +36,8 @@ try {
 
         var clusterList  = [];
         //var allClusters  = vcConnection.getAllClusterComputeResources()
-        var allClusters = vcConnection.getAllResourcePools() //CHANGE THIS BEFORE GOING INTO ENVIRONMENT WITH MULTIPLE CLUSTERS
+        var allResourcePools = vcConnection.getAllResourcePools() 
+        var allClusters = vcConnection.getAllClusterComputeResources()
 
         if (!allClusters || allClusters.length === 0) {
             System.warn("getClusterList: No clusters found in vCenter inventory.");
@@ -54,6 +55,30 @@ try {
             }
 
             clusterList.push(clusterName);
+        }
+
+        if (!allResourcePools || allResourcePools.length === 0) {
+            System.warn("getClusterList: No clusters found in vCenter inventory.");
+            return JSON.stringify([]);
+        }
+
+        for (var i = 0; i < allResourcePools.length; i++) {
+            var resourcePool = allResourcePools[i];
+
+            try {
+                if (resourcePool.name == "Resources"){
+                    //do nothing
+                }
+                else {
+                    var resourcePoolName = resourcePool.name
+                    System.log("clusterName: " + resourcePool)
+                }
+                
+            } catch (summaryErr) {
+                System.warn("getClusterList: Could not get name for cluster '" + resourcePool.name);
+            }
+
+            clusterList.push(resourcePoolName);
         }
 
         System.log("getClusterList: Returned " + clusterList.length + " cluster(s) in vCenter: " + vcenterName);
