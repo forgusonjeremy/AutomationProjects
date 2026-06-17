@@ -1,6 +1,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # Configuration Element Definition
 # VCF/WindowsLogManagement/WindowsLogManagement-Config
+# Updated after cvs_functions.ps1 source review
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 # Create this Configuration Element in the vRO Configuration tab before
@@ -11,6 +12,45 @@
 # (Create the folder structure VCF > WindowsLogManagement if it does not exist.)
 #
 # ───────────────────────────────────────────────────────────────────────────────
+# PREREQUISITE — PS HOST MUST BE CONFIGURED AND REGISTERED IN vRO FIRST
+# ───────────────────────────────────────────────────────────────────────────────
+#
+# All four workflows require a PowerShell host to be registered in VCF
+# Orchestrator before they can be run.  The PowerShell host is the Windows
+# Server that executes cvs_functions.ps1 on behalf of vRO.
+#
+# See: PS-Host-Build-Guide.txt — complete build and registration guide.
+#
+# HTTPS Certificate Requirement:
+#   The workflows in this package use HTTPS to communicate with the PowerShell
+#   host.  Before the PS host can be added to VCF Orchestrator, the certificate
+#   presented by the Windows Server on port 5986 must be trusted by vRO.
+#
+#   Two valid approaches:
+#
+#   Option A (Preferred): Certificate signed by a CA already trusted by vRO
+#     No additional vRO configuration needed.  Add the PS host directly.
+#
+#   Option B: Self-signed certificate or internal CA not yet trusted by vRO
+#     The certificate (or CA certificate chain) must be imported into the
+#     VCF Orchestrator trust store BEFORE the PS host is added.
+#
+#     Import via:
+#       vRO → Library → Configuration → SSL Trust Manager
+#         → "Import a trusted certificate from a URL"
+#             URL: https://<pshostfqdn>:5986
+#         OR
+#         → "Import a trusted certificate from a file"
+#             File: Base-64 encoded .cer / .pem export of the certificate
+#
+#     The "Add a PowerShell host" workflow does NOT offer a "trust anyway"
+#     option for untrusted certificates.  If the certificate is not trusted
+#     when the workflow runs, it will fail with an SSL error.
+#
+#     See PS-Host-Build-Guide.txt Part 2 (Steps 2.1 and 2.2) for full
+#     certificate import instructions.
+#
+# ───────────────────────────────────────────────────────────────────────────────
 # ATTRIBUTES
 # ───────────────────────────────────────────────────────────────────────────────
 #
@@ -18,19 +58,40 @@
 # ─────────────────────     ──────── ────────────────────────────────────────────────── ──────────────────────────────────────────────
 # defaultScriptPath         string   C:\PSO\Scripts\cvs_functions.ps1                   Full path to cvs_functions.ps1 on the PS host.
 #                                                                                        Must match the actual deployed path exactly.
+#                                                                                        Verify with: Test-Path '<path>' on PS host.
 #
 # defaultFileShareTarget    string   \\fileserver.corp.local\mdcarchivelog$\Windows      Default UNC destination root for log moves.
 #                                                                                        Per-server subfolders are created below this path
 #                                                                                        by the script (e.g. \\server\share$\Windows\srv01).
+#                                                                                        Must be writable by the PS host service account.
 #
-# defaultDomainName         string   corp.local                                          Default AD domain name.  Used as -DomainName in
-#                                                                                        ByADGroupName and ByADGroupCN workflows and as
-#                                                                                        the -Server value for AD queries in ByCN.
+# defaultDomainName         string   corp.local                                          Default AD domain name.
+#                                                                                        Used as -DomainName in ByADGroupName workflow
+#                                                                                        (passed to Get-ADGroupMember -Server).
+#                                                                                        Used as -DomainName in ByADGroupCN workflow
+#                                                                                        (passed to Get-ListOfServers-ByCN -Server).
 #
 # defaultLogRetentionDays   number   370                                                 Default age threshold for Remove-OldFiles-UNCShare.
 #                                                                                        Files older than this many days are candidates for
 #                                                                                        deletion (subject to whatIf setting).
 #                                                                                        370 = ~13 months.  Minimum enforced: 1.
+#                                                                                        Maps to -OlderThanDays in cvs_functions.ps1.
+#
+# ───────────────────────────────────────────────────────────────────────────────
+# IMPORTANT — WhatIf BEHAVIOUR FOR Remove-OldFiles-UNCShare
+# ───────────────────────────────────────────────────────────────────────────────
+#
+# The Remove-OldFiles-UNCPath function in cvs_functions.ps1 calls Read-Host
+# for confirmation when WhatIf='yes' (-Force $false).  In a non-interactive
+# PS host session (as used by vRO), this will either block or silently cancel.
+#
+# WhatIf='yes' does NOT function as a report-only preview mode from vRO.
+# Run the script manually on the PS host with WhatIf='yes' before scheduling
+# any vRO workflow with WhatIf='no'.
+#
+# There is no Config Element attribute for the whatIf default — it is set
+# directly on the workflow custom form with a default of 'yes' and a dropdown
+# of 'yes' / 'no'.  Operators must explicitly change to 'no' to delete files.
 #
 # ───────────────────────────────────────────────────────────────────────────────
 # HOW TO CREATE IN vRO UI
@@ -65,18 +126,43 @@
 # WORKFLOW-TO-ATTRIBUTE MAPPING
 # ───────────────────────────────────────────────────────────────────────────────
 #
-# Workflow                       Input               Config Element Attribute
-# ─────────────────────────────  ──────────────────  ─────────────────────────────
-# Move-ArchivedLogs-LocalHost    scriptPath          defaultScriptPath
-# Move-ArchivedLogs-LocalHost    fileShareTarget     defaultFileShareTarget
+# Workflow                        Input               Config Element Attribute
+# ──────────────────────────────  ──────────────────  ────────────────────────────
+# Move-ArchivedLogs-LocalHost     scriptPath          defaultScriptPath
+# Move-ArchivedLogs-LocalHost     fileShareTarget     defaultFileShareTarget
 #
-# Move-ArchivedLogs-ByADGroupName scriptPath         defaultScriptPath
-# Move-ArchivedLogs-ByADGroupName domainName         defaultDomainName
-# Move-ArchivedLogs-ByADGroupName fileShareTarget    defaultFileShareTarget
+# Move-ArchivedLogs-ByADGroupName scriptPath          defaultScriptPath
+# Move-ArchivedLogs-ByADGroupName domainName          defaultDomainName
+# Move-ArchivedLogs-ByADGroupName fileShareTarget     defaultFileShareTarget
 #
-# Move-ArchivedLogs-ByADGroupCN  scriptPath          defaultScriptPath
-# Move-ArchivedLogs-ByADGroupCN  domainName          defaultDomainName
-# Move-ArchivedLogs-ByADGroupCN  fileShareTarget     defaultFileShareTarget
+# Move-ArchivedLogs-ByADGroupCN   scriptPath          defaultScriptPath
+# Move-ArchivedLogs-ByADGroupCN   domainName          defaultDomainName
+# Move-ArchivedLogs-ByADGroupCN   fileShareTarget     defaultFileShareTarget
 #
-# Remove-OldFiles-UNCShare       scriptPath          defaultScriptPath
-# Remove-OldFiles-UNCShare       olderThanDays       defaultLogRetentionDays
+# Remove-OldFiles-UNCShare        scriptPath          defaultScriptPath
+# Remove-OldFiles-UNCShare        olderThanDays       defaultLogRetentionDays
+#
+# ───────────────────────────────────────────────────────────────────────────────
+# SCRIPT PARAMETER REFERENCE (confirmed from cvs_functions.ps1 source)
+# ───────────────────────────────────────────────────────────────────────────────
+#
+# The following script parameters are relevant to these workflows.
+# Note underscores — these must match exactly in the invocation strings
+# generated by the build* actions.
+#
+# Script Parameter     Maps from workflow input    Used by action
+# ─────────────────    ─────────────────────────   ───────────────────────────────────
+# -Action              (constant per workflow)      all build* actions
+# -FileShareTarget     fileShareTarget              buildMoveLocalHostInvocation
+#                                                   buildMoveByGroupNameInvocation
+#                                                   buildMoveByGroupCNInvocation
+# -ADGroupMember       adGroupMember               buildMoveByGroupNameInvocation
+# -DomainName          domainName                  buildMoveByGroupNameInvocation
+#                                                   buildMoveByGroupCNInvocation
+# -SecurityGroup_CN    securityGroupCN             buildMoveByGroupCNInvocation
+#   (underscore)
+# -HostList            derived from psHost.name    buildMoveLocalHostInvocation
+# -UNC_SharePath       uncSharePath                buildRemoveFilesInvocation
+#   (underscore)
+# -OlderThanDays       olderThanDays               buildRemoveFilesInvocation
+# -WhatIf              whatIf                      buildRemoveFilesInvocation

@@ -1,0 +1,450 @@
+═══════════════════════════════════════════════════════════════════════════════
+BUILD GUIDE — Windows PowerShell Host for VCF Operations Orchestrator 9
+Windows Archive Log Management Project
+═══════════════════════════════════════════════════════════════════════════════
+
+Reference: Broadcom TechDocs — VCF Operations Orchestrator 9.0
+  Configuring WinRM:
+    https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/
+    configuration-of-vmware-cloud-foundation-operations-orchestrator/
+    vcf-ochestrator-plugins-overview/using-the-powershell-plug-in/
+    configuring-the-powershell-plug-in/configuring-winrm.html
+
+  Add a PowerShell Host:
+    https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/
+    configuration-of-vmware-cloud-foundation-operations-orchestrator/
+    vcf-ochestrator-plugins-overview/using-the-powershell-plug-in/
+    configuring-the-powershell-plug-in/add-a-powershell-host.html
+
+  Manage VCF Operations Orchestrator Certificates:
+    https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/
+    configuration-of-vmware-cloud-foundation-operations-orchestrator/
+    types-of-orchestrator-instances/configuring-vcf-operations-orchestrator/
+    manage-orchestrator-certificates.html
+
+───────────────────────────────────────────────────────────────────────────────
+OVERVIEW
+───────────────────────────────────────────────────────────────────────────────
+
+This guide covers the end-to-end configuration required to make a Windows
+Server usable as a VCF Operations Orchestrator PowerShell host over HTTPS with
+Kerberos authentication.
+
+The Windows server configured here is the PS host that:
+  - Runs cvs_functions.ps1 on behalf of vRO workflows
+  - Accesses target servers via UNC admin shares (\\server\C$\...)
+  - Writes moved log files to the central archive share
+
+This guide assumes the Windows Server OS is already installed, domain-joined,
+and has network connectivity to VCF Orchestrator.
+
+───────────────────────────────────────────────────────────────────────────────
+PREREQUISITES
+───────────────────────────────────────────────────────────────────────────────
+
+  [ ] Windows Server 2019 or 2022 (recommended)
+  [ ] Domain-joined to the target AD domain (e.g. corp.local)
+  [ ] Static IP address or stable DNS hostname
+  [ ] FQDN resolves correctly from VCF Orchestrator appliance
+  [ ] Local Administrator or Domain Admin access for configuration steps
+  [ ] Access to a CA or ability to create a self-signed certificate
+  [ ] cvs_functions.ps1 deployed to C:\PSO\Scripts\ (or configured path)
+  [ ] Service account created in AD for vRO execution context
+
+───────────────────────────────────────────────────────────────────────────────
+PART 1 — WINDOWS SERVER CONFIGURATION
+───────────────────────────────────────────────────────────────────────────────
+
+STEP 1.1 — Install RSAT Active Directory Tools
+───────────────────────────────────────────────
+Required for Get-ADGroupMember and Get-ADComputer used by cvs_functions.ps1.
+
+Run on the PS host (PowerShell as Administrator):
+
+  # Windows Server 2019 / 2022
+  Add-WindowsFeature RSAT-AD-PowerShell
+
+  # Verify
+  Get-Module -ListAvailable ActiveDirectory
+  # Expected: Module entry for ActiveDirectory is listed
+
+
+STEP 1.2 — Configure WinRM Base Settings
+─────────────────────────────────────────
+Run on the PS host (PowerShell as Administrator):
+
+  winrm quickconfig
+
+  # Enable Kerberos authentication on the WinRM service
+  winrm set winrm/config/service/auth '@{Kerberos="true"}'
+
+  # Increase shell memory limit (required for larger script operations)
+  winrm set winrm/config/winrs @{MaxMemoryPerShellMB="2048"}
+
+  # Verify WinRM service is running
+  Get-Service WinRM
+  # Expected: Status = Running
+
+
+STEP 1.3 — Obtain or Generate a Certificate for HTTPS
+──────────────────────────────────────────────────────
+VCF Orchestrator requires HTTPS for secure PS host communication.  The
+certificate must meet one of the following conditions:
+
+  Option A (Preferred): Signed by a CA already trusted by VCF Orchestrator
+    - Request a certificate from your internal CA
+    - Certificate must include the PS host FQDN as the CN or Subject
+      Alternative Name (SAN)
+    - No additional vRO configuration needed if the CA is already trusted
+
+  Option B: Self-signed certificate
+    - Must be imported into the VCF Orchestrator trust store before the
+      PS host can be added (see Part 2, Step 2.1)
+
+To generate a self-signed certificate (Option B), run on the PS host
+(PowerShell as Administrator):
+
+  # Replace machinename.subdomain.company.com and machinename with your values
+  $cert = New-SelfSignedCertificate `
+      -CertStoreLocation cert:\localmachine\my `
+      -DnsName ("pshost.corp.local", "pshost") `
+      -NotAfter (Get-Date).AddYears(5) `
+      -Provider "Microsoft RSA SChannel Cryptographic Provider" `
+      -KeyLength 2048
+
+  # Note the thumbprint for use in Step 1.4
+  $cert.Thumbprint
+
+  # Export the certificate (public key only) for import into vRO
+  Export-Certificate `
+      -Cert "cert:\LocalMachine\My\$($cert.Thumbprint)" `
+      -FilePath "C:\PSO\pshost-cert.cer" `
+      -Type CERT
+
+  # Copy C:\PSO\pshost-cert.cer to a location accessible from vRO
+  # (e.g. SCP to a staging location or upload via vRO UI)
+
+  NOTE: -NotAfter specifies a 5-year expiry.  If omitted, the certificate
+  expires in 1 year.  Set a calendar reminder for renewal before expiry —
+  an expired certificate will break all vRO workflows using this PS host.
+
+
+STEP 1.4 — Configure WinRM HTTPS Listener
+──────────────────────────────────────────
+Run on the PS host (PowerShell as Administrator):
+
+  # Use the thumbprint from Step 1.3
+  $thumbprint = "<paste thumbprint here>"
+
+  # Create the HTTPS WinRM listener
+  New-WSManInstance `
+      -ResourceURI winrm/config/listener `
+      -SelectorSet @{Address="*"; Transport="HTTPS"} `
+      -ValueSet @{
+          Hostname = "pshost.corp.local";
+          CertificateThumbprint = $thumbprint
+      }
+
+  # Alternatively, using winrm command line:
+  # winrm create winrm/config/listener?Address=*+Transport=HTTPS
+  #   @{Hostname="pshost.corp.local";CertificateThumbprint="<thumbprint>"}
+
+  # Verify the HTTPS listener is created
+  winrm enumerate winrm/config/listener
+  # Expected: Entry with Transport=HTTPS is listed
+
+
+STEP 1.5 — Open Windows Firewall for WinRM HTTPS
+─────────────────────────────────────────────────
+Run on the PS host (PowerShell as Administrator):
+
+  # WinRM HTTPS uses port 5986
+  New-NetFirewallRule `
+      -Name "WinRM-HTTPS" `
+      -DisplayName "WinRM HTTPS (port 5986)" `
+      -Protocol TCP `
+      -LocalPort 5986 `
+      -Action Allow `
+      -Direction Inbound `
+      -Enabled True
+
+  # Verify
+  Get-NetFirewallRule -Name "WinRM-HTTPS"
+  # Expected: Enabled = True, Action = Allow
+
+
+STEP 1.6 — Configure Service Account
+─────────────────────────────────────
+The service account used by vRO to connect to the PS host must:
+  a) Have permission to log on via WinRM (local or domain)
+  b) Have read access to \\targetservers\C$\Windows\System32\winevt\Logs
+  c) Have write access to the archive file share
+  d) Be configured for Kerberos constrained delegation if accessing
+     both a UNC source and UNC destination (double-hop)
+
+Minimum local rights on PS host:
+  Add service account to the local "Remote Management Users" group:
+
+  Add-LocalGroupMember -Group "Remote Management Users" -Member "corp\svc-vro-ps"
+
+  # If the account also needs to run scripts with elevated access:
+  # Add to local Administrators group (evaluate against security policy)
+  # Add-LocalGroupMember -Group "Administrators" -Member "corp\svc-vro-ps"
+
+Kerberos constrained delegation (if double-hop UNC access is needed):
+  Configure in Active Directory on the PS host computer account:
+  - AD Users and Computers → PS host computer account → Properties → Delegation
+  - Select: "Trust this computer for delegation to specified services only"
+  - Select: "Use Kerberos only"
+  - Add the CIFS SPN of the target file server:
+      Service type: cifs
+      Computer: fileserver.corp.local
+  - Repeat for each target server that the PS host accesses via UNC
+
+
+STEP 1.7 — Deploy cvs_functions.ps1
+─────────────────────────────────────
+  [ ] Create directory: C:\PSO\Scripts\
+  [ ] Copy cvs_functions.ps1 to C:\PSO\Scripts\cvs_functions.ps1
+  [ ] Set NTFS permissions: service account has Read & Execute on the file
+  [ ] Verify: Test-Path 'C:\PSO\Scripts\cvs_functions.ps1'  → True
+
+  Set PowerShell execution policy to allow script execution:
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine
+  # RemoteSigned allows local scripts; scripts downloaded from internet
+  # must be signed.  Adjust per your organisation's security policy.
+
+
+STEP 1.8 — Verify WinRM HTTPS Connectivity from vRO Appliance
+──────────────────────────────────────────────────────────────
+From the VCF Orchestrator appliance (SSH as root or admin):
+
+  # Test TCP connectivity to WinRM HTTPS port
+  Test-NetConnection -ComputerName pshost.corp.local -Port 5986
+  # Or using curl from Linux:
+  curl -v -k https://pshost.corp.local:5986/wsman
+
+  Expected: TCP connection succeeds (port 5986 open)
+
+───────────────────────────────────────────────────────────────────────────────
+PART 2 — VCF ORCHESTRATOR CERTIFICATE TRUST CONFIGURATION
+───────────────────────────────────────────────────────────────────────────────
+
+IMPORTANT — READ BEFORE ADDING THE PS HOST:
+
+If the PS host certificate is signed by a CA that VCF Orchestrator does not
+already trust, the certificate (or the CA certificate chain) MUST be imported
+into the VCF Orchestrator trust store BEFORE the PS host is added.
+
+If you attempt to add the PS host without importing the certificate first,
+the connection will fail with an SSL trust error.  Adding the PS host
+workflow does not offer an option to accept or ignore untrusted certificates —
+unlike some other vRO plugin host-add workflows.
+
+Skip to Step 2.3 if the certificate is signed by a CA already trusted by vRO
+(e.g. your organisation's internal CA is already in the vRO trust store from
+a previous configuration).
+
+
+STEP 2.1 — Determine Whether Certificate Import is Required
+────────────────────────────────────────────────────────────
+Method A — Check via vRO UI:
+  1. Log in to VCF Orchestrator
+  2. Navigate to: Administration → Certificates (or Configuration → Certificates
+     depending on your vRO 9 UI version)
+  3. Check Trusted Certificates for an entry matching your CA or the PS host
+     certificate
+  4. If not present → proceed to Step 2.2
+
+Method B — Attempt to add PS host (Step 2.3) and check for SSL errors:
+  If the add workflow fails with a certificate trust error → proceed to Step 2.2
+  This method is acceptable only if you understand you will need to retry after
+  importing the certificate.
+
+
+STEP 2.2 — Import Certificate into VCF Orchestrator Trust Store
+────────────────────────────────────────────────────────────────
+Two methods are available.  Method A (workflow) is preferred.
+
+METHOD A — Via SSL Trust Manager Workflow (Recommended)
+
+  Option i: Import from URL (simplest if PS host is reachable)
+    1. In vRO, navigate to: Library → Configuration → SSL Trust Manager
+    2. Run workflow: "Import a trusted certificate from a URL"
+    3. Enter: https://pshost.corp.local:5986
+    4. vRO retrieves the certificate from the live endpoint
+    5. Review the certificate details presented
+    6. Confirm and run
+    7. Verify completion with no errors
+
+  Option ii: Import from PEM file (use if URL method is unavailable)
+    1. Export the PS host certificate (or CA certificate) as a PEM-encoded
+       file (.cer or .pem, Base-64 encoded X.509 format)
+       On the PS host:
+         # Export from Windows certificate store as Base-64 encoded CER
+         # Right-click certificate in certmgr.msc → Export → Base-64 encoded X.509
+         # Or via PowerShell:
+         $cert = Get-ChildItem cert:\LocalMachine\My | Where-Object {$_.Subject -like "*pshost*"}
+         [System.IO.File]::WriteAllBytes("C:\PSO\pshost-cert.pem",
+             $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+
+    2. Transfer the .pem / .cer file to a location accessible from the vRO UI
+       (local browser machine is sufficient for file upload)
+
+    3. In vRO, navigate to: Library → Configuration → SSL Trust Manager
+    4. Run workflow: "Import a trusted certificate from a file"
+    5. Browse to and select the exported certificate file
+    6. Run the workflow
+    7. Verify completion with no errors
+
+  If the PS host uses a certificate signed by an internal CA:
+    Import the ROOT CA certificate (and any intermediate CA certificates),
+    not just the PS host certificate.  Importing only the leaf certificate
+    will work for this specific host but will require re-import for any
+    future host using the same CA.  Importing the CA is the correct approach.
+
+METHOD B — Via vRO Administration UI (Certificate Management page)
+
+  VCF Orchestrator 9 also exposes certificate management directly in the UI:
+  1. Navigate to: Administration → Certificate Management (exact path may vary)
+  2. Click: Import Certificate
+  3. Select: From URL or From PEM file
+  4. Follow prompts
+  Refer to: Manage VCF Operations orchestrator certificates (TechDocs link above)
+
+  After import, verify the certificate appears in the trusted certificates list
+  before proceeding to Step 2.3.
+
+───────────────────────────────────────────────────────────────────────────────
+PART 3 — ADD PS HOST TO VCF ORCHESTRATOR
+───────────────────────────────────────────────────────────────────────────────
+
+STEP 2.3 — Add the PowerShell Host via Plugin Workflow
+───────────────────────────────────────────────────────
+Prerequisites:
+  [ ] Part 1 (Windows Server configuration) complete
+  [ ] Certificate imported into vRO trust store (Step 2.2) if required
+  [ ] Service account credentials available
+
+In vRO:
+  1. Navigate to: Library → PowerShell → Configuration
+     (or: Workflows → Library → PowerShell → Configuration)
+  2. Run workflow: "Add a PowerShell host"
+  3. Complete the input form:
+
+     General tab:
+       Name:            <descriptive name, e.g. "PSO-WinRM-Host-01">
+       Host:            pshost.corp.local   (FQDN — must match certificate CN/SAN)
+       Port:            5986                (WinRM HTTPS default)
+       Transport:       HTTPS
+       Host type:       WinRM
+
+     NOTE on Transport / Certificate:
+       When HTTPS is selected, vRO will attempt to verify the server certificate
+       against its trust store.  If the certificate was not imported in Step 2.2,
+       this step will fail.  The workflow does NOT offer a "trust anyway" option.
+
+     Authentication tab:
+       Authentication:  Kerberos
+         (Select Kerberos if the service account is a domain account and
+          Kerberos is configured on WinRM per Step 1.2.
+          Select Basic only if Kerberos is not available — not recommended
+          as Basic sends credentials in base64 over the wire.)
+
+       Session mode:    Shared Session
+         (Shared Session uses a single persistent session for all workflow
+          executions.  Session per User creates a new session per vRO user
+          identity.  Shared Session is standard for service-account-based
+          automation.)
+
+       Username:        corp\svc-vro-ps    (or svc-vro-ps@corp.local)
+       Password:        <service account password>
+
+  4. Run the workflow
+  5. Verify: workflow completes without errors
+
+  Common failure at this step:
+    "SSL handshake failed" or certificate error
+    → Certificate was not imported or does not match the hostname used
+    → Verify: hostname in the Host field exactly matches the certificate CN or SAN
+    → Re-run Step 2.2 with the correct certificate
+
+    "Null realm name (601) - default realm not specified"
+    → Kerberos realm not configured in vRO krb5.conf
+    → Refer to: TechDocs — Kerberos Authentication Session Mode Fails
+      https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-9-0-and-later/9-0/
+      configuration-of-vmware-cloud-foundation-operations-orchestrator/
+      vcf-ochestrator-plugins-overview/using-the-powershell-plug-in/
+      troubleshooting/kerberos-authentication-shared-session-fails.html
+
+
+STEP 2.4 — Verify PS Host in vRO Inventory
+────────────────────────────────────────────
+  1. Navigate to: Inventory → PowerShell
+  2. Confirm the new PS host appears in the list
+  3. Expand the host entry — snap-ins and cmdlets should be visible
+  4. If the host shows as disconnected or snap-ins are empty:
+     - Check WinRM listener is running on the PS host
+     - Check firewall rule for port 5986
+     - Check service account credentials and Kerberos configuration
+
+
+STEP 2.5 — Functional Smoke Test
+──────────────────────────────────
+Run a minimal test before referencing the PS host in any workflow.
+
+  1. In vRO, run workflow: Library → PowerShell → Invoke a PowerShell script
+  2. Inputs:
+       host:   <select the newly added PS host>
+       script: Write-Host 'PS host connectivity test OK'
+  3. Expected:
+       - Workflow completes successfully
+       - Output contains: PS host connectivity test OK
+  4. If workflow fails with authentication error:
+       - Verify Kerberos is enabled on WinRM (Step 1.2)
+       - Verify service account is in Remote Management Users group (Step 1.6)
+  5. If workflow fails with script execution error:
+       - Check PowerShell execution policy on PS host (Step 1.7)
+
+───────────────────────────────────────────────────────────────────────────────
+PART 4 — POST-CONFIGURATION CHECKLIST
+───────────────────────────────────────────────────────────────────────────────
+
+  [ ] WinRM quickconfig completed
+  [ ] Kerberos enabled on WinRM service
+  [ ] WinRM shell memory limit set to 2048 MB
+  [ ] HTTPS listener created on port 5986 with correct certificate thumbprint
+  [ ] Windows Firewall rule allows inbound TCP 5986
+  [ ] Certificate CN or SAN matches FQDN used in vRO host configuration
+  [ ] If self-signed or internal CA: certificate imported into vRO trust store
+      BEFORE PS host was added
+  [ ] Service account added to Remote Management Users group on PS host
+  [ ] Kerberos constrained delegation configured if double-hop UNC required
+  [ ] RSAT AD Tools installed (Get-Module -ListAvailable ActiveDirectory)
+  [ ] cvs_functions.ps1 deployed with correct NTFS permissions
+  [ ] PowerShell execution policy set to RemoteSigned or as per policy
+  [ ] PS host added to vRO via "Add a PowerShell host" workflow (HTTPS/Kerberos)
+  [ ] PS host visible in vRO Inventory → PowerShell
+  [ ] Smoke test: "Invoke a PowerShell script" with Write-Host succeeds
+  [ ] PS host object (.name property) confirmed to return FQDN
+      (required for Move-ArchivedLogs-LocalHost workflow)
+
+───────────────────────────────────────────────────────────────────────────────
+CERTIFICATE MAINTENANCE
+───────────────────────────────────────────────────────────────────────────────
+
+If using a self-signed certificate, set a calendar reminder before the
+certificate expiry date (5 years from creation if -NotAfter was used).
+
+Certificate renewal process:
+  1. Generate a new certificate on the PS host (Step 1.3)
+  2. Update the WinRM HTTPS listener with the new thumbprint (Step 1.4)
+  3. Import the new certificate into vRO trust store (Step 2.2)
+  4. Remove the old certificate from vRO trust store if it is no longer needed
+  5. Test connectivity via smoke test (Step 2.5)
+  6. Verify all four log management workflows execute successfully
+
+If using a CA-signed certificate:
+  Renew through your normal PKI process.  If the CA is already trusted by vRO,
+  no vRO trust store changes are required — only the WinRM listener thumbprint
+  needs updating (Step 1.4).

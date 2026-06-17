@@ -1,22 +1,48 @@
 ═══════════════════════════════════════════════════════════════════════════════
 VALIDATION AND TESTING PLAN
 Windows Archive Log Management — VCF Orchestrator Phase 1
+Updated after cvs_functions.ps1 source review
 ═══════════════════════════════════════════════════════════════════════════════
 
 ───────────────────────────────────────────────────────────────────────────────
 PHASE A — ENVIRONMENT PRE-CHECKS (Before deploying any vRO content)
 ───────────────────────────────────────────────────────────────────────────────
 
-A1. Confirm PS plugin PowerShellRemotePSObject method names
+A1. Confirm PS host is fully configured and registered in vRO
+    The Windows PowerShell host must be configured and added to VCF Orchestrator
+    before any workflow in this package can be run.
+
+    See: PS-Host-Build-Guide.txt — complete end-to-end configuration guide.
+
+    Key requirements confirmed before proceeding:
+      [ ] WinRM configured with HTTPS listener on port 5986
+      [ ] HTTPS certificate meets one of the following conditions:
+            a) Signed by a CA already trusted by VCF Orchestrator, OR
+            b) Self-signed / internal CA certificate imported into the
+               VCF Orchestrator trust store BEFORE the PS host was added
+               (see PS-Host-Build-Guide.txt Part 2, Step 2.2)
+      [ ] PS host added to vRO via "Add a PowerShell host" workflow
+          (Library → PowerShell → Configuration) using HTTPS / Kerberos
+      [ ] PS host visible in vRO Inventory → PowerShell
+      [ ] Smoke test passed: "Invoke a PowerShell script" with Write-Host succeeds
+
+    IMPORTANT — Certificate must be imported before adding the PS host:
+    When HTTPS is selected in the "Add a PowerShell host" workflow, vRO
+    validates the certificate against its trust store immediately.  The workflow
+    does not offer an option to accept or bypass an untrusted certificate.
+    If the certificate is not trusted, the workflow will fail with an SSL error.
+    Import the certificate first (Step 2.2 in the build guide), then add the host.
+
+A2. Confirm PowerShellRemotePSObject.getRootObject() is available
     Location: vRO UI → Administration → Scripting API Browser
               → Plugin: PowerShell → Type: PowerShellRemotePSObject
-    Confirm existence of:
-      [ ] getOutputLine()   — returns stdout lines (String[] or array-like)
-      [ ] getErrorLine()    — returns stderr lines (String[] or array-like)
-      [ ] getExitCode()     — returns integer exit code (may not exist; gracefully handled)
-    If method names differ: update parseScriptOutput.js accordingly before deploying.
+    Confirm:
+      [ ] getRootObject() method exists and is callable
+    Note: getOutputLine(), getErrorLine(), getExitCode() do NOT exist on this
+    type in the installed plugin version.  parseScriptOutput.js uses
+    getRootObject() exclusively — no changes needed if getRootObject() is present.
 
-A2. Confirm PowerShell:PowerShellHost FQDN property name
+A3. Confirm PowerShell:PowerShellHost FQDN property name
     Location: vRO UI → Scripting API Browser → Plugin: PowerShell
               → Type: PowerShellHost
     Confirm which property returns the FQDN of the PS host:
@@ -27,59 +53,80 @@ A2. Confirm PowerShell:PowerShellHost FQDN property name
     If property name differs: update buildMoveLocalHostInvocation.js line:
       var psHostFqdn = psHost.name;
 
-A3. Confirm cvs_functions.ps1 script parameter names
-    Open the deployed cvs_functions.ps1 on the PS host.
-    Confirm the following parameter names in the param() block match what
-    the invocation builder actions construct:
-      [ ] -Action              (used by all build* actions)
-      [ ] -ADGroupMember       (used by buildMoveByGroupNameInvocation)
-      [ ] -DomainName          (used by buildMoveByGroupNameInvocation, buildMoveByGroupCNInvocation)
-      [ ] -FileShareTarget     (used by all three move build* actions)
-      [ ] -SecurityGroupCN     (used by buildMoveByGroupCNInvocation)
-      [ ] -UNCSharePath        (used by buildRemoveFilesInvocation)
-      [ ] -OlderThanDays       (used by buildRemoveFilesInvocation)
-      [ ] -WhatIf              (used by buildRemoveFilesInvocation)
-      [ ] -HostList            (new parameter — added per additive changes doc)
-    If any parameter name differs: update the corresponding build* action.
+A4. Confirm cvs_functions.ps1 script parameter names
+    Script has been reviewed.  The following are confirmed from the param() block.
+    Verify the deployed script on the PS host matches:
+      [x] -Action              confirmed in ValidateSet
+      [x] -ADGroupMember       confirmed
+      [x] -DomainName          confirmed
+      [x] -FileShareTarget     confirmed
+      [x] -SecurityGroup_CN    confirmed — NOTE underscore (not -SecurityGroupCN)
+      [x] -UNC_SharePath       confirmed — NOTE underscore (not -UNCSharePath)
+      [x] -OlderThanDays       confirmed
+      [x] -WhatIf              confirmed
+      [x] -HostList            confirmed — already present in deployed script
 
-A4. Confirm cvs_functions.ps1 Action values
-    Confirm the following -Action string values exist in the switch block:
-      [ ] move-archived-logs
-      [ ] move-archived-logs-ByCN
-      [ ] Delete-OldFiles-UNC-Share
-      [ ] move-archived-logs-ByHostList  (new — added per additive changes doc)
+A5. Confirm cvs_functions.ps1 Action values
+    All four action values confirmed present in the deployed script:
+      [x] move-archived-logs              line 1174
+      [x] move-archived-logs-ByCN         line 1186
+      [x] Delete-OldFiles-UNC-Share       line 1244
+      [x] move-archived-logs-ByHostList   line 1197 — already present, no changes needed
 
-A5. Confirm script path on PS host
-      [ ] C:\PSO\Scripts\cvs_functions.ps1 exists (or update defaultScriptPath in Config Element)
+    NOTE: cvs_functions_additive_changes.ps1 documents changes that are already
+    applied to the deployed script.  No further script modifications are required.
+
+A6. Confirm script path on PS host
+      [ ] Script exists at the path configured in defaultScriptPath
       Command: Test-Path 'C:\PSO\Scripts\cvs_functions.ps1'
       Expected: True
+      If False: update defaultScriptPath in the Config Element to match actual path.
 
-A6. Confirm service account — UNC read access
-    Run from PS host under the service account context:
+A7. Confirm service account — UNC read access
+    Run from PS host under the vRO service account context:
       Test-Path '\\targetserver\C$\Windows\System32\winevt\Logs'
     Expected: True
-    If False: Review PS host service account permissions on target servers.
+    If False: review PS host service account permissions on target servers.
 
-A7. Confirm service account — UNC write access
-    Run from PS host under the service account context:
+A8. Confirm service account — UNC write access
+    Run from PS host under the vRO service account context:
       New-Item -Path '\\fileserver\mdcarchivelog$\Windows\test-write-check' -ItemType Directory -Force
       Remove-Item -Path '\\fileserver\mdcarchivelog$\Windows\test-write-check' -Force
     Expected: Both commands succeed without errors.
 
-A8. Confirm Kerberos constrained delegation (double-hop)
+A9. Confirm Kerberos constrained delegation (double-hop)
     The PS host reads from \\targetserver\C$\... and writes to \\fileserver\share$\...
-    This is a double-hop. The PS host machine account or service account must be
+    This is a double-hop.  The PS host machine account or service account must be
     trusted for constrained delegation to the file server SPN.
     Check: AD Users and Computers → PS host account → Delegation tab
       [ ] "Trust this computer for delegation to specified services only" is set
       [ ] File server CIFS SPN is listed in the allowed services
-    If not configured: Engage AD team before running live workflows.
+    If not configured: engage AD team before running live workflows.
+    See also: PS-Host-Build-Guide.txt Step 1.6.
 
-A9. Confirm RSAT AD Tools on PS host
+A10. Confirm RSAT AD Tools on PS host
     Run on PS host:
       Get-Module -ListAvailable ActiveDirectory
     Expected: Module is listed.
-    If not found: Install RSAT on PS host before running ByADGroupName or ByADGroupCN workflows.
+    If not found: install RSAT AD Tools on PS host before running
+    ByADGroupName or ByADGroupCN workflows.
+    See also: PS-Host-Build-Guide.txt Step 1.1.
+
+A11. Confirm Remove-OldFiles-UNCShare non-interactive behaviour (WhatIf risk)
+    KNOWN ISSUE: Remove-OldFiles-UNCPath calls Read-Host when -Force $false
+    (WhatIf='yes').  In a non-interactive PS host session, Read-Host will either
+    block indefinitely or return empty string, causing the script to cancel with
+    "Operation cancelled by user" and no files listed.
+
+    WhatIf='yes' does NOT function as a safe report-only preview from vRO.
+
+    Before using Remove-OldFiles-UNCShare in any context:
+      [ ] Run the script manually on the PS host with WhatIf='yes' to preview scope
+      [ ] Only then schedule the vRO workflow with WhatIf='no' for live deletion
+      [ ] Document this limitation for operators in the workflow description field
+
+    Phase 2 resolution: add a -ReportOnly switch to Remove-OldFiles-UNCPath that
+    lists candidate files without prompting and without deleting.
 
 ───────────────────────────────────────────────────────────────────────────────
 PHASE B — vRO CONTENT DEPLOYMENT CHECKS
@@ -87,17 +134,21 @@ PHASE B — vRO CONTENT DEPLOYMENT CHECKS
 
 B1. Configuration Element
     [ ] VCF/WindowsLogManagement/WindowsLogManagement-Config exists
-    [ ] All four attributes are present with correct types and values
-    [ ] defaultScriptPath matches actual script path on PS host
+    [ ] All four attributes present with correct types and values:
+          defaultScriptPath        (string)
+          defaultFileShareTarget   (string)
+          defaultDomainName        (string)
+          defaultLogRetentionDays  (number)
+    [ ] defaultScriptPath matches actual script path confirmed in A6
     [ ] defaultFileShareTarget is reachable from PS host
 
 B2. Actions deployed
     Module: broadcom.pso.vc.vm.guestOps.files.windows.logs
-    [ ] buildMoveLocalHostInvocation
-    [ ] buildMoveByGroupNameInvocation
-    [ ] buildMoveByGroupCNInvocation
-    [ ] buildRemoveFilesInvocation
-    [ ] parseScriptOutput
+    [ ] buildMoveLocalHostInvocation       return type: string
+    [ ] buildMoveByGroupNameInvocation     return type: string
+    [ ] buildMoveByGroupCNInvocation       return type: string
+    [ ] buildRemoveFilesInvocation         return type: string
+    [ ] parseScriptOutput                  return type: Properties
 
 B3. Workflows deployed
     Folder: PSO >> VC >> VM >> GuestOps >> Files >> Windows >> Logs
@@ -108,14 +159,19 @@ B3. Workflows deployed
 
 B4. OOTB workflow available
     [ ] Library/PowerShell/Invoke a PowerShell script is present in vRO library
+    [ ] Output binding confirms it returns PowerShellRemotePSObject
 
-B5. Input bindings
-    For each workflow, verify Config Element defaults are bound:
-    [ ] Move-ArchivedLogs-LocalHost: scriptPath ← defaultScriptPath
-    [ ] Move-ArchivedLogs-LocalHost: fileShareTarget ← defaultFileShareTarget
-    [ ] Move-ArchivedLogs-ByADGroupName: scriptPath, domainName, fileShareTarget ← Config Element
-    [ ] Move-ArchivedLogs-ByADGroupCN: scriptPath, domainName, fileShareTarget ← Config Element
-    [ ] Remove-OldFiles-UNCShare: scriptPath, olderThanDays ← Config Element
+B5. Input bindings — Config Element defaults
+    [ ] Move-ArchivedLogs-LocalHost:      scriptPath ← defaultScriptPath
+    [ ] Move-ArchivedLogs-LocalHost:      fileShareTarget ← defaultFileShareTarget
+    [ ] Move-ArchivedLogs-ByADGroupName:  scriptPath ← defaultScriptPath
+    [ ] Move-ArchivedLogs-ByADGroupName:  domainName ← defaultDomainName
+    [ ] Move-ArchivedLogs-ByADGroupName:  fileShareTarget ← defaultFileShareTarget
+    [ ] Move-ArchivedLogs-ByADGroupCN:   scriptPath ← defaultScriptPath
+    [ ] Move-ArchivedLogs-ByADGroupCN:   domainName ← defaultDomainName
+    [ ] Move-ArchivedLogs-ByADGroupCN:   fileShareTarget ← defaultFileShareTarget
+    [ ] Remove-OldFiles-UNCShare:         scriptPath ← defaultScriptPath
+    [ ] Remove-OldFiles-UNCShare:         olderThanDays ← defaultLogRetentionDays
 
 ───────────────────────────────────────────────────────────────────────────────
 PHASE C — UNIT TESTS (Actions — via vRO scripting console or test workflow)
@@ -146,45 +202,67 @@ C4. buildMoveByGroupCNInvocation — valid input
             domainName='corp.local'
             fileShareTarget='\\fileserver\share$\Windows'
     Expected return:
-      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByCN' -SecurityGroupCN 'Windows Log Servers CN' -DomainName 'corp.local' -FileShareTarget '\\fileserver\share$\Windows'
+      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByCN' -SecurityGroup_CN 'Windows Log Servers CN' -DomainName 'corp.local' -FileShareTarget '\\fileserver\share$\Windows'
+    NOTE: parameter is -SecurityGroup_CN with underscore — not -SecurityGroupCN
 
-C5. buildRemoveFilesInvocation — whatIf=yes
+C5. buildRemoveFilesInvocation — whatIf=no
     Input:  scriptPath='C:\PSO\Scripts\cvs_functions.ps1'
             uncSharePath='\\fileserver\share$\Windows'
             olderThanDays=370
-            whatIf='yes'
+            whatIf='no'
     Expected return:
-      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'Delete-OldFiles-UNC-Share' -UNCSharePath '\\fileserver\share$\Windows' -OlderThanDays 370 -WhatIf 'yes'
+      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'Delete-OldFiles-UNC-Share' -UNC_SharePath '\\fileserver\share$\Windows' -OlderThanDays 370 -WhatIf 'no'
+    NOTE: parameter is -UNC_SharePath with underscore — not -UNCSharePath
 
-C6. buildRemoveFilesInvocation — invalid olderThanDays
+C6. buildRemoveFilesInvocation — whatIf=yes (verify warning is logged)
+    Input:  same as C5 but whatIf='yes'
+    Expected return: same string with -WhatIf 'yes'
+    Expected log:    System.warn containing "Read-Host" warning emitted
+    NOTE: this invocation will trigger the Read-Host prompt issue described in A11.
+    Do not run this against a live PS session without understanding the consequence.
+
+C7. buildRemoveFilesInvocation — invalid olderThanDays
     Input:  olderThanDays=0
     Expected: throws Error containing "must be an integer >= 1"
 
-C7. buildRemoveFilesInvocation — invalid whatIf
+C8. buildRemoveFilesInvocation — invalid whatIf
     Input:  whatIf='maybe'
     Expected: throws Error containing "must be 'yes' or 'no'"
 
-C8. parseScriptOutput — confirm method names compile without error
-    Run a test invocation of parseScriptOutput against a real PSObject returned
-    from a benign OOTB PS workflow run (e.g. invoke 'Get-Date' as the script).
+C9. parseScriptOutput — getRootObject() against a benign script
+    Run the OOTB "Invoke a PowerShell script" workflow with script: Write-Host 'test output'
+    Pass the resulting PowerShellRemotePSObject to parseScriptOutput.
     Check vRO execution log for:
-      [ ] No "method not found" errors on getOutputLine() or getErrorLine()
-      [ ] If getExitCode() is missing: warn message logged, execution continues
-      [ ] parsedResult Properties returned with success, outputText, errorText keys
+      [ ] getRootObject() returns a string containing "test output"
+      [ ] No exceptions thrown
+      [ ] parsedResult Properties returned with keys: success, outputText, errorLines
+      [ ] success = true (no "Error:" in output)
+
+C10. parseScriptOutput — error line detection
+    Run the OOTB PS workflow with script:
+      Write-Host 'Info: starting'
+      Write-Host 'Error: something failed'
+      Write-Host 'Info: continuing'
+    Pass result to parseScriptOutput with executionContext='test'.
+    Expected:
+      [ ] success = false
+      [ ] errorLines contains the "Error: something failed" line
+      [ ] outputText contains all three lines
 
 ───────────────────────────────────────────────────────────────────────────────
 PHASE D — WORKFLOW INTEGRATION TESTS (Non-production targets)
 ───────────────────────────────────────────────────────────────────────────────
 
 D1. Move-ArchivedLogs-LocalHost — safe run
-    Pre-condition: Ensure at least one Archive*.evtx file exists in
+    Pre-condition: At least one Archive*.evtx file exists in
       \\<pshostfqdn>\C$\Windows\System32\winevt\Logs
     Run with:  psHost=<PS host>, fileShareTarget=<non-prod test share>
     Expected:
       [ ] Workflow reaches End - Completed Successfully
       [ ] executionSuccess = true
       [ ] Archive*.evtx file(s) moved to <fileShareTarget>\<pshostshortname>\
-      [ ] vRO execution log shows stdout from script
+      [ ] vRO execution log shows Write-Host output from script (via getRootObject())
+      [ ] No "Error:" lines in output
 
 D2. Move-ArchivedLogs-ByADGroupName — safe run
     Pre-condition: Use a small non-critical AD group (1-2 test servers)
@@ -192,67 +270,86 @@ D2. Move-ArchivedLogs-ByADGroupName — safe run
                fileShareTarget=<non-prod test share>
     Expected:
       [ ] Workflow reaches End - Completed Successfully or End - Completed with Errors
-      [ ] vRO execution log shows which servers were processed
+      [ ] vRO execution log shows per-server "Info: <server> - moving archived files" lines
       [ ] No unexpected side effects on servers outside the test group
 
 D3. Move-ArchivedLogs-ByADGroupCN — safe run
     Same as D2 but using securityGroupCN and a CN-identified test group.
+    Verify -SecurityGroup_CN (underscore) is correctly passed by checking
+    vRO log for the invocationString before execution.
 
-D4. Remove-OldFiles-UNCShare — whatIf=yes (report only, safe)
-    Run with:  uncSharePath=<production or test share>, olderThanDays=370, whatIf=yes
-    Expected:
+D4. Remove-OldFiles-UNCShare — manual preview before any vRO run
+    Due to the Read-Host issue with WhatIf='yes' in non-interactive sessions:
+      1. Run manually on PS host first:
+           & 'C:\PSO\Scripts\cvs_functions.ps1' -Action 'Delete-OldFiles-UNC-Share' -UNC_SharePath '\\share\path' -OlderThanDays 370 -WhatIf 'yes'
+         Review output.  Confirm file list is acceptable.
+      2. Only then run Remove-OldFiles-UNCShare workflow with whatIf='no' against
+         a non-production share with known old test files.
+    Expected from vRO run (whatIf='no'):
       [ ] Workflow reaches End - Completed Successfully
       [ ] executionSuccess = true
-      [ ] No files are deleted (whatIf mode)
-      [ ] Output log lists files that would be deleted (script-dependent output format)
-
-D5. Remove-OldFiles-UNCShare — whatIf=no (live deletion, non-production only)
-    Pre-condition: Use a dedicated non-production share with known old test files.
-    Run with:  uncSharePath=<test share>, olderThanDays=1, whatIf=no
-    Expected:
-      [ ] Test files older than 1 day are deleted
-      [ ] Workflow reaches End - Completed Successfully
+      [ ] Test files older than threshold are deleted
+      [ ] Deletion Summary in vRO log (from Write-Host in Remove-OldFiles-UNCPath end block)
       [ ] No files outside olderThanDays threshold are deleted
+
+D5. Remove-OldFiles-UNCShare — whatIf='yes' behaviour observation
+    Run with whatIf='yes' against a non-production share and observe actual behaviour:
+      [ ] If workflow blocks indefinitely: Read-Host issue confirmed — cancel run
+      [ ] If workflow completes with "Operation cancelled by user": Read-Host returned empty
+      [ ] Document observed behaviour for operator guidance
+    In either case: do not use whatIf='yes' from vRO for production previewing until
+    Phase 2 script fix is applied.
 
 ───────────────────────────────────────────────────────────────────────────────
 PHASE E — SUCCESS CRITERIA
 ───────────────────────────────────────────────────────────────────────────────
 
-[ ] All pre-checks (Phase A) pass without remediation items outstanding
+[ ] PS host configured per PS-Host-Build-Guide.txt and registered in vRO
+[ ] PS host certificate trusted by vRO (CA-signed or manually imported)
+[ ] PS host smoke test passes before any log management workflow is run
+[ ] All pre-checks (Phase A) pass or have documented workarounds
+[ ] A11 (WhatIf/Read-Host) risk acknowledged and communicated to operators
 [ ] All four workflows deploy without import errors
 [ ] Config Element attributes load correctly as workflow defaults in custom form
 [ ] All five actions execute without runtime errors against valid inputs
 [ ] All four build* actions return correctly formatted invocation strings
-[ ] parseScriptOutput returns a Properties object with success, outputText, errorText
+[ ] Invocation strings use -SecurityGroup_CN and -UNC_SharePath (underscores) — confirmed in logs
+[ ] parseScriptOutput returns Properties with keys: success, outputText, errorLines
+[ ] parseScriptOutput correctly detects "Error:" lines as success=false
 [ ] Move-ArchivedLogs-LocalHost moves Archive*.evtx files to correct destination
 [ ] Move-ArchivedLogs-ByADGroupName processes all group members correctly
 [ ] Move-ArchivedLogs-ByADGroupCN processes all CN group members correctly
-[ ] Remove-OldFiles-UNCShare whatIf=yes produces report without deletion
-[ ] Remove-OldFiles-UNCShare whatIf=no deletes correct files on test share
+[ ] Remove-OldFiles-UNCShare whatIf='no' deletes correct files on non-prod test share
 [ ] All workflow executions produce meaningful log output in vRO execution history
 
 ───────────────────────────────────────────────────────────────────────────────
 ROLLBACK AND RECOVERY
 ───────────────────────────────────────────────────────────────────────────────
 
-Item                     Rollback Approach
-─────────────────────── ────────────────────────────────────────────────────────────────────────────────────────
-cvs_functions.ps1        Keep a backup of the original before applying additive changes.
-                         Restore from backup if the new switch case causes regression.
-                         The change is isolated to a new switch case; existing cases are unmodified.
+Item                      Rollback Approach
+────────────────────────  ───────────────────────────────────────────────────────────────────────────
+cvs_functions.ps1         No changes required — additive changes were already present in deployed
+                          script.  No rollback needed for script.
 
-Moved .evtx files        Files are moved, not deleted.  If a move operation places files at the wrong
-                         destination, they can be manually moved back.
-                         The script creates per-server subfolders; identify the correct destination by
-                         matching server short name.
+Moved .evtx files         Files are moved, not deleted.  If a move places files at the wrong
+                          destination, they can be manually moved back.
+                          The script creates per-server subfolders; match server short name to
+                          identify correct destination.
 
-Deleted files (Remove)   No automated recovery — deletion is permanent.
-                         Mitigation: Always run with whatIf=yes first to preview scope.
-                         For production: confirm output of whatIf=yes run before approving whatIf=no.
+Deleted files (Remove)    No automated recovery — deletion is permanent.
+                          Mitigation: always run script manually with WhatIf='yes' first to
+                          preview scope before running vRO workflow with WhatIf='no'.
 
-vRO content              All items are new (no modifications to existing vRO content).
-                         Rollback = delete the four workflows, five actions, and Config Element.
-                         The OOTB "Invoke a PowerShell script" workflow is not modified.
+vRO content               All items are new (no modifications to existing vRO content).
+                          Rollback = delete the four workflows, five actions, and Config Element.
+                          The OOTB "Invoke a PowerShell script" workflow is not modified.
 
-Config Element           Delete or update attribute values to revert defaults.
-                         No production impact until workflows are run.
+Config Element            Delete or update attribute values to revert defaults.
+                          No production impact until workflows are run.
+
+PS host registration      Remove the PS host from vRO Inventory → PowerShell if needed.
+                          This does not affect the Windows Server configuration.
+                          The Windows Server WinRM configuration can be reverted by:
+                            Remove-WSManInstance winrm/config/listener
+                              -SelectorSet @{Address="*";Transport="HTTPS"}
+                          This removes the HTTPS listener only; HTTP listener is unaffected.
