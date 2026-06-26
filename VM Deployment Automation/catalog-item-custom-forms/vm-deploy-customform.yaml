@@ -95,6 +95,14 @@ layout:
                 visible: false
                 read-only: false
               signpostPosition: right-middle
+        - id: section_orgName
+          fields:
+            - id: orgName
+              display: textField
+              state:
+                visible: false
+                read-only: false
+              signpostPosition: right-middle
         - id: section_configElementName
           fields:
             - id: configElementName
@@ -272,6 +280,10 @@ schema:
         - $type:
             dataType: string
             isMultiple: false
+          orgName: orgName
+        - $type:
+            dataType: string
+            isMultiple: false
           configElementName: configElementName
         - $type:
             dataType: string
@@ -292,7 +304,15 @@ schema:
     type:
       dataType: string
       isMultiple: false
-    default: https://vcfa.corp.local
+    default: https://vcfa.site-a.vcf.lab
+    constraints:
+      required: true
+  orgName:
+    label: VCF Automation Org Name
+    type:
+      dataType: string
+      isMultiple: false
+    default: <your-vm-apps-org-name>
     constraints:
       required: true
   configElementName:
