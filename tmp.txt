@@ -1,7 +1,0 @@
-ef737b69-4e26-9dc1-6e90-e09d7300a92c/radius.vmdk
-
-
-No operating system was found. If you have an operating system installation disc, you can insert the disc into the system's CD-ROM drive and restart the virtual machine.
-
-
-This virtual machine is vSphere HA Protected and HA will attempt to restart it after a failure.
