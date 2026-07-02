@@ -115,11 +115,18 @@ To generate a self-signed certificate (Option B), run on the PS host
   # Note the thumbprint for use in Step 1.4
   $cert.Thumbprint
 
-  # Import the certificate into Orchestrator
-  Export-Certificate `
-      -Cert "cert:\LocalMachine\My\$($cert.Thumbprint)" `
-      -FilePath "C:\PSO\pshost-cert.cer" `
-      -Type CERT
+  # Export the certificate as Base-64 (PEM) for import into Orchestrator.
+  # IMPORTANT: vRO's "Import a trusted certificate from a file" requires a
+  # Base-64 (PEM) X.509 cert.  Export-Certificate -Type CERT writes DER (binary),
+  # which vRO rejects ("Could not import the SSL certificate...").  Use PEM:
+  @(
+      '-----BEGIN CERTIFICATE-----'
+      [System.Convert]::ToBase64String($cert.RawData, 'InsertLineBreaks')
+      '-----END CERTIFICATE-----'
+  ) | Set-Content -Path "C:\PSO\pshost-cert.cer" -Encoding Ascii
+
+  # (If you already have a DER .cer, convert it instead:
+  #   certutil -encode C:\PSO\pshost-der.cer C:\PSO\pshost-cert.cer )
 
   # Copy C:\PSO\pshost-cert.cer to a location accessible from VCF Orchestrator
   # (e.g. SCP to a staging location or upload via VCF Orchestrator UI)
@@ -144,13 +151,13 @@ Run on the PS host (PowerShell as Administrator):
       -ResourceURI winrm/config/listener `
       -SelectorSet @{Address="*"; Transport="HTTPS"} `
       -ValueSet @{
-          Hostname = "pshost.corp.local";
+          Hostname = "pshost.vcf.lab";
           CertificateThumbprint = $thumbprint
       }
 
   # Alternatively, using winrm command line:
   # winrm create winrm/config/listener?Address=*+Transport=HTTPS
-  #   @{Hostname="pshost.corp.local";CertificateThumbprint="<thumbprint>"}
+  #   @{Hostname="pshost.vcf.lab";CertificateThumbprint="<thumbprint>"}
 
   # Verify the HTTPS listener is created
   winrm enumerate winrm/config/listener
@@ -280,16 +287,30 @@ METHOD A — Via SSL Trust Manager Workflow (Recommended)
     6. Confirm and run
     7. Verify completion with no errors
 
+    PROXY CAVEAT: if the vRO appliance has an HTTP proxy configured, this
+    outbound call is routed through it and may fail with:
+      "Unable to tunnel through proxy. Proxy returns HTTP/1.1 503" or "Read timed out".
+    The proxy cannot usually reach an internal PS host.  Fix by adding the PS host
+    FQDN / internal domain to the vRO appliance proxy bypass (no-proxy) list, or
+    simply use Option ii (file import), which makes no outbound connection.
+
   Option ii: Import from PEM file (use if URL method is unavailable)
     1. Export the PS host certificate (or CA certificate) as a PEM-encoded
        file (.cer or .pem, Base-64 encoded X.509 format)
        On the PS host:
          # Export from Windows certificate store as Base-64 encoded CER
          # Right-click certificate in certmgr.msc → Export → Base-64 encoded X.509
-         # Or via PowerShell:
+         # Or via PowerShell (writes Base-64 / PEM — NOT DER):
          $cert = Get-ChildItem cert:\LocalMachine\My | Where-Object {$_.Subject -like "*pshost*"}
-         [System.IO.File]::WriteAllBytes("C:\PSO\pshost-cert.pem",
-             $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+         @(
+             '-----BEGIN CERTIFICATE-----'
+             [System.Convert]::ToBase64String($cert.RawData, 'InsertLineBreaks')
+             '-----END CERTIFICATE-----'
+         ) | Set-Content -Path "C:\PSO\pshost-cert.cer" -Encoding Ascii
+
+         # NOTE: $cert.Export(...::Cert) and Export-Certificate -Type CERT both
+         # produce DER (binary), which vRO's file import REJECTS.  If you have a
+         # DER file already, convert it: certutil -encode der.cer base64.cer
 
     2. Transfer the .pem / .cer file to a location accessible from the VCF Orchestrator UI
        (local browser machine is sufficient for file upload)
@@ -429,8 +450,6 @@ PART 4 — POST-CONFIGURATION CHECKLIST
   [ ] PS host added to VCF Orchestrator via "Add a PowerShell host" workflow (HTTPS/Kerberos)
   [ ] PS host visible in VCF Orchestrator Inventory → PowerShell
   [ ] Smoke test: "Invoke a PowerShell script" with Write-Host succeeds
-  [ ] PS host object (.name property) confirmed to return FQDN
-      (required for Move-ArchivedLogs-LocalHost workflow)
 
 ───────────────────────────────────────────────────────────────────────────────
 CERTIFICATE MAINTENANCE
@@ -445,7 +464,7 @@ Certificate renewal process:
   3. Import the new certificate into VCF Orchestrator trust store (Step 2.2)
   4. Remove the old certificate from VCF Orchestrator trust store if it is no longer needed
   5. Test connectivity via smoke test (Step 2.5)
-  6. Verify all four log management workflows execute successfully
+  6. Verify both log management workflows execute successfully
 
 If using a CA-signed certificate:
   Renew through your normal PKI process.  If the CA is already trusted by VCF Orchestrator,

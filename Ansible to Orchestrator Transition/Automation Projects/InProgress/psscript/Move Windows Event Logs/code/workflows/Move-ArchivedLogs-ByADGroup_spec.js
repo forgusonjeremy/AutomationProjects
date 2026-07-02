@@ -1,20 +1,33 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * Workflow: Move-ArchivedLogs-LocalHost
+ * Workflow: Move-ArchivedLogs-ByADGroup
  * Folder:   PSO >> VC >> VM >> GuestOps >> Files >> Windows >> Logs
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Purpose:
- *   Moves archived .evtx log files off the PowerShell host itself by passing
- *   the PS host's own FQDN as the HostList parameter to cvs_functions.ps1.
- *   The script constructs the UNC source path:
- *     \\<pshostfqdn>\C$\Windows\System32\winevt\Logs
+ *   Moves archived .evtx log files from every server that is a member of an AD
+ *   security group.  This is the single, consolidated move workflow for the
+ *   package.  AD resolution and per-server iteration are handled entirely inside
+ *   cvs_functions.ps1 via Get-ListOfServers-ByCN, which expands nested groups
+ *   recursively, filters to enabled computer objects only, and targets a specific
+ *   DC via -Server $DomainName.  This is the most comprehensive resolution path:
+ *   it finds all computers requiring archive-log cleanup while skipping
+ *   disabled/decommissioned accounts.
  *
- * Maps from:
- *   - file-move_with-LocalPath_Inventory
- *   - file-move_with-LocalPath_AD-Group
+ *   The servers that previously executed these PowerShell scripts under Ansible
+ *   (the former "LocalHost" use case) are members of the AD group in the
+ *   Orchestrator model and are covered by this workflow — no separate LocalHost
+ *   workflow is required.
  *
- * Script action invoked: move-archived-logs-ByHostList
+ * Maps from (Ansible playbooks):
+ *   - file-move_with-UNCPath_AD-Group
+ *   - file-move_with-UNCPath_AD-Group-TEST
+ *   - file-move_with-UNCPath_AD-Group-TEST(1)
+ *   - move-win-archived-logs
+ *   - file-move_with-LocalPath_AD-Group     (local execution hosts now covered as AD group members)
+ *   - file-move_with-LocalPath_Inventory    (former local execution hosts now covered as AD group members)
+ *
+ * Script action invoked: move-archived-logs-ByCN
  *
  * ───────────────────────────────────────────────────────────────────────────
  * WORKFLOW SCHEMA
@@ -23,10 +36,11 @@
  * [Start]
  *     │
  *     ▼
- * [Action: buildMoveLocalHostInvocation]
+ * [Action: buildMoveByADGroupInvocation]
  *     Module: broadcom.pso.vc.vm.guestOps.files.windows.logs
  *     IN:  scriptPath      ← workflow input: scriptPath
- *          psHost          ← workflow input: psHost
+ *          adGroup         ← workflow input: adGroup
+ *          domainName      ← workflow input: domainName
  *          fileShareTarget ← workflow input: fileShareTarget
  *     OUT: invocationString → workflow attribute: invocationString
  *     │
@@ -35,7 +49,7 @@
  *     ▼
  * [Workflow: Invoke a PowerShell script]
  *     OOTB path: Library/PowerShell/Invoke a PowerShell script
- *     IN:  host   ← workflow attribute: psHost
+ *     IN:  host   ← workflow input: psHost
  *          script ← workflow attribute: invocationString
  *     OUT: output → workflow attribute: psRawOutput
  *     │
@@ -45,7 +59,7 @@
  * [Action: parseScriptOutput]
  *     Module: broadcom.pso.vc.vm.guestOps.files.windows.logs
  *     IN:  psOutput         ← workflow attribute: psRawOutput
- *          executionContext ← (inline expression) psHost.name + " (LocalHost)"
+ *          executionContext ← (inline expression) adGroup + " @ " + domainName
  *     OUT: parsedResult → workflow attribute: parsedResult
  *     │
  *     ▼
@@ -63,83 +77,65 @@
  *   ─────────────── ──────────────────────────── ───────────────────────────────────── ─────────────
  *   psHost          PowerShell:PowerShellHost    (none)                                Mandatory
  *   scriptPath      string                       defaultScriptPath (Config Element)    Mandatory
+ *   adGroup         string                       (none)                                Mandatory
+ *   domainName      string                       defaultDomainName (Config Element)    Mandatory
  *   fileShareTarget string                       defaultFileShareTarget (Config Elem.) Mandatory
+ *
+ *   adGroup accepts any unambiguous AD group identifier (sAMAccountName, CN,
+ *   distinguishedName, GUID, or SID).  Passed to the script as -SecurityGroup_CN.
  *
  * Configuration Element defaults:
  *   Path: VCF/WindowsLogManagement/WindowsLogManagement-Config
  *   Attribute: defaultScriptPath      → scriptPath default
+ *   Attribute: defaultDomainName      → domainName default
  *   Attribute: defaultFileShareTarget → fileShareTarget default
  *
  * ───────────────────────────────────────────────────────────────────────────
- * ATTRIBUTES (workflow-scoped, not exposed as inputs/outputs)
+ * ATTRIBUTES
  * ───────────────────────────────────────────────────────────────────────────
  *
- *   Name              Type                                    Description
- *   ───────────────── ─────────────────────────────────────── ─────────────────────────────
- *   invocationString  string                                  PS invocation string built by action
- *   psRawOutput       PowerShell:PowerShellRemotePSObject     Raw output from OOTB PS workflow
- *   parsedResult      Properties                              Parsed result from parseScriptOutput
+ *   invocationString  string                               - Built by buildMoveByADGroupInvocation
+ *   psRawOutput       PowerShell:PowerShellRemotePSObject  - Output from OOTB PS workflow
+ *   parsedResult      Properties                           - Output from parseScriptOutput
  *
  * ───────────────────────────────────────────────────────────────────────────
  * OUTPUTS
  * ───────────────────────────────────────────────────────────────────────────
  *
- *   Name              Type     Description
- *   ───────────────── ──────── ────────────────────────────────────────────
- *   executionSuccess  boolean  true = completed without errors
- *   executionOutput   string   Summary message or error description
- *
- * ───────────────────────────────────────────────────────────────────────────
- * DECISION ELEMENT BINDING
- * ───────────────────────────────────────────────────────────────────────────
- *
- *   Condition (JavaScript expression on parsedResult attribute):
- *     parsedResult.get("success") === true
- *
- *   true  → End: Completed Successfully
- *     Set before end:
- *       executionSuccess = true;
- *       executionOutput  = parsedResult.get("outputText");
- *
- *   false → End: Completed with Errors
- *     Set before end:
- *       executionSuccess = false;
- *       executionOutput  = "Script completed with errors. See log for details. "
- *                          + parsedResult.get("errorText");
+ *   executionSuccess  boolean  - true = completed without errors
+ *   executionOutput   string   - Summary message or error description
  *
  * ───────────────────────────────────────────────────────────────────────────
  * END-STATE SCRIPTABLE TASKS
  * ───────────────────────────────────────────────────────────────────────────
- *
- * Place a small scriptable task before each End node to set workflow outputs.
- * These are NOT shown as separate schema nodes in the diagram above for
- * brevity — they are inline before each End node.
  */
 
 // ── End state: Completed Successfully ────────────────────────────────────────
-// Scriptable task placed immediately before [End - Completed Successfully]
-// Inputs bound: parsedResult (Properties)
-// Outputs bound: executionSuccess (boolean), executionOutput (string)
+// Place before [End - Completed Successfully]
+// Inputs: parsedResult, adGroup, domainName
+// Outputs: executionSuccess, executionOutput
 
 executionSuccess = true;
 executionOutput  = parsedResult.get("outputText");
 
 System.log(
-    "Move-ArchivedLogs-LocalHost | Completed successfully." +
+    "Move-ArchivedLogs-ByADGroup | Completed successfully." +
+    " | adGroup=" + adGroup + " | domain=" + domainName +
     " | output=" + executionOutput
 );
 
 
 // ── End state: Completed with Errors ─────────────────────────────────────────
-// Scriptable task placed immediately before [End - Completed with Errors]
-// Inputs bound: parsedResult (Properties)
-// Outputs bound: executionSuccess (boolean), executionOutput (string)
+// Place before [End - Completed with Errors]
+// Inputs: parsedResult, adGroup, domainName
+// Outputs: executionSuccess, executionOutput
 
 executionSuccess = false;
 executionOutput  = "Script completed with errors. See workflow log for details. Error: " +
                    parsedResult.get("errorText");
 
 System.warn(
-    "Move-ArchivedLogs-LocalHost | Completed with errors." +
+    "Move-ArchivedLogs-ByADGroup | Completed with errors." +
+    " | adGroup=" + adGroup + " | domain=" + domainName +
     " | errorText=" + parsedResult.get("errorText")
 );

@@ -15,9 +15,10 @@
  *   Write-Host with an "Error:" or "error:" prefix, success/failure is
  *   determined by scanning the output string for those prefixes.
  *
- *   The only terminating error in the relevant actions is the HostList null
- *   check in move-archived-logs-ByHostList — that is caught by the OOTB
+ *   Terminating errors (e.g. an invalid script path, or a hard failure inside
+ *   the OOTB "Invoke a PowerShell script" workflow) are caught by the OOTB
  *   workflow exception path (handlePSFailure) before this action is reached.
+ *   This action therefore only classifies non-terminating "Error:" output.
  *
  * Inputs:
  *   psOutput         (PowerShell:PowerShellRemotePSObject) - Raw PS output object
@@ -55,7 +56,7 @@ System.log("parseScriptOutput | context=" + context + " | calling getRootObject(
 //   PowerShellPSObject   — if a complex PS object was returned
 //   null                 — if the script emitted nothing
 //
-// For our four actions, we expect string or null.
+// For our actions, we expect string or null.
 
 var outputText = "";
 

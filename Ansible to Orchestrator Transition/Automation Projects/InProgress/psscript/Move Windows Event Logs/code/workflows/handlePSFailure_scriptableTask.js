@@ -3,10 +3,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Workflow placement:
  *   Exception path from the OOTB "Invoke a PowerShell script" workflow element
- *   in ALL FOUR workflows:
- *     - Move-ArchivedLogs-LocalHost
- *     - Move-ArchivedLogs-ByADGroupName
- *     - Move-ArchivedLogs-ByADGroupCN
+ *   in BOTH workflows:
+ *     - Move-ArchivedLogs-ByADGroup
  *     - Remove-OldFiles-UNCShare
  *
  * Inputs (bound from exception outputs of the OOTB PS workflow):

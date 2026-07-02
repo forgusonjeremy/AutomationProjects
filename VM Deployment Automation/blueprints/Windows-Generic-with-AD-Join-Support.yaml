@@ -1,0 +1,78 @@
+formatVersion: 1
+inputs:
+  vmHostname:
+    type: string
+    title: VM Hostname
+    description: VM display name and guest hostname. Alphanumeric and hyphens only. Max 15 chars (Windows NetBIOS).
+    minLength: 1
+    maxLength: 15
+    pattern: ^[a-zA-Z0-9\-]+$
+  vcenterName:
+    type: string
+    title: vCenter to which to deploy the VM
+    description: Name of the vCenter server where the VM will be deployed
+  clusterName:
+    type: string
+    title: vSphere Cluster Name
+    description: Name of the vSphere cluster where the VM is to be created.
+  networkName:
+    type: string
+    title: Network Name
+    description: Name of the dvPortgroup to which the VM is to be connected.
+  folderName:
+    type: string
+    title: VM Folder Name
+    description: Name of the VM folder where the VM is to be placed.
+  cpuCount:
+    type: integer
+    title: CPU Count
+    default: 2
+    minimum: 1
+    maximum: 64
+  memoryGB:
+    type: integer
+    title: Memory (GB)
+    default: 4
+    minimum: 1
+    maximum: 512
+  joinDomain:
+    type: boolean
+    default: true
+    title: Join Active Directory
+  ouDn:
+    type: string
+resources:
+  vm:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    properties:
+      name: ${input.vmHostname}
+      imageRef: win-2025/baseline
+      customizationSpec: '${input.joinDomain ? "win-2025-domain" : "win-2025-workgroup"}'
+      cpuCount: ${input.cpuCount}
+      totalMemoryMB: ${input.memoryGB * 1024}
+      folderName: ${input.folderName}
+      osType: windows
+      adOU: ${input.ouDn}
+      constraints:
+        - tag: clusterName:${input.clusterName}
+      networks:
+        - network: ${resource.network.id}
+          assignment: static
+          dns: ${resource.network.dns}
+          gateway: ${resource.network.gateway}
+          domain: ${resource.network.domain}
+          dnsSearchDomains: ${resource.network.dnsSearchDomains}
+  network:
+    type: Cloud.vSphere.Network
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: networkName:${input.networkName}

@@ -13,25 +13,28 @@ vcf-windows-log-mgmt/
 ├── Validation-and-Testing-Plan.txt                  ← Pre-checks, tests, success criteria, rollback
 │
 ├── actions/
-│   ├── buildMoveLocalHostInvocation.js              ← Action: builds PS invocation for LocalHost move
-│   ├── buildMoveByGroupNameInvocation.js            ← Action: builds PS invocation for sAMAccountName move
-│   ├── buildMoveByGroupCNInvocation.js              ← Action: builds PS invocation for CN-based move
+│   ├── buildMoveByADGroupInvocation.js              ← Action: builds PS invocation for AD-group move
 │   ├── buildRemoveFilesInvocation.js                ← Action: builds PS invocation for UNC cleanup
 │   └── parseScriptOutput.js                         ← Action: parses PSObject into structured Properties
 │
 ├── workflows/
-│   ├── Move-ArchivedLogs-LocalHost_spec.js          ← Workflow 1: schema, bindings, end-state tasks
-│   ├── Move-ArchivedLogs-ByADGroupName_spec.js      ← Workflow 2: schema, bindings, end-state tasks
-│   ├── Move-ArchivedLogs-ByADGroupCN_spec.js        ← Workflow 3: schema, bindings, end-state tasks
-│   ├── Remove-OldFiles-UNCShare_spec.js             ← Workflow 4: schema, bindings, end-state tasks
+│   ├── Move-ArchivedLogs-ByADGroup_spec.js          ← Workflow 1: schema, bindings, end-state tasks
+│   ├── Remove-OldFiles-UNCShare_spec.js             ← Workflow 2: schema, bindings, end-state tasks
 │   └── handlePSFailure_scriptableTask.js            ← Shared scriptable task (exception path)
-│
-├── powershell/
-│   └── cvs_functions_additive_changes.ps1           ← 3 additive changes to existing script (no modifications)
 │
 └── config/
     └── WindowsLogManagement-Config_definition.txt   ← Configuration Element attributes and binding guide
 ```
+
+> **Consolidation note (Phase 1 update):** The package previously shipped four
+> workflows (LocalHost, ByADGroupName, ByADGroupCN, Remove). The two move
+> workflows that targeted by AD group are now merged into a single
+> **Move-ArchivedLogs-ByADGroup** built on the recursive + Enabled-only
+> resolution path (`Get-ListOfServers-ByCN`). The **LocalHost** workflow is
+> removed: the Windows servers that formerly executed the scripts locally under
+> Ansible are members of the AD group in the Orchestrator model and are covered
+> by Move-ArchivedLogs-ByADGroup. As a result, **no changes to `cvs_functions.ps1`
+> are required** — every action invoked already exists in the deployed script.
 
 ---
 
@@ -39,20 +42,18 @@ vcf-windows-log-mgmt/
 
 Follow this sequence exactly to avoid dependency failures.
 
-### Step 1 — Apply PowerShell Script Changes
+### Step 1 — Confirm PowerShell Script (no changes required)
 
-Open `powershell/cvs_functions_additive_changes.ps1` and apply the three changes
-to the deployed `cvs_functions.ps1` on the PowerShell host:
+This package makes **no changes to `cvs_functions.ps1`**. Both workflows invoke
+`-Action` values that already exist in the deployed script:
+`move-archived-logs-ByCN` and `Delete-OldFiles-UNC-Share`.
 
-1. Add `'move-archived-logs-ByHostList'` to the `[ValidateSet]` on `$Action`
-2. Add the `$HostList` parameter to the `param()` block
-3. Add the `move-archived-logs-ByHostList` switch case to the `Main` function
-
-Verify with:
+Verify the script is present and the actions resolve:
 ```powershell
 Test-Path 'C:\PSO\Scripts\cvs_functions.ps1'  # should return True
-& 'C:\PSO\Scripts\cvs_functions.ps1' -Action 'move-archived-logs-ByHostList' -HostList '' -FileShareTarget '\\server\share'
-# Expected: Write-Log error + thrown exception (HostList is required)
+# Confirm the action values exist in the script's [ValidateSet] on $Action:
+Select-String -Path 'C:\PSO\Scripts\cvs_functions.ps1' -Pattern "move-archived-logs-ByCN","Delete-OldFiles-UNC-Share"
+# Expected: both patterns are found in the ValidateSet and the Main switch block
 ```
 
 ### Step 2 — Create Configuration Element in vRO
@@ -74,11 +75,9 @@ See `config/WindowsLogManagement-Config_definition.txt` for full instructions.
 Module path: `broadcom.pso.vc.vm.guestOps.files.windows.logs`
 
 Deploy in this order (no inter-action dependencies, but logical order helps):
-1. `buildMoveLocalHostInvocation`
-2. `buildMoveByGroupNameInvocation`
-3. `buildMoveByGroupCNInvocation`
-4. `buildRemoveFilesInvocation`
-5. `parseScriptOutput`
+1. `buildMoveByADGroupInvocation`
+2. `buildRemoveFilesInvocation`
+3. `parseScriptOutput`
 
 Each `.js` file in `actions/` contains the complete action code.
 Copy the code into a new action in the vRO Action editor.
@@ -87,9 +86,7 @@ Copy the code into a new action in the vRO Action editor.
 
 | Action | Return Type |
 |---|---|
-| `buildMoveLocalHostInvocation` | string |
-| `buildMoveByGroupNameInvocation` | string |
-| `buildMoveByGroupCNInvocation` | string |
+| `buildMoveByADGroupInvocation` | string |
 | `buildRemoveFilesInvocation` | string |
 | `parseScriptOutput` | Properties |
 
@@ -105,7 +102,7 @@ Each spec file contains:
 - OOTB workflow binding
 - End-state scriptable task code
 
-**Workflow build checklist (repeat for each of the 4 workflows):**
+**Workflow build checklist (repeat for each of the 2 workflows):**
 
 1. Create new workflow in the correct folder
 2. Add inputs as defined in the spec
@@ -141,10 +138,9 @@ See `Validation-and-Testing-Plan.txt` for full details.
 
 | Item | What to Confirm | Where |
 |---|---|---|
-| `PowerShellRemotePSObject` method names | `getOutputLine()`, `getErrorLine()`, `getExitCode()` exist | vRO Scripting API Browser |
-| `PowerShellHost.name` property | Returns FQDN (not display name) | vRO Scripting API Browser |
-| Script parameter names | Match what build* actions construct | `cvs_functions.ps1` param block |
-| Script Action values | All four `-Action` values exist in switch block | `cvs_functions.ps1` switch |
+| `PowerShellRemotePSObject` method names | `getRootObject()` exists and is callable | vRO Scripting API Browser |
+| Script parameter names | Match what build* actions construct (`-SecurityGroup_CN`, `-UNC_SharePath` underscores) | `cvs_functions.ps1` param block |
+| Script Action values | `move-archived-logs-ByCN` and `Delete-OldFiles-UNC-Share` exist in switch block | `cvs_functions.ps1` switch |
 | UNC read access | PS host SA can read `\\server\C$\Windows\System32\winevt\Logs` | Test-Path from PS host |
 | UNC write access | PS host SA can write to archive share | New-Item from PS host |
 | Kerberos constrained delegation | PS host configured for double-hop delegation | AD delegation settings |
@@ -156,10 +152,12 @@ See `Validation-and-Testing-Plan.txt` for full details.
 
 | Decision | Rationale |
 |---|---|
-| Script reused as-is (additive only) | Minimizes rewriting risk; script logic is proven in production |
+| Script reused as-is (zero changes) | No script modification needed; every invoked `-Action` already exists in the deployed script |
+| Single AD-group move workflow | Consolidated from two; uses the recursive + Enabled-only path (`Get-ListOfServers-ByCN`) — the most comprehensive server-discovery method |
+| LocalHost workflow removed | Former local-execution hosts are AD group members in the Orchestrator model; covered by Move-ArchivedLogs-ByADGroup |
 | PS host plugin — not WinRM | vRO executes via configured PS host plugin; script handles remote access via UNC |
 | UNC source paths everywhere | Standardizes all source access; eliminates need for local `C:\` path handling |
-| Script handles AD resolution | Get-ListOfServers and Get-ListOfServers-ByCN already tested; no benefit in replicating in vRO |
+| Script handles AD resolution | Get-ListOfServers-ByCN already tested; no benefit in replicating in vRO |
 | No per-server vRO loop | One workflow = one script invocation; script iterates internally |
 | Form-based validation only | All input constraints enforced by custom form; no validation action nodes in schema |
 | OOTB PS workflow consumed | `Library/PowerShell/Invoke a PowerShell script` used directly; no custom PS execution action |
@@ -172,8 +170,15 @@ See `Validation-and-Testing-Plan.txt` for full details.
 
 | Item | Reason Deferred |
 |---|---|
-| Standardize to single computer targeting method | Phase 1 preserves all three patterns to avoid forcing customer environment changes |
 | Optimize `cvs_functions.ps1` logic | Out of scope for delivery replacement effort |
 | Email reporting on workflow completion | Not confirmed as in-scope requirement |
 | AD query within vRO natively | Script handles AD; no benefit in Phase 1 |
 | Per-server status reporting in vRO | Script outputs aggregate; per-server breakdown requires script changes (Phase 2) |
+
+> **Resolved in this update** (see `Change-Register.md`):
+> - "Standardize to a single computer targeting method" — the three targeting
+>   patterns are consolidated to one AD-group workflow (process changes P-2…P-4).
+> - "Fix `Remove-OldFiles-UNCPath` `Read-Host` prompt" — replaced with a
+>   non-interactive `-ReportOnly` mode so `whatIf='yes'` is a true report-only
+>   preview (script change S-1). Requires the updated script deployed; see
+>   Validation Plan A11.

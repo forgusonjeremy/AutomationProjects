@@ -15,7 +15,7 @@
       5. Opens Windows Firewall for port 5986
       6. Adds the service account to the Remote Management Users local group
       7. Sets PowerShell execution policy to RemoteSigned
-      8. Exports the certificate for import into VCF Orchestrator
+      8. Exports the certificate as Base-64 (PEM) for import into VCF Orchestrator
       9. Prints a post-run summary with next steps
 
     This script does NOT:
@@ -220,7 +220,7 @@ try {
     Write-Fail "Failed to install RSAT AD PowerShell tools: $($_.Exception.Message)"
     Write-Warn "Continuing - install manually with: Add-WindowsFeature RSAT-AD-PowerShell"
     Add-Result "RSAT AD Tools" "FAILED" $_.Exception.Message
-    $Warnings.Add("RSAT AD PowerShell tools not installed. Required for ByADGroupName and ByADGroupCN workflows.")
+    $Warnings.Add("RSAT AD PowerShell tools not installed. Required for the Move-ArchivedLogs-ByADGroup workflow.")
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -505,13 +505,19 @@ try {
 
     $certExportFile = Join-Path $CertExportPath "$($shortName)-vro-cert.cer"
 
-    Export-Certificate `
-        -Cert "cert:\LocalMachine\My\$certThumbprint" `
-        -FilePath $certExportFile `
-        -Type CERT `
-        -Force | Out-Null
+    # vRO's "Import a trusted certificate from a file" requires a Base-64 (PEM)
+    # encoded X.509 certificate.  Export-Certificate -Type CERT writes DER
+    # (binary), which vRO rejects with "Could not import the SSL certificate.
+    # Check whether the file contains a valid SSL certificate".  Write PEM instead.
+    $certObj = Get-Item "cert:\LocalMachine\My\$certThumbprint"
+    $pemLines = @(
+        '-----BEGIN CERTIFICATE-----'
+        [System.Convert]::ToBase64String($certObj.RawData, [System.Base64FormattingOptions]::InsertLineBreaks)
+        '-----END CERTIFICATE-----'
+    )
+    Set-Content -Path $certExportFile -Value $pemLines -Encoding Ascii
 
-    Write-OK "Certificate exported to: $certExportFile"
+    Write-OK "Certificate exported (Base-64 / PEM) to: $certExportFile"
     Write-Info "Transfer this file to a machine with browser access to VCF Orchestrator"
     Write-Info "for import via: Library > Configuration > SSL Trust Manager >"
     Write-Info "  'Import a trusted certificate from a file'"

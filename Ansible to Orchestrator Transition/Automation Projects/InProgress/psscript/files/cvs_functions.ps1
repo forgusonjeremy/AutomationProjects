@@ -227,9 +227,12 @@ Function Remove-OldFiles-UNCPath {
         
         [Parameter(Mandatory=$false)]
         [bool]$Recurse=$true,
-        
+
         [Parameter(Mandatory=$false)]
-        [bool]$Force=$false
+        [bool]$Force=$false,
+
+        [Parameter(Mandatory=$false)]
+        [bool]$ReportOnly=$false
     )
     
     begin {
@@ -287,13 +290,18 @@ Function Remove-OldFiles-UNCPath {
             
             write-log "Info: Total size: $TotalSizeMB MB" $true
             
-            # Confirm deletion if not using -Force or -WhatIf
-            if (-not $Force -and -not $WhatIfPreference) {
-                $Confirmation = Read-Host "Are you sure you want to delete these files? (Y/N)"
-                if ($Confirmation -ne 'Y') {
-                    write-log "Info: Operation cancelled by user" $true
-                    return
+            # Report-only mode: list the files that WOULD be deleted, then exit
+            # without deleting anything.  Replaces the former interactive
+            # Read-Host confirmation, which blocked (or silently cancelled with
+            # "Operation cancelled by user") in non-interactive sessions such as
+            # the VCF Orchestrator PowerShell plug-in.
+            if ($ReportOnly) {
+                write-log "Info: ReportOnly mode enabled - NO files will be deleted." $true
+                write-log "Info: The following $($FilesToDelete.Count) file(s) would be deleted:" $true
+                foreach ($File in $FilesToDelete) {
+                    write-log "Info: [ReportOnly] WouldDelete: $($File.FullName) (LastWriteTime: $($File.LastWriteTime))" $true
                 }
+                return
             }
             
             # Delete files
@@ -1243,11 +1251,14 @@ function Main($Action){
         }
         'Delete-OldFiles-UNC-Share'{
             if($WhatIf -eq 'yes'){
-                Remove-OldFiles-UNCPath -path $UNC_SharePath -OlderThanDays $OlderThanDays -Force $false
+                # Report-only: lists candidate files, deletes nothing.
+                # Safe for non-interactive execution (vRO PowerShell plug-in).
+                Remove-OldFiles-UNCPath -path $UNC_SharePath -OlderThanDays $OlderThanDays -ReportOnly $true
             }elseif($WhatIf -eq 'no'){
+                # Live deletion, no interactive prompt.
                 Remove-OldFiles-UNCPath -path $UNC_SharePath -OlderThanDays $OlderThanDays -Force $true
             }else{
-
+                write-log "Error: Delete-OldFiles-UNC-Share - invalid WhatIf value '$WhatIf' (expected 'yes' or 'no'). No action taken." $true
             }
             
         }

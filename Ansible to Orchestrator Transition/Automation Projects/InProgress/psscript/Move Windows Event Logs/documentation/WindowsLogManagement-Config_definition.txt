@@ -5,7 +5,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 # Create this Configuration Element in the vRO Configuration tab before
-# deploying any workflow.  All four workflows bind their string/number input
+# deploying any workflow.  Both workflows bind their string/number input
 # defaults to attributes in this element.
 #
 # Path:    VCF/WindowsLogManagement/WindowsLogManagement-Config
@@ -15,7 +15,7 @@
 # PREREQUISITE — PS HOST MUST BE CONFIGURED AND REGISTERED IN vRO FIRST
 # ───────────────────────────────────────────────────────────────────────────────
 #
-# All four workflows require a PowerShell host to be registered in VCF
+# Both workflows require a PowerShell host to be registered in VCF
 # Orchestrator before they can be run.  The PowerShell host is the Windows
 # Server that executes cvs_functions.ps1 on behalf of vRO.
 #
@@ -66,10 +66,9 @@
 #                                                                                        Must be writable by the PS host service account.
 #
 # defaultDomainName         string   corp.local                                          Default AD domain name.
-#                                                                                        Used as -DomainName in ByADGroupName workflow
-#                                                                                        (passed to Get-ADGroupMember -Server).
-#                                                                                        Used as -DomainName in ByADGroupCN workflow
-#                                                                                        (passed to Get-ListOfServers-ByCN -Server).
+#                                                                                        Used as -DomainName in Move-ArchivedLogs-ByADGroup
+#                                                                                        (passed to Get-ListOfServers-ByCN -Server for
+#                                                                                        recursive, Enabled-only group resolution).
 #
 # defaultLogRetentionDays   number   370                                                 Default age threshold for Remove-OldFiles-UNCShare.
 #                                                                                        Files older than this many days are candidates for
@@ -81,13 +80,16 @@
 # IMPORTANT — WhatIf BEHAVIOUR FOR Remove-OldFiles-UNCShare
 # ───────────────────────────────────────────────────────────────────────────────
 #
-# The Remove-OldFiles-UNCPath function in cvs_functions.ps1 calls Read-Host
-# for confirmation when WhatIf='yes' (-Force $false).  In a non-interactive
-# PS host session (as used by vRO), this will either block or silently cancel.
+# The Remove-OldFiles-UNCPath function in cvs_functions.ps1 supports a
+# -ReportOnly parameter (see Change-Register.md, change S-1).  The
+# Delete-OldFiles-UNC-Share switch case maps WhatIf='yes' to -ReportOnly $true
+# (lists candidate files, deletes nothing, runs non-interactively) and
+# WhatIf='no' to -Force $true (live delete).  The former interactive Read-Host
+# prompt has been removed.
 #
-# WhatIf='yes' does NOT function as a report-only preview mode from vRO.
-# Run the script manually on the PS host with WhatIf='yes' before scheduling
-# any vRO workflow with WhatIf='no'.
+# REQUIRES the updated cvs_functions.ps1 deployed on the PS host.  On an older
+# (un-patched) script, WhatIf='yes' will instead hit a blocking Read-Host
+# prompt under vRO — confirm -ReportOnly is present (Validation Plan A11).
 #
 # There is no Config Element attribute for the whatIf default — it is set
 # directly on the workflow custom form with a default of 'yes' and a dropdown
@@ -128,16 +130,9 @@
 #
 # Workflow                        Input               Config Element Attribute
 # ──────────────────────────────  ──────────────────  ────────────────────────────
-# Move-ArchivedLogs-LocalHost     scriptPath          defaultScriptPath
-# Move-ArchivedLogs-LocalHost     fileShareTarget     defaultFileShareTarget
-#
-# Move-ArchivedLogs-ByADGroupName scriptPath          defaultScriptPath
-# Move-ArchivedLogs-ByADGroupName domainName          defaultDomainName
-# Move-ArchivedLogs-ByADGroupName fileShareTarget     defaultFileShareTarget
-#
-# Move-ArchivedLogs-ByADGroupCN   scriptPath          defaultScriptPath
-# Move-ArchivedLogs-ByADGroupCN   domainName          defaultDomainName
-# Move-ArchivedLogs-ByADGroupCN   fileShareTarget     defaultFileShareTarget
+# Move-ArchivedLogs-ByADGroup     scriptPath          defaultScriptPath
+# Move-ArchivedLogs-ByADGroup     domainName          defaultDomainName
+# Move-ArchivedLogs-ByADGroup     fileShareTarget     defaultFileShareTarget
 #
 # Remove-OldFiles-UNCShare        scriptPath          defaultScriptPath
 # Remove-OldFiles-UNCShare        olderThanDays       defaultLogRetentionDays
@@ -153,15 +148,10 @@
 # Script Parameter     Maps from workflow input    Used by action
 # ─────────────────    ─────────────────────────   ───────────────────────────────────
 # -Action              (constant per workflow)      all build* actions
-# -FileShareTarget     fileShareTarget              buildMoveLocalHostInvocation
-#                                                   buildMoveByGroupNameInvocation
-#                                                   buildMoveByGroupCNInvocation
-# -ADGroupMember       adGroupMember               buildMoveByGroupNameInvocation
-# -DomainName          domainName                  buildMoveByGroupNameInvocation
-#                                                   buildMoveByGroupCNInvocation
-# -SecurityGroup_CN    securityGroupCN             buildMoveByGroupCNInvocation
+# -FileShareTarget     fileShareTarget              buildMoveByADGroupInvocation
+# -SecurityGroup_CN    adGroup                     buildMoveByADGroupInvocation
 #   (underscore)
-# -HostList            derived from psHost.name    buildMoveLocalHostInvocation
+# -DomainName          domainName                  buildMoveByADGroupInvocation
 # -UNC_SharePath       uncSharePath                buildRemoveFilesInvocation
 #   (underscore)
 # -OlderThanDays       olderThanDays               buildRemoveFilesInvocation

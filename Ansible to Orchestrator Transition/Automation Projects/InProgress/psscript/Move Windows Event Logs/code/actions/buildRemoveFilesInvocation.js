@@ -11,24 +11,21 @@
  *     $OlderThanDays
  *     $WhatIf
  *
- *   Script behaviour:
- *     WhatIf='yes' → calls Remove-OldFiles-UNCPath with -Force $false
- *                    The function checks: if (-not $Force -and -not $WhatIfPreference)
- *                    and calls Read-Host for confirmation.
+ *   Script behaviour (with the report-only fix applied to cvs_functions.ps1 —
+ *   see Change-Register.md, change S-1):
+ *     WhatIf='yes' → script calls Remove-OldFiles-UNCPath with -ReportOnly $true
+ *                    Lists the files that WOULD be deleted (via Write-Log) and
+ *                    deletes nothing.  Runs non-interactively — no prompt.
+ *     WhatIf='no'  → script calls Remove-OldFiles-UNCPath with -Force $true
+ *                    Deletes files older than OlderThanDays without prompting.
  *
- *   !! IMPORTANT — WhatIf='yes' WILL PROMPT for confirmation !!
- *   The Remove-OldFiles-UNCPath function calls Read-Host when -Force $false
- *   and $WhatIfPreference is not set.  In a non-interactive PS host session
- *   (as used by vRO), Read-Host will either block indefinitely or throw.
- *   This is a script-level issue to address before production use.
- *   Recommended fix (Phase 2): add a -WhatIf switch or -ReportOnly parameter
- *   to Remove-OldFiles-UNCPath that lists files without prompting.
- *   For Phase 1: use WhatIf='no' (-Force $true) for non-interactive execution,
- *   accepting that the safety report-only mode is not functional as-is.
- *   Document this risk explicitly in the validation plan.
+ *   This action builds the same -WhatIf 'yes'/'no' string in both cases; the
+ *   script's Delete-OldFiles-UNC-Share switch case maps it to -ReportOnly/-Force.
  *
- *   WhatIf='no'  → calls Remove-OldFiles-UNCPath with -Force $true
- *                  Deletes files older than OlderThanDays without prompting.
+ *   NOTE: report-only behaviour requires the UPDATED cvs_functions.ps1 (with the
+ *   -ReportOnly parameter) deployed on the PS host.  On an un-patched script,
+ *   WhatIf='yes' hits an interactive Read-Host prompt that blocks/cancels under
+ *   vRO — confirm the deployed script includes -ReportOnly (Validation Plan A11).
  *
  * Inputs:
  *   scriptPath    (string) - Full path to cvs_functions.ps1 on the PS host
@@ -74,11 +71,10 @@ System.log(
 );
 
 if (whatIfNormalised === "yes") {
-    System.warn(
-        "buildRemoveFilesInvocation | whatIf=yes — NOTE: Remove-OldFiles-UNCPath calls " +
-        "Read-Host for confirmation when -Force $false in non-interactive sessions. " +
-        "This may block or fail. Validate script behaviour before scheduling. " +
-        "See action header comment for details."
+    System.log(
+        "buildRemoveFilesInvocation | whatIf=yes — report-only mode: candidate files " +
+        "are listed and nothing is deleted. Requires the updated cvs_functions.ps1 " +
+        "(-ReportOnly support, Change-Register S-1) deployed on the PS host."
     );
 }
 

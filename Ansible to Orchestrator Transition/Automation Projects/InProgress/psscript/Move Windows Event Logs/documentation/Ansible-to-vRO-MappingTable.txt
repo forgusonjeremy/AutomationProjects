@@ -9,13 +9,22 @@ SECTION 1 — PLAYBOOK-TO-WORKFLOW MAPPING
 
 Ansible Playbook                            Target vRO Workflow                    Notes
 ──────────────────────────────────────────  ─────────────────────────────────────  ────────────────────────────────────────────────────────────────
-file-move_with-LocalPath_Inventory          Move-ArchivedLogs-LocalHost            PS host FQDNused as HostList; UNC source path, not local C:\
-file-move_with-LocalPath_AD-Group           Move-ArchivedLogs-LocalHost            Same workflow; PS host is subject regardless of AD group context
-file-move_with-UNCPath_AD-Group             Move-ArchivedLogs-ByADGroupName        sAMAccountName-based AD group targeting
-file-move_with-UNCPath_AD-Group-TEST        Move-ArchivedLogs-ByADGroupName        Explicit credential passing replaced by PS host plugin credentials
-file-move_with-UNCPath_AD-Group-TEST(1)     Move-ArchivedLogs-ByADGroupCN          CN-based AD group targeting with -Server domain targeting
-move-win-archived-logs                      Move-ArchivedLogs-ByADGroupName        Deploy+invoke pattern replaced; script pre-staged
+file-move_with-UNCPath_AD-Group             Move-ArchivedLogs-ByADGroup            AD group targeting; resolved via Get-ListOfServers-ByCN
+file-move_with-UNCPath_AD-Group-TEST        Move-ArchivedLogs-ByADGroup            Explicit credential passing replaced by PS host plugin credentials
+file-move_with-UNCPath_AD-Group-TEST(1)     Move-ArchivedLogs-ByADGroup            Recursive + Enabled-only resolution with -Server domain targeting
+move-win-archived-logs                      Move-ArchivedLogs-ByADGroup            Deploy+invoke pattern replaced; script pre-staged
+file-move_with-LocalPath_AD-Group           Move-ArchivedLogs-ByADGroup            Former local-execution hosts are AD group members; covered here
+file-move_with-LocalPath_Inventory          Move-ArchivedLogs-ByADGroup            Former local-execution hosts are AD group members; covered here
 remove-OldFiles-UNCPath                     Remove-OldFiles-UNCShare               Deploy+invoke pattern replaced; script pre-staged
+
+NOTE: Phase 1 consolidated the two AD-group move workflows (ByADGroupName /
+ByADGroupCN) into a single Move-ArchivedLogs-ByADGroup using the recursive +
+Enabled-only resolution path (Get-ListOfServers-ByCN), and removed the separate
+LocalHost workflow.  The Windows servers that executed scripts locally under
+Ansible are members of the AD group in the Orchestrator model, so they are
+covered by Move-ArchivedLogs-ByADGroup.  No cvs_functions.ps1 changes are
+required: move-archived-logs-ByCN and Delete-OldFiles-UNC-Share already exist
+in the deployed script.
 
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 SECTION 2 — TASK-LEVEL MAPPING
@@ -28,8 +37,7 @@ ansible.windows.win_shell             Invoke PS script with -Action param    OOT
 ansible.windows.win_command           Same as win_shell                      OOTB: Invoke a PowerShell script      psHost, invocationString                Same as above                          win_command vs win_shell distinction is irrelevant post-conversion
 vars / group_vars / host_vars         Variable injection                     Workflow inputs + Config Element      Per-workflow input set                  Config Element provides stable defaults  All vars become explicit inputs or Config Element attributes
 inventory file (hosts)                Target host selection                  psHost plugin object (PS host only)   PowerShell:PowerShellHost               Managed by vRO PS host plugin           No inventory concept in vRO; PS host is the single execution target
-AD group targeting (sAMAccountName)   Resolve group members for iteration    Script-internal (Get-ListOfServers)   adGroupMember, domainName               Script handles deduplication            vRO does not replicate AD resolution; script owns this
-AD group targeting (CN + recursive)   Resolve group members recursively      Script-internal (Get-ListOfServers-ByCN) securityGroupCN, domainName          Script handles Enabled filter           vRO does not replicate AD resolution; script owns this
+AD group targeting (recursive)        Resolve group members recursively      Script-internal (Get-ListOfServers-ByCN) adGroup, domainName                  Script handles recursion + Enabled filter  vRO does not replicate AD resolution; script owns this
 loop / with_items (per-server)        Iterate servers and move files         Script-internal foreach loop          (none — handled by script)              Script iterates; no vRO loop needed     One workflow execution = one script invocation
 handlers                              Post-task notification (not used)      Not applicable                        —                                       —                                      Source playbooks do not use handlers
 become / credential passing           Privilege escalation / runas           PS host plugin service account        Configured on PowerShell:PowerShellHost  PS plugin handles auth context          Explicit credential vars in TEST playbooks are replaced by plugin SA
@@ -66,8 +74,7 @@ Ansible Variable                       vRO Equivalent                           
 ─────────────────────────────────────  ──────────────────────────────────────────  ───────────────────────────────────────────────────────
 script_path / ps_script_path           Workflow input: scriptPath                  Config Element: defaultScriptPath
 file_share_target / archive_dest       Workflow input: fileShareTarget             Config Element: defaultFileShareTarget
-ad_group / group_name (sAMAccountName) Workflow input: adGroupMember               Operator-supplied (no default)
-security_group_cn / group_cn           Workflow input: securityGroupCN             Operator-supplied (no default)
+ad_group / group_name / group_cn       Workflow input: adGroup                     Operator-supplied (no default); passed to script as -SecurityGroup_CN
 domain_name / domain                   Workflow input: domainName                  Config Element: defaultDomainName
 unc_share_path / share_path            Workflow input: uncSharePath                Operator-supplied (no default)
 older_than_days / retention_days       Workflow input: olderThanDays               Config Element: defaultLogRetentionDays (370)

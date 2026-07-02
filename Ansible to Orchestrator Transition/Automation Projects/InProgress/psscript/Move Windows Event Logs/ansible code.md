@@ -699,59 +699,6 @@ days_old: '-1'
       debug:
         var: move_result.stdout_lines
 
-
-**remove-OldFiles-UNCPath**
-***extra vars***
-var_ps_folder: ps_scripts
-var_ps_script_file: cvs_functions.ps1
-var_parameter_action: Delete-OldFiles-UNC-Share
-var_UNC_SharePath: \\fileserver.corp.local\mdcarchivelog$\Windows
-var_OlderThanDays: 370
-var_WhatIf: 'no'
-
-***playbook***
----
-- name: playbook to run powershell script remotely
-  hosts: all
-  become_method: runas
-  gather_facts: yes
-  connection: winrm
-  port: 5986
-
-  tasks:
-  - name: "Create temporary directory"
-    ansible.windows.win_tempfile:
-      state: directory
-    register: tempdir
-
-  - name: "Scipt Operations"
-    block:
-    - name: "Copy Scripts to Host"
-      ansible.windows.win_copy:
-        src: "files/{{var_ps_folder}}"
-        dest: "{{ tempdir.path }}"
-
-    - name: check if file exist
-      ansible.windows.win_stat:
-        path: "{{ tempdir.path }}\\{{var_ps_folder}}\\{{var_ps_script_file}}"
-      register: file_data
-
-    - name: Run PowerShell script
-      when: file_data.stat.exists == true
-      ansible.windows.win_command: powershell.exe -ExecutionPolicy ByPass
-        -File "{{ tempdir.path }}\\{{var_ps_folder}}\\{{var_ps_script_file}}"
-        -Action "{{var_parameter_action}}"
-        -UNC_SharePath "{{var_UNC_SharePath}}"
-        -OlderThanDays "{{var_OlderThanDays}}"
-        -WhatIf "{{var_WhatIf}}"
-
-    always:
-    - name: "Cleanup Temporary Files"
-      ansible.windows.win_file:
-        state: absent
-        path: "{{ tempdir.path }}"
-
-
 **cvs_functions.ps1**
 [CmdletBinding()]
 param (

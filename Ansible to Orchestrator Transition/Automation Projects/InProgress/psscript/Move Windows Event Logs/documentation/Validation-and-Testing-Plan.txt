@@ -42,39 +42,32 @@ A2. Confirm PowerShellRemotePSObject.getRootObject() is available
     type in the installed plugin version.  parseScriptOutput.js uses
     getRootObject() exclusively — no changes needed if getRootObject() is present.
 
-A3. Confirm PowerShell:PowerShellHost FQDN property name
-    Location: vRO UI → Scripting API Browser → Plugin: PowerShell
-              → Type: PowerShellHost
-    Confirm which property returns the FQDN of the PS host:
-      [ ] .name (assumed in buildMoveLocalHostInvocation.js)
-      [ ] .hostName
-      [ ] .host
-      [ ] other: _______________
-    If property name differs: update buildMoveLocalHostInvocation.js line:
-      var psHostFqdn = psHost.name;
+A3. (No longer applicable) PowerShell:PowerShellHost FQDN property name
+    This check was only required by the former Move-ArchivedLogs-LocalHost
+    workflow, which derived the target server FQDN from psHost.name.  That
+    workflow has been removed.  Move-ArchivedLogs-ByADGroup resolves all target
+    servers from Active Directory inside the script (Get-ListOfServers-ByCN);
+    no FQDN is read from the psHost object.  No action required.
 
 A4. Confirm cvs_functions.ps1 script parameter names
     Script has been reviewed.  The following are confirmed from the param() block.
     Verify the deployed script on the PS host matches:
       [x] -Action              confirmed in ValidateSet
-      [x] -ADGroupMember       confirmed
       [x] -DomainName          confirmed
       [x] -FileShareTarget     confirmed
       [x] -SecurityGroup_CN    confirmed — NOTE underscore (not -SecurityGroupCN)
       [x] -UNC_SharePath       confirmed — NOTE underscore (not -UNCSharePath)
       [x] -OlderThanDays       confirmed
       [x] -WhatIf              confirmed
-      [x] -HostList            confirmed — already present in deployed script
 
 A5. Confirm cvs_functions.ps1 Action values
-    All four action values confirmed present in the deployed script:
-      [x] move-archived-logs              line 1174
-      [x] move-archived-logs-ByCN         line 1186
-      [x] Delete-OldFiles-UNC-Share       line 1244
-      [x] move-archived-logs-ByHostList   line 1197 — already present, no changes needed
+    Both action values used by this package are confirmed present in the
+    deployed script:
+      [x] move-archived-logs-ByCN         (Move-ArchivedLogs-ByADGroup)
+      [x] Delete-OldFiles-UNC-Share       (Remove-OldFiles-UNCShare)
 
-    NOTE: cvs_functions_additive_changes.ps1 documents changes that are already
-    applied to the deployed script.  No further script modifications are required.
+    NOTE: This package makes NO changes to cvs_functions.ps1.  Both invoked
+    -Action values already exist in the deployed script.
 
 A6. Confirm script path on PS host
       [ ] Script exists at the path configured in defaultScriptPath
@@ -109,24 +102,26 @@ A10. Confirm RSAT AD Tools on PS host
       Get-Module -ListAvailable ActiveDirectory
     Expected: Module is listed.
     If not found: install RSAT AD Tools on PS host before running
-    ByADGroupName or ByADGroupCN workflows.
+    the Move-ArchivedLogs-ByADGroup workflow.
     See also: PS-Host-Build-Guide.txt Step 1.1.
 
-A11. Confirm Remove-OldFiles-UNCShare non-interactive behaviour (WhatIf risk)
-    KNOWN ISSUE: Remove-OldFiles-UNCPath calls Read-Host when -Force $false
-    (WhatIf='yes').  In a non-interactive PS host session, Read-Host will either
-    block indefinitely or return empty string, causing the script to cancel with
-    "Operation cancelled by user" and no files listed.
+A11. Confirm Remove-OldFiles-UNCShare report-only behaviour (WhatIf)
+    RESOLVED (see Change-Register.md, change S-1): Remove-OldFiles-UNCPath now
+    supports a -ReportOnly parameter.  The Delete-OldFiles-UNC-Share switch case
+    maps WhatIf='yes' to -ReportOnly $true (lists candidate files, deletes
+    nothing, no prompt) and WhatIf='no' to -Force $true (live delete, no prompt).
+    The former interactive Read-Host prompt has been removed.
 
-    WhatIf='yes' does NOT function as a safe report-only preview from vRO.
+    Confirm the FIX IS DEPLOYED before relying on WhatIf='yes' from vRO:
+      [ ] The deployed cvs_functions.ps1 contains the -ReportOnly parameter on
+          Remove-OldFiles-UNCPath:
+            Get-Content 'C:\PSO\Scripts\cvs_functions.ps1' | Select-String 'ReportOnly'
+            # Expected: matches found (param declaration + switch-case usage)
+      [ ] WhatIf='yes' from vRO completes non-interactively and lists candidate
+          files without deleting (see test D3)
 
-    Before using Remove-OldFiles-UNCShare in any context:
-      [ ] Run the script manually on the PS host with WhatIf='yes' to preview scope
-      [ ] Only then schedule the vRO workflow with WhatIf='no' for live deletion
-      [ ] Document this limitation for operators in the workflow description field
-
-    Phase 2 resolution: add a -ReportOnly switch to Remove-OldFiles-UNCPath that
-    lists candidate files without prompting and without deleting.
+    If the deployed script does NOT contain -ReportOnly, it is the older version:
+    deploy the updated script first, or use WhatIf='no' only.
 
 ───────────────────────────────────────────────────────────────────────────────
 PHASE B — vRO CONTENT DEPLOYMENT CHECKS
@@ -144,17 +139,13 @@ B1. Configuration Element
 
 B2. Actions deployed
     Module: broadcom.pso.vc.vm.guestOps.files.windows.logs
-    [ ] buildMoveLocalHostInvocation       return type: string
-    [ ] buildMoveByGroupNameInvocation     return type: string
-    [ ] buildMoveByGroupCNInvocation       return type: string
+    [ ] buildMoveByADGroupInvocation       return type: string
     [ ] buildRemoveFilesInvocation         return type: string
     [ ] parseScriptOutput                  return type: Properties
 
 B3. Workflows deployed
     Folder: PSO >> VC >> VM >> GuestOps >> Files >> Windows >> Logs
-    [ ] Move-ArchivedLogs-LocalHost
-    [ ] Move-ArchivedLogs-ByADGroupName
-    [ ] Move-ArchivedLogs-ByADGroupCN
+    [ ] Move-ArchivedLogs-ByADGroup
     [ ] Remove-OldFiles-UNCShare
 
 B4. OOTB workflow available
@@ -162,14 +153,9 @@ B4. OOTB workflow available
     [ ] Output binding confirms it returns PowerShellRemotePSObject
 
 B5. Input bindings — Config Element defaults
-    [ ] Move-ArchivedLogs-LocalHost:      scriptPath ← defaultScriptPath
-    [ ] Move-ArchivedLogs-LocalHost:      fileShareTarget ← defaultFileShareTarget
-    [ ] Move-ArchivedLogs-ByADGroupName:  scriptPath ← defaultScriptPath
-    [ ] Move-ArchivedLogs-ByADGroupName:  domainName ← defaultDomainName
-    [ ] Move-ArchivedLogs-ByADGroupName:  fileShareTarget ← defaultFileShareTarget
-    [ ] Move-ArchivedLogs-ByADGroupCN:   scriptPath ← defaultScriptPath
-    [ ] Move-ArchivedLogs-ByADGroupCN:   domainName ← defaultDomainName
-    [ ] Move-ArchivedLogs-ByADGroupCN:   fileShareTarget ← defaultFileShareTarget
+    [ ] Move-ArchivedLogs-ByADGroup:      scriptPath ← defaultScriptPath
+    [ ] Move-ArchivedLogs-ByADGroup:      domainName ← defaultDomainName
+    [ ] Move-ArchivedLogs-ByADGroup:      fileShareTarget ← defaultFileShareTarget
     [ ] Remove-OldFiles-UNCShare:         scriptPath ← defaultScriptPath
     [ ] Remove-OldFiles-UNCShare:         olderThanDays ← defaultLogRetentionDays
 
@@ -177,33 +163,26 @@ B5. Input bindings — Config Element defaults
 PHASE C — UNIT TESTS (Actions — via vRO scripting console or test workflow)
 ───────────────────────────────────────────────────────────────────────────────
 
-C1. buildMoveLocalHostInvocation — valid input
+C1. buildMoveByADGroupInvocation — valid input
     Input:  scriptPath='C:\PSO\Scripts\cvs_functions.ps1'
-            psHost=<valid PS host object with .name='pshostfqdn.corp.local'>
+            adGroup='WinLogServers'
+            domainName='corp.local'
             fileShareTarget='\\fileserver\share$\Windows'
     Expected return:
-      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByHostList' -FileShareTarget '\\fileserver\share$\Windows' -HostList 'pshostfqdn.corp.local'
+      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByCN' -SecurityGroup_CN 'WinLogServers' -DomainName 'corp.local' -FileShareTarget '\\fileserver\share$\Windows'
+    NOTE: parameter is -SecurityGroup_CN with underscore — not -SecurityGroupCN
 
-C2. buildMoveLocalHostInvocation — empty scriptPath
+C2. buildMoveByADGroupInvocation — empty scriptPath
     Input:  scriptPath='' (empty string)
     Expected: throws Error containing "scriptPath is required"
 
-C3. buildMoveByGroupNameInvocation — valid input
-    Input:  scriptPath='C:\PSO\Scripts\cvs_functions.ps1'
-            adGroupMember='WinLogServers'
-            domainName='corp.local'
-            fileShareTarget='\\fileserver\share$\Windows'
-    Expected return:
-      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs' -ADGroupMember 'WinLogServers' -DomainName 'corp.local' -FileShareTarget '\\fileserver\share$\Windows'
+C3. buildMoveByADGroupInvocation — empty adGroup
+    Input:  adGroup='' (empty string), other inputs valid
+    Expected: throws Error containing "adGroup is required"
 
-C4. buildMoveByGroupCNInvocation — valid input
-    Input:  scriptPath='C:\PSO\Scripts\cvs_functions.ps1'
-            securityGroupCN='Windows Log Servers CN'
-            domainName='corp.local'
-            fileShareTarget='\\fileserver\share$\Windows'
-    Expected return:
-      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByCN' -SecurityGroup_CN 'Windows Log Servers CN' -DomainName 'corp.local' -FileShareTarget '\\fileserver\share$\Windows'
-    NOTE: parameter is -SecurityGroup_CN with underscore — not -SecurityGroupCN
+C4. buildMoveByADGroupInvocation — empty domainName
+    Input:  domainName='' (empty string), other inputs valid
+    Expected: throws Error containing "domainName is required"
 
 C5. buildRemoveFilesInvocation — whatIf=no
     Input:  scriptPath='C:\PSO\Scripts\cvs_functions.ps1'
@@ -214,12 +193,12 @@ C5. buildRemoveFilesInvocation — whatIf=no
       & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'Delete-OldFiles-UNC-Share' -UNC_SharePath '\\fileserver\share$\Windows' -OlderThanDays 370 -WhatIf 'no'
     NOTE: parameter is -UNC_SharePath with underscore — not -UNCSharePath
 
-C6. buildRemoveFilesInvocation — whatIf=yes (verify warning is logged)
+C6. buildRemoveFilesInvocation — whatIf=yes
     Input:  same as C5 but whatIf='yes'
     Expected return: same string with -WhatIf 'yes'
-    Expected log:    System.warn containing "Read-Host" warning emitted
-    NOTE: this invocation will trigger the Read-Host prompt issue described in A11.
-    Do not run this against a live PS session without understanding the consequence.
+    Expected log:    System.log noting report-only mode
+    NOTE: report-only behaviour at run time requires the updated cvs_functions.ps1
+    (-ReportOnly parameter); see A11 and Change-Register.md change S-1.
 
 C7. buildRemoveFilesInvocation — invalid olderThanDays
     Input:  olderThanDays=0
@@ -253,38 +232,27 @@ C10. parseScriptOutput — error line detection
 PHASE D — WORKFLOW INTEGRATION TESTS (Non-production targets)
 ───────────────────────────────────────────────────────────────────────────────
 
-D1. Move-ArchivedLogs-LocalHost — safe run
-    Pre-condition: At least one Archive*.evtx file exists in
-      \\<pshostfqdn>\C$\Windows\System32\winevt\Logs
-    Run with:  psHost=<PS host>, fileShareTarget=<non-prod test share>
-    Expected:
-      [ ] Workflow reaches End - Completed Successfully
-      [ ] executionSuccess = true
-      [ ] Archive*.evtx file(s) moved to <fileShareTarget>\<pshostshortname>\
-      [ ] vRO execution log shows Write-Host output from script (via getRootObject())
-      [ ] No "Error:" lines in output
-
-D2. Move-ArchivedLogs-ByADGroupName — safe run
-    Pre-condition: Use a small non-critical AD group (1-2 test servers)
-    Run with:  adGroupMember=<test group sAMAccountName>, domainName=<domain>,
-               fileShareTarget=<non-prod test share>
+D1. Move-ArchivedLogs-ByADGroup — safe run
+    Pre-condition: Use a small non-critical AD group (1-2 test servers), at least
+      one of which has an Archive*.evtx file in C$\Windows\System32\winevt\Logs.
+    Run with:  adGroup=<test group identifier>, domainName=<domain>,
+               fileShareTarget=<non-prod test share>, psHost=<PS host>
     Expected:
       [ ] Workflow reaches End - Completed Successfully or End - Completed with Errors
       [ ] vRO execution log shows per-server "Info: <server> - moving archived files" lines
+      [ ] Archive*.evtx file(s) moved to <fileShareTarget>\<server-short-name>\
+      [ ] vRO execution log shows the invocationString with -SecurityGroup_CN (underscore)
+      [ ] Only enabled computer members of the group are processed (recursive expansion)
       [ ] No unexpected side effects on servers outside the test group
 
-D3. Move-ArchivedLogs-ByADGroupCN — safe run
-    Same as D2 but using securityGroupCN and a CN-identified test group.
-    Verify -SecurityGroup_CN (underscore) is correctly passed by checking
-    vRO log for the invocationString before execution.
-
-D4. Remove-OldFiles-UNCShare — manual preview before any vRO run
-    Due to the Read-Host issue with WhatIf='yes' in non-interactive sessions:
-      1. Run manually on PS host first:
-           & 'C:\PSO\Scripts\cvs_functions.ps1' -Action 'Delete-OldFiles-UNC-Share' -UNC_SharePath '\\share\path' -OlderThanDays 370 -WhatIf 'yes'
-         Review output.  Confirm file list is acceptable.
-      2. Only then run Remove-OldFiles-UNCShare workflow with whatIf='no' against
-         a non-production share with known old test files.
+D2. Remove-OldFiles-UNCShare — preview before live deletion
+    With the -ReportOnly fix deployed (A11), preview via the workflow itself:
+      1. Run the Remove-OldFiles-UNCShare workflow with whatIf='yes' (see D3) and
+         review the "[ReportOnly] WouldDelete" lines.  Confirm the list is
+         acceptable.  (Or run the same -Action manually on the PS host with
+         -WhatIf 'yes' if preferred.)
+      2. Only then run the workflow with whatIf='no' against a non-production
+         share with known old test files.
     Expected from vRO run (whatIf='no'):
       [ ] Workflow reaches End - Completed Successfully
       [ ] executionSuccess = true
@@ -292,13 +260,13 @@ D4. Remove-OldFiles-UNCShare — manual preview before any vRO run
       [ ] Deletion Summary in vRO log (from Write-Host in Remove-OldFiles-UNCPath end block)
       [ ] No files outside olderThanDays threshold are deleted
 
-D5. Remove-OldFiles-UNCShare — whatIf='yes' behaviour observation
-    Run with whatIf='yes' against a non-production share and observe actual behaviour:
-      [ ] If workflow blocks indefinitely: Read-Host issue confirmed — cancel run
-      [ ] If workflow completes with "Operation cancelled by user": Read-Host returned empty
-      [ ] Document observed behaviour for operator guidance
-    In either case: do not use whatIf='yes' from vRO for production previewing until
-    Phase 2 script fix is applied.
+D3. Remove-OldFiles-UNCShare — whatIf='yes' report-only verification
+    Pre-condition: updated cvs_functions.ps1 (-ReportOnly) deployed (see A11).
+    Run with whatIf='yes' against a non-production share with known old test files:
+      [ ] Workflow completes non-interactively (no blocking, no prompt)
+      [ ] vRO log lists "[ReportOnly] WouldDelete: <file>" lines for aged files
+      [ ] NO files are actually deleted from the share
+      [ ] Deletion Summary reports "Total files deleted: 0"
 
 ───────────────────────────────────────────────────────────────────────────────
 PHASE E — SUCCESS CRITERIA
@@ -308,17 +276,16 @@ PHASE E — SUCCESS CRITERIA
 [ ] PS host certificate trusted by vRO (CA-signed or manually imported)
 [ ] PS host smoke test passes before any log management workflow is run
 [ ] All pre-checks (Phase A) pass or have documented workarounds
-[ ] A11 (WhatIf/Read-Host) risk acknowledged and communicated to operators
-[ ] All four workflows deploy without import errors
+[ ] A11 (WhatIf report-only): updated cvs_functions.ps1 (-ReportOnly) deployed and WhatIf='yes' verified report-only (D3)
+[ ] Both workflows deploy without import errors
 [ ] Config Element attributes load correctly as workflow defaults in custom form
-[ ] All five actions execute without runtime errors against valid inputs
-[ ] All four build* actions return correctly formatted invocation strings
+[ ] All three actions execute without runtime errors against valid inputs
+[ ] Both build* actions return correctly formatted invocation strings
 [ ] Invocation strings use -SecurityGroup_CN and -UNC_SharePath (underscores) — confirmed in logs
 [ ] parseScriptOutput returns Properties with keys: success, outputText, errorLines
 [ ] parseScriptOutput correctly detects "Error:" lines as success=false
-[ ] Move-ArchivedLogs-LocalHost moves Archive*.evtx files to correct destination
-[ ] Move-ArchivedLogs-ByADGroupName processes all group members correctly
-[ ] Move-ArchivedLogs-ByADGroupCN processes all CN group members correctly
+[ ] Move-ArchivedLogs-ByADGroup processes all enabled group members (recursively) correctly
+[ ] Move-ArchivedLogs-ByADGroup moves Archive*.evtx files to correct per-server destination
 [ ] Remove-OldFiles-UNCShare whatIf='no' deletes correct files on non-prod test share
 [ ] All workflow executions produce meaningful log output in vRO execution history
 
@@ -328,8 +295,8 @@ ROLLBACK AND RECOVERY
 
 Item                      Rollback Approach
 ────────────────────────  ───────────────────────────────────────────────────────────────────────────
-cvs_functions.ps1         No changes required — additive changes were already present in deployed
-                          script.  No rollback needed for script.
+cvs_functions.ps1         No changes made by this package — both invoked -Action values already
+                          exist in the deployed script.  No rollback needed for script.
 
 Moved .evtx files         Files are moved, not deleted.  If a move places files at the wrong
                           destination, they can be manually moved back.
@@ -341,7 +308,7 @@ Deleted files (Remove)    No automated recovery — deletion is permanent.
                           preview scope before running vRO workflow with WhatIf='no'.
 
 vRO content               All items are new (no modifications to existing vRO content).
-                          Rollback = delete the four workflows, five actions, and Config Element.
+                          Rollback = delete the two workflows, three actions, and Config Element.
                           The OOTB "Invoke a PowerShell script" workflow is not modified.
 
 Config Element            Delete or update attribute values to revert defaults.
