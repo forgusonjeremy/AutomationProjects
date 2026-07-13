@@ -22,9 +22,12 @@ ByADGroupCN) into a single Move-ArchivedLogs-ByADGroup using the recursive +
 Enabled-only resolution path (Get-ListOfServers-ByCN), and removed the separate
 LocalHost workflow.  The Windows servers that executed scripts locally under
 Ansible are members of the AD group in the Orchestrator model, so they are
-covered by Move-ArchivedLogs-ByADGroup.  No cvs_functions.ps1 changes are
-required: move-archived-logs-ByCN and Delete-OldFiles-UNC-Share already exist
-in the deployed script.
+covered by Move-ArchivedLogs-ByADGroup.  Both invoked actions
+(move-archived-logs-ByCN and Delete-OldFiles-UNC-Share) already exist in the
+deployed script; the cvs_functions.ps1 changes are limited to S-1 (report-only),
+S-2..S-4 (parameterised filter/age + resilient, logged per-server failure
+handling for the AD-group move), and S-5 (removal of the orphaned
+move-archived-logs-ByHostList action).  See Change-Register.md.
 
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 SECTION 2 — TASK-LEVEL MAPPING
@@ -37,7 +40,7 @@ ansible.windows.win_shell             Invoke PS script with -Action param    OOT
 ansible.windows.win_command           Same as win_shell                      OOTB: Invoke a PowerShell script      psHost, invocationString                Same as above                          win_command vs win_shell distinction is irrelevant post-conversion
 vars / group_vars / host_vars         Variable injection                     Workflow inputs + Config Element      Per-workflow input set                  Config Element provides stable defaults  All vars become explicit inputs or Config Element attributes
 inventory file (hosts)                Target host selection                  psHost plugin object (PS host only)   PowerShell:PowerShellHost               Managed by vRO PS host plugin           No inventory concept in vRO; PS host is the single execution target
-AD group targeting (recursive)        Resolve group members recursively      Script-internal (Get-ListOfServers-ByCN) adGroup, domainName                  Script handles recursion + Enabled filter  vRO does not replicate AD resolution; script owns this
+AD group targeting (recursive)        Resolve group members recursively      Script-internal (Get-ListOfServers-ByCN) groupDN, domainName                  Script handles recursion + Enabled filter (disabled skipped + logged; per-object isolation)  vRO does not replicate AD resolution; script owns this
 loop / with_items (per-server)        Iterate servers and move files         Script-internal foreach loop          (none — handled by script)              Script iterates; no vRO loop needed     One workflow execution = one script invocation
 handlers                              Post-task notification (not used)      Not applicable                        —                                       —                                      Source playbooks do not use handlers
 become / credential passing           Privilege escalation / runas           PS host plugin service account        Configured on PowerShell:PowerShellHost  PS plugin handles auth context          Explicit credential vars in TEST playbooks are replaced by plugin SA
@@ -72,12 +75,14 @@ SECTION 4 — VARIABLE MAPPING
 
 Ansible Variable                       vRO Equivalent                              Default Source
 ─────────────────────────────────────  ──────────────────────────────────────────  ───────────────────────────────────────────────────────
-script_path / ps_script_path           Workflow input: scriptPath                  Config Element: defaultScriptPath
-file_share_target / archive_dest       Workflow input: fileShareTarget             Config Element: defaultFileShareTarget
-ad_group / group_name / group_cn       Workflow input: adGroup                     Operator-supplied (no default); passed to script as -SecurityGroup_CN
-domain_name / domain                   Workflow input: domainName                  Config Element: defaultDomainName
+script_path / ps_script_path           Workflow input: scriptPath                  Move: input default set directly on input; Remove: Config Element defaultScriptPath
+file_share_target / archive_dest       Workflow input: fileShareTarget             Move workflow input default set directly on input (no Config Element)
+group_dn / ad_group / group_name       Workflow input: groupDN                     Operator-supplied (no default); DN preferred; passed to script as -SecurityGroup_CN
+domain_name / domain                   Workflow input: domainName                  Move workflow input default set directly on input (no Config Element)
+file_filter / filter_on                Workflow input: fileFilter                  Move workflow input default set directly on input (Archive-*.evtx); passed to script as -FilterOn
+days_old / file_age                    Workflow input: fileAgeDays                 Move workflow input default set directly on input (-1); passed to script as -NumberOfDays
 unc_share_path / share_path            Workflow input: uncSharePath                Operator-supplied (no default)
-older_than_days / retention_days       Workflow input: olderThanDays               Config Element: defaultLogRetentionDays (370)
+older_than_days / retention_days       Workflow input: olderThanDays               Config Element: defaultLogRetentionDays (370) [Remove workflow]
 what_if / dry_run                      Workflow input: whatIf (yes/no dropdown)    Hard default: yes (safe)
 ansible_host / inventory hostname      Derived from psHost.name (FQDN)             PowerShell:PowerShellHost plugin object
 ansible_user / ansible_password        PS host plugin service account              Configured in vRO PS host configuration

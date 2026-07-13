@@ -66,14 +66,16 @@ A5. Confirm cvs_functions.ps1 Action values
       [x] move-archived-logs-ByCN         (Move-ArchivedLogs-ByADGroup)
       [x] Delete-OldFiles-UNC-Share       (Remove-OldFiles-UNCShare)
 
-    NOTE: This package makes NO changes to cvs_functions.ps1.  Both invoked
-    -Action values already exist in the deployed script.
+    NOTE: Both invoked -Action values already exist in the deployed script.
+    The cvs_functions.ps1 changes are limited to S-1..S-5 (see Change-Register.md);
+    confirm the updated script is deployed.
 
 A6. Confirm script path on PS host
-      [ ] Script exists at the path configured in defaultScriptPath
+      [ ] Script exists at the path used by the workflows
       Command: Test-Path 'C:\PSO\Scripts\cvs_functions.ps1'
       Expected: True
-      If False: update defaultScriptPath in the Config Element to match actual path.
+      If False: update the Move workflow scriptPath input default AND the
+      defaultScriptPath Config Element attribute (Remove workflow) to match.
 
 A7. Confirm service account — UNC read access
     Run from PS host under the vRO service account context:
@@ -127,15 +129,15 @@ A11. Confirm Remove-OldFiles-UNCShare report-only behaviour (WhatIf)
 PHASE B — vRO CONTENT DEPLOYMENT CHECKS
 ───────────────────────────────────────────────────────────────────────────────
 
-B1. Configuration Element
+B1. Configuration Element (Remove-OldFiles-UNCShare only)
     [ ] VCF/WindowsLogManagement/WindowsLogManagement-Config exists
-    [ ] All four attributes present with correct types and values:
+    [ ] Both attributes present with correct types and values:
           defaultScriptPath        (string)
-          defaultFileShareTarget   (string)
-          defaultDomainName        (string)
           defaultLogRetentionDays  (number)
     [ ] defaultScriptPath matches actual script path confirmed in A6
-    [ ] defaultFileShareTarget is reachable from PS host
+    [ ] The move-only attributes (defaultDomainName, defaultFileShareTarget,
+        defaultFileFilter, defaultFileAgeDays) are NOT present (removed - the
+        Move workflow uses input defaults, not this element)
 
 B2. Actions deployed
     Module: broadcom.pso.vc.vm.guestOps.files.windows.logs
@@ -144,7 +146,8 @@ B2. Actions deployed
     [ ] parseScriptOutput                  return type: Properties
 
 B3. Workflows deployed
-    Folder: PSO >> VC >> VM >> GuestOps >> Files >> Windows >> Logs
+    Folder: Production >> Servers >> Windows >> Event Log Management
+    (lab/dev: Workflows >> Customer >> <Customer Name> >> Production >> Servers >> Windows >> Event Log Management)
     [ ] Move-ArchivedLogs-ByADGroup
     [ ] Remove-OldFiles-UNCShare
 
@@ -152,12 +155,17 @@ B4. OOTB workflow available
     [ ] Library/PowerShell/Invoke a PowerShell script is present in vRO library
     [ ] Output binding confirms it returns PowerShellRemotePSObject
 
-B5. Input bindings — Config Element defaults
-    [ ] Move-ArchivedLogs-ByADGroup:      scriptPath ← defaultScriptPath
-    [ ] Move-ArchivedLogs-ByADGroup:      domainName ← defaultDomainName
-    [ ] Move-ArchivedLogs-ByADGroup:      fileShareTarget ← defaultFileShareTarget
-    [ ] Remove-OldFiles-UNCShare:         scriptPath ← defaultScriptPath
-    [ ] Remove-OldFiles-UNCShare:         olderThanDays ← defaultLogRetentionDays
+B5. Input defaults
+    Move-ArchivedLogs-ByADGroup — defaults set DIRECTLY on each input (no Config Element):
+    [ ] scriptPath       has a default value set on the input
+    [ ] domainName       has a default value set on the input
+    [ ] fileShareTarget  has a default value set on the input
+    [ ] fileFilter       has a default value set on the input (e.g. Archive-*.evtx)
+    [ ] fileAgeDays      has a default value set on the input (e.g. -1)
+    [ ] groupDN          has NO default (per-run value)
+    Remove-OldFiles-UNCShare — Config Element bindings:
+    [ ] scriptPath ← defaultScriptPath
+    [ ] olderThanDays ← defaultLogRetentionDays
 
 ───────────────────────────────────────────────────────────────────────────────
 PHASE C — UNIT TESTS (Actions — via vRO scripting console or test workflow)
@@ -165,20 +173,32 @@ PHASE C — UNIT TESTS (Actions — via vRO scripting console or test workflow)
 
 C1. buildMoveByADGroupInvocation — valid input
     Input:  scriptPath='C:\PSO\Scripts\cvs_functions.ps1'
-            adGroup='WinLogServers'
+            groupDN='CN=WinLogServers,OU=Groups,DC=corp,DC=local'
             domainName='corp.local'
             fileShareTarget='\\fileserver\share$\Windows'
+            fileFilter='Archive-*.evtx'
+            fileAgeDays=-1
     Expected return:
-      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByCN' -SecurityGroup_CN 'WinLogServers' -DomainName 'corp.local' -FileShareTarget '\\fileserver\share$\Windows'
+      & "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByCN' -SecurityGroup_CN 'CN=WinLogServers,OU=Groups,DC=corp,DC=local' -DomainName 'corp.local' -FileShareTarget '\\fileserver\share$\Windows' -FilterOn 'Archive-*.evtx' -NumberOfDays '-1'
     NOTE: parameter is -SecurityGroup_CN with underscore — not -SecurityGroupCN
+    NOTE: a groupDN without a 'DC=' component still succeeds but logs a System.warn nudge
 
 C2. buildMoveByADGroupInvocation — empty scriptPath
     Input:  scriptPath='' (empty string)
     Expected: throws Error containing "scriptPath is required"
 
-C3. buildMoveByADGroupInvocation — empty adGroup
-    Input:  adGroup='' (empty string), other inputs valid
-    Expected: throws Error containing "adGroup is required"
+C3. buildMoveByADGroupInvocation — empty groupDN
+    Input:  groupDN='' (empty string), other inputs valid
+    Expected: throws Error containing "groupDN is required"
+
+C3b. buildMoveByADGroupInvocation — missing / non-numeric fileAgeDays
+    Input:  fileAgeDays='' (or 'abc'), other inputs valid
+    Expected: throws Error containing "fileAgeDays is required" (empty) or
+              "fileAgeDays must be a whole number" (non-numeric)
+
+C3c. buildMoveByADGroupInvocation — empty fileFilter
+    Input:  fileFilter='' (empty string), other inputs valid
+    Expected: throws Error containing "fileFilter is required"
 
 C4. buildMoveByADGroupInvocation — empty domainName
     Input:  domainName='' (empty string), other inputs valid
@@ -235,15 +255,44 @@ PHASE D — WORKFLOW INTEGRATION TESTS (Non-production targets)
 D1. Move-ArchivedLogs-ByADGroup — safe run
     Pre-condition: Use a small non-critical AD group (1-2 test servers), at least
       one of which has an Archive*.evtx file in C$\Windows\System32\winevt\Logs.
-    Run with:  adGroup=<test group identifier>, domainName=<domain>,
-               fileShareTarget=<non-prod test share>, psHost=<PS host>
+    Run with:  groupDN=<test group DN>, domainName=<domain>,
+               fileShareTarget=<non-prod test share>, fileFilter='Archive-*.evtx',
+               fileAgeDays=-1, psHost=<PS host>
     Expected:
       [ ] Workflow reaches End - Completed Successfully or End - Completed with Errors
       [ ] vRO execution log shows per-server "Info: <server> - moving archived files" lines
       [ ] Archive*.evtx file(s) moved to <fileShareTarget>\<server-short-name>\
-      [ ] vRO execution log shows the invocationString with -SecurityGroup_CN (underscore)
+      [ ] vRO execution log shows the invocationString with -SecurityGroup_CN (underscore),
+          -FilterOn and -NumberOfDays
       [ ] Only enabled computer members of the group are processed (recursive expansion)
       [ ] No unexpected side effects on servers outside the test group
+
+D1a. Move-ArchivedLogs-ByADGroup — disabled member is skipped (S-4)
+    Pre-condition: Add a DISABLED computer object to the test AD group.
+    Run D1 again.
+    Expected:
+      [ ] vRO log shows "Info: skipping disabled computer object <name>"
+      [ ] The disabled server is NOT contacted and NOT processed
+      [ ] Enabled members still processed; workflow does not fail on account of the disabled one
+
+D1b. Move-ArchivedLogs-ByADGroup — unavailable server is logged and non-fatal (S-2/S-3)
+    Pre-condition: Include an enabled member that is powered off / unreachable
+      (or whose C$ admin share is blocked), plus at least one healthy member.
+    Run D1 again.
+    Expected:
+      [ ] vRO log shows an "Error:" line naming the unreachable server
+          (e.g. "Error: [<server>] failed moving 'Archive-*.evtx' from ...")
+      [ ] The loop CONTINUES — the healthy member's files are still moved
+      [ ] Workflow ends at End - Completed with Errors (success=false), NOT a hard Failed state
+      [ ] parseScriptOutput flags success=false because of the Error: line
+
+D1c. Move-ArchivedLogs-ByADGroup — total failure terminates (S-2/S-4)
+    Pre-condition: Supply a groupDN that does not exist, OR run on a PS host
+      without the ActiveDirectory (RSAT) module.
+    Expected:
+      [ ] Group-resolution failure / missing module terminates the script
+      [ ] Workflow routes through handlePSFailure to End - Failed: PS Execution
+      [ ] executionSuccess = false with a "PS execution failed" message
 
 D2. Remove-OldFiles-UNCShare — preview before live deletion
     With the -ReportOnly fix deployed (A11), preview via the workflow itself:
@@ -278,10 +327,13 @@ PHASE E — SUCCESS CRITERIA
 [ ] All pre-checks (Phase A) pass or have documented workarounds
 [ ] A11 (WhatIf report-only): updated cvs_functions.ps1 (-ReportOnly) deployed and WhatIf='yes' verified report-only (D3)
 [ ] Both workflows deploy without import errors
-[ ] Config Element attributes load correctly as workflow defaults in custom form
+[ ] Move-ArchivedLogs-ByADGroup input defaults load in the custom form (set on inputs, no Config Element)
+[ ] Remove-OldFiles-UNCShare Config Element attributes load correctly as defaults in the custom form
 [ ] All three actions execute without runtime errors against valid inputs
 [ ] Both build* actions return correctly formatted invocation strings
 [ ] Invocation strings use -SecurityGroup_CN and -UNC_SharePath (underscores) — confirmed in logs
+[ ] Move invocation includes -FilterOn and -NumberOfDays from fileFilter / fileAgeDays inputs
+[ ] Disabled AD members are skipped and logged (D1a); unavailable servers are logged and non-fatal (D1b); total failures route to Failed (D1c)
 [ ] parseScriptOutput returns Properties with keys: success, outputText, errorLines
 [ ] parseScriptOutput correctly detects "Error:" lines as success=false
 [ ] Move-ArchivedLogs-ByADGroup processes all enabled group members (recursively) correctly

@@ -2,7 +2,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  * Action:  getProjectADChildOUs
  * Module:  com.broadcom.pso.vcfa.customforms
- * Return:  Array/string   — child OU RELATIVE DNs, for a custom-form dropdown
+ * Return:  Array/string   — descendant OU FULL DNs, for a custom-form dropdown
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * OVERVIEW
@@ -14,9 +14,10 @@
  *     3. Reads the AD integration's Base DN (GET /iaas/api/integrations).
  *     4. Reads the project's OU from an admin-set project CUSTOM PROPERTY
  *        (GET /iaas/api/projects/{id}); combines it with the Base DN if relative.
- *     5. Enumerates the OUs directly beneath the project OU via the vRO Active
- *        Directory plugin (scopes the requester's choices to the project subtree).
- *     6. Returns those child OUs as FULL DNs. The selected OU is consumed by a vRO
+ *     5. Enumerates EVERY OU in the subtree beneath the project OU (any depth) via
+ *        the vRO Active Directory plugin (scopes the requester's choices to the
+ *        project's own AD subtree).
+ *     6. Returns those descendant OUs as FULL DNs. The selected OU is consumed by a vRO
  *        workflow (Compute Allocation) that pre-creates the computer account; the OS
  *        domain join is handled by a vCenter customization spec. Fails closed if the
  *        project OU is unresolved — never lists the whole domain.
@@ -55,9 +56,10 @@
  *   apiVersion             string  IaaS API version date, e.g. "2021-07-15" (optional)
  *
  * OUTPUT
- *   Array/string — FULL DNs of the OUs directly beneath the project's configured AD OU,
- *   sorted. The selected value is passed to the create-computer workflow (AD plugin) to
- *   pre-stage the computer account in that OU. Empty if the project OU has no child OUs.
+ *   Array/string — FULL DNs of EVERY OU in the subtree beneath the project's configured
+ *   AD OU (any depth), sorted. The selected value is passed to the create-computer
+ *   workflow (AD plugin) to pre-stage the computer account in that OU. Empty if the
+ *   project OU has no descendant OUs.
  *   THROWS if the project OU cannot be resolved (never lists the whole domain).
  *
  * ───────────────────────────────────────────────────────────────────────────
@@ -226,30 +228,13 @@ function getAdHost() {
     return hosts[0];
 }
 
-// ── Helper: enumerate DIRECT child OUs of a base DN via the AD plugin ─────────
-// (a) base is an OU -> resolve the OU object, read .organizationalUnits
-// (b) base is the domain root -> list OUs, keep direct children by DN
-// All searches pass the AD host explicitly: ActiveDirectory.search(type, query, adHost).
-function getChildOUs(baseDN, adHost) {
+// ── Helper: enumerate ALL descendant OUs beneath a base DN via the AD plugin ──
+// Lists every OU on the host, then keeps those whose DN ends with ",<baseDN>" —
+// i.e. any OU sitting in the subtree rooted at baseDN, at ANY depth. The base DN
+// itself is excluded (it does not end with ",<baseDN>"). Returns FULL DNs, sorted.
+// The AD host is passed explicitly: ActiveDirectory.search(type, query, adHost).
+function getDescendantOUs(baseDN, adHost) {
     var result = [];
-
-    if (/^\s*ou=/i.test(baseDN)) {
-        var rdn = baseDN.split(",")[0].replace(/^\s*ou=/i, "").trim();
-        var matches = ActiveDirectory.search("OrganizationalUnit", rdn, adHost) || [];
-        for (var mi = 0; mi < matches.length; mi++) {
-            var m = matches[mi];
-            if (m.distinguishedName && normDN(m.distinguishedName) === normDN(baseDN)) {
-                var kids = m.organizationalUnits || [];
-                for (var ki = 0; ki < kids.length; ki++) {
-                    if (kids[ki].distinguishedName) result.push(kids[ki].distinguishedName);
-                }
-                result.sort();
-                return result;
-            }
-        }
-        // fall through to (b) if the exact OU object could not be resolved
-    }
-
     var suffix = "," + normDN(baseDN);
     var all = ActiveDirectory.search("OrganizationalUnit", "", adHost) || [];  // empty query => all OUs
     if (all.length === 0)
@@ -259,9 +244,9 @@ function getChildOUs(baseDN, adHost) {
         var dn = all[oi].distinguishedName;
         if (!dn) continue;
         var dnl = normDN(dn);
+        // Keep any OU whose DN ends with ",<baseDN>" (descendant at any depth).
         if (dnl.length > suffix.length && dnl.substring(dnl.length - suffix.length) === suffix) {
-            var prefix = dnl.substring(0, dnl.length - suffix.length);  // part before ",base"
-            if (prefix.indexOf(",") === -1 && prefix.indexOf("ou=") === 0) result.push(dn);
+            result.push(dn);
         }
     }
     result.sort();
@@ -309,12 +294,13 @@ try {
     }
     System.log("getProjectADChildOUs | project OU (" + kind + "): " + projectOuDN);
 
-    // Enumerate ONLY the OUs beneath the project OU (scopes the requester's choices).
-    var adHost   = getAdHost();
-    var childOUs = getChildOUs(projectOuDN, adHost);   // FULL DNs (consumed by the create-computer workflow)
-    childOUs.sort();
-    System.log("getProjectADChildOUs | returning " + childOUs.length + " OU DN(s).");
-    return childOUs;
+    // Enumerate ALL OUs in the subtree beneath the project OU (any depth) — scopes
+    // the requester's choices to the project's own AD subtree.
+    var adHost = getAdHost();
+    var descendantOUs = getDescendantOUs(projectOuDN, adHost);   // FULL DNs (consumed by the create-computer workflow)
+    descendantOUs.sort();
+    System.log("getProjectADChildOUs | returning " + descendantOUs.length + " OU DN(s).");
+    return descendantOUs;
 
 } catch (e) {
     System.error("getProjectADChildOUs | " + e);

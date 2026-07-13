@@ -71,15 +71,7 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_59abf97b
-          fields:
-            - id: dataDisks
-              display: datagrid
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_d6212069
+        - id: section_83eb4644
           fields:
             - id: joinDomain
               display: checkbox
@@ -87,7 +79,7 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_c3da891e
+        - id: section_3fd02fe8
           fields:
             - id: ouDn
               display: dropDown
@@ -101,7 +93,16 @@ layout:
                       joinDomain: false
                     value: false
               signpostPosition: right-middle
+        - id: section_bdbf40fe
+          fields:
+            - id: dataDisks
+              display: datagrid
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
       title: General
+      state: {}
     - id: page_7e3a3faa
       sections:
         - id: section_fc41d381
@@ -139,6 +140,38 @@ layout:
         - id: section_6ed7c0e0
           fields:
             - id: defaultAdminNewPasswordAttrName
+              display: textField
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_69354d96
+          fields:
+            - id: textField_2450f76e
+              display: textField
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_d387f653
+          fields:
+            - id: textField_12757df8
+              display: textField
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_22db3e41
+          fields:
+            - id: textField_8588d78b
+              display: textField
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_3b6d9d9f
+          fields:
+            - id: textField_cc2af01c
               display: textField
               state:
                 visible: true
@@ -273,6 +306,47 @@ schema:
     constraints:
       min-value: 1
       max-value: 512
+  joinDomain:
+    label: Join Active Directory
+    type:
+      dataType: boolean
+      isMultiple: false
+    default: false
+  ouDn:
+    label: Ou Dn
+    type:
+      dataType: string
+      isMultiple: false
+    valueList:
+      id: com.broadcom.pso.vcfa.customforms/getProjectADChildOUs
+      type: scriptAction
+      parameters:
+        - $type:
+            dataType: string
+            isMultiple: false
+          apiVersion: '``'
+        - $type:
+            dataType: string
+            isMultiple: false
+          configElementAttribute: textField_12757df8
+        - $type:
+            dataType: string
+            isMultiple: false
+          vcfaBaseUrl: textField_8588d78b
+        - $type:
+            dataType: string
+            isMultiple: false
+          orgName: textField_cc2af01c
+        - $type:
+            dataType: string
+            isMultiple: false
+          configElementName: textField_2450f76e
+        - $type:
+            dataType: string
+            isMultiple: false
+          projectId: _projectId
+    constraints:
+      required: true
   dataDisks:
     label: Additional Data Disks
     description: One entry per additional disk. Choose a size and a SCSI controller.
@@ -300,6 +374,7 @@ schema:
             - value: SCSI_Controller_3
               label: SCSI_Controller_3
           id: SCSIController
+          constraints: {}
         - label: driveLetter
           description: Single letter E through Z
           type:
@@ -317,6 +392,7 @@ schema:
             dataType: string
             isMultiple: false
           id: driveLabel
+          constraints: {}
         - label: Provisioning Type
           type:
             dataType: string
@@ -330,52 +406,12 @@ schema:
             - value: eagerZeroedThick
               label: eagerZeroedThick
           id: provisionType
+          constraints: {}
       isMultiple: true
     constraints:
       required: true
       min-value: 1
       max-value: 10
-  joinDomain:
-    label: Join Active Directory
-    type:
-      dataType: boolean
-      isMultiple: false
-    default: true
-  ouDn:
-    label: Ou Dn
-    type:
-      dataType: string
-      isMultiple: false
-    valueList:
-      id: com.broadcom.pso.vcfa.customforms/getProjectADChildOUs
-      type: scriptAction
-      parameters:
-        - $type:
-            dataType: string
-            isMultiple: false
-          apiVersion: '``'
-        - $type:
-            dataType: string
-            isMultiple: false
-          configElementAttribute: '`refreshToken`'
-        - $type:
-            dataType: string
-            isMultiple: false
-          vcfaBaseUrl: '`https://cvsd26vcfaut01.connect.lab`'
-        - $type:
-            dataType: string
-            isMultiple: false
-          orgName: '`CVS-IaaS-Lab`'
-        - $type:
-            dataType: string
-            isMultiple: false
-          configElementName: '`vcfa-authentication`'
-        - $type:
-            dataType: string
-            isMultiple: false
-          projectId: _projectId
-    constraints:
-      required: true
   adminAcctConfigElemName:
     label: Local Admin Configuration Element Name
     description: >-
@@ -448,5 +484,33 @@ schema:
     default: newDefaultAdminPassword
     constraints:
       required: true
+  textField_2450f76e:
+    label: VCFA-Auth-Config-Element-Name
+    type:
+      dataType: string
+    default: vcfa-rest-authentication
+    placeholder: ''
+    constraints: {}
+  textField_12757df8:
+    label: VCFA-Auth-Refresh-Token-Attribute-Name
+    type:
+      dataType: string
+    default: refreshToken
+    placeholder: ''
+    constraints: {}
+  textField_8588d78b:
+    label: vcfa-base-url
+    type:
+      dataType: string
+    default: https://vcfa.site-a.vcf.lab
+    placeholder: ''
+    constraints: {}
+  textField_cc2af01c:
+    label: OrgName
+    type:
+      dataType: string
+    default: vm-apps
+    placeholder: ''
+    constraints: {}
 options:
   externalValidations: []

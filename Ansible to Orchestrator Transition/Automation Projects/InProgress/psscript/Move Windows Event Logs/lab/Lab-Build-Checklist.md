@@ -88,13 +88,14 @@ Match these and you avoid reconfiguring the package.
 ## 6. VCF / Aria Orchestrator Appliance
 
 - [ ] Configure PowerShell plugin with the PSO host (Kerberos or CredSSP auth)
-- [ ] Create Configuration Element `VCF/WindowsLogManagement/WindowsLogManagement-Config`:
+- [ ] Create Configuration Element `VCF/WindowsLogManagement/WindowsLogManagement-Config`
+      (used by Remove-OldFiles-UNCShare only):
   - [ ] `defaultScriptPath` = `C:\PSO\Scripts\cvs_functions.ps1`
-  - [ ] `defaultFileShareTarget` = `\\fileserver.corp.local\mdcarchivelog$\Windows`
-  - [ ] `defaultDomainName` = `corp.local`
   - [ ] `defaultLogRetentionDays` = `370`
 - [ ] Deploy the 3 actions (`buildMoveByADGroupInvocation`, `buildRemoveFilesInvocation`, `parseScriptOutput`)
 - [ ] Deploy the 2 workflows per `code/README.md`
+  - [ ] Move-ArchivedLogs-ByADGroup: set input defaults directly on each input
+        (`scriptPath`, `domainName`, `fileShareTarget`, `fileFilter`, `fileAgeDays`) — no Config Element
 
 ## 7. SMTP (optional — Phase 2 defers email reporting)
 

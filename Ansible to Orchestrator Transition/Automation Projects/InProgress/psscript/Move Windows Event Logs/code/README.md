@@ -33,8 +33,10 @@ vcf-windows-log-mgmt/
 > resolution path (`Get-ListOfServers-ByCN`). The **LocalHost** workflow is
 > removed: the Windows servers that formerly executed the scripts locally under
 > Ansible are members of the AD group in the Orchestrator model and are covered
-> by Move-ArchivedLogs-ByADGroup. As a result, **no changes to `cvs_functions.ps1`
-> are required** — every action invoked already exists in the deployed script.
+> by Move-ArchivedLogs-ByADGroup. Every `-Action` invoked already exists in the
+> deployed script; the only `cvs_functions.ps1` changes are S-1 (report-only) and
+> S-2…S-4 (parameterised file filter/age + resilient, logged per-server failure
+> handling for the AD-group move). See `Change-Register.md`.
 
 ---
 
@@ -42,23 +44,32 @@ vcf-windows-log-mgmt/
 
 Follow this sequence exactly to avoid dependency failures.
 
-### Step 1 — Confirm PowerShell Script (no changes required)
+### Step 1 — Deploy the updated PowerShell script
 
-This package makes **no changes to `cvs_functions.ps1`**. Both workflows invoke
-`-Action` values that already exist in the deployed script:
-`move-archived-logs-ByCN` and `Delete-OldFiles-UNC-Share`.
+This package requires the **updated `cvs_functions.ps1`** (changes S-1…S-4, see
+`Change-Register.md`) deployed on the PS host. Both workflows invoke `-Action`
+values that already exist in the script — `move-archived-logs-ByCN` and
+`Delete-OldFiles-UNC-Share` — but the AD-group move now relies on the S-2…S-4
+behaviour (parameterised `-FilterOn` / `-NumberOfDays`, AD-module guard, and
+resilient/logged per-server failure handling).
 
-Verify the script is present and the actions resolve:
+Verify the script is present, the actions resolve, and the updates are in place:
 ```powershell
 Test-Path 'C:\PSO\Scripts\cvs_functions.ps1'  # should return True
 # Confirm the action values exist in the script's [ValidateSet] on $Action:
 Select-String -Path 'C:\PSO\Scripts\cvs_functions.ps1' -Pattern "move-archived-logs-ByCN","Delete-OldFiles-UNC-Share"
-# Expected: both patterns are found in the ValidateSet and the Main switch block
+# Confirm S-1 (report-only) and S-2…S-4 (resilience) are deployed:
+Select-String -Path 'C:\PSO\Scripts\cvs_functions.ps1' -Pattern "ReportOnly","ErrorAction Stop","skipping disabled computer"
+# Expected: patterns found in the switch block and the Move-files / Get-ListOfServers-ByCN functions
 ```
 
-### Step 2 — Create Configuration Element in vRO
+### Step 2 — Create Configuration Element in vRO (Remove workflow only)
 
 See `config/WindowsLogManagement-Config_definition.txt` for full instructions.
+
+This element is used **only by Remove-OldFiles-UNCShare**. Move-ArchivedLogs-ByADGroup
+uses plain input parameters with defaults set directly on each input — it has no
+Configuration Element dependency.
 
 - Path: `VCF/WindowsLogManagement/WindowsLogManagement-Config`
 - Attributes:
@@ -66,8 +77,6 @@ See `config/WindowsLogManagement-Config_definition.txt` for full instructions.
 | Attribute | Type | Example |
 |---|---|---|
 | `defaultScriptPath` | string | `C:\PSO\Scripts\cvs_functions.ps1` |
-| `defaultFileShareTarget` | string | `\\fileserver.corp.local\mdcarchivelog$\Windows` |
-| `defaultDomainName` | string | `corp.local` |
 | `defaultLogRetentionDays` | number | `370` |
 
 ### Step 3 — Deploy Actions
@@ -92,7 +101,13 @@ Copy the code into a new action in the vRO Action editor.
 
 ### Step 4 — Deploy Workflows
 
-Folder: `PSO >> VC >> VM >> GuestOps >> Files >> Windows >> Logs`
+Workflow folder: `Production >> Servers >> Windows >> Event Log Management`
+
+- Lab/dev location: `Workflows >> Customer >> <Customer Name> >> Production >> Servers >> Windows >> Event Log Management`
+  (where `Workflows` is a folder at the same level as the default `Library`).
+- The **actions** stay in their module namespace
+  `broadcom.pso.vc.vm.guestOps.files.windows.logs` (Step 3) — only the workflows
+  use the folder path above.
 
 Create each workflow using its `_spec.js` file as the implementation reference.
 Each spec file contains:
@@ -122,7 +137,13 @@ Each spec file contains:
    - Add Decision node → condition: `parsedResult.get("success") === true`
    - True path → Scriptable Task (success end-state code from spec) → End (Completed Successfully)
    - False path → Scriptable Task (error end-state code from spec) → End (Completed with Errors)
-6. Bind Config Element defaults to inputs (see spec and config definition)
+6. Set input defaults:
+   - **Move-ArchivedLogs-ByADGroup:** set each input's default value **directly on
+     the input** (no Config Element) — see the INPUTS table in its spec
+     (`scriptPath`, `domainName`, `fileShareTarget`, `fileFilter`, `fileAgeDays`;
+     `groupDN` has no default). Adjust environment-specific values.
+   - **Remove-OldFiles-UNCShare:** bind `scriptPath` → `defaultScriptPath` and
+     `olderThanDays` → `defaultLogRetentionDays` from the Config Element.
 7. Configure custom form:
    - Mark all inputs mandatory
    - Add dropdown constraint on `whatIf` (Remove-OldFiles-UNCShare only): `yes` / `no`
@@ -152,7 +173,7 @@ See `Validation-and-Testing-Plan.txt` for full details.
 
 | Decision | Rationale |
 |---|---|
-| Script reused as-is (zero changes) | No script modification needed; every invoked `-Action` already exists in the deployed script |
+| Script reused, minimally changed (S-1…S-4) | Every invoked `-Action` already exists; changes are limited to the report-only fix (S-1) and, for the AD-group move, parameterised filter/age + resilient logged per-server failure handling (S-2…S-4) |
 | Single AD-group move workflow | Consolidated from two; uses the recursive + Enabled-only path (`Get-ListOfServers-ByCN`) — the most comprehensive server-discovery method |
 | LocalHost workflow removed | Former local-execution hosts are AD group members in the Orchestrator model; covered by Move-ArchivedLogs-ByADGroup |
 | PS host plugin — not WinRM | vRO executes via configured PS host plugin; script handles remote access via UNC |

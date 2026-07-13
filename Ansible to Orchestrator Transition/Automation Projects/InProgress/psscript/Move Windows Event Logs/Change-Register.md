@@ -45,14 +45,20 @@ It covers two areas:
 
 ## 2. Changes to `cvs_functions.ps1`
 
-> The Orchestrator package was designed to reuse the proven script **as-is**.
-> The table below is the complete list of changes **to `cvs_functions.ps1`**. As of
-> this revision there is exactly **one** functional change. (Changes to the build
+> The Orchestrator package was designed to reuse the proven script **as-is** where
+> possible. The table below is the complete list of changes **to `cvs_functions.ps1`**.
+> As of this revision there are **five** changes (S-1 … S-5). S-2…S-4 expose the
+> file filter / age as operator inputs and make per-server failure handling
+> reliable and non-fatal; S-5 removes an orphaned action. (Changes to the build
 > tooling and setup guides are tracked separately in section 2A.)
 
 | # | Date | Function / Section | Change | Reason | Deployment impact |
 |---|------|--------------------|--------|--------|-------------------|
 | S-1 | 2026-06-28 | `Remove-OldFiles-UNCPath` + `Delete-OldFiles-UNC-Share` switch case | Replaced interactive `Read-Host` confirmation with a non-interactive `-ReportOnly` mode | The `Read-Host` prompt blocks (or silently cancels) when run non-interactively by the Orchestrator PowerShell plug-in, so `whatIf='yes'` never produced a usable "report only" preview | Requires redeploying the updated `cvs_functions.ps1` to the PS host. No change to how operators call the workflow. |
+| S-2 | 2026-07-08 | `move-archived-logs-ByCN` switch case | (a) File filter and age are no longer hardcoded — the case now uses `-FilterOn`/`-NumberOfDays` (supplied by the workflow), falling back to the proven `Archive*.evtx` / `-1` defaults; (b) added an ActiveDirectory module guard that **throws** (total failure) if the module is missing; (c) each server iteration is wrapped in its own `try/catch` and a zero-result group logs a warning and exits cleanly | The workflow requires file extension filter and file age as inputs; these could not pass through while the values were hardcoded. The guard + per-server isolation make a single unreachable server non-fatal while a genuine total failure still fails the run | Requires redeploying the updated `cvs_functions.ps1`. Operators now pass `fileFilter` / `fileAgeDays` (defaults preserve current behaviour). |
+| S-3 | 2026-07-08 | `Move-files` function | (a) Fixed the malformed catch message (`"error: $_.Exception.message"` → proper `$($_.Exception.Message)` with server context); (b) added `-ErrorAction Stop` to the `New-Item`/`Get-ChildItem`/`Move-Item` pipeline so an unreachable source (server down / inaccessible `C$`) becomes a **terminating** error caught and logged to stdout instead of a silent non-terminating error on the PS error stream | Failures against an unavailable server were not being logged where the workflow could see them, and the log line that did fire was unreadable. "Any failure should be logged" | Requires redeploying the updated `cvs_functions.ps1`. Behaviour is more resilient; also benefits the `move-archived-logs` action. |
+| S-4 | 2026-07-08 | `Get-ListOfServers-ByCN` function | Rewrote the single pipeline into: resolve group members with `-ErrorAction Stop` (group-not-found / domain-unreachable now terminates), then resolve each computer individually inside a `try/catch` — enabled servers are returned, **disabled** ones are explicitly skipped **and logged**, and a single unresolvable object no longer aborts the whole group | Guarantees disabled machines are not processed (with an audit log), isolates per-object failures, and makes a true group-resolution failure a proper total failure | Requires redeploying the updated `cvs_functions.ps1`. Also used by `Get-ServerRebootReportStatus-ByCN` (same return shape — compatible). |
+| S-5 | 2026-07-08 | `[ValidateSet]` on `$Action`, `$HostList` param, `move-archived-logs-ByHostList` switch case | Removed the orphaned `move-archived-logs-ByHostList` action in full — the ValidateSet entry, the `$HostList` parameter, and the entire switch case | The action existed only to serve a `Move-ArchivedLogs-LocalHost` vRO workflow that was never built and will not exist (see P-2/P-3). It was never called by Ansible or vRO. Standardisation: the PS host is added to the AD group and processed by `move-archived-logs-ByCN` like any other member (source access is via its own `\\host\C$` admin share, so no local-path branch is needed) | Requires redeploying the updated `cvs_functions.ps1`. No caller impact — nothing invoked this action. |
 
 ### S-1 detail — `Remove-OldFiles-UNCPath` report-only fix
 
@@ -139,10 +145,36 @@ if($WhatIf -eq 'yes'){
 - **Manual interactive callers** of `Remove-OldFiles-UNCPath` no longer get a
   confirmation prompt. Use `-ReportOnly $true` to preview before a live run.
 
-**Not changed / not required:** The previously-proposed "additive changes"
-(`move-archived-logs-ByHostList` action + `$HostList` parameter) are **no longer
-needed** — the LocalHost workflow was removed (see process change P-2). The
-deployed script's other actions are untouched.
+**Retired (see S-5):** The previously-proposed "additive changes"
+(`move-archived-logs-ByHostList` action + `$HostList` parameter) have been
+**removed from the script** — the LocalHost workflow they served was removed
+(see process changes P-2/P-3) and will not be built.  The PS host is instead
+added to the AD group and handled by `move-archived-logs-ByCN` like any other
+member.
+
+### S-2 … S-4 detail — parameterised filter/age and resilient per-server handling
+
+**Why these were added:** The `Move-ArchivedLogs-ByADGroup` workflow requirements
+are that the operator supplies six inputs — domain, group (DN), script path,
+file share target, **file extension filter**, and **file age** — and that:
+disabled machines are not processed; an unavailable machine is handled, logged,
+and does **not** stop the remaining moves; and only a failure that would make
+**every** move fail terminates the run. The first two requirements could not be
+met with the script as it stood: the `move-archived-logs-ByCN` case hardcoded
+`Archive*.evtx` / `-1`, and per-server failures were either unlogged (silent
+non-terminating `Get-ChildItem` errors on the PS error stream) or logged with a
+malformed message.
+
+**Failure-handling contract after S-2…S-4:**
+- **Disabled server** → skipped during resolution (`Get-ListOfServers-ByCN`,
+  `Enabled -eq $true`) and logged as an `Info:` skip.
+- **Unavailable/failed server** → `Move-files` hits a terminating error (via
+  `-ErrorAction Stop`), logs an `Error:` line to stdout, and the per-server loop
+  continues. The workflow's `parseScriptOutput` sees the `Error:` line and ends
+  the run in **Completed with Errors** (not a hard failure).
+- **Total failure** (AD module missing, or group/domain resolution failing) →
+  the script `throw`s / the AD cmdlet errors terminate; the OOTB *Invoke a
+  PowerShell script* workflow routes to `handlePSFailure` → **Failed** end state.
 
 ---
 
@@ -151,6 +183,8 @@ deployed script's other actions are untouched.
 | # | Date | File(s) | Change | Reason |
 |---|------|---------|--------|--------|
 | T-1 | 2026-06-30 | `code/Configure-vROPSHost.ps1`, `documentation/PS-Host-Build-Guide.txt` | PS host certificate is now exported as **Base-64 (PEM)** instead of DER | vRO's "Import a trusted certificate from a file" only accepts Base-64/PEM. The prior `Export-Certificate -Type CERT` produced DER (binary), which vRO rejected with *"Could not import the SSL certificate. Check whether the file contains a valid SSL certificate."* The guide also now notes the proxy caveat for URL-based import (vRO appliance proxy returning 503 / read-timeout). |
+| T-2 | 2026-07-09 | `code/Configure-vROPSHost.ps1` (Step 4) | Create the WinRM **HTTPS listener via the WSMan provider** (`New-Item -Path WSMan:\localhost\Listener …`) instead of `Invoke-Expression "winrm create … @{…}"`; restart WinRM and **verify the listener exists** before reporting success | The `winrm create … @{Hostname=…;CertificateThumbprint=…}` form is cmd.exe syntax. Under PowerShell (via `Invoke-Expression`) the unquoted `@{…}` was parsed as a hashtable and stringified to `System.Collections.Hashtable` before reaching `winrm.exe`, so the listener was **never created** — only HTTP/5985 ended up listening. As a native-command failure it raised no exception, so the `try/catch` printed a false `[OK]`. Symptom: `Test-NetConnection <host> -Port 5986` fails and `winrm enumerate winrm/config/listener` shows only `Transport = HTTP`. The provider cmdlet binds the cert correctly and raises a real terminating error on failure. |
+| T-3 | 2026-07-10 | `documentation/Implementation-Guide.md`, `documentation/PS-Host-Build-Guide.txt` | Corrected the Kerberos setup guidance after live bring-up on VCF Orchestrator 9: (a) **fixed the `krb5.conf` `[realms]` block** from the single-line `VCF.LAB = { kdc = …; default_domain = … }` form to the required **multi-line, one-key-per-line, no-`;`** form; (b) **corrected the root cause of `salt must be at least 128 bits`** — it is the **service account sAMAccountName being too short**, not a malformed krb5.conf (the guide previously stated the wrong cause); (c) added a **new prerequisite** that `UPPERCASE_REALM + sAMAccountName ≥ 16 chars` and bumped the example account `vcf_svc` → `vcf_svc_ps`; (d) added a **Kerberos bring-up error sequence** covering `Vector cannot be cast to Hashtable`, the salt error, and `Pre-authentication information was invalid (24)`; (e) require the **UPN** username form (not `DOMAIN\user`) for Kerberos; (f) set `dns_lookup_kdc = false` since the KDC is pinned | Adding the PS host over HTTPS/Kerberos failed through three successive errors that the docs either caused (the single-line realm block threw `java.util.Vector cannot be cast to java.util.Hashtable` in Java's `sun.security.krb5.Config` parser) or mis-diagnosed (the salt error was documented as a krb5.conf problem, sending troubleshooting down the wrong path; the true cause is the 128-bit AES salt = realm + account name being under 16 chars on the hardened JDK). The `(24)` pre-auth error was undocumented. These are one-time bring-up gotchas but block the entire integration until resolved. |
 
 **Operator note (already-exported DER files):** convert with
 `certutil -encode <der>.cer <base64>.cer`, then import the Base-64 file. A
@@ -169,12 +203,14 @@ Base-64/PEM file opens as text beginning with `-----BEGIN CERTIFICATE-----`.
 | P-5 | 2026-06-28 | Cleanup workflow | `remove-OldFiles-UNCPath` playbook | `Remove-OldFiles-UNCShare` workflow (now with working report-only mode — see S-1) | Direct port; report-only safety mode now functional non-interactively |
 | P-6 | 2026-06-28 | Server iteration | Ansible `loop` / dynamic inventory iterates servers | Script iterates internally (`foreach`); one workflow run = one script invocation | No `vRO`-side loop needed; AD resolution and iteration owned by the script |
 | P-7 | 2026-06-28 | Variables / secrets | `vars` / `group_vars` / Ansible vault / `become` | Workflow inputs + a Configuration Element for defaults; credentials via the PS host plug-in service account | Standard Orchestrator patterns; no vault equivalent needed |
+| P-8 | 2026-07-09 | Move workflow input model | Move-ArchivedLogs-ByADGroup defaults bound to Configuration Element attributes | **Move-ArchivedLogs-ByADGroup uses plain input parameters with defaults set directly on each input** (no Configuration Element). The move-only attributes (`defaultDomainName`, `defaultFileShareTarget`, `defaultFileFilter`, `defaultFileAgeDays`) were removed from the element; `defaultScriptPath` + `defaultLogRetentionDays` remain for Remove-OldFiles-UNCShare | Customer preference: these values are static per environment and "do not need to be updated by anything", so explicit self-contained inputs are preferred over a shared Config Element for the move workflow |
 
 **Net result:** 7 playbooks → **2 workflows** (`Move-ArchivedLogs-ByADGroup`,
-`Remove-OldFiles-UNCShare`); 5 build actions → **3**; and — apart from the S-1
-report-only fix — **no changes to `cvs_functions.ps1`** are required, because
-both invoked actions (`move-archived-logs-ByCN`, `Delete-OldFiles-UNC-Share`)
-already exist in the deployed script.
+`Remove-OldFiles-UNCShare`); 5 build actions → **3**. Both invoked actions
+(`move-archived-logs-ByCN`, `Delete-OldFiles-UNC-Share`) already exist in the
+deployed script; the changes to `cvs_functions.ps1` are limited to S-1 (report-only)
+and S-2…S-4 (parameterised file filter/age + resilient, logged per-server failure
+handling for the AD-group move).
 
 ---
 
@@ -208,3 +244,10 @@ already exist in the deployed script.
 |---|---|---|
 | 2026-06-28 | Automation transition | Initial register. Recorded script change S-1 (report-only fix) and process changes P-1…P-7 (consolidation to 2 workflows; LocalHost removed; single recursive+Enabled AD targeting). |
 | 2026-06-30 | Automation transition | Added tooling change T-1 — PS host cert exported as Base-64/PEM (was DER, rejected by vRO file import); documented URL-import proxy caveat. |
+| 2026-07-08 | Automation transition | Added script changes S-2…S-4 for `Move-ArchivedLogs-ByADGroup`: parameterised file filter/age (were hardcoded), AD-module guard, per-server `try/catch`, reliable/logged failure handling (`-ErrorAction Stop`, fixed catch message), and `Get-ListOfServers-ByCN` per-object isolation with logged disabled-server skips. Renamed the group input `adGroup` → `groupDN` (DN is the intended identifier) and added `fileFilter` / `fileAgeDays` inputs and `defaultFileFilter` / `defaultFileAgeDays` Config Element attributes. |
+| 2026-07-08 | Automation transition | Added script change S-5: removed the orphaned `move-archived-logs-ByHostList` action (ValidateSet entry, `$HostList` parameter, switch case) — it served a LocalHost workflow that will not be built; the PS host joins the AD group and is handled by `move-archived-logs-ByCN`. |
+| 2026-07-09 | Automation transition | Added tooling change T-2 — `Configure-vROPSHost.ps1` Step 4 now creates the WinRM HTTPS listener via the WSMan provider (was `Invoke-Expression "winrm create … @{…}"`, which PowerShell mangled so the 5986 listener was never created and a false `[OK]` was printed); restarts WinRM and verifies the listener before reporting success. |
+| 2026-07-09 | Automation transition | Process change P-8: Move-ArchivedLogs-ByADGroup converted to plain input parameters with defaults set directly on each input (no Configuration Element). Removed the move-only attributes `defaultDomainName` / `defaultFileShareTarget` / `defaultFileFilter` / `defaultFileAgeDays`; the Configuration Element is retained (`defaultScriptPath`, `defaultLogRetentionDays`) for Remove-OldFiles-UNCShare only. Updated all package docs accordingly. |
+| 2026-07-09 | Automation transition | Authored the customer documentation set (Executive-Summary, Design-Document, Implementation-Guide, User-Guide) under `documentation/`. |
+| 2026-07-10 | Automation transition | Corrected the workflow folder path across all package docs to `Production >> Servers >> Windows >> Event Log Management` (lab/dev: under `Workflows >> Customer >> <Customer Name> >> Production >> …`). The actions' module namespace (`broadcom.pso.vc.vm.guestOps.files.windows.logs`) is unchanged. |
+| 2026-07-10 | Automation transition | Tooling/docs change T-3 — corrected the Kerberos setup guidance after live bring-up: fixed the `krb5.conf` `[realms]` block to the required multi-line/no-`;` form (single-line form threw `Vector cannot be cast to Hashtable`); corrected the `salt must be at least 128 bits` root cause to service-account name length (was wrongly attributed to krb5.conf); added the `UPPERCASE_REALM + sAMAccountName ≥ 16 chars` prerequisite (example account `vcf_svc` → `vcf_svc_ps`); added a Kerberos bring-up error sequence (incl. pre-auth error 24); required UPN username form; set `dns_lookup_kdc = false`. |

@@ -1,7 +1,11 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * Workflow: Remove-OldFiles-UNCShare
- * Folder:   PSO >> VC >> VM >> GuestOps >> Files >> Windows >> Logs
+ * Folder:   Production >> Servers >> Windows >> Event Log Management
+ *           (lab/dev: Workflows >> Customer >> <Customer Name> >> Production >> Servers >> Windows >> Event Log Management)
+ *           NOTE: the actions live in the module namespace declared in each
+ *           action .js file (broadcom.pso.vc.vm.guestOps.files.windows.logs) -
+ *           only the WORKFLOW folder uses the path above.
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Purpose:

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param (
-    [ValidateSet('move-archived-logs-ByCN','move-archived-logs-ByHostList','Delete-OldFiles-UNC-Share','tls-fix','move-archived-logs','clean-ServerDisk','Invoke-ServerReboot','Get-ServerPendingRebootStatus','Get-ServerRebootReportStatus-ByCN','Get-AllAdmin-Accounts','Get-ServiceAccountExpiration','get_datastores_75_100_used','VMware_Disable_SSH')]
+    [ValidateSet('move-archived-logs-ByCN','Delete-OldFiles-UNC-Share','tls-fix','move-archived-logs','clean-ServerDisk','Invoke-ServerReboot','Get-ServerPendingRebootStatus','Get-ServerRebootReportStatus-ByCN','Get-AllAdmin-Accounts','Get-ServiceAccountExpiration','get_datastores_75_100_used','VMware_Disable_SSH')]
     [string]$Action,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$eMailReport='yes',
@@ -48,9 +48,7 @@ param (
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$WhatIf,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$OlderThanDays,
-    [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$HostList
+    [string]$OlderThanDays
 )
 
 [string[]]$MailTo = $MailToString.split(',')
@@ -380,13 +378,24 @@ Function Move-files { # Move-files -Path "C:\TempDir" -FilterOn "*.ps1" -Days '-
 
             if ( !(Test-Path -PathType container $TargetPath) ){
                 write-log "info: creating folder $($TargetPath)" $true
-                new-item -ItemType Directory -Path $TargetPath
+                new-item -ItemType Directory -Path $TargetPath -ErrorAction Stop | Out-Null
             }
-            
-            Get-ChildItem -Path $Path -Recurse -File -Filter $FilterOn | Where-Object { $_.LastWriteTime -lt $dateTime } | Move-Item -Destination "$($TargetPath)" -Force
 
-        }Catch{ 
-            Write-Log "error: $_.Exception.message" $true 
+            # -ErrorAction Stop promotes an unreachable source (e.g. a server that
+            # is down or whose C$ admin share is inaccessible) from a silent
+            # non-terminating error - which try/catch would NOT catch and which
+            # would go to the PS error stream instead of stdout - into a
+            # terminating error that lands in the Catch below and is logged via
+            # Write-Log (stdout) so the caller can see and report it.
+            Get-ChildItem -Path $Path -Recurse -File -Filter $FilterOn -ErrorAction Stop |
+                Where-Object { $_.LastWriteTime -lt $dateTime } |
+                Move-Item -Destination "$($TargetPath)" -Force -ErrorAction Stop
+
+        }Catch{
+            # Non-terminating for the overall run: log the failure (with the
+            # server context) and return so the caller's per-server loop can
+            # continue with the next server.
+            Write-Log "Error: [$ServerName] failed moving '$FilterOn' from '$Path' to '$TargetPath': $($_.Exception.Message)" $true
         }
     }
 }       # Move-files
@@ -596,19 +605,40 @@ function Get-ListOfServers{
 
 function Get-ListOfServers-ByCN {
     [CmdletBinding()]
-    param( 
+    param(
         [parameter(Mandatory = $true)]
-        [string]$SG_CN,
+        [string]$SG_CN,       # Group identity - a distinguishedName (DN) is preferred/unambiguous
         [parameter (Mandatory = $false)]
         [string]$DomainName
     )
     process {
-        $OUQuery1 = Get-ADGroupMember "$($SG_CN)" -Server $DomainName -Recursive |
-            Where-Object { $_.objectClass -eq 'computer' } |
-            Get-ADComputer -Server $DomainName -Properties Enabled |
-            Where-Object { $_.Enabled -eq $true }
+        # Group membership resolution. -Identity accepts a distinguishedName
+        # (the preferred, unambiguous identifier), CN, sAMAccountName, GUID or SID.
+        # -ErrorAction Stop makes a group-level failure (group not found, domain
+        # unreachable) terminating: with no members resolvable, EVERY move would
+        # fail, so the run should stop and be reported as failed rather than be
+        # masked as "0 servers / no action".
+        $members = Get-ADGroupMember -Identity "$($SG_CN)" -Server $DomainName -Recursive -ErrorAction Stop |
+            Where-Object { $_.objectClass -eq 'computer' }
 
-        return $OUQuery1
+        $result = @()
+        foreach ($m in $members) {
+            # Per-object isolation: a single computer object that cannot be
+            # resolved must not abort resolution of the rest of the group.
+            Try {
+                $comp = Get-ADComputer -Identity $m.distinguishedName -Server $DomainName -Properties Enabled -ErrorAction Stop
+                if ($comp.Enabled -eq $true) {
+                    $result += $comp
+                } else {
+                    # Disabled/decommissioned accounts are explicitly skipped and logged.
+                    Write-Log "Info: skipping disabled computer object $($comp.Name)" $true
+                }
+            } Catch {
+                Write-Log "Warn: could not resolve computer object '$($m.distinguishedName)' - skipped: $($_.Exception.Message)" $true
+            }
+        }
+
+        return $result
     }
 }
 
@@ -1192,50 +1222,47 @@ function Main($Action){
 
         }
         'move-archived-logs-ByCN'{
+            $strModule = 'ActiveDirectory'
+            if (-not (Invoke-Module $strModule)) {
+                # No AD module = no server resolution = ALL moves fail. This is a
+                # total failure, so throw (terminating) - the vRO caller routes a
+                # terminating error to its failure end-state.
+                Write-Log "Error: Unable to import PS Module $($strModule) or it is NOT installed. Cannot resolve servers - aborting." $true
+                throw "ActiveDirectory module not available on the PS host; cannot resolve group '$($SecurityGroup_CN)'."
+            }
+
+            # File filter and age are supplied by the caller (vRO workflow inputs
+            # -FilterOn / -NumberOfDays). Fall back to the proven archive-log
+            # defaults if left at the script defaults, so a stray manual call
+            # never sweeps every file at a 0-day age.
+            $moveFilter = if ([string]::IsNullOrWhiteSpace($FilterOn) -or $FilterOn -eq '*') { 'Archive*.evtx' } else { $FilterOn }
+            $moveDays   = if ([string]::IsNullOrWhiteSpace($NumberOfDays)) { '-1' } else { $NumberOfDays }
+
+            # Server resolution. A failure here is a total failure (see
+            # Get-ListOfServers-ByCN) and is allowed to terminate the run.
             $ListOfComputers = Get-ListOfServers-ByCN -SG_CN $SecurityGroup_CN -DomainName $DomainName
-            $ListOfServers = @()
-            foreach($L in $ListOfComputers){ 
-                $ListOfServers += ($L.name)
-                Write-Log "Info: $($L.name) - moving archived files to $($FileShareTarget)\$($L.name)" $true
-                Move-files -Path "\\$($L.name)\C$\Windows\System32\winevt\Logs" `
-                -ServerName $L.name -TargetPath "$($FileShareTarget)\$($L.name)" `
-                -FilterOn "Archive*.evtx" -Days '-1' -F 'force'
-            }
-        }
-        'move-archived-logs-ByHostList'{
-            # Accepts a comma-separated list of FQDNs.
-            # Source path is constructed as a UNC admin share path for each host,
-            # consistent with move-archived-logs and move-archived-logs-ByCN.
-            # Used by the Move-ArchivedLogs-LocalHost vRO workflow where the PS
-            # host FQDN is passed as the single HostList entry, ensuring all
-            # source access is via UNC admin shares regardless of whether the
-            # executing host is itself in the list.
 
-            if ([string]::IsNullOrEmpty($HostList)) {
-                Write-Log "Error: HostList is required for move-archived-logs-ByHostList" $true
-                throw "HostList is required."
-            }
-
-            $hosts = $HostList -split ',' |
-                     ForEach-Object { $_.Trim() } |
-                     Where-Object   { $_ -ne ''  }
-
-            if ($hosts.Count -eq 0) {
-                Write-Log "Warn: HostList resolved to zero entries after parsing. No action taken." $true
+            if (($ListOfComputers | Measure-Object).Count -eq 0) {
+                Write-Log "Warn: move-archived-logs-ByCN - group '$($SecurityGroup_CN)' resolved to zero enabled computer objects. No action taken." $true
                 return
             }
 
-            Write-Log "Info: move-archived-logs-ByHostList - processing $($hosts.Count) host(s)" $true
+            Write-Log "Info: move-archived-logs-ByCN - $(($ListOfComputers | Measure-Object).Count) enabled server(s) to process. Filter='$moveFilter' AgeDays='$moveDays'" $true
 
-            foreach ($h in $hosts) {
-                $hostname = $h.Split('.')[0]
-                Write-Log "Info: $hostname - moving archived files to $($FileShareTarget)\$hostname" $true
-                Move-files -Path       "\\$h\C$\Windows\System32\winevt\Logs" `
-                           -ServerName $hostname `
-                           -TargetPath "$($FileShareTarget)\$hostname" `
-                           -FilterOn   "Archive*.evtx" `
-                           -Days       '-1' `
-                           -F          'force'
+            $ListOfServers = @()
+            foreach($L in $ListOfComputers){
+                $ListOfServers += ($L.name)
+                # Per-server isolation: one unreachable/failed server must not
+                # stop the remaining moves. Move-files logs its own failures;
+                # this Catch is a backstop for anything it does not swallow.
+                Try {
+                    Write-Log "Info: $($L.name) - moving archived files to $($FileShareTarget)\$($L.name)" $true
+                    Move-files -Path "\\$($L.name)\C$\Windows\System32\winevt\Logs" `
+                        -ServerName $L.name -TargetPath "$($FileShareTarget)\$($L.name)" `
+                        -FilterOn $moveFilter -Days $moveDays -F 'force'
+                } Catch {
+                    Write-Log "Error: $($L.name) - archive-log move failed and was skipped: $($_.Exception.Message)" $true
+                }
             }
         }
         'tls-fix'{

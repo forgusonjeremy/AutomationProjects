@@ -5,8 +5,14 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 # Create this Configuration Element in the vRO Configuration tab before
-# deploying any workflow.  Both workflows bind their string/number input
-# defaults to attributes in this element.
+# deploying the Remove-OldFiles-UNCShare workflow.
+#
+# SCOPE (updated): This element is used ONLY by Remove-OldFiles-UNCShare.
+# The Move-ArchivedLogs-ByADGroup workflow does NOT use a Configuration Element -
+# all of its inputs are plain workflow parameters whose defaults are set directly
+# on each input (see Move-ArchivedLogs-ByADGroup_spec.js). The move-only
+# attributes (defaultDomainName, defaultFileShareTarget, defaultFileFilter,
+# defaultFileAgeDays) were therefore removed.
 #
 # Path:    VCF/WindowsLogManagement/WindowsLogManagement-Config
 # (Create the folder structure VCF > WindowsLogManagement if it does not exist.)
@@ -57,24 +63,23 @@
 # Attribute Name            Type     Example Value                                      Description
 # ─────────────────────     ──────── ────────────────────────────────────────────────── ──────────────────────────────────────────────
 # defaultScriptPath         string   C:\PSO\Scripts\cvs_functions.ps1                   Full path to cvs_functions.ps1 on the PS host.
+#                                                                                        Used by Remove-OldFiles-UNCShare (scriptPath).
 #                                                                                        Must match the actual deployed path exactly.
 #                                                                                        Verify with: Test-Path '<path>' on PS host.
-#
-# defaultFileShareTarget    string   \\fileserver.corp.local\mdcarchivelog$\Windows      Default UNC destination root for log moves.
-#                                                                                        Per-server subfolders are created below this path
-#                                                                                        by the script (e.g. \\server\share$\Windows\srv01).
-#                                                                                        Must be writable by the PS host service account.
-#
-# defaultDomainName         string   corp.local                                          Default AD domain name.
-#                                                                                        Used as -DomainName in Move-ArchivedLogs-ByADGroup
-#                                                                                        (passed to Get-ListOfServers-ByCN -Server for
-#                                                                                        recursive, Enabled-only group resolution).
 #
 # defaultLogRetentionDays   number   370                                                 Default age threshold for Remove-OldFiles-UNCShare.
 #                                                                                        Files older than this many days are candidates for
 #                                                                                        deletion (subject to whatIf setting).
 #                                                                                        370 = ~13 months.  Minimum enforced: 1.
 #                                                                                        Maps to -OlderThanDays in cvs_functions.ps1.
+#
+# ---------------------------------------------------------------------------------
+# REMOVED (no longer part of this element):
+#   defaultDomainName, defaultFileShareTarget, defaultFileFilter, defaultFileAgeDays
+#   These were defaults for Move-ArchivedLogs-ByADGroup. That workflow now uses
+#   plain input parameters with defaults set directly on each input, so these
+#   attributes are no longer required. Do NOT recreate them.
+# ---------------------------------------------------------------------------------
 #
 # ───────────────────────────────────────────────────────────────────────────────
 # IMPORTANT — WhatIf BEHAVIOUR FOR Remove-OldFiles-UNCShare
@@ -106,14 +111,14 @@
 # 5. Add each attribute using the table above:
 #    - Click "Add attribute"
 #    - Enter Name, select Type, enter Value
-#    - Repeat for all four attributes
+#    - Repeat for both attributes (defaultScriptPath, defaultLogRetentionDays)
 # 6. Save
 #
 # ───────────────────────────────────────────────────────────────────────────────
-# HOW TO BIND TO WORKFLOW INPUTS
+# HOW TO BIND TO WORKFLOW INPUTS (Remove-OldFiles-UNCShare only)
 # ───────────────────────────────────────────────────────────────────────────────
 #
-# For each workflow input that has a Config Element default:
+# For each Remove-OldFiles-UNCShare input that has a Config Element default:
 # 1. Open the workflow in vRO
 # 2. Edit → Inputs tab → select the input (e.g. scriptPath)
 # 3. In the "Default value" field, click the binding icon
@@ -124,18 +129,20 @@
 # The custom form will pre-populate the field with the Config Element value,
 # which the operator can override at run time if needed.
 #
+# NOTE: Move-ArchivedLogs-ByADGroup does NOT bind to this element. Set its input
+# defaults directly on each input (see Move-ArchivedLogs-ByADGroup_spec.js).
+#
 # ───────────────────────────────────────────────────────────────────────────────
 # WORKFLOW-TO-ATTRIBUTE MAPPING
 # ───────────────────────────────────────────────────────────────────────────────
 #
 # Workflow                        Input               Config Element Attribute
 # ──────────────────────────────  ──────────────────  ────────────────────────────
-# Move-ArchivedLogs-ByADGroup     scriptPath          defaultScriptPath
-# Move-ArchivedLogs-ByADGroup     domainName          defaultDomainName
-# Move-ArchivedLogs-ByADGroup     fileShareTarget     defaultFileShareTarget
-#
 # Remove-OldFiles-UNCShare        scriptPath          defaultScriptPath
 # Remove-OldFiles-UNCShare        olderThanDays       defaultLogRetentionDays
+#
+# Move-ArchivedLogs-ByADGroup     (all inputs)        NONE - plain parameters with
+#                                                     defaults set directly on each input
 #
 # ───────────────────────────────────────────────────────────────────────────────
 # SCRIPT PARAMETER REFERENCE (confirmed from cvs_functions.ps1 source)
@@ -149,9 +156,12 @@
 # ─────────────────    ─────────────────────────   ───────────────────────────────────
 # -Action              (constant per workflow)      all build* actions
 # -FileShareTarget     fileShareTarget              buildMoveByADGroupInvocation
-# -SecurityGroup_CN    adGroup                     buildMoveByADGroupInvocation
-#   (underscore)
+# -SecurityGroup_CN    groupDN                     buildMoveByADGroupInvocation
+#   (underscore)                                    (DN preferred; accepts CN/sAMAccountName/GUID/SID)
 # -DomainName          domainName                  buildMoveByADGroupInvocation
+# -FilterOn            fileFilter                  buildMoveByADGroupInvocation
+# -NumberOfDays        fileAgeDays                 buildMoveByADGroupInvocation
+#   (script maps NumberOfDays -> Move-files -Days)
 # -UNC_SharePath       uncSharePath                buildRemoveFilesInvocation
 #   (underscore)
 # -OlderThanDays       olderThanDays               buildRemoveFilesInvocation

@@ -345,24 +345,50 @@ if ($CertificateMode -eq 'SelfSigned') {
 Write-Step "Configuring WinRM HTTPS listener on port 5986"
 
 try {
-    # Check for an existing HTTPS listener
-    $existingListener = winrm enumerate winrm/config/listener 2>&1 |
-        Select-String 'Transport = HTTPS'
+    # Remove any existing HTTPS listener(s) via the WSMan provider so we can
+    # (re)bind the current certificate. Filtering on the listener's Keys selector
+    # set avoids the unpredictable Listener_<id> node names.
+    $existingHttps = Get-ChildItem WSMan:\localhost\Listener -ErrorAction SilentlyContinue |
+        Where-Object { $_.Keys -contains 'Transport=HTTPS' }
 
-    if ($existingListener) {
+    if ($existingHttps) {
         Write-Warn "An existing HTTPS WinRM listener was found."
-        Write-Info "Removing existing HTTPS listener to replace with updated certificate..."
-        winrm delete 'winrm/config/listener?Address=*+Transport=HTTPS' 2>&1 | Out-Null
+        Write-Info "Removing it to (re)bind the current certificate..."
+        $existingHttps | Remove-Item -Recurse -Force
         Write-OK "Existing HTTPS listener removed."
     }
 
-    Write-Info "Creating HTTPS listener with thumbprint $certThumbprint ..."
-    $listenerCmd = "winrm create winrm/config/listener?Address=*+Transport=HTTPS " +
-                   "@{Hostname=`"$Fqdn`";CertificateThumbprint=`"$certThumbprint`"}"
-    Invoke-Expression $listenerCmd | Out-Null
+    # Create the HTTPS listener via the WSMan provider (New-Item) rather than the
+    # `winrm create ... @{...}` command syntax. That syntax is cmd.exe-only: under
+    # PowerShell the unquoted @{...} is parsed as a hashtable and stringified to
+    # "System.Collections.Hashtable" before it reaches winrm.exe, so the listener
+    # is silently never created (and, being a native-command failure, it does not
+    # raise an exception - which is why the old code printed a false [OK]). The
+    # provider cmdlet binds the thumbprint correctly and raises a real terminating
+    # error on failure, which the catch below handles.
+    Write-Info "Creating HTTPS listener bound to thumbprint $certThumbprint ..."
+    New-Item -Path WSMan:\localhost\Listener `
+        -Address '*' `
+        -Transport HTTPS `
+        -HostName $Fqdn `
+        -CertificateThumbPrint $certThumbprint `
+        -Force -ErrorAction Stop | Out-Null
 
-    Write-OK "WinRM HTTPS listener created on port 5986."
-    Add-Result "WinRM HTTPS listener" "Created" "Port 5986 | Cert: $certThumbprint"
+    # Restart WinRM so the new listener binds and begins listening on 5986.
+    # Safe here: this script runs locally on the host, not over a WinRM session.
+    Write-Info "Restarting WinRM to activate the listener..."
+    Restart-Service WinRM -Force -ErrorAction Stop
+
+    # Verify the listener actually exists now - never report success blindly.
+    $httpsListener = Get-ChildItem WSMan:\localhost\Listener -ErrorAction SilentlyContinue |
+        Where-Object { $_.Keys -contains 'Transport=HTTPS' }
+
+    if ($httpsListener) {
+        Write-OK "WinRM HTTPS listener created on port 5986."
+        Add-Result "WinRM HTTPS listener" "Created" "Port 5986 | Cert: $certThumbprint"
+    } else {
+        throw "HTTPS listener is not present after creation - WinRM did not accept the binding."
+    }
 
 } catch {
     Write-Fail "Failed to create WinRM HTTPS listener: $($_.Exception.Message)"

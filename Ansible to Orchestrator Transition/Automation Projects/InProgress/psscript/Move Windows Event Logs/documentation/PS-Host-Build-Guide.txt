@@ -50,6 +50,11 @@ PREREQUISITES
   [ ] Access to a CA or ability to create a self-signed certificate
   [ ] cvs_functions.ps1 deployed to C:\PSO\Scripts\ (or configured path)
   [ ] Service account created in AD for VCF Orchestrator execution context
+      NOTE (Kerberos): the account's sAMAccountName must be long enough that
+      UPPERCASE_REALM + sAMAccountName is at least 16 characters (128-bit AES
+      salt).  Realm VCF.LAB (7 chars) therefore needs a name of >= 9 chars.
+      A short name (e.g. vcf_svc = 7) fails the host-add with
+      "salt must be at least 128 bits".  Use a name like vcf_svc_ps.
 
 ───────────────────────────────────────────────────────────────────────────────
 PART 1 — WINDOWS SERVER CONFIGURATION
@@ -155,13 +160,18 @@ Run on the PS host (PowerShell as Administrator):
           CertificateThumbprint = $thumbprint
       }
 
-  # Alternatively, using winrm command line:
-  # winrm create winrm/config/listener?Address=*+Transport=HTTPS
-  #   @{Hostname="pshost.vcf.lab";CertificateThumbprint="<thumbprint>"}
+  # DO NOT paste the `winrm create ... @{...}` form into PowerShell. That syntax
+  # is cmd.exe-only: in PowerShell the unquoted @{...} is parsed as a hashtable and
+  # stringified before it reaches winrm.exe, so the listener is silently NOT created
+  # (only HTTP/5985 ends up listening). Use New-WSManInstance above. If you must use
+  # the winrm command line, run it from cmd.exe (not PowerShell):
+  #   cmd /c "winrm create winrm/config/listener?Address=*+Transport=HTTPS @{Hostname=\"pshost.vcf.lab\";CertificateThumbprint=\"<thumbprint>\"}"
 
-  # Verify the HTTPS listener is created
+  # Restart WinRM so the new listener binds, then verify it is present
+  Restart-Service WinRM -Force
   winrm enumerate winrm/config/listener
-  # Expected: Entry with Transport=HTTPS is listed
+  # Expected: an entry with Transport = HTTPS, Port = 5986 is listed
+  Get-NetTCPConnection -LocalPort 5986 -State Listen   # confirm 5986 is actually listening
 
 
 STEP 1.5 — Open Windows Firewall for WinRM HTTPS
@@ -191,6 +201,10 @@ The service account used by VCF Orchestrator to connect to the PS host must:
   c) Have write access to the archive file share
   d) Be configured for Kerberos constrained delegation if accessing
      both a UNC source and UNC destination (double-hop)
+  e) (Kerberos only) Have a sAMAccountName long enough that
+     UPPERCASE_REALM + sAMAccountName >= 16 characters, so the AES key salt
+     meets the JDK 128-bit minimum.  Realm VCF.LAB (7) needs a name >= 9 chars.
+     A short account name fails host-add with "salt must be at least 128 bits".
 
 Minimum local rights on PS host:
   Add service account to the local "Remote Management Users" group:
@@ -381,7 +395,9 @@ In VCF Orchestrator:
           identity.  Shared Session is standard for service-account-based
           automation.)
 
-       Username:        corp\svc-vro-ps    (or svc-vro-ps@corp.local)
+       Username:        svc-vro-ps@corp.local    (UPN form)
+                        For Kerberos use the UPN (user@domain) form.  Do NOT use the
+                        down-level corp\svc-vro-ps form with Kerberos.
        Password:        <service account password>
 
   4. Run the workflow
@@ -400,6 +416,43 @@ In VCF Orchestrator:
       configuration-of-vmware-cloud-foundation-operations-orchestrator/
       vcf-ochestrator-plugins-overview/using-the-powershell-plug-in/
       troubleshooting/kerberos-authentication-shared-session-fails.html
+
+  ─────────────────────────────────────────────────────────────────────────
+  KERBEROS BRING-UP ERROR SEQUENCE (VCF Orchestrator 9, hardened JDK)
+  ─────────────────────────────────────────────────────────────────────────
+  On first configuration these surface one at a time, each behind the last.
+  The krb5.conf referenced below lives on the Orchestrator pod, not the PS host
+  (path: /usr/lib/vco/app-server/conf/krb5.conf) — see the Implementation Guide,
+  Phase 4.
+
+    "java.lang.ClassCastException: java.util.Vector cannot be cast to
+     java.util.Hashtable"
+    → The [realms] block in krb5.conf is written on ONE line and/or uses ';'
+      separators.  VCF Orchestrator's Kerberos parser is Java's
+      sun.security.krb5.Config (NOT MIT krb5): the realm block must be MULTI-LINE
+      with '{' as the last token on its line, one key per line, and '}' alone.
+      Correct:
+          VCF.LAB = {
+              kdc = dc.vcf.lab
+              default_domain = vcf.lab
+          }
+      Save with LF line endings, no BOM.  This is a parsing error, not auth.
+
+    "salt must be at least 128 bits"
+    → The service account's sAMAccountName is too short.  The Kerberos AES salt is
+      UPPERCASE_REALM + sAMAccountName; the hardened JDK rejects a salt under 16
+      characters.  Realm VCF.LAB (7) needs a name >= 9 chars (vcf_svc = 7 fails;
+      vcf_svc_ps = 10 works).  This is NOT a krb5.conf problem.
+      Diagnostic only: forcing rc4-hmac (no salt) bypasses it and confirms the
+      cause — do not leave RC4 enabled.
+
+    "Pre-authentication information was invalid (24)"  (KDC_ERR_PREAUTH_FAILED)
+    → The account was found but the password-derived key did not match — almost
+      always a wrong/mistyped password.  Also verify the account is not flagged
+      "User must change password at next logon" or "Smart card required for
+      interactive logon," and use the UPN username (user@domain), not DOMAIN\user.
+      Confirm the credential independently:  kinit user@REALM   (or runas).
+      NOTE: a bad USERNAME instead gives error 6 (client not found), not 24.
 
 
 STEP 2.4 — Verify PS Host in VCF Orchestrator Inventory

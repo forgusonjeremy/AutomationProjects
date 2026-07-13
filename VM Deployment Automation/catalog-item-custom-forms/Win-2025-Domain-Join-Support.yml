@@ -71,7 +71,7 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_f19b0a7c
+        - id: section_83eb4644
           fields:
             - id: joinDomain
               display: checkbox
@@ -79,7 +79,7 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_b1f206de
+        - id: section_3fd02fe8
           fields:
             - id: ouDn
               display: dropDown
@@ -93,38 +93,11 @@ layout:
                       joinDomain: false
                     value: false
               signpostPosition: right-middle
-          isVertical: false
-          isExpandable: false
-          collapsed: false
       title: General
       state: {}
-    - id: page_550ebd26
+    - id: page_7e3a3faa
       sections:
-        - id: section_bcce871f
-          fields:
-            - id: textField_957573f9
-              display: textField
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_55090516
-          fields:
-            - id: textField_4413af14
-              display: textField
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_dd2f963c
-          fields:
-            - id: textField_b5f583b9
-              display: textField
-              state:
-                visible: true
-                read-only: false
-              signpostPosition: right-middle
-        - id: section_4e5d412a
+        - id: section_fc41d381
           fields:
             - id: adminAcctConfigElemName
               display: textField
@@ -132,7 +105,7 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_c6427549
+        - id: section_45c4d162
           fields:
             - id: defaultAdminNameAttrName
               display: textField
@@ -140,7 +113,7 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_8b2ff4da
+        - id: section_92fae8f9
           fields:
             - id: defaultAdminPasswordAttrName
               display: textField
@@ -148,7 +121,7 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_9bbb820e
+        - id: section_4391fbc3
           fields:
             - id: defaultAdminNewNameAttrName
               display: textField
@@ -156,9 +129,41 @@ layout:
                 visible: true
                 read-only: false
               signpostPosition: right-middle
-        - id: section_019b6f9d
+        - id: section_6ed7c0e0
           fields:
             - id: defaultAdminNewPasswordAttrName
+              display: textField
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_69354d96
+          fields:
+            - id: textField_2450f76e
+              display: textField
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_d387f653
+          fields:
+            - id: textField_12757df8
+              display: textField
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_22db3e41
+          fields:
+            - id: textField_8588d78b
+              display: textField
+              state:
+                visible: true
+                read-only: false
+              signpostPosition: right-middle
+        - id: section_3b6d9d9f
+          fields:
+            - id: textField_cc2af01c
               display: textField
               state:
                 visible: true
@@ -276,7 +281,7 @@ schema:
     constraints:
       required: true
   cpuCount:
-    label: vCPU Count
+    label: CPU Count
     type:
       dataType: integer
       isMultiple: false
@@ -304,7 +309,6 @@ schema:
     type:
       dataType: string
       isMultiple: false
-    default: ' '
     valueList:
       id: com.broadcom.pso.vcfa.customforms/getProjectADChildOUs
       type: scriptAction
@@ -316,46 +320,25 @@ schema:
         - $type:
             dataType: string
             isMultiple: false
-          configElementAttribute: '`refreshToken`'
+          configElementAttribute: textField_12757df8
         - $type:
             dataType: string
             isMultiple: false
-          vcfaBaseUrl: '`https://cvsd26vcfauto01.connect.lab`'
+          vcfaBaseUrl: textField_8588d78b
         - $type:
             dataType: string
             isMultiple: false
-          orgName: '`CVS-IaaS-Lab`'
+          orgName: textField_cc2af01c
         - $type:
             dataType: string
             isMultiple: false
-          configElementName: '`vcfa-authentication`'
+          configElementName: textField_2450f76e
         - $type:
             dataType: string
             isMultiple: false
           projectId: _projectId
     constraints:
       required: true
-  textField_957573f9:
-    label: VCFA Authentication Configuration Element Name
-    type:
-      dataType: string
-    default: vcfa-authentication
-    placeholder: ''
-    constraints: {}
-  textField_4413af14:
-    label: VCFA Authentication Configuration Element Attribute Name
-    type:
-      dataType: string
-    default: refreshToken
-    placeholder: ''
-    constraints: {}
-  textField_b5f583b9:
-    label: VCFA URL
-    type:
-      dataType: string
-    default: https://cvsd26vcfauto01.connect.lab
-    placeholder: ''
-    constraints: {}
   adminAcctConfigElemName:
     label: Local Admin Configuration Element Name
     description: >-
@@ -428,5 +411,33 @@ schema:
     default: newDefaultAdminPassword
     constraints:
       required: true
+  textField_2450f76e:
+    label: VCFA-Auth-Config-Element-Name
+    type:
+      dataType: string
+    default: vcfa-rest-authentication
+    placeholder: ''
+    constraints: {}
+  textField_12757df8:
+    label: VCFA-Auth-Refresh-Token-Attribute-Name
+    type:
+      dataType: string
+    default: refreshToken
+    placeholder: ''
+    constraints: {}
+  textField_8588d78b:
+    label: vcfa-base-url
+    type:
+      dataType: string
+    default: https://vcfa.site-a.vcf.lab
+    placeholder: ''
+    constraints: {}
+  textField_cc2af01c:
+    label: OrgName
+    type:
+      dataType: string
+    default: vm-apps
+    placeholder: ''
+    constraints: {}
 options:
   externalValidations: []
