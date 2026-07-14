@@ -228,13 +228,57 @@ function getAdHost() {
     return hosts[0];
 }
 
+// ── Helper: resolve a base DN to its AD plugin OU object ──────────────────────
+// Searches by the base's leftmost RDN (a name filter the plugin supports), then
+// pins the exact object by comparing full DNs. Returns the OU object or null.
+function resolveOU(baseDN, adHost) {
+    var first = ("" + baseDN).split(",")[0];         // e.g. "OU=Projects"
+    var rdn   = first.replace(/^\s*ou=/i, "").trim(); // e.g. "Projects"
+    if (rdn === "") return null;
+    var matches = ActiveDirectory.search("OrganizationalUnit", rdn, adHost) || [];
+    for (var mi = 0; mi < matches.length; mi++) {
+        var m = matches[mi];
+        if (m.distinguishedName && normDN(m.distinguishedName) === normDN(baseDN)) return m;
+    }
+    return null;
+}
+
 // ── Helper: enumerate ALL descendant OUs beneath a base DN via the AD plugin ──
-// Lists every OU on the host, then keeps those whose DN ends with ",<baseDN>" —
-// i.e. any OU sitting in the subtree rooted at baseDN, at ANY depth. The base DN
-// itself is excluded (it does not end with ",<baseDN>"). Returns FULL DNs, sorted.
+// PRIMARY: resolve the base OU object and recursively walk .organizationalUnits.
+//   Each .organizationalUnits access is a fresh one-level LDAP fetch, so recursing
+//   into every child reaches any depth (children, grandchildren, ...). This is the
+//   reliable path: an empty-query OU scan is NOT guaranteed to return deep OUs.
+// FALLBACK (only if the base OU object can't be resolved): list all OUs and keep
+//   those whose DN ends with ",<baseDN>". Returns FULL DNs, sorted; base excluded.
 // The AD host is passed explicitly: ActiveDirectory.search(type, query, adHost).
 function getDescendantOUs(baseDN, adHost) {
     var result = [];
+    var seen = {};
+    function pushDN(dn) {
+        if (!dn) return;
+        var k = normDN(dn);
+        if (!seen[k]) { seen[k] = true; result.push(dn); }
+    }
+    function walk(ou) {
+        var kids = ou.organizationalUnits || [];
+        for (var i = 0; i < kids.length; i++) {
+            var child = kids[i];
+            if (child.distinguishedName) pushDN(child.distinguishedName);
+            walk(child);   // recurse into deeper OUs (any depth)
+        }
+    }
+
+    // PRIMARY: recursive object walk from the resolved base OU.
+    var baseOu = resolveOU(baseDN, adHost);
+    if (baseOu) {
+        walk(baseOu);
+        result.sort();
+        return result;
+    }
+
+    // FALLBACK: could not resolve the base OU object — scan all OUs and suffix-match.
+    System.warn("getProjectADChildOUs: could not resolve base OU object '" + baseDN +
+        "'; falling back to a full OU scan (may miss deep OUs on some plugin versions).");
     var suffix = "," + normDN(baseDN);
     var all = ActiveDirectory.search("OrganizationalUnit", "", adHost) || [];  // empty query => all OUs
     if (all.length === 0)
@@ -246,7 +290,7 @@ function getDescendantOUs(baseDN, adHost) {
         var dnl = normDN(dn);
         // Keep any OU whose DN ends with ",<baseDN>" (descendant at any depth).
         if (dnl.length > suffix.length && dnl.substring(dnl.length - suffix.length) === suffix) {
-            result.push(dn);
+            pushDN(dn);
         }
     }
     result.sort();
