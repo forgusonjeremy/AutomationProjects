@@ -13,9 +13,16 @@ It covers two areas:
    (the playbooks the customer runs today).
 
 > **File locations (for reference)**
-> - Deployed script under change: `psscript/files/cvs_functions.ps1`
+> - Deployed script under change: `psscript/files/cvs_functions.ps1` (reference copy: `Move Windows Event Logs/_Shared/Code/cvs_functions.ps1`)
 > - Current-state playbooks (baseline): `Move Windows Event Logs/ansible code.md`
-> - New Orchestrator package: `Move Windows Event Logs/code/`
+> - New Orchestrator package (split into two deliverables + shared):
+>   - `Move Windows Event Logs/Move-ArchivedLogs-ByADGroup/` (Code + Documentation)
+>   - `Move Windows Event Logs/Remove-OldFiles-UNCShare/` (Code + Documentation)
+>   - `Move Windows Event Logs/_Shared/` (parseScriptOutput, handlePSFailure, cvs_functions; Shared-Components, this register, Ansible map)
+>   - PS host build reference: `Automation Projects/_Shared References/PowerShell Host Build Guide/`
+>
+> **This is the shared copy** of the register, cited by both deliverables — it
+> records the change history for the whole transition (both workflows).
 
 ---
 

@@ -1,3 +1,12 @@
+# Ansible → VCF Orchestrator Mapping Table
+
+**Project:** Ansible → VCF Orchestrator transition — "Move Windows Event Logs"
+**Scope:** Covers **both** deliverables (Move-ArchivedLogs-ByADGroup and Remove-OldFiles-UNCShare) — the Ansible-to-Orchestrator conversion is one shared history.
+
+> Fixed-width conversion reference (playbook → workflow, task-level, component
+> disposition, variable mapping, and gaps). Preserved as originally authored.
+
+```text
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
 ║  ANSIBLE → VCF ORCHESTRATOR MAPPING TABLE                                                                                                      ║
 ║  Windows Archive Log Management — Phase 1 Conversion                                                                                           ║
@@ -101,3 +110,5 @@ Email reporting on completion          Not confirmed in scope                   
 AD query within vRO (native)           Would require AD plugin or REST calls       Script handles AD; not replicated in vRO in Phase 1
 Per-server rollback                    Script does not support undo                No rollback implemented; monitor destination share post-run
 Parallel execution across servers      Ansible can fork; vRO invokes script once   Script iterates serially; acceptable for Phase 1 volume
+
+```
