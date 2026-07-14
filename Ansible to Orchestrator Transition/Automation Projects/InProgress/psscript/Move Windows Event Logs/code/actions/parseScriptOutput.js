@@ -8,8 +8,16 @@
  *
  *   cvs_functions.ps1 emits all output via Write-Host (through Write-Log) and
  *   Write-Warning.  It does not use Write-Output or Write-Error for operational
- *   messages.  There are no structured objects returned.  getRootObject() will
- *   return a string (the console output stream) or null if nothing was emitted.
+ *   messages.  There are no structured objects returned.
+ *
+ *   IMPORTANT: the vRO PowerShell plugin returns ONLY the success (pipeline)
+ *   stream via getRootObject(); Write-Host / Write-Warning output is logged by
+ *   the plugin but is NOT part of the returned object. To make the transcript
+ *   available here, the build*Invocation actions append ' *>&1 | Out-String' to
+ *   the invocation, which merges all host/info/warning/error streams into the
+ *   success stream as a single string. getRootObject() therefore returns that
+ *   string, or null if the invocation was NOT built with the redirect (in which
+ *   case success/failure cannot be determined from output — treated as no output).
  *
  *   Because all error messages are non-terminating and written to stdout via
  *   Write-Host with an "Error:" or "error:" prefix, success/failure is
@@ -27,8 +35,8 @@
  * Return type: Properties
  *   Keys:
  *     success    (boolean) - true if no "Error:" lines detected in output
- *     outputText (string)  - full output string from getRootObject()
- *     errorLines (string)  - newline-joined lines containing "Error:" or "error:"
+ *     outputText (string)  - full output string from getRootObject() (CLIXML-decoded)
+ *     errorText  (string)  - newline-joined lines containing "Error:" or "error:"
  */
 
 // ── Input validation ──────────────────────────────────────────────────────────
@@ -84,6 +92,21 @@ try {
     // Do not rethrow — let the caller decide based on success=false
     outputText = "";
 }
+
+// ── Decode CLIXML character escapes ───────────────────────────────────────────
+//
+// The build*Invocation actions append ' *>&1 | Out-String', producing a single
+// multi-line string. When that string crosses the WinRM/PSRP boundary, the vRO
+// PowerShell plugin serializes control characters as literal CLIXML escapes
+// (_xNNNN_) and does NOT decode them — e.g. CR/LF arrive as the text
+// "_x000D__x000A_" and TAB as "_x0009_". Left as-is, the transcript contains no
+// real "\n", so the line-based scan below sees the entire output as ONE line and
+// cannot isolate individual "Error:" lines. Decode every _xNNNN_ hex escape back
+// to its character so split("\n") works and outputText displays correctly.
+
+outputText = outputText.replace(/_x([0-9A-Fa-f]{4})_/g, function (m, hex) {
+    return String.fromCharCode(parseInt(hex, 16));
+});
 
 // ── Scan for error lines ──────────────────────────────────────────────────────
 //
@@ -142,6 +165,6 @@ if (hasErrors) {
 var result = new Properties();
 result.put("success",    success);
 result.put("outputText", outputText);
-result.put("errorLines", errorText);
+result.put("errorText",  errorText);
 
 return result;

@@ -104,7 +104,21 @@ System.log(
 //       -DomainName 'corp.local' `
 //       -FileShareTarget '\\server\share$\Windows' `
 //       -FilterOn 'Archive-*.evtx' `
-//       -NumberOfDays '-1'
+//       -NumberOfDays '-1' *>&1 | Out-String -Width 4096
+//
+// Stream capture ( *>&1 | Out-String -Width 4096 ):
+//   cvs_functions.ps1 emits everything through Write-Log -> Write-Host (the host/
+//   information stream) and Write-Warning. The vRO PowerShell plugin only returns
+//   the SUCCESS (pipeline) stream via getRootObject(); Write-Host output is logged
+//   but NOT returned, so without this redirect the OOTB "Invoke a PowerShell script"
+//   workflow hands back a null output object and parseScriptOutput has nothing to
+//   parse. '*>&1' merges all streams (Info/Warning/Error/Verbose) into the success
+//   stream and 'Out-String' collapses them to a single multi-line string, which the
+//   plugin returns as a String root object for parseScriptOutput to scan.
+//   '-Width 4096' prevents Out-String from wrapping at the default console width
+//   (~80 cols) — without it, a long log line (e.g. an "Error:" message with a UNC
+//   path) is split across several physical lines, so parseScriptOutput's per-line
+//   "Error:" scan would capture only the first fragment and truncate the message.
 
 var invocationString =
     "& \"" + scriptPath.trim() + "\"" +
@@ -113,7 +127,8 @@ var invocationString =
     " -DomainName '" + domainName.trim() + "'" +
     " -FileShareTarget '" + fileShareTarget.trim() + "'" +
     " -FilterOn '" + fileFilter.trim() + "'" +
-    " -NumberOfDays '" + ageDays + "'";
+    " -NumberOfDays '" + ageDays + "'" +
+    " *>&1 | Out-String -Width 4096";
 
 System.log("buildMoveByADGroupInvocation | invocationString=" + invocationString);
 

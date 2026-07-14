@@ -90,13 +90,26 @@ if (whatIfNormalised === "no") {
 //   -UNC_SharePath  (with underscore)
 //   -OlderThanDays
 //   -WhatIf
+//
+// Stream capture ( *>&1 | Out-String -Width 4096 ):
+//   cvs_functions.ps1 emits everything through Write-Log -> Write-Host (the host/
+//   information stream) and Write-Warning. The vRO PowerShell plugin only returns
+//   the SUCCESS (pipeline) stream via getRootObject(); Write-Host output is logged
+//   but NOT returned, so without this redirect the OOTB "Invoke a PowerShell script"
+//   workflow hands back a null output object and parseScriptOutput has nothing to
+//   parse. '*>&1' merges all streams into the success stream and 'Out-String'
+//   collapses them to a single multi-line string returned as a String root object.
+//   '-Width 4096' prevents wrapping at the default console width (~80 cols) so long
+//   log lines (e.g. an "Error:" message with a UNC path) stay on one physical line
+//   and are not truncated by parseScriptOutput's per-line "Error:" scan.
 
 var invocationString =
     "& \"" + scriptPath.trim() + "\"" +
     " -Action 'Delete-OldFiles-UNC-Share'" +
     " -UNC_SharePath '" + uncSharePath.trim() + "'" +
     " -OlderThanDays " + days +
-    " -WhatIf '" + whatIfNormalised + "'";
+    " -WhatIf '" + whatIfNormalised + "'" +
+    " *>&1 | Out-String -Width 4096";
 
 System.log("buildRemoveFilesInvocation | invocationString=" + invocationString);
 
