@@ -41,7 +41,7 @@ Business outcome: automated offload of Windows `Archive-*.evtx` logs continues u
 | Risk | Impact | Mitigation |
 |---|---|---|
 | **Second-hop authentication** (PS host → remote `\\server\C$` source and `\\fileshare` destination) | Move fails access-denied if the credential cannot be delegated | Kerberos + constrained delegation (production) or Basic-over-HTTPS (lab); **validate the hop before go-live** (Implementation Guide) |
-| **AD "enabled" ≠ host reachable** | An enabled-but-offline computer object (e.g. `disabledsrv01`) is still processed and errors | To exclude a host, `Disable-ADAccount` it or remove it from the group — do not rely on the hostname |
+| **AD "enabled" ≠ host reachable** | An enabled-but-offline computer object (e.g. `disabledsrv01`) is still processed and errors | To exclude a host, `Disable-ADAccount` it or remove it from the group |
 | **RSAT ActiveDirectory module missing** on the PS host | AD resolution fails; run terminates (Failed: PS Execution) | Install RSAT AD tools on the PS host before go-live (see PS-Host guide) |
 | **Script version drift** | Behavior depends on the updated `cvs_functions.ps1` (changes S-1…S-5) | Deploy/verify the updated script first (Change-Register, shared) |
 | **Certificate trust & Kerberos setup** | Host registration fails on untrusted cert or misconfigured `krb5.conf` | Import cert to Orchestrator trust store; follow the PS-Host guide for Kerberos |

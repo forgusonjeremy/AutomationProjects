@@ -112,7 +112,6 @@ Per the workflow spec (`Remove-OldFiles-UNCShare_spec.js`):
 - **UNC archive share** with **write/delete** access for the PS host service account.
 - **VCF Orchestrator 9** with the PowerShell plug-in and a registered PS host.
 - **Certificate trust** between Orchestrator and the PS host.
-- **Configuration Element** `VCF/WindowsLogManagement/WindowsLogManagement-Config`.
 
 ---
 
