@@ -106,8 +106,8 @@ resources:
         - 1
     properties:
       name: ${input.vmHostname}
-      image: win-2022
-      customizationSpec: '${input.joinDomain ? "win-2022-domain" : "win-2022-workgroup"}'
+      imageRef: win-2025/basline
+      customizationSpec: '${input.joinDomain ? "win-2025-domain" : "win-2025-workgroup"}'
       cpuCount: ${input.cpuCount}
       totalMemoryMB: ${input.memoryGB * 1024}
       folderName: ${input.folderName}
