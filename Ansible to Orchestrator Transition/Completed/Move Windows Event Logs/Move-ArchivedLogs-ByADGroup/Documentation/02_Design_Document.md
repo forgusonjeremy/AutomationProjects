@@ -1,14 +1,5 @@
 # Move Archived Logs (By AD Group) — Design Document
 
-**Deliverable:** Move-ArchivedLogs-ByADGroup
-**Project:** Ansible → VCF Orchestrator transition — "Move Windows Event Logs"
-**Platform:** VCF Automation 9 / VCF Operations Orchestrator 9
-**Status:** Phase 1
-**This set:** 01 Executive Summary · 02 Design Document · 03 Implementation Guide · 04 User Guide · 05 Validation & Testing Plan
-**Shared references:** ../../_Shared/Documentation/Shared-Components.md · ../../_Shared/Documentation/Change-Register.md · ../../_Shared/Documentation/Ansible-to-vRO-MappingTable.md · "How to Build a PowerShell Host" (Automation Projects/_Shared References/PowerShell Host Build Guide/)
-
----
-
 ## 1. Architecture overview
 
 The workflow builds one PowerShell invocation string, executes it on a pre-staged PS host via the OOTB *Invoke a PowerShell script* workflow, and parses the result. **All AD resolution and per-server iteration happen inside `cvs_functions.ps1`**, not in Orchestrator. **One workflow run = one script invocation; there is no Orchestrator-side loop.**
