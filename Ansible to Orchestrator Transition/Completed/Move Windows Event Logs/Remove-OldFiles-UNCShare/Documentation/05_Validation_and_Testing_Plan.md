@@ -1,5 +1,17 @@
 # Remove Old Files (UNC Share) — Validation & Testing Plan
 
+**Deliverable:** Remove-OldFiles-UNCShare
+**Project:** Ansible → VCF Orchestrator transition — "Move Windows Event Logs"
+**Platform:** VCF Automation 9 / VCF Operations Orchestrator 9
+**Status:** Phase 1
+**This set:** 01 Executive Summary · 02 Design Document · 03 Implementation Guide · 04 User Guide · 05 Validation & Testing Plan · WindowsLogManagement-Config_definition
+**Shared references:** ../../_Shared/Documentation/Shared-Components.md · ../../_Shared/Documentation/Change-Register.md · ../../_Shared/Documentation/Ansible-to-vRO-MappingTable.md · "How to Build a PowerShell Host" (Automation Projects/_Shared References/PowerShell Host Build Guide/)
+
+Scope: **Remove-OldFiles-UNCShare only.** Steps that apply to shared components
+reference the shared docs rather than re-testing them here.
+
+---
+
 ## Phase A — Environment pre-checks
 
 | ID | Check | Method / expected |

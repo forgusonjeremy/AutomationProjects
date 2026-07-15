@@ -1,0 +1,30 @@
+.\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\Ansible to Orchestrator Transition\vmops\Cleanup VM Snapshots\Test Scripts\bulk_generate_snapshot_io.ps1' -CsvPath ./servers.csv  //copies gen io script to VMs
+
+./bulk_generate_snapshot_io.ps1 -CsvPath ./servers.csv -ScriptRemotePath "/tmp/generate_snapshot_io.sh" -TargetDeltaGB 2 -ScriptDurationMinutes 360 -MaxParallelJobs 45  //runs the gen io script inside each VM, target delta disk size 2GB, for 27 minutes.  10 VMs per datastore should create 200GB of deltas since workflow to create snapshots takes snapshots at 3 minute intervals
+
+./Stop-SnapshotIO.ps1 -CsvPath .\servers.csv -MaxParallelJobs 40  //stops existing generate_snapshot_io.sh processes
+
+
+
+$servers = Import-Csv "servers.csv"
+foreach ($row in $servers) {
+    $result = ssh -o StrictHostKeyChecking=no -o BatchMode=yes `
+        "$($row.Username)@$($row.Server)" `
+        "rm -rf ~/snapshot_io_test && echo OK"
+    Write-Host "$($row.Server): $result"
+}
+
+.\bulk_scp.ps1 -FilePath 'C:\Users\forgusonjw\Documents\GitHubRepos\AutomationProjects\OrchestratorWorkflows\vCenter\vms\snapshots\Test Scripts\generate_datastore_latency.sh' -CsvPath ./servers.csv     
+
+//vSAN
+./bulk_generate_DatastoreLatency.ps1 -CsvPath ./vsanservers.csv -ScriptRemotePath "/tmp/generate_datastore_latency.sh" -DurationSeconds 1200 -Workers 8 -IoDepth 16
+
+//iSCSI
+./bulk_generate_DatastoreLatency.ps1 -CsvPath ./iscsiservers.csv -ScriptRemotePath "/tmp/generate_datastore_latency.sh" -DurationSeconds 1200 -Workers 1 -IoDepth 1
+
+
+./Stop-DatastoreLatency.ps1 -CsvPath vsanservers.csv
+./Stop-DatastoreLatency.ps1 -CsvPath iscsiservers.csv
+
+
+Snapshot used by Content Library

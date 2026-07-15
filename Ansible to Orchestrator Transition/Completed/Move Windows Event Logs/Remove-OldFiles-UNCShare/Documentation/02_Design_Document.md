@@ -1,5 +1,14 @@
 # Remove Old Files (UNC Share) — Design Document
 
+**Deliverable:** Remove-OldFiles-UNCShare
+**Project:** Ansible → VCF Orchestrator transition — "Move Windows Event Logs"
+**Platform:** VCF Automation 9 / VCF Operations Orchestrator 9
+**Status:** Phase 1
+**This set:** 01 Executive Summary · 02 Design Document · 03 Implementation Guide · 04 User Guide · 05 Validation & Testing Plan · WindowsLogManagement-Config_definition
+**Shared references:** ../../_Shared/Documentation/Shared-Components.md · ../../_Shared/Documentation/Change-Register.md · ../../_Shared/Documentation/Ansible-to-vRO-MappingTable.md · "How to Build a PowerShell Host" (Automation Projects/_Shared References/PowerShell Host Build Guide/)
+
+---
+
 ## 1. Architecture overview
 
 The workflow builds a single PowerShell invocation string, executes it on a
