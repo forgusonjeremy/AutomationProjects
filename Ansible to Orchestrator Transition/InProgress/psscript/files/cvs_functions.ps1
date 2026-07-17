@@ -24,6 +24,27 @@ param (
     [string]$RebootIt = "no",
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$RebootIt_DelayBetweenServer = "60",
+    # S-10: post-reboot verification budget. After all reboots are issued, each
+    # rebooted server is polled until its LastBootUpTime advances past the value
+    # captured before the reboot, or until this many seconds elapse (per server,
+    # measured from that server's own reboot time).
+    [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
+    [string]$RebootIt_VerifyTimeoutSec = "600",
+    [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
+    [string]$RebootIt_VerifyPollSec = "15",
+    # S-13: opt-in gate for the pre-reboot script (ownership_w2k.ps1).
+    # DEFAULT IS 'no' - the step does NOT run unless explicitly enabled.
+    # Rationale: because of the S-6 defect this step has never actually executed
+    # (the script path resolved to "/ownership_w2k.ps1" and Invoke-Command failed
+    # non-terminating). Fixing S-6 would silently START applying it. The script
+    # takes ownership of and loosens ACLs on c:\windows\inf\usbstor.inf (USB mass
+    # storage driver INF - a common hardening DENY target) and
+    # c:\windows\system32\termsrv.dll (Terminal Services). Re-enabling that on
+    # every rebooted member of a security group is a security-posture change and
+    # must be a deliberate, reviewed decision - not a side effect of a bug fix.
+    # Set to 'yes' only after security review.
+    [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
+    [string]$RebootIt_RunPreRebootScript = "no",
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$FileShareTarget,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
@@ -115,7 +136,16 @@ Function Get-ScriptDirectory { # Get-ScriptDirectory
                 Split-Path $psise.CurrentFile.FullPath
             }
             else {
-                $global:PSScriptRoot
+                # S-6: was $global:PSScriptRoot. $PSScriptRoot is an AUTOMATIC
+                # variable scoped to the running script - it is not published to
+                # the global scope, so $global:PSScriptRoot was always $null and
+                # this function returned an empty string. Callers that build a
+                # path from it (Invoke-ServerReboot -> "$scriptDir/ownership_w2k.ps1",
+                # tls-fix -> "$scriptDir/$ActionRemoteFile") therefore produced a
+                # rooted path like "/ownership_w2k.ps1", which Invoke-Command
+                # failed to find. That failure is non-terminating, so the reboot
+                # loop continued and the pre-reboot step was silently skipped.
+                $PSScriptRoot
             }
 
         }Catch{ Write-log "Error: $_.Exception.message" $true} 
@@ -539,12 +569,22 @@ Function Invoke-Module{ # Invoke-Module
         if ($retValue.name -eq $moduleName){
             Write-Log "Info: $($moduleName) has already imported"
             return $true
-        }else{ 
+        }else{
             Write-Log "Info: Importing Module $($moduleName)"
             try{
-                Import-Module $moduleName -ErrorAction SilentlyContinue
+                # S-12: two defects fixed here.
+                #  (a) -ErrorAction SilentlyContinue suppressed the import failure, so a
+                #      genuinely missing module never reached the Catch and the function
+                #      fell through returning $null. -ErrorAction Stop makes a failed
+                #      import terminating so the Catch (and 'return $false') actually fire.
+                #  (b) the success path had no 'return $true' - it fell out of the else
+                #      block returning $null (falsy). Every caller tests
+                #      'if (Invoke-Module $strModule)', so a module that imported
+                #      successfully on this path was misreported as unavailable.
+                Import-Module $moduleName -ErrorAction Stop
                 Write-Log "Info: Success - loaded module $($moduleName)" $true
-            }catch{ Write-log "Error: Issue importing module $($moduleName)" $true; return $false }
+                return $true
+            }catch{ Write-log "Error: Issue importing module $($moduleName) - $($_.Exception.Message)" $true; return $false }
         }
 
     }
@@ -638,6 +678,64 @@ function Get-ListOfServers-ByCN {
             }
         }
 
+        return $result
+    }
+}
+
+function Get-ListOfServers-Direct {
+    # S-7: Direct (NON-RECURSIVE) computer-member resolution for Invoke-ServerReboot.
+    #
+    # NON-RECURSIVE BY DESIGN - read before changing:
+    #   - Get-ADGroupMember is called WITHOUT -Recursive, so only TOP-LEVEL
+    #     (direct) members of the group are considered.
+    #   - Only COMPUTER objects are returned. A nested SUB-GROUP that is a direct
+    #     member is filtered out by the objectClass test and is NOT expanded; a
+    #     user object is likewise ignored.
+    #   - Disabled computer accounts are skipped and logged.
+    #
+    # This is deliberately different from Get-ListOfServers-ByCN (which IS
+    # recursive). Rebooting a machine is destructive, so group membership must be
+    # explicit: only what the operator put directly in the group is a target.
+    #
+    # Why a NEW function rather than changing Get-ListOfServers: that function is
+    # also called by Get-ServerPendingRebootStatus, clean-ServerDisk,
+    # move-archived-logs and tls-fix. Changing its return shape or filtering would
+    # alter those actions' behaviour.
+    [CmdletBinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [string]$SecurityGroup,       # DN preferred (unambiguous); CN / sAMAccountName / GUID / SID also resolve
+
+        [parameter(Mandatory = $false)]
+        [string]$DomainName
+    )
+    process {
+        # Group-level failure (group not found / domain unreachable) is a TOTAL
+        # failure - with no members resolvable every reboot would be skipped, so
+        # let it terminate rather than be masked as "0 servers / no action".
+        $adParams = @{ Identity = "$($SecurityGroup)"; ErrorAction = 'Stop' }
+        if (-not [string]::IsNullOrWhiteSpace($DomainName)) { $adParams['Server'] = $DomainName }
+
+        $members = Get-ADGroupMember @adParams | Where-Object { $_.objectClass -eq 'computer' }
+
+        $result = @()
+        foreach ($m in $members) {
+            # Per-object isolation: one unresolvable computer must not abort the group.
+            Try {
+                $compParams = @{ Identity = $m.distinguishedName; Properties = 'Enabled'; ErrorAction = 'Stop' }
+                if (-not [string]::IsNullOrWhiteSpace($DomainName)) { $compParams['Server'] = $DomainName }
+                $comp = Get-ADComputer @compParams
+                if ($comp.Enabled -eq $true) {
+                    $result += $comp
+                } else {
+                    Write-Log "Info: skipping disabled computer object $($comp.Name)" $true
+                }
+            } Catch {
+                Write-Log "Warn: could not resolve computer object '$($m.distinguishedName)' - skipped: $($_.Exception.Message)" $true
+            }
+        }
+
+        Write-Log "Info: group '$($SecurityGroup)' resolved to $(($result | Measure-Object).Count) enabled, direct computer member(s)." $true
         return $result
     }
 }
@@ -745,14 +843,114 @@ function Invoke-ServerReboot{
 
             Write-log "Info: invoke server rebooting on $($ServerName)" $true
             #Restart-Computer -ComputerName $($ServerName)
-            shutdown /r /t 2 /c "Ansible rebooting server to address pending reboot status on patching" /f /m "\\$($ServerName)"
+
+            # S-9: capture shutdown.exe's exit code. shutdown.exe is a NATIVE
+            # executable - when it fails (access denied, RPC unavailable, host
+            # unreachable) it does NOT raise a PowerShell exception, so the
+            # surrounding Try/Catch never fired and a failed reboot was reported
+            # as a success. Redirect stderr into the output so the reason is
+            # captured, then test $LASTEXITCODE explicitly.
+            $shutdownOutput = & shutdown.exe /r /t 2 /c "VCF Orchestrator rebooting server to address pending reboot status on patching" /f /m "\\$($ServerName)" 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "Error: $($ServerName) - shutdown command failed (exit code $LASTEXITCODE): $($shutdownOutput -join ' ')" $true
+                return $false
+            }
+
+            Write-Log "Info: $($ServerName) - reboot command accepted" $true
+            return $true
 
         } catch {
-            Write-Log "Error: $($_.Exception.Message)" $true
+            Write-Log "Error: $($ServerName) - $($_.Exception.Message)" $true
+            return $false
         }
 
     }
 
+}
+
+Function Wait-ServersBackOnline {
+    # S-10: post-reboot verification pass.
+    #
+    # Runs ONCE, AFTER every reboot has been issued - not per-server inline.
+    # Rationale: servers reboot concurrently in reality, so a single polling pass
+    # bounds the whole verification to roughly one boot window (~VerifyTimeoutSec)
+    # instead of N x VerifyTimeoutSec. A per-server blocking wait on a large group
+    # would run for hours and exceed the WinRM/PSRP operation timeout of the
+    # calling Orchestrator PowerShell plug-in session.
+    #
+    # Proof of reboot: poll win32_operatingsystem.LastBootUpTime and require it to
+    # ADVANCE past the value captured before the reboot (Get-RebootStatus already
+    # records it as ComputerlastBootUptime). This is stronger than a ping - it
+    # proves the OS actually restarted AND is answering WMI again - and it works
+    # identically for physical and virtual servers, which a VMware Tools check
+    # could not.
+    #
+    # A server still up (pre-reboot boot time unchanged) simply stays in the
+    # pending set until it goes down and returns, or until its own deadline.
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$true)]
+        [AllowEmptyCollection()]
+        [array] $Targets,          # report objects: ComputerName, PreRebootLastBoot, RebootIssued, RebootIssuedAt
+
+        [Parameter(Mandatory=$false)]
+        [int] $TimeoutSec = 600,
+
+        [Parameter(Mandatory=$false)]
+        [int] $PollSec = 15
+    )
+    Process{
+        $pending = @($Targets | Where-Object { $_.RebootIssued -eq $true })
+        if ($pending.Count -eq 0) {
+            Write-Log "Info: no successfully-issued reboots to verify." $true
+            return
+        }
+
+        Write-Log "Info: verifying $($pending.Count) server(s) return online (timeout $($TimeoutSec)s per server, polling every $($PollSec)s)" $true
+
+        while ($true) {
+            $stillPending = @()
+
+            foreach ($t in $pending) {
+                $deadline = $t.RebootIssuedAt.AddSeconds($TimeoutSec)
+
+                $newBoot = $null
+                Try {
+                    # Expected to fail while the server is down - that is a normal
+                    # part of the cycle, not an error worth logging each poll.
+                    $newBoot = Get-CimInstance -ComputerName $t.ComputerName -ClassName win32_operatingsystem -ErrorAction Stop |
+                        Select-Object -ExpandProperty lastbootuptime
+                } Catch {
+                    $newBoot = $null
+                }
+
+                if ($newBoot -ne $null -and ($t.PreRebootLastBoot -eq $null -or $newBoot -gt $t.PreRebootLastBoot)) {
+                    $t.BackOnline  = $true
+                    $t.NewLastBoot = $newBoot
+                    $t.DurationSec = [int]((Get-Date) - $t.RebootIssuedAt).TotalSeconds
+                    $t.Status      = 'Rebooted'
+                    $t.Detail      = "Back online; LastBootUpTime advanced to $newBoot"
+                    Write-Log "Success: $($t.ComputerName) back online after $($t.DurationSec)s" $true
+                }
+                elseif ((Get-Date) -ge $deadline) {
+                    $t.BackOnline  = $false
+                    $t.DurationSec = [int]((Get-Date) - $t.RebootIssuedAt).TotalSeconds
+                    $t.Status      = 'NotReturned'
+                    $t.Detail      = "Did not return within $($TimeoutSec)s of the reboot being issued"
+                    Write-Log "Error: $($t.ComputerName) did not return within $($TimeoutSec)s after reboot" $true
+                }
+                else {
+                    $stillPending += $t
+                }
+            }
+
+            $pending = $stillPending
+            if ($pending.Count -eq 0) { break }
+            Start-Sleep -Seconds $PollSec
+        }
+
+        Write-Log "Info: verification pass complete." $true
+    }
 }
 
 function Get-UserlogonSession($Computer){
@@ -833,6 +1031,52 @@ function GenerateReportServerPendingRebootStatus($data){
     $body = $body -replace 'YES','<font color="red">YES</font>'
     $body = $HeaderNote + $body
     $body | out-File -append -FilePath "$($Global:DebugDir)\ServerPendingRebootStatus_result.html"
+    if($eMailReport -eq 'yes'){ SendMail -MailBody $body }
+}
+
+function GenerateReportServerReboot($data){
+    # S-11: reporting for the Invoke-ServerReboot action.
+    # This action previously produced NO report and sent NO mail - the only record
+    # of a reboot run was the stdout transcript. Modelled on
+    # GenerateReportServerPendingRebootStatus; gated by -eMailReport as usual.
+
+    $Style = "<style>"
+    $Style = $Style + "BODY{background-color:white;font-family:Segoe UI;font-size:12px}"
+    $Style = $Style + "TABLE{border-width: 1px;border-style: solid;border-color: black;border-collapse: collapse;}"
+    $Style = $Style + "TH{border-width: 1px;padding: 1px;border-style: solid;border-color: black;background-color:gray;color:white}"
+    $Style = $Style + "TD{border-width: 1px;text-align: center;padding: 1px;border-style: solid;border-color: black;background-color:lightgrey}"
+    $Style = $Style + "</style>"
+
+    $HeaderNote = "<p>The list of servers was based on the direct (non-recursive) enabled computer members of the security group called $($HeaderNotesSubstr). " +
+                  "The script performed a remote WMI/registry call to each server to determine whether a reboot was pending; " +
+                  "<b>only servers reporting a pending reboot were rebooted</b>. Servers whose pending state could not be read were skipped and NOT rebooted. " +
+                  "Each rebooted server was verified as returning to service by confirming its LastBootUpTime advanced past its pre-reboot value " +
+                  "(timeout $($RebootIt_VerifyTimeoutSec)s per server). The RPC/WMI service on the remote server must be available and accessible or the server will be reported as an error.</p>"
+
+    [string]$body = $data |
+        Sort-Object -Property Status, ComputerName |
+        ConvertTo-Html -Property ComputerName, PendingReboot, PreRebootLastBoot, RebootIssued, BackOnline, DurationSec, Status, Detail -Head $Style
+
+    $body = $body -replace '<td>Rebooted</td>','<td><font color="green">Rebooted</font></td>'
+    $body = $body -replace '<td>NotReturned</td>','<td><font color="red">Did NOT return</font></td>'
+    $body = $body -replace '<td>RebootFailed</td>','<td><font color="red">Reboot FAILED</font></td>'
+    $body = $body -replace '<td>Skipped-StatusUnknown</td>','<td><font color="red">Skipped - status unknown</font></td>'
+    $body = $body -replace '<td>Skipped-NoRebootRequired</td>','<td><font color="green">Skipped - no reboot required</font></td>'
+    $body = $body -replace 'PreRebootLastBoot', 'LastBootUpTime (before)'
+    $body = $body -replace 'DurationSec', 'Return time (s)'
+    $body = $HeaderNote + $body
+
+    # The Debug folder is not guaranteed to exist on a freshly-staged PS host;
+    # create it rather than letting Out-File throw and lose the report.
+    Try {
+        if ( !(Test-Path -PathType Container $Global:DebugDir) ) {
+            New-Item -ItemType Directory -Path $Global:DebugDir -ErrorAction Stop | Out-Null
+        }
+        $body | out-File -append -FilePath "$($Global:DebugDir)\ServerReboot_result.html"
+    } Catch {
+        Write-Log "Warn: could not write report file to $($Global:DebugDir): $($_.Exception.Message)" $true
+    }
+
     if($eMailReport -eq 'yes'){ SendMail -MailBody $body }
 }
 
@@ -1023,46 +1267,149 @@ function Main($Action){
 
         }
         'Invoke-ServerReboot'{
-            $strModule = 'ActiveDirectory' 
-            if (Invoke-Module $strModule ){
+            $strModule = 'ActiveDirectory'
+            if (-not (Invoke-Module $strModule)) {
+                # No AD module = no server resolution = EVERY reboot fails. This is a
+                # total failure, so throw (terminating) - the vRO caller routes a
+                # terminating error to its failure end-state.
+                Write-Log "Error: Unable to import PS Module $($strModule) or it is NOT installed. Cannot resolve servers - aborting." $true
+                throw "ActiveDirectory module not available on the PS host; cannot resolve group '$($ADGroupMember)'."
+            }
 
-                $ListOfComputers = Get-ListOfServers -SecurityGroup $ADGroupMember  -DomainName $DomainName
-                $ListOfServers = @()
-                write-log "Info: server count $($ListOfComputers.count)" $true
-                foreach($L in $ListOfComputers){ 
-                    $ListOfServers += ($L.name)
-                    
+            # S-7: DIRECT (non-recursive) enabled COMPUTER members only. Rebooting is
+            # destructive, so only what the operator placed directly in the group is a
+            # target - nested sub-groups are never expanded.
+            $ListOfComputers = Get-ListOfServers-Direct -SecurityGroup $ADGroupMember -DomainName $DomainName
+
+            if (($ListOfComputers | Measure-Object).Count -eq 0) {
+                Write-Log "Warn: Invoke-ServerReboot - group '$($ADGroupMember)' resolved to zero enabled, direct computer members. No action taken." $true
+                return
+            }
+
+            $ListOfServers = @()
+            foreach($L in $ListOfComputers){ $ListOfServers += ($L.name) }
+            write-log "Info: list of servers: $($ListOfServers -join ', ')" $true
+
+            $Result = Get-RebootStatus -ComputerNames $ListOfServers
+
+            # -- Build the per-server record set --------------------------------
+            # Driven from the RESOLVED server list, not from Get-RebootStatus output,
+            # so a server that returned no status at all still appears in the report
+            # rather than vanishing silently.
+            $report = @()
+            foreach($s in $ListOfServers){
+                $sUpper = $s.ToUpper()
+                $r = $Result | Where-Object { $_.ComputerName -eq $sUpper } | Select-Object -First 1
+
+                $pending = 'No status returned'
+                $preBoot = $null
+                if ($r) { $pending = [string]$r.PendingReboot; $preBoot = $r.ComputerlastBootUptime }
+
+                $rec = [PSCustomObject]@{
+                    ComputerName      = $sUpper
+                    PendingReboot     = $pending
+                    PreRebootLastBoot = $preBoot
+                    RebootIssued      = $false
+                    RebootIssuedAt    = $null
+                    BackOnline        = $false
+                    NewLastBoot       = $null
+                    DurationSec       = 0
+                    Status            = ''
+                    Detail            = ''
                 }
-                write-log "Info: list of servers: $($ListOfServers)" $true
-                $Result = Get-RebootStatus -ComputerNames $ListOfServers
-                $NumberOfRequiredReboot = 0
 
-                # checking for reboot requirements
-                foreach($r in $Result){
-                    $TotalNumberOfRequiredReboot++
-                    if(!([string]$r.PendingReboot -eq "False")){ $NumberOfRequiredReboot++ }
+                # S-8: ONLY an explicit 'True' is a reboot target.
+                # Previously the test was !(PendingReboot -eq 'False'), which is also
+                # true for 'Error Accessing Server' - so a server whose pending state
+                # could NOT be read was force-rebooted (shutdown /f) anyway. Never
+                # reboot a machine we could not first interrogate.
+                if ($pending -eq 'True') {
+                    $rec.Status = 'PendingReboot'
+                    $rec.Detail = 'Pending reboot detected; queued for reboot.'
+                } elseif ($pending -eq 'False') {
+                    $rec.Status = 'Skipped-NoRebootRequired'
+                    $rec.Detail = 'No pending reboot; not rebooted.'
+                } else {
+                    $rec.Status = 'Skipped-StatusUnknown'
+                    $rec.Detail = "Pending-reboot state could not be determined ('$pending'); server skipped and NOT rebooted."
+                    Write-Log "Error: $($sUpper) - pending-reboot state could not be determined ('$pending'); server SKIPPED and NOT rebooted." $true
                 }
 
-                Write-Log "Info: number of server required reboot - $($NumberOfRequiredReboot)" $true
-                if ( $RebootIt -eq 'simpleMode' -and $NumberOfRequiredReboot -gt 0){
+                $report += $rec
+            }
 
-                    foreach($r in $Result){
+            $rebootTargets = @($report | Where-Object { $_.Status -eq 'PendingReboot' })
+            $NumberOfRequiredReboot = $rebootTargets.Count
+            Write-Log "Info: number of server required reboot - $($NumberOfRequiredReboot)" $true
 
-                        if(!([string]$r.PendingReboot -eq "False")){ 
-                            write-log "Info: invoke script $($scriptDir)/ownership_w2k.ps1 against $($r.ComputerName)" $true
-                            Invoke-Command -ComputerName $($r.ComputerName) -FilePath "$($scriptDir)/ownership_w2k.ps1"
+            if ( $RebootIt -eq 'simpleMode' -and $NumberOfRequiredReboot -gt 0){
 
-                            Invoke-ServerReboot -ServerName $($r.ComputerName)
-                            Start-Sleep -Seconds $RebootIt_DelayBetweenServer                           
+                # -- Phase 1: issue reboots sequentially, delay between each -----
+                # Unchanged cadence from the Ansible-era behaviour.
+                foreach($t in $rebootTargets){
+
+                    # S-13: pre-reboot step is OPT-IN and defaults to OFF.
+                    # ownership_w2k.ps1 takes ownership of and loosens ACLs on
+                    # usbstor.inf (USB mass-storage driver INF) and termsrv.dll
+                    # (Terminal Services). The S-6 defect meant it never actually
+                    # ran, so enabling it now is a security-posture CHANGE, not a
+                    # restoration of working behaviour. It executes only when
+                    # -RebootIt_RunPreRebootScript is 'yes'.
+                    #
+                    # When enabled, failure is non-fatal by design (matches the
+                    # historic intent): log an Error: and still reboot the server.
+                    if ($RebootIt_RunPreRebootScript -eq 'yes') {
+                        Try {
+                            write-log "Info: invoke script $($scriptDir)/ownership_w2k.ps1 against $($t.ComputerName)" $true
+                            Invoke-Command -ComputerName $($t.ComputerName) -FilePath "$($scriptDir)/ownership_w2k.ps1" -ErrorAction Stop
+                        } Catch {
+                            Write-Log "Error: $($t.ComputerName) - pre-reboot script ownership_w2k.ps1 failed: $($_.Exception.Message)" $true
                         }
-
+                    } else {
+                        Write-Log "Info: $($t.ComputerName) - pre-reboot script step is disabled (RebootIt_RunPreRebootScript='$($RebootIt_RunPreRebootScript)'); ownership_w2k.ps1 NOT run." $true
                     }
 
+                    # S-9: Invoke-ServerReboot now returns $true/$false based on shutdown.exe's exit code.
+                    $issued = Invoke-ServerReboot -ServerName $($t.ComputerName)
+                    if ($issued -eq $true) {
+                        $t.RebootIssued   = $true
+                        $t.RebootIssuedAt = Get-Date
+                        $t.Status         = 'RebootIssued'
+                        $t.Detail         = 'Reboot command accepted; awaiting verification.'
+                    } else {
+                        $t.RebootIssued = $false
+                        $t.Status       = 'RebootFailed'
+                        $t.Detail       = 'shutdown command failed; see the Error: line in the transcript.'
+                    }
+
+                    Start-Sleep -Seconds ([int]$RebootIt_DelayBetweenServer)
                 }
 
-            }else{ 
-                Write-Log "Error: Unable to import PS Modules $($strModule) or it is NOT install" $true 
+                # -- Phase 2: S-10 single verification pass ----------------------
+                # One pass over everything actually rebooted, bounding total
+                # verification to ~one boot window instead of N x timeout.
+                Wait-ServersBackOnline -Targets $report `
+                    -TimeoutSec ([int]$RebootIt_VerifyTimeoutSec) `
+                    -PollSec ([int]$RebootIt_VerifyPollSec)
+
             }
+            elseif ($NumberOfRequiredReboot -gt 0) {
+                # Report-only run: pending reboots found, but the RebootIt safety
+                # gate was not set to 'simpleMode'.
+                Write-Log "Info: RebootIt='$($RebootIt)' (not 'simpleMode') - report-only run; $($NumberOfRequiredReboot) server(s) require a reboot but none were rebooted." $true
+                foreach($t in $rebootTargets){
+                    $t.Status = 'Skipped-ReportOnly'
+                    $t.Detail = "Pending reboot detected but RebootIt was '$($RebootIt)', not 'simpleMode'."
+                }
+            }
+            else {
+                Write-Log "Info: no servers require a reboot." $true
+            }
+
+            # -- S-11: report + optional mail (this action previously did neither) --
+            $rebootedOk = @($report | Where-Object { $_.Status -eq 'Rebooted' }).Count
+            $Global:MailSubject = "$($MailSubjectstring) - $($rebootedOk) of $($NumberOfRequiredReboot) pending server(s) rebooted and verified"
+            GenerateReportServerReboot $report
 
         }
         'get_datastores_75_100_used'{
