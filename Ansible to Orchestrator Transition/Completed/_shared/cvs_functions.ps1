@@ -51,6 +51,8 @@ param (
     [string]$OlderThanDays
 )
 
+#
+
 [string[]]$MailTo = $MailToString.split(',')
 [string[]]$MailCc = $MailCcString.split(',')
 
