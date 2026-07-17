@@ -46,16 +46,27 @@ Completed copy, and the Completed copy is migrated to the customer environment.
 **Exempt from the two-copy rule:** `Ansible Playbooks and Files - Sanitized/psscript/files/`
 (`cvs_functions.ps1`, `cvs_functions-v2.ps1`, `cvs_report_script.ps1`) — this is the
 **as-received source archive** (pre-S-1 originals), retained for reference. It is not
-a working copy and must not be edited. There is no version control in this
-repository, so it is the only surviving record of the original state.
+a working copy and must not be edited.
 
 **Files in scope:** `cvs_functions.ps1`, `ownership_w2k.ps1`.
+
+**Version control:** `AutomationProjects` is a git repository
+(`https://github.com/forgusonjeremy/AutomationProjects`), so every path below is
+tracked and prior states are recoverable — including across the folder
+reorganisations, which git records as renames. Note that commits are made
+periodically rather than per-change, so the recovery granularity is the last commit,
+not the last edit (see §6).
 
 > **Current deviation (2026-07-17):** the Completed copy carries S-6…S-12 for the
 > in-flight Server Reboots project, because those edits were applied before this
 > policy was set. It therefore does **not** currently represent the shipped state.
-> This self-corrects at promotion, when the In-Progress copy overwrites it. The
-> pre-S-6 baseline (58,155 bytes, SHA256 `01B7DCAD…FB37`) is not retained on disk.
+> This self-corrects at promotion, when the In-Progress copy overwrites it.
+>
+> The true pre-S-6 baseline (58,155 bytes, SHA256 `01B7DCAD…FB37`) **is recoverable**
+> from commit `56f7cf8` and has been verified byte-identical:
+> ```
+> git show 56f7cf8:"Ansible to Orchestrator Transition/Completed/_Shared References/psscript/files/cvs_functions.ps1"
+> ```
 
 ---
 
@@ -147,6 +158,7 @@ today exactly**.
 | **P-10** | 2026-07-17 | Server Reboots | Iteration & timing | **Unchanged** — script keeps AD resolution, iteration, delay and verification. Orchestrator passes inputs and classifies the transcript. Consistent with P-6 |
 | **P-11** | 2026-07-17 | Server Reboots | Targeting | Resolution now direct + computer-only + enabled (S-7); operator input named `groupDN` to steer toward the DN form |
 | **P-12** | 2026-07-17 | Server Reboots | Reporting | No report/mail → per-server HTML report emailed to a recipient **array** (S-11); outcome also surfaced via workflow end state |
+| **P-13** | 2026-07-17 | Server Reboots | Report header label | `HeaderNotesSubstr` dropped as an input — it is only a report-header label, so it is **derived from `groupDN`** in the build action. No script change | 
 
 **Programme net result so far:** 7 log playbooks → 2 workflows; 1 reboot playbook →
 1 workflow; snapshot cleanup delivered as a vCenter-native package.
@@ -159,7 +171,7 @@ today exactly**.
 |---|---|---|
 | **S-12 is a shared-code change** | Move Event Logs (delivered) + Server Reboots | `Invoke-Module` is called by `move-archived-logs-ByCN` and others. All callers are improved, but the **delivered Event Log package should be re-tested** before the updated script is migrated. |
 | **`ownership_w2k.ps1` security review** | Server Reboots | Open — see §3. Default is OFF, so no action is forced. |
-| **No version control** | Whole repository | There is no git history here. The pre-S-6 baseline was lost during a folder reorganisation and had to be reconstructed. **Recommend initialising a repository** for the transition tree. |
+| **Commit granularity** | Whole repository | `AutomationProjects` **is** git-tracked (`forgusonjeremy/AutomationProjects`), and prior states — including the pre-S-6 baseline and the deleted `Completed/_shared/` folder — are recoverable; git follows the folder reorganisations as renames. However, commits are made **periodically rather than per-change**, so recovery granularity is the last commit, not the last edit. During shared-script surgery a whole editing session can sit between checkpoints. **Recommendation: commit immediately before and after a batch of `cvs_functions.ps1` changes**, so each `S-` change has a restore point. (Note: `E:\GitHub-LocalRepos` is *not* itself a repo — it is a container holding several independent repos, of which `AutomationProjects` is one.) |
 | **WinRM operation timeout** | Server Reboots | The reboot run is one synchronous invocation lasting `(N × delay) + up to VerifyTimeoutSec`. The PS host's WinRM `MaxTimeoutms` / plug-in timeout must exceed the worst case. |
 | **Second hop (delegation)** | Move Event Logs, Server Reboots | PS host → AD and PS host → each target. Requires Kerberos constrained delegation. See *How to Build a PowerShell Host* §6. |
 | **Old `!(PendingReboot -eq 'False')` test retained** | `Get-ServerRebootReportStatus-ByCN`, `Get-ServerPendingRebootStatus` | Intentional. In those **report-only** actions the test only increments a counter for the mail subject and never triggers a reboot. Only the reboot path was corrected (S-8). |
@@ -171,3 +183,4 @@ today exactly**.
 | Date | Author | Summary |
 |---|---|---|
 | 2026-07-17 | Automation transition | Master register created. Consolidated the shared-script history (S-1…S-13), tooling changes (T-1…T-3) and process changes (P-1…P-12) across Snapshot Cleanup, Move Windows Event Logs and Server Reboots. Recorded the two-copy script policy and promotion workflow, the sanitized-archive exemption, the five pre-existing defects found in the customer's current automation (S-1, S-6, S-8, S-9, S-12), and the `ownership_w2k.ps1` security decision (S-13). |
+| 2026-07-17 | Automation transition | **Corrected the version-control entry.** An earlier revision wrongly stated the tree had no git history — the check had been run against `E:\GitHub-LocalRepos`, which is a *container* of repos, not a repo. `AutomationProjects` is git-tracked and prior states are recoverable; the pre-S-6 baseline was retrieved from commit `56f7cf8` and verified byte-identical (58,155 bytes, SHA256 `01B7DCAD…FB37`). Risk restated as **commit granularity** (commits are periodic, not per-change) with a checkpoint recommendation for shared-script edits. |

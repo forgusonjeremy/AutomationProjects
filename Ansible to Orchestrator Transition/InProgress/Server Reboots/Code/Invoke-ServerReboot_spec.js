@@ -59,8 +59,9 @@
  *          mailTo                 ← workflow input: mailTo
  *          mailCc                 ← workflow input: mailCc
  *          mailSubject            ← workflow input: mailSubject
- *          headerNote             ← workflow input: headerNote
  *     OUT: invocationString → workflow attribute: invocationString
+ *          (the script's -HeaderNotesSubstr is DERIVED from groupDN inside the
+ *           action — it is a report-header label only — so it is NOT an input)
  *     │
  *     ├─[Exception]──────────────────────────────────► [End - Failed: Bad Inputs]
  *     │
@@ -110,7 +111,9 @@
  *   mailTo                  Array/string                 (set to real recipients)                 Optional
  *   mailCc                  Array/string                 (set to real recipients)                 Optional
  *   mailSubject             string                       VCF Orchestrator: Server Reboot status   Optional
- *   headerNote              string                       Security-Reboot-Servers                  Optional
+ *
+ *   (removed) headerNote — the report-header group label is now derived from
+ *   groupDN inside buildServerRebootInvocation, so there is no separate input.
  *
  *   ── rebootMode is the SAFETY GATE. It maps to the script's -RebootIt parameter:
  *      'simpleMode' = actually reboot.  ANY other value (default 'no') = report

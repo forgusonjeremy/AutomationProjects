@@ -103,11 +103,12 @@ a false success by sampling too early.
 | P-10 | 2026-07-17 | Server iteration & timing | Script iterates internally; Ansible only launches it | **Unchanged** — the script still owns AD resolution, iteration, the inter-server delay and verification. Orchestrator passes inputs and classifies the transcript; it owns no loop | Customer decision: keep all looping/timing in `cvs_functions.ps1`. Consistent with P-6 |
 | P-11 | 2026-07-17 | Targeting | `-ADGroupMember` name, unfiltered non-recursive membership | Same parameter, but resolution is now direct + computer-only + enabled (S-7). Operator input named `groupDN` to steer toward the unambiguous DN form | Rebooting is destructive; targets must be explicit. Consistent with the Move package's `groupDN` naming |
 | P-12 | 2026-07-17 | Reporting | No report, no mail (`var_eMailReport: 'no'`) | HTML per-server report emailed to a recipient **array** (S-11); run outcome also surfaced through the workflow end state | Closes the two Phase-2 items the Move project deferred ("per-server status reporting", "email reporting on workflow completion") |
+| P-13 | 2026-07-17 | Report header label | `var_HeaderNotesSubstr` supplied as its own variable | **Dropped as an input.** The script's `-HeaderNotesSubstr` is only a display label ("the security group called X") in the report header, so `buildServerRebootInvocation` now **derives** it from `groupDN` (leftmost CN of a DN, or the identifier as-is). No script change — the parameter is still passed, just computed | Removes a redundant input and makes it impossible for the header to name a different group than the one actually targeted |
 
 **Net result:** 1 playbook → **1 workflow** (`Invoke-ServerReboot`); 1 new build
 action; `parseScriptOutput` / `handlePSFailure` reused from the Event Log package.
 The invoked script action (`Invoke-ServerReboot`) already existed; changes are
-limited to S-6…S-11.
+limited to S-6…S-13.
 
 ---
 
@@ -125,7 +126,7 @@ limited to S-6…S-11.
 | `var_SMTPServer` | `smtpServer` input |
 | `var_MailToString` / `var_MailCcString` | `mailTo` / `mailCc` inputs (**arrays**, joined to CSV) |
 | `var_MailSubjectstring` | `mailSubject` input |
-| `var_HeaderNotesSubstr` | `headerNote` input |
+| `var_HeaderNotesSubstr` | *(no input — derived from `groupDN` in the build action; see P-13)* |
 | `var_OUPath` | *(dropped — not used by this action)* |
 | `var_ps_folder` / `var_ps_script_file` / `var_parameter_action` / `var_cleanup_temporary_folder` | *(dropped — script is pre-staged, not copied per run)* |
 

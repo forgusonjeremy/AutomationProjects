@@ -1,6 +1,6 @@
 /**
  * Action: buildServerRebootInvocation
- * Module:  broadcom.pso.vc.vm.guestOps.windows.servers.reboot
+ * Module:  broadcom.pso.vc.vm.guestOps.windows.reboot
  *
  * Purpose:
  *   Builds the PowerShell invocation string for the Invoke-ServerReboot action in
@@ -47,7 +47,13 @@
  *   mailTo                 (Array/string) - Recipients, joined with ','              → -MailToString
  *   mailCc                 (Array/string) - CC recipients, joined with ','           → -MailCcString
  *   mailSubject            (string)       - Subject stem                             → -MailSubjectstring
- *   headerNote             (string)       - Note rendered in the report header       → -HeaderNotesSubstr
+ *
+ * Note: -HeaderNotesSubstr (the group name shown in the report header) is NOT a
+ * separate input. The script only ever uses it as a display label for "which group
+ * this report is about", so it is DERIVED from groupDN here (the leftmost CN of a
+ * DN, or the identifier as-is if it is already a plain name). This removes a
+ * redundant input and guarantees the header can never name a different group than
+ * the one actually targeted.
  *
  * Return type: string
  */
@@ -178,6 +184,25 @@ function psQuote(value) {
     return "'" + String(value === null || value === undefined ? "" : value).replace(/'/g, "''") + "'";
 }
 
+// Derive the report-header group name from the group identifier. The script's
+// -HeaderNotesSubstr is purely a display label ("the security group called X"), so
+// there is no reason to ask for it separately.
+//   - DN form  (CN=Security-Reboot-Servers,OU=Groups,DC=corp,DC=local) -> leftmost
+//     CN value, with DN escaping (\,) unescaped.
+//   - Plain form (CN / sAMAccountName / GUID / SID) -> used as-is.
+function deriveGroupName(identifier) {
+    var id = String(identifier === null || identifier === undefined ? "" : identifier).trim();
+    if (id === "") { return ""; }
+    // First RDN of a DN: CN=<value> up to the first UNescaped comma.
+    var m = id.match(/CN=((?:[^,\\]|\\.)*)/i);
+    if (m && m[1]) {
+        return m[1].replace(/\\(.)/g, "$1"); // turn \, \+ etc. back into literals
+    }
+    return id;
+}
+
+var headerNote = deriveGroupName(groupDN);
+
 // Stream capture ( *>&1 | Out-String -Width 4096 ):
 //   cvs_functions.ps1 emits everything through Write-Log -> Write-Host and
 //   Write-Warning. The vRO PowerShell plugin only returns the SUCCESS (pipeline)
@@ -203,7 +228,7 @@ var invocationString =
     " -MailToString " + psQuote(toList) +
     " -MailCcString " + psQuote(ccList) +
     " -MailSubjectstring " + psQuote(mailSubject ? mailSubject.trim() : "") +
-    " -HeaderNotesSubstr " + psQuote(headerNote ? headerNote.trim() : "") +
+    " -HeaderNotesSubstr " + psQuote(headerNote) +   // derived from groupDN, not an input
     " *>&1 | Out-String -Width 4096";
 
 System.log(
@@ -216,7 +241,8 @@ System.log(
     " | verifyPollSec=" + pollSec +
     " | runPreRebootScript=" + runPreScript +
     " | emailReport=" + wantsEmail +
-    " | mailTo=" + toList
+    " | mailTo=" + toList +
+    " | headerNote(derived)=" + headerNote
 );
 System.log("buildServerRebootInvocation | invocationString=" + invocationString);
 
