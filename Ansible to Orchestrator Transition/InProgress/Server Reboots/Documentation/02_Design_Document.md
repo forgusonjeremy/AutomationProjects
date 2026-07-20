@@ -60,7 +60,7 @@ the same requirement as the Move Windows Event Logs package.
 
 ---
 
-## 3. Workflow schema (as built)
+## 3. Workflow schema
 
 Elements and flow, from the exported definition:
 
@@ -197,9 +197,9 @@ the WinRM operation timeout.
 
 ## 7. Reporting and end states
 
-- The script builds an **HTML per-server report** (computer, pending state,
+- The script builds an **HTML reboot report** which shows each computer, pending state,
   pre-reboot boot time, whether a reboot was issued, whether it came back, return
-  time, status, detail) and emails it when `emailReport = true`. The report is built
+  time, status, detail and emails it when `emailReport = true`. The report is built
   regardless; email is the delivery option.
 - Orchestrator classifies the run via `parseScriptOutput`, which scans the transcript
   for `Error:` lines:
