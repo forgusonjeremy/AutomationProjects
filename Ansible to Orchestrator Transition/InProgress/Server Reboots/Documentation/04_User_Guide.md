@@ -1,11 +1,5 @@
 # User Guide — Server Reboot Automation
 
-**Project:** Ansible → VCF Orchestrator transition — "Server Reboots"
-**Workflow:** `Reboot Servers in AD Group` (`Invoke-ServerReboot`)
-**Audience:** Operators who run or schedule the workflow and read its reports.
-
----
-
 ## 1. What this workflow does
 
 It reboots the Windows servers in a chosen Active Directory security group **that are
