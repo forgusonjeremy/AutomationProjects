@@ -10,7 +10,7 @@ transition — what changed, and **why**.
 > Changes S-1 … S-5 were made by the **Move Windows Event Logs** project and are
 > recorded in that project's register
 > (`Completed/Move Windows Event Logs/_Shared/Documentation/Change-Register.md`).
-> This deliverable adds **S-6 … S-13** and process changes **P-9 … P-12**.
+> This deliverable adds **S-6 … S-13** and process changes **P-9 … P-13**.
 >
 > **Script under change (working copy):** `InProgress/psscript/files/cvs_functions.ps1`
 > **Promoted to (on completion):** `Completed/_Shared References/psscript/files/cvs_functions.ps1`
@@ -156,3 +156,4 @@ limited to S-6…S-13.
 | 2026-07-17 | Automation transition | **Canonical script location corrected.** S-6…S-12 were first applied to `Completed/_shared/cvs_functions.ps1`, which was removed during a repository reorganisation; the changes were reapplied and re-verified (parses clean, all changes present, reboot decision confirmed as `$pending -eq 'True'`). |
 | 2026-07-17 | Automation transition | **Two-copy policy adopted.** Working edits are made in `InProgress/psscript/files/`; `Completed/_Shared References/psscript/files/` receives the promoted copy when a project completes and is what migrates to the customer environment. The `Ansible Playbooks and Files - Sanitized/psscript/files/` originals are retained as an as-received source archive (exempt). Server Reboots' working copy is the In-Progress one. |
 | 2026-07-17 | Automation transition | Added script change S-13 after reviewing the supplied `ownership_w2k.ps1`: the pre-reboot step is now **opt-in, default OFF**. The script `takeown`s and loosens ACLs on `usbstor.inf` and `termsrv.dll`; since S-6 shows the step has never executed, fixing S-6 alone would have silently introduced a security-posture change on the `Security-Reboot-Servers` group. Default behaviour therefore remains identical to today. Security review recommended before enabling. |
+| 2026-07-20 | Automation transition | Added process change P-13: the report-header label (`-HeaderNotesSubstr`) is no longer an input — `buildServerRebootInvocation` derives it from `groupDN` (a vRO-layer change; no script change). Corrected the header note "P-9 … P-12" → "P-9 … P-13". This register is reproduced as Appendix A of the Design Document (the standalone file remains authoritative). |
