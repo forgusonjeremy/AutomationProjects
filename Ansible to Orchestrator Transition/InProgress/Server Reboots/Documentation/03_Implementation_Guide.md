@@ -1,9 +1,5 @@
 # Implementation Guide — Server Reboot Automation
 
-**Project:** Ansible → VCF Orchestrator transition — "Server Reboots"
-**Platform:** VCF Automation 9 / VCF Operations Orchestrator 9
-**Workflow:** `Reboot Servers in AD Group` (`Invoke-ServerReboot`)
-
 This guide covers importing the Orchestrator package, re-pointing the
 environment-specific values (PS host, domain, script path, mail), and configuring the
 custom form and schedule. Steps assume VCF Operations Orchestrator 9 (Orchestrator
@@ -117,7 +113,7 @@ Leave these at their defaults unless you have a reason to change them:
   form (optional).
 
 The FROM address is derived by the script itself
-(`<PSHOST>_Do_Not_Reply@corp.local`); if that domain is wrong for your environment,
+(`<PSHOST>_Do_Not_Reply@<domain>`); if that domain is wrong for your environment,
 adjust `$Global:MailFrom` in `cvs_functions.ps1` (`InitializeVariables`).
 
 ---
@@ -137,26 +133,7 @@ The workflow is designed to run on a schedule that **always attempts reboots**.
 
 ---
 
-## 6. Optional workflow hardening
-
-The two issues flagged in earlier drafts are **resolved in the current build**:
-
-- The `parseScriptOutput` module-name typo is corrected — both references now use
-  `com.broadcom.pso.vcf.vm.guestOps.files.windows.logs`.
-- Terminating-error handling is wired — the *Invoke a PowerShell script* element
-  catches a hard failure into `err_0` and re-throws it (item9 → item10 *End
-  workflow*), so a PS-host outage or an AD-module `throw` ends the run **Failed**
-  instead of faulting uncontrolled.
-
-One optional refinement remains (see Design Document §9): the build action
-(`buildServerRebootInvocation`, item1) has no exception path, so a validation `throw`
-(missing required input, or `verifyPollSec` > `verifyTimeoutSec`) still faults the
-workflow. If you want a clean *Bad Inputs* end state, add an exception out-binding on
-item1 to a dedicated end element. This is a nicety, not a blocker.
-
----
-
-## 7. Validate the deployment
+## 6. Validate the deployment
 
 Run these in order (details and the lab tool are in the Validation section / User
 Guide):
@@ -178,7 +155,7 @@ Guide):
 
 ---
 
-## 8. Rollback
+## 7. Rollback
 
 - The workflow performs no persistent change in Orchestrator; disabling/deleting the
   schedule stops all automated reboots immediately.
