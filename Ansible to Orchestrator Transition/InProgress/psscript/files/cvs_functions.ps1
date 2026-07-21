@@ -7,9 +7,9 @@ param (
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$SMTPServer,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$MailToString = 'admin@corp.local',
+    [string]$MailToString = 'admin@vcf.lab',
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$MailCcString = 'admin@corp.local',
+    [string]$MailCcString = 'admin@vcf.lab',
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$MailSubjectstring,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
@@ -490,7 +490,7 @@ Function InitializeVariables { # Initialize Variables
             #[string[]]$MailCc = $MailCcString.split(',')
             $Global:DebugDir = "$($PSScriptRoot)\Debug"
             $Global:Today = Get-Date
-            $Global:MailFrom = $env:COMPUTERNAME + '_Do_Not_Reply@corp.local'
+            $Global:MailFrom = $env:COMPUTERNAME + '_Do_Not_Reply@vcf.lab'
             $Global:MailSubject = ""
             $Global:PKIEnabledCount = 0
             $Global:PKIDisabledCount = 0

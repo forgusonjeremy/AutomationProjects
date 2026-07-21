@@ -80,10 +80,33 @@ if (!domainName || domainName.trim() === "") {
     throw new Error("buildServerRebootReportInvocation: domainName is required and must not be empty.");
 }
 
+// Recipient inputs may arrive as an Array (input typed Array/string) OR as a
+// single/CSV string (input typed string) depending on how the workflow was built.
+// A string has no .join(), so normalize either form to a clean comma-separated
+// string: split on commas, trim each address, drop blanks, rejoin. The script
+// splits -MailToString / -MailCcString back on ','.
+function toCsv(value) {
+    if (value === null || value === undefined) { return ""; }
+    var parts;
+    if (typeof value === "string") {
+        parts = value.split(",");
+    } else if (typeof value.join === "function") {   // array-like (has join)
+        parts = value;
+    } else {
+        parts = [String(value)];
+    }
+    var clean = [];
+    for (var i = 0; i < parts.length; i++) {
+        var p = String(parts[i]).trim();
+        if (p !== "") { clean.push(p); }
+    }
+    return clean.join(",");
+}
+
 // Email is opt-in; when on, we must have somewhere to send it.
 var wantsEmail = (emailReport === true);
-var toList = (mailTo && mailTo.length) ? mailTo.join(",") : "";
-var ccList = (mailCc && mailCc.length) ? mailCc.join(",") : "";
+var toList = toCsv(mailTo);
+var ccList = toCsv(mailCc);
 
 if (wantsEmail) {
     if (!smtpServer || smtpServer.trim() === "") {
@@ -92,6 +115,27 @@ if (wantsEmail) {
     if (toList === "") {
         throw new Error("buildServerRebootReportInvocation: mailTo must contain at least one recipient when emailReport is true.");
     }
+    // Guard against the vRO "scalar string bound to an Array/string input" artifact,
+    // which explodes one address into single characters (mailTo becomes
+    // ['j','f','o',...] → -MailToString 'j,f,o,...'). Every real SMTP recipient
+    // contains '@', so a token without one means the recipient list was char-split
+    // or mistyped — fail loudly here rather than emailing garbage. Applies to To
+    // (and Cc when present); fix by binding recipients as an Array of addresses
+    // (one element each) or as a plain/CSV string, not a string fed to an Array.
+    function assertAddresses(csv, inputName) {
+        var tokens = csv.split(",");
+        for (var i = 0; i < tokens.length; i++) {
+            if (tokens[i].indexOf("@") === -1) {
+                throw new Error("buildServerRebootReportInvocation: " + inputName +
+                    " contains an entry with no '@' ('" + tokens[i] + "'). This usually means a single " +
+                    "address string was bound to an Array/string input and vRO split it into characters. " +
+                    "Bind " + inputName + " as an Array of addresses (one element per recipient), or as a " +
+                    "plain/CSV string — not a string fed to an Array parameter.");
+            }
+        }
+    }
+    assertAddresses(toList, "mailTo");
+    if (ccList !== "") { assertAddresses(ccList, "mailCc"); }
 }
 
 // DN nudge: warn (do not fail) when the identifier does not look like a DN, so

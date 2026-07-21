@@ -54,6 +54,12 @@
  * [Start]
  *     │
  *     ▼
+ * [Scriptable Task: logRunMarker]
+ *     Calls System.setLogMarker("Workflow:<name>-WorkflowRunId:<run id>"). vRO then
+ *     tags every subsequent log line in this run with the marker automatically —
+ *     no attribute to carry and no per-line prefixing needed.
+ *     │
+ *     ▼
  * [Action: buildServerRebootReportInvocation]
  *     Module: broadcom.pso.vc.vm.guestOps.windows.servers.reboot
  *     IN:  scriptPath   ← workflow input: scriptPath
@@ -184,14 +190,31 @@
  *   per-server condition that drives "Completed with Errors".
  *
  * ───────────────────────────────────────────────────────────────────────────
- * END-STATE SCRIPTABLE TASKS
+ * SCRIPTABLE TASKS
  * ───────────────────────────────────────────────────────────────────────────
  */
+
+// ── Scriptable task: logRunMarker ────────────────────────────────────────────
+// Place as the FIRST schema element (before buildServerRebootReportInvocation).
+// Inputs:  (none)
+// Outputs: (none)
+//
+// Sets the vRO log marker for this run. Once set, vRO automatically prepends the
+// marker to every subsequent log line in this workflow token, so a whole run's
+// lines are greppable — there is no attribute to carry and no need to prefix each
+// System.log call by hand. workflow.name is the workflow name;
+// workflow.currentWorkflowToken.id is the unique id of THIS execution (the value
+// shown in the run-history URL). NOTE: workflow.id is the workflow DEFINITION id,
+// not the run — use currentWorkflowToken.id for the run.
+
+System.setLogMarker("Workflow:" + workflow.name + "-WorkflowRunId:" + workflow.currentWorkflowToken.id);
+
 
 // ── End state: Completed Successfully ────────────────────────────────────────
 // Place before [End - Completed Successfully]
 // Inputs: parsedResult, groupDN, domainName
 // Outputs: executionSuccess, executionOutput
+// (The run's log marker set by logRunMarker is applied to these lines by vRO.)
 
 executionSuccess = true;
 executionOutput  = parsedResult.get("outputText");
@@ -207,6 +230,7 @@ System.log(
 // Place before [End - Completed with Errors]
 // Inputs: parsedResult, groupDN, domainName
 // Outputs: executionSuccess, executionOutput
+// (The run's log marker set by logRunMarker is applied to these lines by vRO.)
 //
 // NOTE: This is the "completed with errors" end state, NOT a hard failure.
 // The only per-server problem a report run can hit is a server whose pending

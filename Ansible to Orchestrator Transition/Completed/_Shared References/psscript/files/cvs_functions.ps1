@@ -7,9 +7,9 @@ param (
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$SMTPServer,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$MailToString = 'admin@corp.local',
+    [string]$MailToString = 'admin@vcf.lab',
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$MailCcString = 'admin@corp.local',
+    [string]$MailCcString = 'admin@vcf.lab',
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$MailSubjectstring,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
@@ -32,6 +32,19 @@ param (
     [string]$RebootIt_VerifyTimeoutSec = "600",
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$RebootIt_VerifyPollSec = "15",
+    # S-13: opt-in gate for the pre-reboot script (ownership_w2k.ps1).
+    # DEFAULT IS 'no' - the step does NOT run unless explicitly enabled.
+    # Rationale: because of the S-6 defect this step has never actually executed
+    # (the script path resolved to "/ownership_w2k.ps1" and Invoke-Command failed
+    # non-terminating). Fixing S-6 would silently START applying it. The script
+    # takes ownership of and loosens ACLs on c:\windows\inf\usbstor.inf (USB mass
+    # storage driver INF - a common hardening DENY target) and
+    # c:\windows\system32\termsrv.dll (Terminal Services). Re-enabling that on
+    # every rebooted member of a security group is a security-posture change and
+    # must be a deliberate, reviewed decision - not a side effect of a bug fix.
+    # Set to 'yes' only after security review.
+    [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
+    [string]$RebootIt_RunPreRebootScript = "no",
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$FileShareTarget,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
@@ -477,7 +490,7 @@ Function InitializeVariables { # Initialize Variables
             #[string[]]$MailCc = $MailCcString.split(',')
             $Global:DebugDir = "$($PSScriptRoot)\Debug"
             $Global:Today = Get-Date
-            $Global:MailFrom = $env:COMPUTERNAME + '_Do_Not_Reply@corp.local'
+            $Global:MailFrom = $env:COMPUTERNAME + '_Do_Not_Reply@vcf.lab'
             $Global:MailSubject = ""
             $Global:PKIEnabledCount = 0
             $Global:PKIDisabledCount = 0
@@ -1349,13 +1362,25 @@ function Main($Action){
                 # Unchanged cadence from the Ansible-era behaviour.
                 foreach($t in $rebootTargets){
 
-                    # Pre-reboot step. Non-fatal by design (matches previous behaviour):
-                    # log the failure and still reboot. See Change-Register open items.
-                    Try {
-                        write-log "Info: invoke script $($scriptDir)/ownership_w2k.ps1 against $($t.ComputerName)" $true
-                        Invoke-Command -ComputerName $($t.ComputerName) -FilePath "$($scriptDir)/ownership_w2k.ps1" -ErrorAction Stop
-                    } Catch {
-                        Write-Log "Error: $($t.ComputerName) - pre-reboot script ownership_w2k.ps1 failed: $($_.Exception.Message)" $true
+                    # S-13: pre-reboot step is OPT-IN and defaults to OFF.
+                    # ownership_w2k.ps1 takes ownership of and loosens ACLs on
+                    # usbstor.inf (USB mass-storage driver INF) and termsrv.dll
+                    # (Terminal Services). The S-6 defect meant it never actually
+                    # ran, so enabling it now is a security-posture CHANGE, not a
+                    # restoration of working behaviour. It executes only when
+                    # -RebootIt_RunPreRebootScript is 'yes'.
+                    #
+                    # When enabled, failure is non-fatal by design (matches the
+                    # historic intent): log an Error: and still reboot the server.
+                    if ($RebootIt_RunPreRebootScript -eq 'yes') {
+                        Try {
+                            write-log "Info: invoke script $($scriptDir)/ownership_w2k.ps1 against $($t.ComputerName)" $true
+                            Invoke-Command -ComputerName $($t.ComputerName) -FilePath "$($scriptDir)/ownership_w2k.ps1" -ErrorAction Stop
+                        } Catch {
+                            Write-Log "Error: $($t.ComputerName) - pre-reboot script ownership_w2k.ps1 failed: $($_.Exception.Message)" $true
+                        }
+                    } else {
+                        Write-Log "Info: $($t.ComputerName) - pre-reboot script step is disabled (RebootIt_RunPreRebootScript='$($RebootIt_RunPreRebootScript)'); ownership_w2k.ps1 NOT run." $true
                     }
 
                     # S-9: Invoke-ServerReboot now returns $true/$false based on shutdown.exe's exit code.
