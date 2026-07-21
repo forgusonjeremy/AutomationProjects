@@ -971,13 +971,27 @@ function SendMail {
 	    Try
 	    {
 
-            Write-Log "Info: smtpserver:$SMTPServer `nFrom:$MailFrom `nTo:$MailTo `nSubject:$MailSubject `nBody:$MailBody"
-            if([string]::IsNullOrEmpty($MailAttachments)){
-                Send-MailMessage -smtpserver $SMTPServer -from $MailFrom -to $MailTo -cc $MailCc -subject $MailSubject -body $MailBody -bodyashtml
+            # CC is OPTIONAL. $MailCc is derived from $MailCcString.split(','), which
+            # yields @('') for an empty/blank string; passing that to
+            # Send-MailMessage -Cc throws "argument is null or empty". Filter out
+            # blank/whitespace entries and only include -Cc when a real recipient
+            # remains, so a report can be sent with no CC at all. Attachments stay
+            # optional the same way. All other behaviour is unchanged.
+            $ccList = @($MailCc | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
+
+            $mailParams = @{
+                SmtpServer = $SMTPServer
+                From       = $MailFrom
+                To         = $MailTo
+                Subject    = $MailSubject
+                Body       = $MailBody
+                BodyAsHtml = $true
             }
-            else{
-                Send-MailMessage -smtpserver $SMTPServer -from $MailFrom -to $MailTo -cc $MailCc -subject $MailSubject -body $MailBody -bodyashtml -Attachments $MailAttachments
-            }  
+            if($ccList.Count -gt 0){ $mailParams['Cc'] = $ccList }
+            if(-not [string]::IsNullOrEmpty($MailAttachments)){ $mailParams['Attachments'] = $MailAttachments }
+
+            Write-Log "Info: smtpserver:$SMTPServer `nFrom:$MailFrom `nTo:$MailTo `nCc:$($ccList -join ',') `nSubject:$MailSubject `nBody:$MailBody"
+            Send-MailMessage @mailParams
 	    }
 	    Catch
 	    {
