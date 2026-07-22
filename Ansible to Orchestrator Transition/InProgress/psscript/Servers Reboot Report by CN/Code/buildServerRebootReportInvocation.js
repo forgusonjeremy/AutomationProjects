@@ -1,6 +1,9 @@
 /**
  * Action: buildServerRebootReportInvocation
- * Module:  broadcom.pso.vc.vm.guestOps.windows.servers.reboot
+ * Module:  com.broadcom.pso.vcf.vm.guestOps.windows.reboot
+ *
+ * vRO input-parameter order (positional call from the workflow):
+ *   (scriptPath, groupDN, domainName, emailReport, smtpServer, mailTo, mailCc, mailSubject)
  *
  * Purpose:
  *   Builds the PowerShell invocation string for the read-only pending-reboot
@@ -16,7 +19,7 @@
  *   post-reboot verification. If you need to actually reboot, use the
  *   Invoke-ServerReboot workflow instead.
  *
- *   What the script does with these values (see Change-Register R-2…R-4):
+ *   What the script does with these values (resolver: Change-Register R-1):
  *     - Resolves the group with Get-ListOfServers-ByCN -SG_CN, which is
  *       RECURSIVE and returns only ENABLED COMPUTER objects, with per-object
  *       isolation (one unresolvable member is skipped and logged, not fatal).

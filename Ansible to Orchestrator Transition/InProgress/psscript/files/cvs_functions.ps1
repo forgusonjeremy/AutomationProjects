@@ -1004,10 +1004,15 @@ function SendMail {
             if(-not [string]::IsNullOrEmpty($MailAttachments)){ $mailParams['Attachments'] = $MailAttachments }
 
             Write-Log "Info: smtpserver:$SMTPServer `nFrom:$MailFrom `nTo:$MailTo `nCc:$($ccList -join ',') `nSubject:$MailSubject `nBody:$MailBody"
+            # $Global:MailSent lets a caller confirm the send actually succeeded (e.g.
+            # to clean up a generated report file only AFTER it has been emailed).
+            $Global:MailSent = $false
             Send-MailMessage @mailParams
+            $Global:MailSent = $true
 	    }
 	    Catch
 	    {
+            $Global:MailSent = $false
             $ErrorMessage = $_.Exception.Message
             $FailedItem = $_.Exception.ItemName
             Write-Log "Error: $($ErrorMessage)" $true
@@ -1044,8 +1049,32 @@ function GenerateReportServerPendingRebootStatus($data){
     $body = $body -replace 'False','<font color="green">No Action required</font>'
     $body = $body -replace 'YES','<font color="red">YES</font>'
     $body = $HeaderNote + $body
-    $body | out-File -append -FilePath "$($Global:DebugDir)\ServerPendingRebootStatus_result.html"
-    if($eMailReport -eq 'yes'){ SendMail -MailBody $body }
+    $reportFile = "$($Global:DebugDir)\ServerPendingRebootStatus_result.html"
+    # Overwrite (NOT append): bounds this file to a single run's size so it cannot
+    # accumulate and fill the PS host drive, even on report-only runs or if the
+    # post-email cleanup below does not run.
+    $body | out-File -FilePath $reportFile
+    if($eMailReport -eq 'yes'){
+        SendMail -MailBody $body
+        # Clean up the generated HTML report from the PS host once the email has
+        # ACTUALLY been sent (SendMail sets $Global:MailSent). If the send failed the
+        # file is kept so the report is not lost. Removes both the appended result
+        # file and the per-run Report.html written above.
+        if($Global:MailSent -eq $true){
+            foreach($rpt in @($reportFile, 'Report.html')){
+                if(Test-Path -LiteralPath $rpt){
+                    Try {
+                        Remove-Item -LiteralPath $rpt -Force -ErrorAction Stop
+                        Write-Log "Info: removed generated report file '$rpt' after email sent." $true
+                    } Catch {
+                        Write-Log "Warn: could not remove report file '$rpt': $($_.Exception.Message)" $true
+                    }
+                }
+            }
+        } else {
+            Write-Log "Warn: email not confirmed sent; keeping generated report file '$reportFile'." $true
+        }
+    }
 }
 
 function GenerateReportServerReboot($data){

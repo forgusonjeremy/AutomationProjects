@@ -1,252 +1,184 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * Workflow: Get-ServerRebootReport
- * Folder:   Production >> Servers >> Windows >> Server Reboot Management
- *           (lab/dev: Workflows >> Customer >> <Customer Name> >> Production >> Servers >> Windows >> Server Reboot Management)
- *           NOTE: the build action lives in the module namespace declared in its
- *           action .js file (broadcom.pso.vc.vm.guestOps.windows.servers.reboot) -
- *           only the WORKFLOW folder uses the path above.
+ * Workflow: Get Server Reboot Report
+ *   Workflow ID : 9fe2e6c5-0186-45a8-94c2-575c926836e9
+ *   Folder      : Production >> Servers >> Windows >> Server Reboot Management
+ *                 (lab/dev: Workflows >> Customer >> <Customer Name> >> ...)
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Purpose:
- *   REPORT-ONLY companion to Invoke-ServerReboot. Queries every Windows server
- *   that is a member of an AD security group for its pending-reboot state and
- *   produces an HTML report (optionally emailed). NOTHING is ever rebooted.
- *   Supports BOTH physical and virtual servers: the pending check is OS-level
- *   (remote WMI/registry/SCCM), so nothing touches vCenter and hardware and VMs
- *   are treated identically.
+ * THIS FILE DOCUMENTS THE AS-BUILT WORKFLOW. It mirrors the exported workflow
+ * definition so the design and the appliance stay in sync. Each scriptable task's
+ * code below is the exact code deployed in the corresponding schema element.
  *
- *   AD resolution, the pending-reboot check, the pending count and the HTML
- *   report/mail are ALL handled inside cvs_functions.ps1. Orchestrator builds the
- *   invocation, runs it on the PS host, and classifies the transcript — it owns
- *   no loop and no per-server logic.
+ * Purpose:
+ *   REPORT-ONLY companion to Invoke-ServerReboot. Resolves an AD security group,
+ *   queries every member server for its pending-reboot state (remote
+ *   WMI/registry/SCCM), and produces an HTML report (optionally emailed). NOTHING
+ *   is ever rebooted. Physical and virtual servers are treated identically (the
+ *   pending check is OS-level; nothing touches vCenter).
+ *
+ *   All resolution, the pending check, the count and the HTML report/mail happen
+ *   inside cvs_functions.ps1. Orchestrator builds the invocation, runs it on a
+ *   pre-bound PowerShell host, and classifies the transcript.
  *
  * Script action invoked: Get-ServerRebootReportStatus-ByCN
  *
  * Maps from (Ansible):
- *   - servers_reboot_report-ByCN.yml     (+ variables.txt: var_SecurityGroup_CN /
- *     var_eMailReport / mail vars)          → Get-ServerRebootReportStatus-ByCN
- *   - servers_pending_reboot_report.yml  (+ vars.txt: var_ADGroupMember / mail vars)
- *                                            → Get-ServerPendingRebootStatus (LEGACY)
- *
- *   Both Ansible variants are CONSOLIDATED onto the single hardened ByCN action in
- *   vRO (see Change-Register R-1). The legacy Get-ServerPendingRebootStatus action
- *   (raw, non-recursive Get-ADGroupMember, no Enabled/computer-class filter) is NOT
- *   invoked by this workflow; the customer's former -ADGroupMember report now runs
- *   through the recursive, Enabled-filtered, per-object-isolated ByCN resolver.
- *   For a read-only report this is a strict improvement (more complete, less noise);
- *   it is called out as a behaviour change in Change-Register R-1.
+ *   - servers_reboot_report-ByCN.yml     (variables.txt: var_SecurityGroup_CN) → Get-ServerRebootReportStatus-ByCN
+ *   - servers_pending_reboot_report.yml  (vars.txt: var_ADGroupMember)         → Get-ServerPendingRebootStatus (LEGACY)
+ *   Both variants are CONSOLIDATED onto the single hardened ByCN action (Change-Register R-1).
+ *   The customer's former -ADGroupMember report now runs through the recursive,
+ *   Enabled-filtered, per-object-isolated ByCN resolver — a strict improvement for a
+ *   read-only report (more complete, less noise).
  *
  * ───────────────────────────────────────────────────────────────────────────
- * PACKAGE DEPENDENCY  (important)
+ * PACKAGE DEPENDENCY
  * ───────────────────────────────────────────────────────────────────────────
- *
- *   parseScriptOutput and handlePSFailure are REUSED from the Event Log package's
- *   module:  broadcom.pso.vc.vm.guestOps.files.windows.logs
- *   This package therefore depends on that package being installed. If the two are
- *   ever shipped independently, move those two shared components into a common
- *   module first. (Same dependency as the Invoke-ServerReboot package.)
+ *   parseScriptOutput is REUSED from the Event Log package's module
+ *   com.broadcom.pso.vcf.vm.guestOps.files.windows.logs — this package depends on
+ *   that one being installed. buildServerRebootReportInvocation lives in
+ *   com.broadcom.pso.vcf.vm.guestOps.windows.reboot.
  *
  * ───────────────────────────────────────────────────────────────────────────
- * WORKFLOW SCHEMA
+ * WORKFLOW SCHEMA (as built)
  * ───────────────────────────────────────────────────────────────────────────
  *
  * [Start]
- *     │
  *     ▼
- * [Scriptable Task: logRunMarker]
- *     Calls System.setLogMarker("Workflow:<name>-WorkflowRunId:<run id>"). vRO then
- *     tags every subsequent log line in this run with the marker automatically —
- *     no attribute to carry and no per-line prefixing needed.
- *     │
+ * (item10) [Scriptable: Set Log Marker]   ── root element
  *     ▼
- * [Action: buildServerRebootReportInvocation]
- *     Module: broadcom.pso.vc.vm.guestOps.windows.servers.reboot
- *     IN:  scriptPath   ← workflow input: scriptPath
- *          groupDN      ← workflow input: groupDN
- *          domainName   ← workflow input: domainName
- *          emailReport  ← workflow input: emailReport
- *          smtpServer   ← workflow input: smtpServer
- *          mailTo       ← workflow input: mailTo
- *          mailCc       ← workflow input: mailCc
- *          mailSubject  ← workflow input: mailSubject
- *     OUT: invocationString → workflow attribute: invocationString
- *          (the script's -HeaderNotesSubstr is DERIVED from groupDN inside the
- *           action — it is a report-header label only — so it is NOT an input)
- *     │
- *     ├─[Exception]──────────────────────────────────► [End - Failed: Bad Inputs]
- *     │
+ * (item1)  [Action: buildServerRebootReportInvocation]
+ *     module com.broadcom.pso.vcf.vm.guestOps.windows.reboot
+ *     IN  scriptPath, groupDN, domainName, emailReport, smtpServer, mailTo, mailCc, mailSubject
+ *     OUT actionResult → invocationString
  *     ▼
- * [Workflow: Invoke a PowerShell script]
- *     OOTB path: Library/PowerShell/Invoke a PowerShell script
- *     IN:  host   ← workflow input: psHost
- *          script ← workflow attribute: invocationString
- *     OUT: output → workflow attribute: psRawOutput
- *     │
- *     ├─[Exception]──► [Scriptable Task: handlePSFailure] ──► [End - Failed: PS Execution]
- *     │
+ * (item2)  [Workflow link: Invoke a PowerShell script]
+ *     IN  host ← attribute host (PRE-BOUND);  script ← invocationString
+ *     OUT output → psRawOutput
+ *     ├─[catch → err_0]→ (item3)[Scriptable: Throw Error  (throw err_0)] → (item4)[End]
  *     ▼
- * [Action: parseScriptOutput]
- *     Module: broadcom.pso.vc.vm.guestOps.files.windows.logs   (reused — see dependency note)
- *     IN:  psOutput         ← workflow attribute: psRawOutput
- *          executionContext ← (inline expression) groupDN + " @ " + domainName
- *     OUT: parsedResult → workflow attribute: parsedResult
- *     │
+ * (item6)  [Scriptable: Set Execution Context]  executionContext = groupDN + "@" + domainName
  *     ▼
- * [Decision: parsedResult.get("success") === true]
- *     │ true  ──────────────────────────────────────► [End - Completed Successfully]
- *     │ false
+ * (item5)  [Action: parseScriptOutput]
+ *     module com.broadcom.pso.vcf.vm.guestOps.files.windows.logs
+ *     IN  psOutput ← psRawOutput;  executionContext ← executionContext
+ *     OUT actionResult → parsedResult
  *     ▼
- * [End - Completed with Errors]
+ * (item8)  [Decision: Script Succeeded?  return parsedResult.success]
+ *     ├─ true  → (item11)[Scriptable: Log Success]  → (item0)[End]
+ *     └─ false → (item9) [Scriptable: Log Failures] → (item7)[End]
  *
  * ───────────────────────────────────────────────────────────────────────────
- * INPUTS
+ * INPUTS  (all optional in the form; none mandatory)
  * ───────────────────────────────────────────────────────────────────────────
+ *   Name         Type           Form control   Notes
+ *   ──────────── ────────────── ────────────── ─────────────────────────────────
+ *   scriptPath   string         textField      Full path to cvs_functions.ps1 on the PS host
+ *   groupDN      string         textField      AD group DN (preferred) → -SecurityGroup_CN
+ *   domainName   string         textField      AD domain → -DomainName
+ *   emailReport  boolean        checkbox       Send the HTML report → -eMailReport
+ *   smtpServer   string         textField      SMTP relay → -SMTPServer
+ *   mailTo       Array/string   array          Recipients (one address per element) → -MailToString
+ *   mailCc       Array/string   array          CC recipients (optional) → -MailCcString
+ *   mailSubject  string         textField      Subject stem → -MailSubjectstring
  *
- *   All inputs are plain workflow parameters with defaults set DIRECTLY on the
- *   input (per process change P-8 — no Configuration Element dependency).
+ *   mailTo / mailCc ARE Array/string (isMultiple). Enter ONE address per array
+ *   element. Do NOT bind a scalar string into these — vRO would split it into
+ *   characters. The action guards against this (throws on a token with no '@').
  *
- *   Name          Type                         Default                                   Form
- *   ───────────── ──────────────────────────── ───────────────────────────────────────── ──────────
- *   psHost        PowerShell:PowerShellHost    (none)                                    Mandatory
- *   scriptPath    string                       C:\PSO\Scripts\cvs_functions.ps1          Mandatory
- *   groupDN       string                       (none)                                    Mandatory
- *   domainName    string                       vcf.lab                                Mandatory
- *   emailReport   boolean                      true                                      Mandatory
- *   smtpServer    string                       mailrelay.vcf.lab                      Optional
- *   mailTo        Array/string                 (set to real recipients)                  Optional
- *   mailCc        Array/string                 (set to real recipients)                  Optional
- *   mailSubject   string                       VCF Orchestrator: Monitoring Servers Reboot status   Optional
- *
- *   (removed) headerNote — the report-header group label is now derived from
- *   groupDN inside buildServerRebootReportInvocation, so there is no separate input.
- *
- *   NO SAFETY GATE: unlike Invoke-ServerReboot there is no rebootMode input. This
- *   workflow only reads pending state and reports it; it can never reboot a server,
- *   so there is nothing to gate. There are likewise no delay / verify inputs.
- *
- *   ── groupDN is the AD group distinguishedName (preferred, unambiguous), e.g.
- *      CN=Monitoring-Servers,OU=Groups,DC=vcf,DC=lab. CN / sAMAccountName /
- *      GUID / SID also resolve. Passed to the script as -SecurityGroup_CN.
- *      Resolution is RECURSIVE and returns only ENABLED COMPUTER members; nested
- *      sub-groups ARE expanded, disabled accounts are skipped and logged. Recursion
- *      is correct here precisely because the run is read-only (see R-1); the reboot
- *      workflow deliberately does the opposite (non-recursive, S-7).
- *
- *   ── mailTo / mailCc are arrays of addresses; the action joins them with ',' for
- *      the script's -MailToString / -MailCcString (the script splits on ',').
- *      The FROM address is derived by the script itself
- *      ($env:COMPUTERNAME + '_Do_Not_Reply@vcf.lab') — there is no from input.
- *
- *   ── mailSubject is a stem; the script appends " - N of M server might required
- *      reboot" before sending, so the operator does not set the count.
+ *   There is NO psHost input. The PowerShell host is a pre-bound ATTRIBUTE (see
+ *   below) — re-point it per environment in the workflow, not at run time.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * ATTRIBUTES
  * ───────────────────────────────────────────────────────────────────────────
+ *   host              PowerShell:PowerShellHost  - PRE-BOUND to the target PS host
+ *                                                  (as built: id 532644c5-…, vcfa.site-a.vcf.lab)
+ *   invocationString  string                     - from buildServerRebootReportInvocation
+ *   psRawOutput       PowerShell:PowerShellRemotePSObject - from Invoke a PowerShell script
+ *   executionContext  string                     - groupDN + "@" + domainName (set by item6)
+ *   parsedResult      Properties                 - from parseScriptOutput
+ *   err_0             string                     - catch binding from the PS link
+ *   executionSuccess  boolean                    - set by Log Success / Log Failures
+ *   executionOutput   string                     - set by Log Success / Log Failures
  *
- *   invocationString  string                               - Built by buildServerRebootReportInvocation
- *   psRawOutput       PowerShell:PowerShellRemotePSObject  - Output from OOTB PS workflow
- *   parsedResult      Properties                           - Output from parseScriptOutput
+ *   NOTE: the workflow defines NO formal outputs. executionSuccess / executionOutput
+ *   are attributes set for logging; the operator-facing result is the emailed HTML
+ *   report and the end state reached. Promote them to workflow OUTPUTS if a calling
+ *   workflow needs to branch on the result.
  *
- * ───────────────────────────────────────────────────────────────────────────
- * OUTPUTS
- * ───────────────────────────────────────────────────────────────────────────
- *
- *   executionSuccess  boolean  - true = completed without errors
- *   executionOutput   string   - Summary message or error description
- *
- * ───────────────────────────────────────────────────────────────────────────
- * RUNTIME / TIMEOUT NOTE
- * ───────────────────────────────────────────────────────────────────────────
- *
- *   A report run is a single synchronous PowerShell invocation that does one
- *   remote WMI/registry/SCCM query per resolved server, sequentially. Runtime
- *   scales roughly linearly with the group size and with how many servers are slow
- *   or unreachable (each unreachable server waits out its own RPC/WMI timeout).
- *   There is no reboot and no post-reboot wait, so runs are far shorter than
- *   Invoke-ServerReboot — but for a large group the WinRM/PSRP operation timeout on
- *   the PS host must still exceed the total query time. If runs are cut off
- *   mid-transcript, raise the PS host's MaxTimeoutms / the plug-in timeout.
+ *   NO SAFETY GATE, no rebootMode, no delay/verify inputs — this workflow only reads
+ *   and reports; it can never reboot a server.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * FAILURE-HANDLING CONTRACT
  * ───────────────────────────────────────────────────────────────────────────
- *
- *   Condition                                                End state
- *   ──────────────────────────────────────────────────────── ───────────────────────────
- *   Input validation fails in buildServerRebootReportInvocation Failed: Bad Inputs
- *   Disabled AD member                                         skipped + Info: logged → continues
- *   Nested sub-group                                           expanded (recursive) → continues
- *   Unresolvable single computer object                        skipped + Warn: logged → continues
- *   Server whose pending state cannot be read                  reported "Error Accessing Server" + Error: → Completed with Errors
- *   Zero enabled members                                       empty report → Completed Successfully
- *   AD module missing / group or domain unresolvable           script throws → handlePSFailure → Failed: PS Execution
- *   PS host unreachable                                        OOTB raises   → handlePSFailure → Failed: PS Execution
- *
- *   NOTE: this workflow issues no reboots, so the RebootFailed / NotReturned
- *   conditions from Invoke-ServerReboot do not exist here. A server that cannot be
- *   queried (Get-RebootStatus catch → Write-Log "Error: ...") is the only
- *   per-server condition that drives "Completed with Errors".
+ *   Condition                                              End state
+ *   ────────────────────────────────────────────────────── ─────────────────────────
+ *   Bad inputs (action throws)                             PS link never reached; action task faults the run
+ *   PS host unreachable / script throws (AD module, group) catch → Throw Error → End (item4) = FAILED
+ *   Server whose pending state cannot be read              "Error:" line → parsedResult.success=false → Log Failures → End (item7)
+ *   Nested sub-group                                       expanded (recursive) → continues
+ *   Disabled / non-computer member                         skipped + logged → continues
+ *   Zero members                                           empty report → success → Log Success → End (item0)
  *
  * ───────────────────────────────────────────────────────────────────────────
- * SCRIPTABLE TASKS
+ * SCRIPTABLE TASK CODE (as deployed)
  * ───────────────────────────────────────────────────────────────────────────
  */
 
-// ── Scriptable task: logRunMarker ────────────────────────────────────────────
-// Place as the FIRST schema element (before buildServerRebootReportInvocation).
-// Inputs:  (none)
-// Outputs: (none)
-//
-// Sets the vRO log marker for this run. Once set, vRO automatically prepends the
-// marker to every subsequent log line in this workflow token, so a whole run's
-// lines are greppable — there is no attribute to carry and no need to prefix each
-// System.log call by hand. workflow.name is the workflow name;
-// workflow.currentWorkflowToken.id is the unique id of THIS execution (the value
-// shown in the run-history URL). NOTE: workflow.id is the workflow DEFINITION id,
-// not the run — use currentWorkflowToken.id for the run.
-
-System.setLogMarker("Workflow:" + workflow.name + "-WorkflowRunId:" + workflow.currentWorkflowToken.id);
+// ── (item10) Set Log Marker — root element ───────────────────────────────────
+// In: (none)  Out: (none)
+// workflow.id is the RUN (token) id in vRO — confirmed by run logs showing a
+// per-run GUID distinct from the workflow definition id. System.setLogMarker then
+// prepends "Workflow:<name>-WorkflowRunId:<run id>" to every subsequent log line.
+var logMarker = "Workflow:" + workflow.name + "-WorkflowRunId:" + workflow.id;
+System.setLogMarker(logMarker);
 
 
-// ── End state: Completed Successfully ────────────────────────────────────────
-// Place before [End - Completed Successfully]
-// Inputs: parsedResult, groupDN, domainName
-// Outputs: executionSuccess, executionOutput
-// (The run's log marker set by logRunMarker is applied to these lines by vRO.)
+// ── (item6) Set Execution Context ────────────────────────────────────────────
+// In: groupDN, domainName   Out: executionContext
+// Passed to parseScriptOutput so its log lines identify the target group/domain.
+executionContext = groupDN + "@" + domainName;
 
+
+// ── (item3) Throw Error — PS link catch path ─────────────────────────────────
+// In: err_0   Out: (none) → routes to End (item4), a FAILED end state.
+throw err_0;
+
+
+// ── (item8) Decision: Script Succeeded? ──────────────────────────────────────
+// In: parsedResult   true → Log Success, false → Log Failures.
+// Deployed decision body (shown here as a comment; a bare top-level `return` is not
+// valid module code):
+//     return parsedResult.success;
+
+
+// ── (item11) Log Success ─────────────────────────────────────────────────────
+// In: parsedResult, groupDN, domainName   Out: executionSuccess, executionOutput
+// The run's setLogMarker token is applied to this line by vRO.
 executionSuccess = true;
 executionOutput  = parsedResult.get("outputText");
 
 System.log(
-    "Get-ServerRebootReport | Completed successfully." +
+    " | Get-ServerRebootReport | Completed successfully." +
     " | groupDN=" + groupDN + " | domain=" + domainName +
     " | output=" + executionOutput
 );
 
 
-// ── End state: Completed with Errors ─────────────────────────────────────────
-// Place before [End - Completed with Errors]
-// Inputs: parsedResult, groupDN, domainName
-// Outputs: executionSuccess, executionOutput
-// (The run's log marker set by logRunMarker is applied to these lines by vRO.)
-//
-// NOTE: This is the "completed with errors" end state, NOT a hard failure.
-// The only per-server problem a report run can hit is a server whose pending
-// state could not be read (reported as "Error Accessing Server"); parseScriptOutput
-// flags success=false on the resulting "Error:" line and the run lands here. Every
-// other server was still queried and the HTML report was still produced and mailed.
-// Only a TERMINATING failure (bad inputs, or a total failure such as the AD module
-// missing / group resolution failing) routes to a Failed end state.
-
+// ── (item9) Log Failures ─────────────────────────────────────────────────────
+// In: parsedResult, groupDN, domainName   Out: executionSuccess, executionOutput
+// "Completed with errors" — NOT a hard failure. One or more servers could not be
+// queried (reported "Error Accessing Server" → "Error:" line → success=false). All
+// other servers were queried and the HTML report was still produced and mailed.
 executionSuccess = false;
 executionOutput  = "Report completed with errors — one or more servers could not be queried. " +
                    "See workflow log and the emailed report for details. Error: " +
                    parsedResult.get("errorText");
 
 System.warn(
-    "Get-ServerRebootReport | Completed with errors." +
+    " | Get-ServerRebootReport | Completed with errors." +
     " | groupDN=" + groupDN + " | domain=" + domainName +
     " | errorText=" + parsedResult.get("errorText")
 );
