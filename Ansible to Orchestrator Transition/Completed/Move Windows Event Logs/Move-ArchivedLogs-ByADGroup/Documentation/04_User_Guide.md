@@ -21,7 +21,7 @@ Server selection, disabled-host filtering, and per-server iteration are handled 
    |---|---|---|
    | `psHost` | The registered PowerShell host | `pshost.vcf.lab` |
    | `scriptPath` | Full path to `cvs_functions.ps1` on the host | `C:\PSO\Scripts\cvs_functions.ps1` |
-   | `groupDN` | **AD group distinguishedName** (preferred, unambiguous) | `CN=WinLogServers,OU=Groups,DC=vcf,DC=local` |
+   | `groupDN` | **AD group distinguishedName** (preferred, unambiguous) | `CN=WinLogServers,OU=Groups,DC=vcf,DC=lab` |
    | `domainName` | AD domain to resolve against (used as `-Server` target) | `vcf.lab` |
    | `fileShareTarget` | Archive destination root (UNC) | `\\fileserver.vcf.lab\mdcarchivelog$\Windows` |
    | `fileFilter` | File-name filter to move | `Archive-*.evtx` |

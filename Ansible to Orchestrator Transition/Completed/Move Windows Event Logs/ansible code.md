@@ -1,7 +1,7 @@
 **file-move_with-LocalPath_Inventory**
 ***extra vars***
 source_path: C:\Windows\System32\winevt\Logs
-target_path: \\fileserver.corp.local\mdcarchivelog$\Windows
+target_path: \\fileserver.vcf.lab\mdcarchivelog$\Windows
 file_filter: Archive-*.evtx
 days_old: '-1'
 
@@ -63,9 +63,9 @@ days_old: '-1'
 
 **file-move_with-UNCPath_AD-Group**
 ***extra vars***
-group_dn: CN=All-Servers,OU=Groups,OU=Lab,DC=CORP,DC=LOCAL
+group_dn: CN=All-Servers,OU=Groups,OU=Lab,DC=vcf,DC=lab
 source_path: C$\Windows\System32\winevt\Logs
-target_path: \\fileserver.corp.local\mdcarchivelog$\Windows
+target_path: \\fileserver.vcf.lab\mdcarchivelog$\Windows
 file_filter: Archive-*.evtx
 days_old: '0'
 
@@ -78,7 +78,7 @@ days_old: '0'
 
   
   vars:
-    group_dn: "CN=mytest,OU=Servers,,DC=corp,DC=local"
+    group_dn: "CN=mytest,OU=Servers,,DC=vcf,DC=lab"
 
   tasks:
     - name: Get computer members
@@ -195,9 +195,9 @@ days_old: '0'
 var_ps_folder: ps_scripts
 var_ps_script_file: cvs_functions.ps1
 var_parameter_action: move-archived-logs
-var_DomainName: corp.local
+var_DomainName: vcf.lab
 var_ADGroupMember: Security-Servers  #changes with ansible job
-var_FileShareTarget: \\fileserver.corp.local\mdcarchivelog$\Windows
+var_FileShareTarget: \\fileserver.vcf.lab\mdcarchivelog$\Windows
 
 ***playbook***
 ---
@@ -246,10 +246,10 @@ var_FileShareTarget: \\fileserver.corp.local\mdcarchivelog$\Windows
 
 **file-move_with-UNCPath_AD-Group-TEST**
 ***extra vars***
-DomainName: corp.local
+DomainName: vcf.lab
 group_dn: OW_Servers
 source_path: C$\Windows\System32\winevt\Logs
-target_path: \\fileserver.corp.local\mdcarchivelog$\Windows
+target_path: \\fileserver.vcf.lab\mdcarchivelog$\Windows
 file_filter: Archive-*.evtx
 days_old: '0'
 
@@ -580,8 +580,8 @@ days_old: '-1'
   run_once: true
   
   vars:
-    domain_name: "corp.local"
-    group_dn: "CN=Monitoring-Servers,OU=Servers,,DC=corp.local"
+    domain_name: "vcf.lab"
+    group_dn: "CN=Monitoring-Servers,OU=Servers,,DC=vcf.lab"
 
   tasks:
     - name: Get computer members
@@ -709,9 +709,9 @@ param (
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$SMTPServer,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$MailToString = 'admin@corp.local',
+    [string]$MailToString = 'admin@vcf.lab',
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$MailCcString = 'admin@corp.local',
+    [string]$MailCcString = 'admin@vcf.lab',
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$MailSubjectstring,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
@@ -1143,7 +1143,7 @@ Function InitializeVariables { # Initialize Variables
             #[string[]]$MailCc = $MailCcString.split(',')
             $Global:DebugDir = "$($PSScriptRoot)\Debug"
             $Global:Today = Get-Date
-            $Global:MailFrom = $env:COMPUTERNAME + '_Do_Not_Reply@corp.local'
+            $Global:MailFrom = $env:COMPUTERNAME + '_Do_Not_Reply@vcf.lab'
             $Global:MailSubject = ""
             $Global:PKIEnabledCount = 0
             $Global:PKIDisabledCount = 0

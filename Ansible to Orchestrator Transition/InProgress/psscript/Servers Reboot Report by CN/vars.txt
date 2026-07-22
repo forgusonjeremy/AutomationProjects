@@ -2,8 +2,8 @@ var_ps_folder: ps_scripts
 var_ps_script_file: cvs_functions.ps1
 var_parameter_action: Get-ServerPendingRebootStatus
 var_eMailReport: 'yes'
-var_SMTPServer: mailrelay.corp.local
-var_MailToString: ' security@corp.local,infadmins@corp.local					#Changes with job
+var_SMTPServer: mailrelay.vcf.lab
+var_MailToString: ' security@vcf.lab,infadmins@vcf.lab					#Changes with job
 var_MailCcString: DTCVSMonitoring@state.gov
 var_MailSubjectstring: 'Ansible-Report: CVS Security Servers Reboot status'
 var_DomainName: washdc.state.sbu

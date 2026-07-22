@@ -91,8 +91,8 @@ input defaults. Update the following for your environment:
 |---|---|---|
 | `scriptPath` | Your staged path | Default `C:\PSO\Scripts\cvs_functions.ps1`; change only if you staged it elsewhere |
 | `domainName` | **Your AD domain** | Default is the lab value `vcf.lab` — **must** be changed |
-| `groupDN` | (leave blank as a default; operators/schedule supply it) | The target group's DN, e.g. `CN=Server-Reboots,OU=Servers,DC=corp,DC=local` |
-| `smtpServer` | Your SMTP relay | e.g. `mailrelay.corp.local` |
+| `groupDN` | (leave blank as a default; operators/schedule supply it) | The target group's DN, e.g. `CN=Server-Reboots,OU=Servers,DC=vcf,DC=lab` |
+| `smtpServer` | Your SMTP relay | e.g. `mailrelay.vcf.lab` |
 | `mailTo` | Default recipient list | Array of addresses |
 | `mailCc` | Default CC list (optional) | Array of addresses |
 | `mailSubject` | Your subject stem | e.g. `VCF Orchestrator: Server Reboot status` |
@@ -112,9 +112,12 @@ Leave these at their defaults unless you have a reason to change them:
   want them hidden until `emailReport` is checked, add a visibility condition on the
   form (optional).
 
-The FROM address is derived by the script itself
-(`<PSHOST>_Do_Not_Reply@<domain>`); if that domain is wrong for your environment,
-adjust `$Global:MailFrom` in `cvs_functions.ps1` (`InitializeVariables`).
+**Set the mail domain to yours.** The FROM address is derived by the script itself
+(`<PSHOST>_Do_Not_Reply@<domain>` via `$Global:MailFrom`), and the default
+`-MailToString` / `-MailCcString` are `admin@<domain>`. The delivered copy uses
+`vcf.lab`. If that domain is wrong for your environment, update the `@<domain>` in
+`cvs_functions.ps1` (`$Global:MailFrom` in `InitializeVariables`, and the mail
+defaults) to match your AD/SMTP domain.
 
 ---
 

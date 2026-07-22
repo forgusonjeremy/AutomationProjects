@@ -19,7 +19,7 @@
  *   Group identity: the script passes the value straight to
  *   Get-ADGroupMember -Identity, so a distinguishedName (DN) is the preferred,
  *   unambiguous identifier — e.g.
- *     CN=All-Servers,OU=Groups,OU=Lab,DC=corp,DC=local
+ *     CN=All-Servers,OU=Groups,OU=Lab,DC=vcf,DC=lab
  *   CN / sAMAccountName / GUID / SID also resolve, but the operator-facing input
  *   is named 'groupDN' to make DN the intended form.  The script parameter it
  *   maps to is -SecurityGroup_CN (underscore — confirmed from the script param
@@ -100,8 +100,8 @@ System.log(
 // Produces:
 //   & "C:\PSO\Scripts\cvs_functions.ps1" `
 //       -Action 'move-archived-logs-ByCN' `
-//       -SecurityGroup_CN 'CN=All-Servers,OU=Groups,DC=corp,DC=local' `
-//       -DomainName 'corp.local' `
+//       -SecurityGroup_CN 'CN=All-Servers,OU=Groups,DC=vcf,DC=lab' `
+//       -DomainName 'vcf.lab' `
 //       -FileShareTarget '\\server\share$\Windows' `
 //       -FilterOn 'Archive-*.evtx' `
 //       -NumberOfDays '-1' *>&1 | Out-String -Width 4096

@@ -2,12 +2,12 @@ var_ps_folder: ps_scripts
 var_ps_script_file: cvs_functions.ps1
 var_parameter_action: Invoke-ServerReboot
 var_eMailReport: 'no'										                        #Changes with job
-var_SMTPServer: mailrelay.corp.local
-var_MailToString: security.corp.local,dep-security.corp.local		                #Changes with job
-var_MailCcString: servermonitoring@corp.local						                #Changes with job
+var_SMTPServer: mailrelay.vcf.lab
+var_MailToString: security.vcf.lab,dep-security.vcf.lab		                #Changes with job
+var_MailCcString: servermonitoring@vcf.lab						                #Changes with job
 var_MailSubjectstring: 'Ansible-Report: Monitoring Servers Reboot status'
-var_DomainName: corp.local							                             	#Changes with job
-var_OUPath: OU=Admin Accounts,DC=corp,DC=local                          			#Changes with job
+var_DomainName: vcf.lab							                             	#Changes with job
+var_OUPath: OU=Admin Accounts,DC=vcf,DC=lab                          			#Changes with job
 var_cleanup_temporary_folder: true
 var_ADGroupMember: Security-Reboot-Servers							                 #Changes with job
 var_HeaderNotesSubstr: Security-Reboot-Servers						                 #Changes with job

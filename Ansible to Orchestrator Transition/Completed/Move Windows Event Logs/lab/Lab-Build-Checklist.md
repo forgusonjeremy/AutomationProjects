@@ -2,8 +2,8 @@
 
 Purpose: Stand up a lab to test the VCF Orchestrator workflows that replace the
 Ansible "Move Windows Event Logs" playbooks. Defaults below match the values
-baked into `cvs_functions.ps1` and the vRO package (`corp.local`,
-`\\fileserver.corp.local\mdcarchivelog$\Windows`, `C:\PSO\Scripts\cvs_functions.ps1`).
+baked into `cvs_functions.ps1` and the vRO package (`vcf.lab`,
+`\\fileserver.vcf.lab\mdcarchivelog$\Windows`, `C:\PSO\Scripts\cvs_functions.ps1`).
 Match these and you avoid reconfiguring the package.
 
 > **The #1 thing this lab must reproduce:** the **double-hop**
@@ -62,7 +62,7 @@ Match these and you avoid reconfiguring the package.
 ## 4. File Server / Archive Share
 
 - [x] Provide host for the share (can be a role on the DC or its own VM)
-- [x] Create hidden share **`mdcarchivelog$`** → exposed as `\\fileserver.corp.local\mdcarchivelog$\Windows`
+- [x] Create hidden share **`mdcarchivelog$`** → exposed as `\\fileserver.vcf.lab\mdcarchivelog$\Windows`
 - [x] Add DNS alias `fileserver` (or rename host) to match the default UNC path
 - [x] Grant `svc-pso` modify/write on the share
 - [ ] Seed files **older than 370 days** + some recent files (for the Remove-OldFiles test)
@@ -111,12 +111,12 @@ These isolate environment problems from workflow problems.
 - [ ] `Get-ADGroupMember 'Monitoring-Servers' -Recursive` resolves to your computers
 - [ ] Group resolves correctly (recursive expansion + enabled-only behaves as expected)
 - [ ] `Test-Path \\<target>\C$\Windows\System32\winevt\Logs` → `True` (hop-2 read + delegation)
-- [ ] `New-Item` into `\\fileserver.corp.local\mdcarchivelog$\Windows` succeeds (hop-2 write)
+- [ ] `New-Item` into `\\fileserver.vcf.lab\mdcarchivelog$\Windows` succeeds (hop-2 write)
 - [ ] Run the action directly once, e.g.:
   ```powershell
   & C:\PSO\Scripts\cvs_functions.ps1 -Action move-archived-logs-ByCN `
-    -SecurityGroup_CN Monitoring-Servers -DomainName corp.local `
-    -FileShareTarget '\\fileserver.corp.local\mdcarchivelog$\Windows'
+    -SecurityGroup_CN Monitoring-Servers -DomainName vcf.lab `
+    -FileShareTarget '\\fileserver.vcf.lab\mdcarchivelog$\Windows'
   ```
 - [ ] **Then** run the same through the vRO PowerShell plugin (confirms the double-hop
       survives the extra vRO → PS-host hop — direct logon testing will not catch this)

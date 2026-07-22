@@ -111,9 +111,9 @@
  *   psHost        PowerShell:PowerShellHost    (none)                                    Mandatory
  *   scriptPath    string                       C:\PSO\Scripts\cvs_functions.ps1          Mandatory
  *   groupDN       string                       (none)                                    Mandatory
- *   domainName    string                       corp.local                                Mandatory
+ *   domainName    string                       vcf.lab                                Mandatory
  *   emailReport   boolean                      true                                      Mandatory
- *   smtpServer    string                       mailrelay.corp.local                      Optional
+ *   smtpServer    string                       mailrelay.vcf.lab                      Optional
  *   mailTo        Array/string                 (set to real recipients)                  Optional
  *   mailCc        Array/string                 (set to real recipients)                  Optional
  *   mailSubject   string                       VCF Orchestrator: Monitoring Servers Reboot status   Optional
@@ -126,7 +126,7 @@
  *   so there is nothing to gate. There are likewise no delay / verify inputs.
  *
  *   ── groupDN is the AD group distinguishedName (preferred, unambiguous), e.g.
- *      CN=Monitoring-Servers,OU=Groups,DC=corp,DC=local. CN / sAMAccountName /
+ *      CN=Monitoring-Servers,OU=Groups,DC=vcf,DC=lab. CN / sAMAccountName /
  *      GUID / SID also resolve. Passed to the script as -SecurityGroup_CN.
  *      Resolution is RECURSIVE and returns only ENABLED COMPUTER members; nested
  *      sub-groups ARE expanded, disabled accounts are skipped and logged. Recursion
@@ -136,7 +136,7 @@
  *   ── mailTo / mailCc are arrays of addresses; the action joins them with ',' for
  *      the script's -MailToString / -MailCcString (the script splits on ',').
  *      The FROM address is derived by the script itself
- *      ($env:COMPUTERNAME + '_Do_Not_Reply@corp.local') — there is no from input.
+ *      ($env:COMPUTERNAME + '_Do_Not_Reply@vcf.lab') — there is no from input.
  *
  *   ── mailSubject is a stem; the script appends " - N of M server might required
  *      reboot" before sending, so the operator does not set the count.

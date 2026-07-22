@@ -31,6 +31,8 @@ Select-String -Path 'C:\PSO\Scripts\cvs_functions.ps1' -Pattern `
 ```
 All patterns must be found (confirms the action and the S-2…S-4 resilient behavior).
 
+> **Set the mail domain to yours.** `cvs_functions.ps1` hardcodes an email domain: the FROM address is derived as `<PSHOST>_Do_Not_Reply@<domain>` in `$Global:MailFrom`, and the default `-MailToString` / `-MailCcString` are `admin@<domain>`. The delivered copy uses `vcf.lab`. If this action emails a report in your environment, update the `@<domain>` in `cvs_functions.ps1` (and the workflow's mail inputs) to match your AD/SMTP domain before deploying.
+
 ## Step 3 — Certificate trust in Orchestrator
 
 If the PS host cert is self-signed or from a CA not already trusted by Orchestrator, import it (Base-64/PEM) via **Library > Configuration > SSL Trust Manager**. Full procedure in the PS-Host guide.

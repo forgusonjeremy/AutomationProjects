@@ -100,14 +100,14 @@
  *   psHost                  PowerShell:PowerShellHost    (none)                                   Mandatory
  *   scriptPath              string                       C:\PSO\Scripts\cvs_functions.ps1         Mandatory
  *   groupDN                 string                       (none)                                   Mandatory
- *   domainName              string                       corp.local                               Mandatory
+ *   domainName              string                       vcf.lab                               Mandatory
  *   rebootMode              string                       no                                       Mandatory
  *   delayBetweenServersSec  number                       10                                       Mandatory
  *   verifyTimeoutSec        number                       600                                      Mandatory
  *   verifyPollSec           number                       15                                       Mandatory
  *   runPreRebootScript      boolean                      false                                    Mandatory
  *   emailReport             boolean                      true                                     Mandatory
- *   smtpServer              string                       mailrelay.corp.local                     Optional
+ *   smtpServer              string                       mailrelay.vcf.lab                     Optional
  *   mailTo                  Array/string                 (set to real recipients)                 Optional
  *   mailCc                  Array/string                 (set to real recipients)                 Optional
  *   mailSubject             string                       VCF Orchestrator: Server Reboot status   Optional
@@ -123,7 +123,7 @@
  *      exactly 'no' and 'simpleMode'.
  *
  *   ── groupDN is the AD group distinguishedName (preferred, unambiguous), e.g.
- *      CN=Security-Reboot-Servers,OU=Groups,DC=corp,DC=local. CN / sAMAccountName
+ *      CN=Security-Reboot-Servers,OU=Groups,DC=vcf,DC=lab. CN / sAMAccountName
  *      / GUID / SID also resolve. Passed to the script as -ADGroupMember.
  *      Only DIRECT (non-recursive) enabled COMPUTER members are targeted; nested
  *      sub-groups are never expanded.
@@ -145,7 +145,7 @@
  *   ── mailTo / mailCc are arrays of addresses; the action joins them with ',' for
  *      the script's -MailToString / -MailCcString (the script splits on ',').
  *      The FROM address is derived by the script itself
- *      ($env:COMPUTERNAME + '_Do_Not_Reply@corp.local') — there is no from input.
+ *      ($env:COMPUTERNAME + '_Do_Not_Reply@vcf.lab') — there is no from input.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * ATTRIBUTES

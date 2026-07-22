@@ -59,7 +59,7 @@
     .\New-ArchiveLogTestData.ps1 -ComputerName srv01,srv02 -FilesPerServer 5 -AgeDays 30
 
 .EXAMPLE
-    .\New-ArchiveLogTestData.ps1 -ADGroup 'Monitoring-Servers' -DomainName corp.local
+    .\New-ArchiveLogTestData.ps1 -ADGroup 'Monitoring-Servers' -DomainName vcf.lab
 
 .EXAMPLE
     .\New-ArchiveLogTestData.ps1 -ComputerName srv01 -UseRemoting -Credential (Get-Credential)

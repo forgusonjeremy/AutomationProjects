@@ -31,7 +31,7 @@ It covers two areas:
 **Goal of the automation (unchanged):**
 - **Move** archived event logs (`Archive-*.evtx`) off Windows servers from
   `C:\Windows\System32\winevt\Logs` to a central archive share, into a
-  per-server subfolder: `\\fileserver.corp.local\mdcarchivelog$\Windows\<server>`.
+  per-server subfolder: `\\fileserver.vcf.lab\mdcarchivelog$\Windows\<server>`.
 - **Clean up** the archive share by deleting files older than a retention
   threshold (default ~370 days).
 

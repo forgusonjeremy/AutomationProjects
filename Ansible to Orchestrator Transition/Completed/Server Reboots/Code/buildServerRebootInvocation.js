@@ -30,7 +30,7 @@
  * Group identity:
  *   Passed to the script as -ADGroupMember, which hands it to Get-ADGroupMember
  *   -Identity.  A distinguishedName (DN) is the preferred, unambiguous form —
- *   e.g. CN=Security-Reboot-Servers,OU=Groups,DC=corp,DC=local.  CN /
+ *   e.g. CN=Security-Reboot-Servers,OU=Groups,DC=vcf,DC=lab.  CN /
  *   sAMAccountName / GUID / SID also resolve.
  *
  * Inputs:
@@ -174,7 +174,7 @@ if (groupDN.trim().toUpperCase().indexOf("DC=") === -1) {
 //   -HeaderNotesSubstr             ← headerNote
 //
 // Note: the script derives the FROM address itself
-// ($Global:MailFrom = $env:COMPUTERNAME + '_Do_Not_Reply@corp.local'), so there is
+// ($Global:MailFrom = $env:COMPUTERNAME + '_Do_Not_Reply@vcf.lab'), so there is
 // no from-address input to pass.
 //
 // Single-quote escaping: PowerShell escapes a single quote inside a single-quoted
@@ -187,7 +187,7 @@ function psQuote(value) {
 // Derive the report-header group name from the group identifier. The script's
 // -HeaderNotesSubstr is purely a display label ("the security group called X"), so
 // there is no reason to ask for it separately.
-//   - DN form  (CN=Security-Reboot-Servers,OU=Groups,DC=corp,DC=local) -> leftmost
+//   - DN form  (CN=Security-Reboot-Servers,OU=Groups,DC=vcf,DC=lab) -> leftmost
 //     CN value, with DN escaping (\,) unescaped.
 //   - Plain form (CN / sAMAccountName / GUID / SID) -> used as-is.
 function deriveGroupName(identifier) {

@@ -28,7 +28,7 @@
     The fully qualified domain name of this server.
     Must match the DNS name that VCF Orchestrator will use to connect.
     Must be included in the certificate CN or SAN.
-    Example: pshost.corp.local
+    Example: pshost.vcf.lab
 
 .PARAMETER ServiceAccount
     The domain service account that vRO will use to connect to this PS host.
@@ -65,20 +65,20 @@
 .EXAMPLE
     # Self-signed certificate (most common)
     .\Configure-vROPSHost.ps1 `
-        -Fqdn "pshost.corp.local" `
+        -Fqdn "pshost.vcf.lab" `
         -ServiceAccount "CORP\svc-vro-ps"
 
 .EXAMPLE
     # Existing CA-issued certificate already installed
     .\Configure-vROPSHost.ps1 `
-        -Fqdn "pshost.corp.local" `
+        -Fqdn "pshost.vcf.lab" `
         -ServiceAccount "CORP\svc-vro-ps" `
         -CertificateMode ExistingCA
 
 .EXAMPLE
     # Custom export path and 3-year self-signed cert
     .\Configure-vROPSHost.ps1 `
-        -Fqdn "pshost.corp.local" `
+        -Fqdn "pshost.vcf.lab" `
         -ServiceAccount "CORP\svc-vro-ps" `
         -CertValidityYears 3 `
         -CertExportPath "C:\Temp\Certs\"

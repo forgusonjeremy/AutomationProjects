@@ -89,7 +89,7 @@
  *   psHost          PowerShell:PowerShellHost    (none)                                Mandatory
  *   scriptPath      string                       C:\PSO\Scripts\cvs_functions.ps1      Mandatory
  *   groupDN         string                       (none)                                Mandatory
- *   domainName      string                       corp.local                            Mandatory
+ *   domainName      string                       vcf.lab                            Mandatory
  *   fileShareTarget string                       \\fileserver\mdcarchivelog$\Windows   Mandatory
  *   fileFilter      string                       Archive-*.evtx                        Mandatory
  *   fileAgeDays     number                       -1                                    Mandatory
@@ -100,7 +100,7 @@
  *   can override any of them at run time.
  *
  *   groupDN is the AD group distinguishedName (preferred, unambiguous) — e.g.
- *   CN=All-Servers,OU=Groups,OU=Lab,DC=corp,DC=local.  CN / sAMAccountName /
+ *   CN=All-Servers,OU=Groups,OU=Lab,DC=vcf,DC=lab.  CN / sAMAccountName /
  *   GUID / SID also resolve.  Passed to the script as -SecurityGroup_CN.
  *   fileFilter is the file-name filter passed as -FilterOn (e.g. Archive-*.evtx).
  *   fileAgeDays is passed as -NumberOfDays; the script moves files whose

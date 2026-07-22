@@ -33,7 +33,7 @@
 
 | ID | Input | Expected |
 |---|---|---|
-| **C1** | Valid: `scriptPath='C:\PSO\Scripts\cvs_functions.ps1'`, `groupDN='CN=WinLogServers,OU=Groups,DC=corp,DC=local'`, `domainName='corp.local'`, `fileShareTarget='\\fileserver\share$\Windows'`, `fileFilter='Archive-*.evtx'`, `fileAgeDays=-1` | Returns `& "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByCN' -SecurityGroup_CN 'CN=WinLogServers,OU=Groups,DC=corp,DC=local' -DomainName 'corp.local' -FileShareTarget '\\fileserver\share$\Windows' -FilterOn 'Archive-*.evtx' -NumberOfDays '-1' *>&1 \| Out-String -Width 4096`. Note `-SecurityGroup_CN` underscore |
+| **C1** | Valid: `scriptPath='C:\PSO\Scripts\cvs_functions.ps1'`, `groupDN='CN=WinLogServers,OU=Groups,DC=vcf,DC=lab'`, `domainName='vcf.lab'`, `fileShareTarget='\\fileserver\share$\Windows'`, `fileFilter='Archive-*.evtx'`, `fileAgeDays=-1` | Returns `& "C:\PSO\Scripts\cvs_functions.ps1" -Action 'move-archived-logs-ByCN' -SecurityGroup_CN 'CN=WinLogServers,OU=Groups,DC=vcf,DC=lab' -DomainName 'vcf.lab' -FileShareTarget '\\fileserver\share$\Windows' -FilterOn 'Archive-*.evtx' -NumberOfDays '-1' *>&1 \| Out-String -Width 4096`. Note `-SecurityGroup_CN` underscore |
 | **C2** | `scriptPath=''` | Throws Error containing `scriptPath is required` |
 | **C3** | `groupDN=''` | Throws Error containing `groupDN is required` |
 | **C3b** | `fileAgeDays=''` (or `'abc'`) | Throws `fileAgeDays is required` (empty) or `fileAgeDays must be a whole number` (non-numeric) |

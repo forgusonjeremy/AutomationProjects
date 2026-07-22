@@ -58,8 +58,8 @@ conditions; a server pending a reboot *only* for those reasons will not be reboo
 | Field | What to enter |
 |---|---|
 | **scriptPath** | Path to `cvs_functions.ps1` on the PowerShell host (usually leave default) |
-| **groupDN** | The target AD group. A full distinguished name is best, e.g. `CN=Server-Reboots,OU=Servers,DC=corp,DC=local`. A plain group name also works |
-| **domainName** | Your AD domain (e.g. `corp.local`) |
+| **groupDN** | The target AD group. A full distinguished name is best, e.g. `CN=Server-Reboots,OU=Servers,DC=vcf,DC=lab`. A plain group name also works |
+| **domainName** | Your AD domain (e.g. `vcf.lab`) |
 | **Reboot or Report Only?** | **Reboot** to actually reboot; **Report-Only** for a dry run |
 | **delayBetweenServersSec** | Seconds to wait between each server's reboot (default 10) |
 | **verifyTimeoutSec** | How long to wait for a rebooted server to come back before marking it failed (default 600 = 10 min) |
@@ -139,7 +139,7 @@ To validate the workflow without waiting for real updates, use the helper
 ```powershell
 # Arm one server (or a whole group)
 .\Set-PendingRebootFlag.ps1 -ComputerName testsrv01 -Action Set
-.\Set-PendingRebootFlag.ps1 -AdGroup 'Server-Reboots' -DomainName corp.local -Action Set
+.\Set-PendingRebootFlag.ps1 -AdGroup 'Server-Reboots' -DomainName vcf.lab -Action Set
 
 # Check what the workflow will see
 .\Set-PendingRebootFlag.ps1 -AdGroup 'Server-Reboots' -Action Check
