@@ -1,6 +1,6 @@
 /**
  * Action: buildCleanDisksInvocation
- * Module:  broadcom.pso.vc.vm.guestOps.files.windows.diskcleanup
+ * Module:  broadcom.pso.vcf.vm.guestOps.files.windows.diskcleanup
  *
  * Purpose:
  *   Builds the PowerShell invocation string for the clean-ServerDisk action in
