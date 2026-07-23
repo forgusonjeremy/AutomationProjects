@@ -26,11 +26,15 @@
     behaviours, not just its deletes:
       * vmware-vmsvc-SYSTEM.log  - back-dated, but the cleaner EXCLUDES this name;
                                    it must SURVIVE (Remove-files $FileExclude).
-      * _KEEP_newer_than_threshold.txt - FUTURE-dated; newer than the age cutoff for
-                                   BOTH scenarios, so it must SURVIVE.
-      * _readonly_hidden_*.txt   - back-dated but Read-Only+Hidden; SURVIVES when
-                                   ForceEnable='no' (ccmcache), DELETED when
-                                   ForceEnable='yes' (profiles). Exercises -Force.
+      * _readonly_aged.txt       - back-dated, READ-ONLY only; SURVIVES ForceEnable='no',
+                                   DELETED under ForceEnable='yes'. This is exactly what
+                                   ForceEnable controls (Remove-Item -Force on read-only).
+      * _hidden_aged.txt         - back-dated, HIDDEN only; SURVIVES regardless of
+                                   ForceEnable, because the cleaner's Get-ChildItem does
+                                   NOT use -Force so hidden files are never enumerated.
+                                   This MATCHES the original Ansible behaviour (hidden
+                                   files were never deleted) - it demonstrates that, it
+                                   is not a defect.
 
     Server targeting (choose one parameter set):
       -ComputerName <list>            explicit server names/FQDNs, OR
@@ -83,8 +87,26 @@
     Days in the past to back-date the aged items. Default 30. Must exceed the
     clean's age threshold (files older than |NumberOfDays|; -1 or 0 in production).
 
+.PARAMETER CurrentFiles
+    Number of TODAY/NOW-dated files to create in each target ROOT (named
+    _current_*.txt). Default 3; 0 to skip. These demonstrate the age boundary:
+    they SURVIVE a clean with fileAgeDays=-1 (cutoff = yesterday, so a today-dated
+    file is newer) but are DELETED with fileAgeDays=0 (cutoff = now, so by the time
+    the clean runs they are older than the cutoff). Placed in the root so their fate
+    reflects only the age filter, not a parent folder being deleted around them.
+
+.PARAMETER GrantModifyTo
+    Optional account/group (e.g. 'CONNECT\svc_diskclean' or 'CONNECT\Domain Admins')
+    granted Modify (inherited) on each target root BEFORE seeding, so the seeded
+    items are deletable by the account the clean job runs as. Needed because the
+    default c:\Windows\ccmcache ACL grants a non-admin domain account only read -
+    which would make a live clean fail with access-denied rather than actually
+    testing deletion. Not required if the clean service account is a LOCAL ADMIN on
+    the targets (local admins already have Full via BUILTIN\Administrators, which is
+    also what grants the \\server\C$ admin-share access the automation relies on).
+
 .PARAMETER NoNegativeTests
-    Skip the survive-me artifacts (excluded name, future-dated file, readonly/hidden).
+    Skip the survive-me artifacts (excluded name, read-only, hidden).
 
 .PARAMETER UseRemoting
     Write via PowerShell remoting (Invoke-Command) instead of the UNC admin share.
@@ -108,6 +130,10 @@
     # Seed a custom path via remoting with explicit creds
     .\New-DiskCleanTestData.ps1 -ComputerName winsrv01 -FolderTarget 'c:\Temp\ScratchCache' -UseRemoting -Credential (Get-Credential)
 
+.EXAMPLE
+    # Seed AND grant the clean service account delete rights on the seeded tree
+    .\New-DiskCleanTestData.ps1 -ADGroup 'Security-Servers' -GrantModifyTo 'VCF\svc_diskclean'
+
 .NOTES
     Lab utility only - NOT part of the deployed vRO package. Files are plain text;
     safe to delete. Re-running adds more files.
@@ -116,8 +142,10 @@
       1. Seed:  this script.
       2. Preview: run Clean-ServerDisks-ByADGroup with whatIf='yes' and confirm the
                  transcript lists the aged items as "[ReportOnly] WouldDelete: ...".
-      3. Verify negatives: confirm vmware-vmsvc-SYSTEM.log, _KEEP_newer_than_threshold,
-                 and (for ForceEnable='no') the readonly/hidden file are NOT listed.
+      3. Verify negatives: confirm vmware-vmsvc-SYSTEM.log and (for ForceEnable='no')
+                 the read-only file are NOT listed; the hidden file is never listed
+                 either way. Today-dated _current_*.txt files appear only when
+                 fileAgeDays=0 (not at -1) - use fileAgeDays to control the boundary.
       4. Delete: run whatIf='no' and re-inspect the folders.
 
     SAFETY: seeding c:\users directly is avoided by default (-Scenario profiles uses
@@ -150,6 +178,11 @@ param(
 
     [ValidateRange(1, 36500)]
     [int]$AgeDays = 30,
+
+    [ValidateRange(0, 1000)]
+    [int]$CurrentFiles = 3,
+
+    [string]$GrantModifyTo,
 
     [switch]$NoNegativeTests,
 
@@ -210,25 +243,34 @@ if (-not $ComputerName) { Write-Warning 'No target servers resolved. Nothing to 
 Write-Host ("Target servers ({0}): {1}" -f $ComputerName.Count, ($ComputerName -join ', '))
 Write-Host ("Folder target(s)   : {0}" -f ($cleanTargets -join ', '))
 $agedPerTarget = $FilesPerFolder * (1 + $SubFolders)
-Write-Host ("Plan per target    : {0} aged file(s) across 1 root + {1} subfolder(s), back-dated {2} day(s){3}" -f `
-        $agedPerTarget, $SubFolders, $AgeDays, $(if ($NoNegativeTests) { '' } else { ', + 3 negative-test artifacts' }))
+Write-Host ("Plan per target    : {0} aged file(s) across 1 root + {1} subfolder(s), back-dated {2} day(s); {3} today-dated file(s){4}" -f `
+        $agedPerTarget, $SubFolders, $AgeDays, $CurrentFiles, $(if ($NoNegativeTests) { '' } else { '; + 3 negative-test artifacts' }))
 
 # --- File/folder creation logic (runs locally or inside a remoting session) ---
 $makeData = {
-    param($BaseDir, $FilesPerFolder, $SubFolders, $AgeDays, $NoNegativeTests)
+    param($BaseDir, $FilesPerFolder, $SubFolders, $AgeDays, $NoNegativeTests, $GrantModifyTo, $CurrentFiles)
 
     $created = New-Object System.Collections.Generic.List[string]
-    $aged    = (Get-Date).AddDays(-1 * $AgeDays)
-    $future  = (Get-Date).AddDays(2)   # newer than any production threshold (-1 / 0)
+    $now     = Get-Date
+    $aged    = $now.AddDays(-1 * $AgeDays)
 
-    # Helper: write a text file and stamp its timestamps.
+    # Helper: write a text file, stamp its timestamps, then (optionally) apply
+    # file attributes (e.g. 'ReadOnly' or 'Hidden').
     function New-StampedFile {
-        param($Path, $Stamp, [switch]$ReadOnlyHidden)
+        param($Path, $Stamp, [string]$Attributes = '')
+        # A prior run may have left this file Read-Only/Hidden; clear attributes
+        # first so Set-Content can overwrite it (idempotent re-runs).
+        if (Test-Path -LiteralPath $Path) {
+            try { (Get-Item -LiteralPath $Path -Force).Attributes = 'Normal' } catch { }
+        }
         "Lab placeholder ($([IO.Path]::GetFileName($Path))) for Clean-ServerDisks testing. Safe to delete." |
             Set-Content -LiteralPath $Path -Encoding Ascii -Force -ErrorAction Stop
         $it = Get-Item -LiteralPath $Path -Force
-        if ($ReadOnlyHidden) { $it.Attributes = 'ReadOnly, Hidden' }
+        # Timestamps MUST be set BEFORE a Read-Only attribute - a Read-Only file
+        # rejects CreationTime/LastWriteTime changes with "Access to the path is
+        # denied". Apply the attributes LAST.
         $it.CreationTime = $Stamp; $it.LastWriteTime = $Stamp; $it.LastAccessTime = $Stamp
+        if (-not [string]::IsNullOrWhiteSpace($Attributes)) { $it.Attributes = $Attributes }
     }
 
     # Ensure the target root exists (the automation cleans its CONTENTS, not itself).
@@ -236,6 +278,26 @@ $makeData = {
     if (-not (Test-Path -LiteralPath $BaseDir)) {
         New-Item -ItemType Directory -Path $BaseDir -Force -ErrorAction Stop | Out-Null
         $rootCreated = $true
+    }
+
+    # Optional: grant an account Modify (inherited) on the target BEFORE seeding, so
+    # every child created below inherits it. Addresses ccmcache's default ACL, where
+    # a non-admin domain account gets only read - i.e. the account the clean job runs
+    # as could not delete the seeded items. Give the clean service account (or a
+    # group it is in) here so the test exercises deletion, not an access-denied.
+    $granted = $false
+    if (-not [string]::IsNullOrWhiteSpace($GrantModifyTo)) {
+        try {
+            $acl  = Get-Acl -LiteralPath $BaseDir
+            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+                $GrantModifyTo, 'Modify',
+                'ContainerInherit,ObjectInherit', 'None', 'Allow')
+            $acl.AddAccessRule($rule)
+            Set-Acl -LiteralPath $BaseDir -AclObject $acl -ErrorAction Stop
+            $granted = $true
+        } catch {
+            Write-Warning "Could not grant Modify to '$GrantModifyTo' on ${BaseDir}: $($_.Exception.Message)"
+        }
     }
 
     # Build the folder list: root + N realistic ccmcache-style subfolders.
@@ -259,18 +321,34 @@ $makeData = {
         }
     }
 
-    # Negative-test artifacts (must SURVIVE, except readonly/hidden which survives
-    # only when ForceEnable='no'). Placed in the target root.
+    # Negative-test artifacts, placed in the target ROOT. Each isolates ONE
+    # behaviour so a survivor is unambiguous:
     if (-not $NoNegativeTests) {
-        # (a) excluded by name in Remove-files ($FileExclude) - must survive
+        # (a) EXCLUDED BY NAME in Remove-files ($FileExclude) - must ALWAYS survive.
         New-StampedFile -Path (Join-Path $BaseDir 'vmware-vmsvc-SYSTEM.log') -Stamp $aged
         $created.Add((Join-Path $BaseDir 'vmware-vmsvc-SYSTEM.log'))
-        # (b) future-dated - newer than the age cutoff for both scenarios - must survive
-        New-StampedFile -Path (Join-Path $BaseDir '_KEEP_newer_than_threshold.txt') -Stamp $future
-        $created.Add((Join-Path $BaseDir '_KEEP_newer_than_threshold.txt'))
-        # (c) read-only + hidden, aged - survives ForceEnable='no', deleted ForceEnable='yes'
-        New-StampedFile -Path (Join-Path $BaseDir '_readonly_hidden_aged.txt') -Stamp $aged -ReadOnlyHidden
-        $created.Add((Join-Path $BaseDir '_readonly_hidden_aged.txt'))
+        # (b) READ-ONLY only, aged - this is exactly what ForceEnable controls:
+        #     survives ForceEnable='no' (Remove-Item without -Force cannot delete a
+        #     read-only item), DELETED under ForceEnable='yes' (Remove-Item -Force).
+        New-StampedFile -Path (Join-Path $BaseDir '_readonly_aged.txt') -Stamp $aged -Attributes 'ReadOnly'
+        $created.Add((Join-Path $BaseDir '_readonly_aged.txt'))
+        # (c) HIDDEN only, aged - survives REGARDLESS of ForceEnable. The cleaner's
+        #     Get-ChildItem does not use -Force, so hidden files are never enumerated.
+        #     This matches the ORIGINAL Ansible behaviour (hidden files were never
+        #     deleted); it is here to demonstrate that, not to flag a defect.
+        New-StampedFile -Path (Join-Path $BaseDir '_hidden_aged.txt') -Stamp $aged -Attributes 'Hidden'
+        $created.Add((Join-Path $BaseDir '_hidden_aged.txt'))
+    }
+
+    # TODAY/NOW-dated files in the target ROOT - demonstrate the age BOUNDARY:
+    #   fileAgeDays=-1 (cutoff = yesterday) -> newer than cutoff -> SURVIVE
+    #   fileAgeDays= 0 (cutoff = now)        -> older than cutoff by clean time -> DELETED
+    # Kept in the root (never removed as a folder) so their fate reflects ONLY the age
+    # filter, not a parent folder being deleted around them.
+    for ($i = 1; $i -le $CurrentFiles; $i++) {
+        $name = '_current_{0}_{1:000}.txt' -f $now.ToString('yyyyMMdd-HHmmss'), $i
+        New-StampedFile -Path (Join-Path $BaseDir $name) -Stamp $now
+        $created.Add((Join-Path $BaseDir $name))
     }
 
     # Back-date the SUBFOLDER timestamps LAST - writing child files bumped them to
@@ -284,10 +362,12 @@ $makeData = {
 
     [pscustomobject]@{
         Directory   = $BaseDir
-        AgedFiles   = ($created | Where-Object { $_ -notmatch '_KEEP_|vmware-vmsvc|_readonly_hidden_' }).Count
+        AgedFiles   = ($created | Where-Object { $_ -notmatch 'vmware-vmsvc|_readonly_|_hidden_|_current_' }).Count
+        CurrentFiles = $CurrentFiles
         SubFolders  = $SubFolders
         Negatives   = (-not $NoNegativeTests)
         RootCreated = $rootCreated
+        Granted     = $granted
     }
 }
 
@@ -304,7 +384,7 @@ foreach ($server in $ComputerName) {
                 $icmParams = @{
                     ComputerName = $server
                     ScriptBlock  = $makeData
-                    ArgumentList = @($target, $FilesPerFolder, $SubFolders, $AgeDays, [bool]$NoNegativeTests)
+                    ArgumentList = @($target, $FilesPerFolder, $SubFolders, $AgeDays, [bool]$NoNegativeTests, $GrantModifyTo, $CurrentFiles)
                     ErrorAction  = 'Stop'
                 }
                 if ($Credential) { $icmParams['Credential'] = $Credential }
@@ -314,14 +394,16 @@ foreach ($server in $ComputerName) {
             else {
                 # c:\path -> \\server\C$\path  (same admin-share addressing the automation uses)
                 $unc = '\\{0}\{1}' -f $server, ($target -replace '^([A-Za-z]):', '$1$')
-                $result = & $makeData $unc $FilesPerFolder $SubFolders $AgeDays ([bool]$NoNegativeTests)
+                $result = & $makeData $unc $FilesPerFolder $SubFolders $AgeDays ([bool]$NoNegativeTests) $GrantModifyTo $CurrentFiles
                 $where  = $unc
             }
 
-            $rootNote = if ($result.RootCreated) { ' (created missing target dir)' } else { '' }
-            $negNote  = if ($result.Negatives)   { ' +3 negatives' } else { '' }
-            Write-Host ("[OK]   {0}: {1} aged file(s), {2} subfolder(s){3} in {4}{5}" -f `
-                    $server, $result.AgedFiles, $result.SubFolders, $negNote, $where, $rootNote) -ForegroundColor Green
+            $rootNote  = if ($result.RootCreated) { ' (created missing target dir)' } else { '' }
+            $curNote   = if ($result.CurrentFiles -gt 0) { " +$($result.CurrentFiles) today-dated" } else { '' }
+            $negNote   = if ($result.Negatives)   { ' +3 negatives' } else { '' }
+            $grantNote = if ($result.Granted)     { " [granted Modify to $GrantModifyTo]" } else { '' }
+            Write-Host ("[OK]   {0}: {1} aged file(s), {2} subfolder(s){3}{4} in {5}{6}{7}" -f `
+                    $server, $result.AgedFiles, $result.SubFolders, $curNote, $negNote, $where, $rootNote, $grantNote) -ForegroundColor Green
             $totalAged += $result.AgedFiles
             $okCount++
         }
@@ -338,11 +420,15 @@ Write-Host '=================== Seeding Summary ==================='
 Write-Host ("  Seed operations OK   : {0}" -f $okCount)
 Write-Host ("  Seed operations FAIL : {0}" -f $failCount) -ForegroundColor $(if ($failCount) { 'Red' } else { 'Gray' })
 Write-Host ("  Total aged files     : {0}  (back-dated {1} day(s))" -f $totalAged, $AgeDays)
+if ($CurrentFiles -gt 0) {
+    Write-Host ("  Today-dated files    : {0} per target (_current_*.txt in the root)" -f $CurrentFiles)
+    Write-Host "                         -> SURVIVE fileAgeDays=-1 (newer than yesterday); DELETED fileAgeDays=0 (older than now)"
+}
 if (-not $NoNegativeTests) {
-    Write-Host '  Negative-test artifacts per target (expected to SURVIVE a clean):'
-    Write-Host '    - vmware-vmsvc-SYSTEM.log        (excluded by name)'
-    Write-Host '    - _KEEP_newer_than_threshold.txt (future-dated, newer than cutoff)'
-    Write-Host "    - _readonly_hidden_aged.txt      (survives ForceEnable='no'; deleted ForceEnable='yes')"
+    Write-Host '  Negative-test artifacts per target:'
+    Write-Host '    - vmware-vmsvc-SYSTEM.log        SURVIVES always (excluded by name)'
+    Write-Host "    - _readonly_aged.txt             SURVIVES ForceEnable='no'; DELETED ForceEnable='yes'"
+    Write-Host '    - _hidden_aged.txt               SURVIVES always (hidden; cleaner does not enumerate with -Force, matches original)'
 }
 Write-Host '  Next: run Clean-ServerDisks-ByADGroup with whatIf=yes and confirm the'
 Write-Host "        aged items appear as '[ReportOnly] WouldDelete: ...' and the"

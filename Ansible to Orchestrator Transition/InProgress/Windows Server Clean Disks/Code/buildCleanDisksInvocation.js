@@ -44,9 +44,11 @@
  *                              e.g. 'c:\Windows\ccmcache' or 'c:\Windows\ccmcache,c:\Temp'.
  *                              Each c:\path is rewritten to \\server\c$\path.          -> -FolderTarget
  *   fileFilter     (string)  - File-name filter, e.g. '*.*'                            -> -FilterOn
- *   fileAgeDays    (number)  - Delete items older than N days.  Uses the script's
- *                              AddDays() convention: 0 (all) or negative (e.g. -1 =
- *                              items last written before yesterday).                    -> -NumberOfDays
+ *   olderThanDays  (number)  - Delete items OLDER THAN this many days. Intuitive,
+ *                              POSITIVE whole number (>= 0): 4 = "4 days old or older",
+ *                              1 = "older than a day", 0 = "delete everything up to now".
+ *                              The script uses a NEGATIVE AddDays() convention, so this
+ *                              is converted here: -NumberOfDays = -olderThanDays.       -> -NumberOfDays
  *   folderIncluded (boolean) - true = also delete folders; false = files only          -> -FolderIncluded ('yes'/'no')
  *   forceEnable    (boolean) - true = remove read-only/hidden items (-Force)           -> -ForceEnable ('yes'/'no')
  *   whatIf         (string)  - 'yes' = report only (default, safe); 'no' = live delete -> -WhatIf
@@ -72,18 +74,34 @@ if (!fileFilter || fileFilter.trim() === "") {
     throw new Error("buildCleanDisksInvocation: fileFilter is required and must not be empty (e.g. '*.*').");
 }
 
-// fileAgeDays must be a whole number. The clean uses (Get-Date).AddDays(N), so a
-// value of 0 (all items) or a negative value (older than |N| days) is expected;
-// positive values are unusual but permitted (they select future-dated items only).
-if (fileAgeDays === null || fileAgeDays === undefined || String(fileAgeDays).trim() === "") {
-    throw new Error("buildCleanDisksInvocation: fileAgeDays is required.");
+// olderThanDays is the OPERATOR-FACING, intuitive value: a POSITIVE whole number of
+// days meaning "delete items older than this many days" (4 = 4 days old or older,
+// 1 = older than a day, 0 = delete everything up to now). Negative values are
+// rejected - the negative AddDays() convention is an implementation detail handled
+// below, not something the operator should ever type.
+if (olderThanDays === null || olderThanDays === undefined || String(olderThanDays).trim() === "") {
+    throw new Error("buildCleanDisksInvocation: olderThanDays is required.");
 }
-var ageDays = parseInt(fileAgeDays, 10);
-if (isNaN(ageDays) || String(ageDays) !== String(fileAgeDays).trim()) {
+var retentionDays = parseInt(olderThanDays, 10);
+if (isNaN(retentionDays) || String(retentionDays) !== String(olderThanDays).trim()) {
     throw new Error(
-        "buildCleanDisksInvocation: fileAgeDays must be a whole number (e.g. -1, 0). Received: " + fileAgeDays
+        "buildCleanDisksInvocation: olderThanDays must be a whole number of days (e.g. 4, 1, 0). Received: " + olderThanDays
     );
 }
+if (retentionDays < 0) {
+    throw new Error(
+        "buildCleanDisksInvocation: olderThanDays must be 0 or greater (it is a positive 'older than N days' " +
+        "value: 4 = 4 days old or older, 0 = delete everything). Received: " + retentionDays
+    );
+}
+
+// Convert the intuitive positive value to the script's negative AddDays() convention.
+// cvs_functions.ps1 deletes items whose LastWriteTime < (today + NumberOfDays), so to
+// delete items older than N days the script needs NumberOfDays = -N.
+//   olderThanDays 4 -> -NumberOfDays '-4' (cutoff = 4 days ago)
+//   olderThanDays 1 -> -NumberOfDays '-1' (cutoff = yesterday)
+//   olderThanDays 0 -> -NumberOfDays '0'  (cutoff = now; deletes everything up to now)
+var numberOfDays = -retentionDays;   // JS: -0 stringifies to "0", so 0 stays "0"
 
 // whatIf is the sole safety control for a DESTRUCTIVE action. Require an explicit
 // 'yes' or 'no'; the script fails safe on anything else, but a typo should not
@@ -111,7 +129,7 @@ if (wi === "no") {
 
 // Dangerous-root nudge: warn if any folder target resolves to a drive root or a
 // critical system directory. cvs_functions.ps1 excludes vmware-vmsvc-SYSTEM.log and
-// honours fileAgeDays, but a bare 'c:\' or 'c:\Windows' target is almost never
+// honours olderThanDays, but a bare 'c:\' or 'c:\Windows' target is almost never
 // intended. This is a warning only - the operator remains in control.
 var targets = folderTarget.split(",");
 for (var t = 0; t < targets.length; t++) {
@@ -146,7 +164,7 @@ if (groupDN.trim().toUpperCase().indexOf("DC=") === -1) {
 //   -DomainName      ← domainName
 //   -FolderTarget    ← folderTarget      (Convert-YAMLList + split ',' inside the script)
 //   -FilterOn        ← fileFilter
-//   -NumberOfDays    ← fileAgeDays        (Remove-files (Get-Date).AddDays(N))
+//   -NumberOfDays    ← -olderThanDays     (Remove-files (Get-Date).AddDays(N); N = -olderThanDays)
 //   -FolderIncluded  ← 'yes'/'no'
 //   -ForceEnable     ← 'yes'/'no'
 //   -WhatIf          ← 'yes'/'no'         (safety gate: only 'no' deletes)
@@ -175,7 +193,7 @@ var invocationString =
     " -DomainName " + psQuote(domainName.trim()) +
     " -FolderTarget " + psQuote(folderTarget.trim()) +
     " -FilterOn " + psQuote(fileFilter.trim()) +
-    " -NumberOfDays '" + ageDays + "'" +
+    " -NumberOfDays '" + numberOfDays + "'" +
     " -FolderIncluded '" + (folderIncluded === true ? "yes" : "no") + "'" +
     " -ForceEnable '" + (forceEnable === true ? "yes" : "no") + "'" +
     " -WhatIf '" + wi + "'" +
@@ -187,7 +205,7 @@ System.log(
     " | domainName=" + domainName +
     " | folderTarget=" + folderTarget +
     " | fileFilter=" + fileFilter +
-    " | fileAgeDays=" + ageDays +
+    " | olderThanDays=" + retentionDays + " (-> -NumberOfDays " + numberOfDays + ")" +
     " | folderIncluded=" + (folderIncluded === true) +
     " | forceEnable=" + (forceEnable === true) +
     " | whatIf=" + wi

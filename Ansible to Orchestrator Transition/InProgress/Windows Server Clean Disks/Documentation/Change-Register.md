@@ -159,6 +159,31 @@ foreach ($c in $candidates) {
 
 ---
 
+## 2A. Items the clean intentionally PRESERVES (never deletes)
+
+> **This is a required, customer-facing list.** The `clean-ServerDisk` action does
+> **not** delete everything under a target — several categories are preserved by
+> design. This behaviour is inherited from the original Ansible script (except where
+> noted) and must be reproduced verbatim in the user-facing docs
+> (`02_Design_Document`, `04_User_Guide`) so operators are never surprised.
+
+| # | Preserved item | Why / mechanism | Configurable? |
+|---|----------------|-----------------|---------------|
+| 1 | **`vmware-vmsvc-SYSTEM.log`** | Hardcoded name exclusion in `Remove-files`: `$FileExclude = "vmware-vmsvc-SYSTEM.log"`, tested with `$_.Name -cne $FileExclude`. Protects the live VMware guest-info log. Inherited from the original script. | No — hardcoded. **Case-sensitive** (`-cne`): only the exact casing `vmware-vmsvc-SYSTEM.log` is protected; a differently-cased copy would be deleted. |
+| 2 | **Anything newer than the age cutoff** | `Remove-files` deletes only items where `LastWriteTime -lt (today + NumberOfDays)`. Files/folders at or after the cutoff are kept. | Yes — via `fileAgeDays` (`-NumberOfDays`). `0` = older than now; `-1` = older than yesterday. |
+| 3 | **Loose hidden / system files** | `Get-ChildItem` runs **without `-Force`**, so hidden/system files directly in a target are never enumerated and never deleted — regardless of `ForceEnable`. (A hidden file *nested inside a folder that is itself deleted* still goes, via the parent's `-Recurse -Force`.) Matches the original script. | No (matches original). Would require adding `-Force` to the enumeration — a deliberate behaviour change, not currently made. |
+| 4 | **The target root folder itself** | `Remove-files` cleans the **contents** of the target (`Get-ChildItem -Path <target> -Recurse` lists children only); the target directory is never a candidate. So `c:\Windows\ccmcache` / `c:\users` are emptied but not removed. Correct and intended (you never want `c:\users` deleted). | No — by design. |
+| 5 | **Read-only files** when `ForceEnable=no` | Without `-Force`, `Remove-Item` cannot delete a read-only item, so it is left (and logged as an `Error:`). `ForceEnable=yes` deletes them. `ForceEnable` is **only** a read-only switch — it has no effect on hidden files (see #3). | Yes — via `forceEnable`. |
+| 6 | **All folders** when `FolderIncluded=no` | With `FolderIncluded=no` the enumeration adds `-File`, so only files are candidates; directories are left in place. `FolderIncluded=yes` allows folder deletion. | Yes — via `folderIncluded`. |
+| 7 | **Everything** when `whatIf=yes` | Report-only mode (`-ReportOnly`) lists `[ReportOnly] WouldDelete: …` and deletes nothing. This is the default. | Yes — via `whatIf` (`yes`/`no`). |
+
+**Lab validation:** the seeder `lab/New-DiskCleanTestData.ps1` creates one negative-test
+artifact per preserved category (`vmware-vmsvc-SYSTEM.log`, `_KEEP_newer_than_threshold.txt`
+[future-dated], `_readonly_aged.txt`, `_hidden_aged.txt`) so each rule above can be
+observed surviving a run.
+
+---
+
 ## 3. Changes to the automation process (Ansible → Orchestrator)
 
 | # | Date | Area | Current process (Ansible) | New process (Orchestrator) | Reason |
@@ -167,6 +192,8 @@ foreach ($c in $candidates) {
 | P-15 | 2026-07-22 | AD targeting method | Flat, **unfiltered** `Get-ListOfServers` (non-recursive; returns users + disabled objects too) | **`Get-ListOfServers-Direct`** — non-recursive, **Enabled-only**, per-object isolation, disabled skips logged | Deleting files is destructive → membership must be explicit (no nested-group expansion), matching the reboot precedent (S-7); disabled/decommissioned and non-computer objects are excluded and logged |
 | P-16 | 2026-07-22 | Safety / preview | None — the action always deleted | **`whatIf` gate**, default `yes` (report-only). `yes` lists would-delete items and deletes nothing; `no` deletes for real | Destructive automation needs a preview; mirrors the report-only safety mode added to `Remove-OldFiles-UNCShare` (S-1). `whatIf` is the sole safety control (there is no interactive prompt in a non-interactive vRO session) |
 | P-17 | 2026-07-22 | Variables / secrets | `vars` / `group_vars` / `become` | Workflow inputs with defaults set directly on each input (no Configuration Element); credentials via the PS host plug-in service account | Standard Orchestrator patterns; these values are static per environment, so self-contained inputs are preferred over a shared Config Element (same decision as Move-ArchivedLogs-ByADGroup, P-8) |
+| P-18 | 2026-07-23 | Age-threshold input | `var_NumberOfDays` is a **negative** value (`-1`, `-4`) fed straight to the script's `(Get-Date).AddDays(N)` | Operator-facing workflow input is a **positive** `olderThanDays` — "delete items older than N days" (`4` = 4 days old or older, `1` = older than a day, `0` = everything up to now). The **build action converts** it to the script's negative convention (`-NumberOfDays = -olderThanDays`); negatives are rejected on the form. **No `cvs_functions.ps1` change** — the script still receives the negative value | The negative form is a footgun on a user form (a bigger negative is *less* aggressive, and there is "no such thing as -4 days old"). A positive "older than N days" reads naturally and matches the sibling `Remove-OldFiles-UNCShare` `olderThanDays` input. Kept entirely in the vRO layer so the shared script and its other callers are unaffected |
+| P-19 | 2026-07-23 | File filter | `var_FilterOn` (`*.*`) supplied as a variable | `fileFilter` is a **fixed workflow attribute `*.*`**, NOT an operator input | `-FilterOn` in `Remove-files` is applied to **directory names too**, not just files. `*.*` matches every file **and** folder, so `FolderIncluded='yes'` actually deletes folders; a restrictive filter such as `*.txt` matches no folders (they aren't named `*.txt`), so folders would silently NOT be deleted. Pinning the filter to `*.*` and keeping it off the form removes that footgun. All eight production templates already use `*.*`. **No `cvs_functions.ps1` or build-action change** — the action passes the attribute value through unchanged |
 
 **Net result:** 1 playbook → **1** workflow (`Clean-ServerDisks-ByADGroup`); the
 invoked action (`clean-ServerDisk`) already exists in the deployed script; the
@@ -191,8 +218,8 @@ PowerShell script* contract is reused unchanged.
 | `var_ADGroupMember` (`CVS-DPT-AllServers`) | `groupDN` | `-ADGroupMember` |
 | `var_DomainName` (`connect.sbu`) | `domainName` | `-DomainName` |
 | `var_FolderTarget` (`c:\Windows\ccmcache`) | `folderTarget` | `-FolderTarget` |
-| `var_FilterOn` (`*.*`) | `fileFilter` | `-FilterOn` |
-| `var_NumberOfDays` (`-1`) | `fileAgeDays` | `-NumberOfDays` |
+| `var_FilterOn` (`*.*`) | `fileFilter` — **fixed workflow attribute `*.*`** (not an operator input) | `-FilterOn` |
+| `var_NumberOfDays` (`-1`) | `olderThanDays` (positive; `1`) | `-NumberOfDays` (build action sends `-olderThanDays`) |
 | `var_FolderIncluded` (`yes`) | `folderIncluded` (boolean) | `-FolderIncluded` |
 | `var_ForceEnable` (`no`) | `forceEnable` (boolean) | `-ForceEnable` |
 | (none — new) | `whatIf` (yes/no, default yes) | `-WhatIf` |
@@ -205,7 +232,7 @@ PowerShell script* contract is reused unchanged.
 
 | Item | Status / note |
 |---|---|
-| Customer documentation set (01_Executive_Summary … 05_Validation_and_Testing_Plan) | **Next pass** — this session delivered script hardening + code + this register |
+| Customer documentation set (01_Executive_Summary … 05_Validation_and_Testing_Plan) | **Next pass** — this session delivered script hardening + code + this register. **Must include the section 2A "Items intentionally preserved" list** in `02_Design_Document` and `04_User_Guide` (especially the `vmware-vmsvc-SYSTEM.log` name exclusion, which is not obvious from the inputs). |
 | `.package` export (`com.broadcom.pso…diskcleanup`) | Built from the action + workflow once the workflow is assembled in vRO |
 | Per-server structured reporting / email on completion | Deferred — script outputs aggregate stdout; `clean-ServerDisk` does not currently email a report |
 | Freed-space (bytes deleted) summary in the transcript | Candidate enhancement — `Remove-files` currently reports item counts, not sizes |
@@ -217,3 +244,6 @@ PowerShell script* contract is reused unchanged.
 | Date | Author | Summary |
 |---|---|---|
 | 2026-07-22 | Automation transition | Initial register. Script changes **S-14** (`clean-ServerDisk`: AD-module guard, `Get-ListOfServers-Direct` resolver, `whatIf` report-only gate, per-server isolation, zero-result guard) and **S-15** (`Remove-files`: `-ErrorAction Stop`, fixed catch message, single-pipeline selection, per-item delete, `-ReportOnly` / `-ServerName`). Process changes **P-14 … P-17** (Ansible→Orchestrator; direct Enabled-only targeting; whatIf safety gate; inputs with direct defaults, no Config Element). Code: `buildCleanDisksInvocation` action + `Clean-ServerDisks-ByADGroup` workflow spec. |
+| 2026-07-23 | Automation transition | Process change **P-19**: pinned `fileFilter` to a **fixed workflow attribute `*.*`** (removed it from the operator form). `-FilterOn` applies to directory names too, so a restrictive filter (e.g. `*.txt`) silently prevents folder deletion under `FolderIncluded='yes'`; `*.*` matches all files and folders. No code change. Updated the workflow spec and variable-mapping table. |
+| 2026-07-23 | Automation transition | Process change **P-18**: replaced the negative `fileAgeDays` workflow input with a positive, intuitive **`olderThanDays`** ("delete items older than N days"); the `buildCleanDisksInvocation` action converts it to the script's negative `-NumberOfDays` (`-olderThanDays`) and rejects negatives. Default `1` (== the former `-1`). No `cvs_functions.ps1` change. Updated the build action, workflow spec, and variable-mapping table. |
+| 2026-07-23 | Automation transition | Added **section 2A "Items the clean intentionally preserves"** — the full, customer-facing list of what is *not* deleted (the `vmware-vmsvc-SYSTEM.log` case-sensitive name exclusion, newer-than-cutoff items, loose hidden/system files, the target root folder, read-only files under `ForceEnable=no`, folders under `FolderIncluded=no`, and report-only `whatIf=yes`). Flagged it as a required section for the pending `02_Design_Document` / `04_User_Guide`. No code change. Prompted by the `vmware-vmsvc-SYSTEM.log` exclusion not being obvious from the workflow inputs. |

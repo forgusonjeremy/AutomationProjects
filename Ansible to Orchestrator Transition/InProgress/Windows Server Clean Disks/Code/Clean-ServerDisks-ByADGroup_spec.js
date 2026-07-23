@@ -40,8 +40,8 @@
  *          groupDN        ← workflow input: groupDN
  *          domainName     ← workflow input: domainName
  *          folderTarget   ← workflow input: folderTarget
- *          fileFilter     ← workflow input: fileFilter
- *          fileAgeDays    ← workflow input: fileAgeDays
+ *          fileFilter     ← workflow attribute: fileFilter (constant '*.*')
+ *          olderThanDays  ← workflow input: olderThanDays
  *          folderIncluded ← workflow input: folderIncluded
  *          forceEnable    ← workflow input: forceEnable
  *          whatIf         ← workflow input: whatIf
@@ -88,11 +88,17 @@
  *   groupDN        string                      (none)                             Mandatory
  *   domainName     string                      vcf.lab                            Mandatory
  *   folderTarget   string                      c:\Windows\ccmcache                Mandatory
- *   fileFilter     string                      *.*                                Mandatory
- *   fileAgeDays    number                      -1                                 Mandatory
+ *   olderThanDays  number                      1                                  Mandatory
  *   folderIncluded boolean                     true                               Mandatory
  *   forceEnable    boolean                     false                              Mandatory
  *   whatIf         string (yes/no dropdown)    yes                                Mandatory
+ *
+ *   NOTE: fileFilter is NOT an operator input. It is a fixed workflow ATTRIBUTE with
+ *   the constant value '*.*' (see ATTRIBUTES). '*.*' matches every file AND every
+ *   folder, so FolderIncluded='yes' actually deletes folders. A restrictive filter
+ *   such as '*.txt' is also applied to directory names, so folders (rarely named
+ *   '*.txt') would NOT be deleted - which is why the filter is pinned to '*.*' and
+ *   kept off the form. All eight production templates use '*.*'.
  *
  *   The default values above are set once on each input when the workflow is built
  *   (environment-specific values such as scriptPath / domainName should be adjusted
@@ -104,10 +110,13 @@
  *   by Get-ListOfServers-Direct (DIRECT members only).
  *
  *   folderTarget is one or more local paths to clean, comma-separated (each c:\path
- *   is rewritten inside the script to \\server\c$\path). fileFilter is passed as
- *   -FilterOn. fileAgeDays is passed as -NumberOfDays; the script deletes items
- *   whose LastWriteTime is older than (today + fileAgeDays), so use 0 (all) or a
- *   negative value (e.g. -1 = items last written before yesterday).
+ *   is rewritten inside the script to \\server\c$\path). The fixed fileFilter '*.*'
+ *   attribute is passed as -FilterOn. olderThanDays is the intuitive, POSITIVE age threshold - "delete items
+ *   older than N days": 4 = 4 days old or older, 1 = older than a day (the default),
+ *   0 = delete everything up to now. The build action converts it to the script's
+ *   negative convention (-NumberOfDays = -olderThanDays); operators never type a
+ *   negative number. Rule of thumb: "delete items older than <olderThanDays> days."
+ *   (Maps from the Ansible var_NumberOfDays '-1', which is olderThanDays 1.)
  *
  *   whatIf is the SAFETY GATE and the recommended default is 'yes' (report only):
  *     - 'yes' → report-only; the script lists the items that WOULD be deleted and
@@ -120,6 +129,9 @@
  * ATTRIBUTES
  * ───────────────────────────────────────────────────────────────────────────
  *
+ *   fileFilter        string ('*.*')                       - Fixed filter, NOT an operator input; bound to
+ *                                                            buildCleanDisksInvocation's fileFilter → -FilterOn.
+ *                                                            '*.*' matches all files AND folders.
  *   invocationString  string                               - Built by buildCleanDisksInvocation
  *   psRawOutput       PowerShell:PowerShellRemotePSObject  - Output from OOTB PS workflow
  *   parsedResult      Properties                           - Output from parseScriptOutput
