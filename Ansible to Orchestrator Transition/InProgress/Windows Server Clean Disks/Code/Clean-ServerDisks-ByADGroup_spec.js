@@ -4,7 +4,7 @@
  * Folder:   Production >> Servers >> Windows >> Disk Cleanup
  *           (lab/dev: Workflows >> Customer >> <Customer Name> >> Production >> Servers >> Windows >> Disk Cleanup)
  *           NOTE: the action lives in the module namespace declared in the action
- *           .js file (broadcom.pso.vc.vm.guestOps.files.windows.diskcleanup) -
+ *           .js file (broadcom.pso.vcf.vm.guestOps.files.windows.diskcleanup) -
  *           only the WORKFLOW folder uses the path above.
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -35,7 +35,7 @@
  *     │
  *     ▼
  * [Action: buildCleanDisksInvocation]
- *     Module: broadcom.pso.vc.vm.guestOps.files.windows.diskcleanup
+ *     Module: broadcom.pso.vcf.vm.guestOps.files.windows.diskcleanup
  *     IN:  scriptPath     ← workflow input: scriptPath
  *          groupDN        ← workflow input: groupDN
  *          domainName     ← workflow input: domainName
@@ -60,7 +60,7 @@
  *     │
  *     ▼
  * [Action: parseScriptOutput]
- *     Module: broadcom.pso.vc.vm.guestOps.files.windows.diskcleanup
+ *     Module: broadcom.pso.vcf.vm.guestOps.files.windows.diskcleanup
  *     IN:  psOutput         ← workflow attribute: psRawOutput
  *          executionContext ← (inline expression) groupDN + " @ " + domainName + " (whatIf=" + whatIf + ")"
  *     OUT: parsedResult → workflow attribute: parsedResult
