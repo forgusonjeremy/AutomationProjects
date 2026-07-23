@@ -209,36 +209,88 @@ Function Remove-files { # Remove-files -Path "C:\TempDir" -FilterOn "*.ps1" -Day
 
         [Parameter(Mandatory=$false)]
         [ValidateNotNullOrEmpty()]
-        [string] $NumberOfDays = 0
+        [string] $NumberOfDays = 0,
+
+        # S-15: report-only preview. When $true, the candidate items are enumerated
+        # and logged as "WouldDelete" but NOTHING is removed. Mirrors the S-1
+        # report-only mode on Remove-OldFiles-UNCPath so the clean-ServerDisk action
+        # can offer a safe dry-run (whatIf='yes').
+        [Parameter(Mandatory=$false)]
+        [bool] $ReportOnly = $false,
+
+        # S-15: optional server context for log lines. The clean-ServerDisk loop
+        # (S-14) passes the target name so a failure line identifies which server
+        # it belongs to.
+        [Parameter(Mandatory=$false)]
+        [string] $ServerName = ''
     )
     Begin{
         $dateTime = (Get-Date).AddDays([int]$NumberOfDays)
+        $ctx = if ([string]::IsNullOrWhiteSpace($ServerName)) { '' } else { "[$ServerName] " }
     }
     Process{
         Try {
             $FolderIncluded = $FolderIncluded.ToLower()
             $ForceEnable = $ForceEnable.ToLower()
             $FileExclude = "vmware-vmsvc-SYSTEM.log"
-            if( $ForceEnable -eq 'yes'){
-                if( $FolderIncluded -eq 'yes' ){
-                    Write-Log "Info: cleaning $($path) - FolderIncluded:$FolderIncluded FilterOn:$FilterOn ForceEnable:$ForceEnable NumberOfDays:$NumberOfDays" $true
-                    Get-ChildItem -recurse -Filter $FilterOn -Path $Path | Where-Object { $_.LastWriteTime -lt $dateTime -and $_.Name -cne $FileExclude } | Remove-Item -Force -recurse -Confirm:$false
 
-                }else{
-                    Write-Log "Info: cleaning $($path) - FolderIncluded:$FolderIncluded FilterOn:$FilterOn ForceEnable:$ForceEnable NumberOfDays:$NumberOfDays" $true
-                    Get-ChildItem -recurse -File -Filter $FilterOn -Path $Path | Where-Object { $_.LastWriteTime -lt $dateTime -and $_.Name -cne $FileExclude } | Remove-Item -Force -recurse -Confirm:$false
+            # S-15: candidate selection is now a SINGLE pipeline (was four near-identical
+            # branches) so report-only and live delete share identical selection.
+            #   FolderIncluded='yes' -> include directories (no -File); 'no' -> -File only.
+            # -ErrorAction Stop promotes an unreachable target (server down / inaccessible
+            # \\server\C$ admin share) from a SILENT non-terminating error on the PS error
+            # stream into a TERMINATING error caught below and logged to stdout - the S-3
+            # fix (previously applied to Move-files), applied here to Remove-files.
+            $gciParams = @{ Path = $Path; Recurse = $true; Filter = $FilterOn; ErrorAction = 'Stop' }
+            if ($FolderIncluded -ne 'yes') { $gciParams['File'] = $true }
+
+            $candidates = @(Get-ChildItem @gciParams |
+                Where-Object { $_.LastWriteTime -lt $dateTime -and $_.Name -cne $FileExclude })
+
+            $count = $candidates.Count
+
+            # Report-only: list what WOULD be removed, delete nothing.
+            if ($ReportOnly) {
+                Write-Log "Info: $($ctx)ReportOnly - $count item(s) under '$Path' match FilterOn:$FilterOn FolderIncluded:$FolderIncluded ForceEnable:$ForceEnable NumberOfDays:$NumberOfDays. NOTHING will be deleted." $true
+                foreach ($c in $candidates) {
+                    Write-Log "Info: $($ctx)[ReportOnly] WouldDelete: $($c.FullName) (LastWriteTime: $($c.LastWriteTime))" $true
                 }
-            }else{
-                if( $FolderIncluded -eq 'yes' ){
-                    Write-Log "Info: cleaning $($path) - FolderIncluded:$FolderIncluded FilterOn:$FilterOn ForceEnable:$ForceEnable NumberOfDays:$NumberOfDays" $true
-                    Get-ChildItem -recurse -Filter $FilterOn -Path $Path | Where-Object { $_.LastWriteTime -lt $dateTime  -and $_.Name -cne $FileExclude} | Remove-Item -recurse -Confirm:$false
-                }else{
-                    Write-Log "Info: cleaning $($path) - FolderIncluded:$FolderIncluded FilterOn:$FilterOn ForceEnable:$ForceEnable NumberOfDays:$NumberOfDays" $true
-                    Get-ChildItem -recurse -File -Filter $FilterOn -Path $Path | Where-Object { $_.LastWriteTime -lt $dateTime -and $_.Name  -and $_.Name -cne $FileExclude } | Remove-Item -recurse -Confirm:$false
-                }
+                return
             }
 
-        }Catch{ Write-Log "Error: $_.Exception.message" $true} 
+            Write-Log "Info: $($ctx)cleaning $($Path) - $count item(s) - FolderIncluded:$FolderIncluded FilterOn:$FilterOn ForceEnable:$ForceEnable NumberOfDays:$NumberOfDays" $true
+
+            # Delete per item (not one bulk pipe) so a single failure is logged and the
+            # rest still proceed ("any failure should be logged"). ForceEnable='yes'
+            # keeps the original -Force semantics (removes read-only/hidden items).
+            $useForce = ($ForceEnable -eq 'yes')
+            $deleted = 0; $failed = 0
+            foreach ($c in $candidates) {
+                Try {
+                    if ($useForce) {
+                        Remove-Item -LiteralPath $c.FullName -Force -Recurse -Confirm:$false -ErrorAction Stop
+                    } else {
+                        Remove-Item -LiteralPath $c.FullName -Recurse -Confirm:$false -ErrorAction Stop
+                    }
+                    $deleted++
+                } Catch {
+                    # A child already removed by a parent directory's -Recurse is not a
+                    # real failure - only count/log it if the item is genuinely still there.
+                    if (Test-Path -LiteralPath $c.FullName) {
+                        $failed++
+                        Write-Log "Error: $($ctx)failed to delete '$($c.FullName)': $($_.Exception.Message)" $true
+                    }
+                }
+            }
+            Write-Log "Info: $($ctx)deleted $deleted item(s); $failed failure(s) under '$Path'." $true
+
+        }Catch{
+            # S-15: fixed the malformed catch message ("Error: $_.Exception.message"
+            # never expanded the exception and mislabelled the stream) to a proper,
+            # context-tagged message. Non-terminating for the overall run: the
+            # clean-ServerDisk loop's own try/catch (S-14) continues with the next server.
+            Write-Log "Error: $($ctx)failed cleaning '$FilterOn' under '$Path': $($_.Exception.Message)" $true
+        }
     }
 }       # Remove-files
 
@@ -1582,19 +1634,73 @@ function Main($Action){
 
         }
         'clean-ServerDisk'{
-            $delimiter = ','
-            $ListOfComputers = Get-ListOfServers -SecurityGroup $ADGroupMember -DomainName $DomainName
-            $ListOfServers = @()
-            $ListOfFolder = $FolderTarget
-            $ListOfFolder = Convert-YAMLList $ListOfFolder
-            foreach($L in $ListOfComputers){ 
-                $ListOfServers += ($L.name)
-                $parsedArray = ($ListOfFolder -split $delimiter).Trim()    
-                foreach( $f in $parsedArray){
-                    $f = $f.replace(':', '$')
-                    $path = "\\$($L.name)\$($f)"
-                    #Write-Log "Info: $($L.name) - cleaning $($path) - FolderIncluded=$FolderIncluded" $true
-                    Remove-files -Path $path -FilterOn $FilterOn -NumberOfDays $NumberOfDays -FolderIncluded $FolderIncluded -ForceEnable $ForceEnable
+            # S-14: hardened to the standards of the other AD-group actions
+            # (move-archived-logs-ByCN, Invoke-ServerReboot). Behaviour changes:
+            #  - AD module guard: no module => no server resolution => EVERY clean would
+            #    fail, so throw (terminating -> the vRO caller routes to its failure end
+            #    state) rather than silently doing nothing.
+            #  - DIRECT (non-recursive) ENABLED computer members only, via
+            #    Get-ListOfServers-Direct. Deleting files is destructive, so only what
+            #    the operator placed DIRECTLY in the group is a target - nested
+            #    sub-groups are never expanded and disabled accounts are skipped+logged.
+            #    (Replaces the legacy flat, UNFILTERED Get-ListOfServers, which also
+            #    returned user objects and disabled computers.)
+            #  - whatIf safety gate ($WhatIf): 'yes' => report-only (list would-delete,
+            #    delete nothing); 'no' => live delete; anything else => Error + no action.
+            #    Fails SAFE - only an explicit 'no' deletes.
+            #  - Per-server try/catch isolation and a zero-result guard, so one
+            #    unreachable server (or an empty group / empty folder list) neither
+            #    aborts the run nor is silently mistaken for success.
+            $strModule = 'ActiveDirectory'
+            if (-not (Invoke-Module $strModule)) {
+                Write-Log "Error: Unable to import PS Module $($strModule) or it is NOT installed. Cannot resolve servers - aborting." $true
+                throw "ActiveDirectory module not available on the PS host; cannot resolve group '$($ADGroupMember)'."
+            }
+
+            # whatIf gate - fail safe: only an explicit 'no' deletes; anything that is
+            # not 'yes'/'no' logs an Error and takes no action.
+            $wi = ("$WhatIf").Trim().ToLower()
+            if ($wi -eq 'no') {
+                $reportOnly = $false
+            } elseif ($wi -eq 'yes') {
+                $reportOnly = $true
+            } else {
+                Write-Log "Error: clean-ServerDisk - invalid WhatIf value '$WhatIf' (expected 'yes' or 'no'). No action taken." $true
+                return
+            }
+
+            # DIRECT enabled computer members only. A group-resolution failure is a total
+            # failure (see Get-ListOfServers-Direct) and is allowed to terminate the run.
+            $ListOfComputers = Get-ListOfServers-Direct -SecurityGroup $ADGroupMember -DomainName $DomainName
+            if (($ListOfComputers | Measure-Object).Count -eq 0) {
+                Write-Log "Warn: clean-ServerDisk - group '$($ADGroupMember)' resolved to zero enabled, direct computer members. No action taken." $true
+                return
+            }
+
+            # Folder targets: Convert-YAMLList tolerates the YAML list form carried over
+            # from the Ansible vars (e.g. "[ 'c:\Windows\ccmcache' ]"); a plain
+            # comma-separated string passes through unchanged. Empty entries are dropped.
+            $ListOfFolder = Convert-YAMLList $FolderTarget
+            $parsedArray = @(($ListOfFolder -split ',') | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            if ($parsedArray.Count -eq 0) {
+                Write-Log "Error: clean-ServerDisk - no folder targets supplied (FolderTarget='$FolderTarget'). No action taken." $true
+                return
+            }
+
+            Write-Log "Info: clean-ServerDisk - $(($ListOfComputers | Measure-Object).Count) server(s), $($parsedArray.Count) folder target(s), ReportOnly=$reportOnly, FilterOn='$FilterOn', NumberOfDays='$NumberOfDays', FolderIncluded='$FolderIncluded', ForceEnable='$ForceEnable'." $true
+
+            foreach($L in $ListOfComputers){
+                # Per-server isolation: one unreachable/failed server must not stop the
+                # rest. Remove-files logs its own failures; this Catch is a backstop.
+                Try {
+                    foreach($f in $parsedArray){
+                        $unc  = $f.replace(':', '$')                 # c:\path -> c$\path (admin share)
+                        $path = "\\$($L.name)\$($unc)"
+                        Write-Log "Info: $($L.name) - $(if($reportOnly){'previewing'}else{'cleaning'}) $($path) - FolderIncluded=$FolderIncluded FilterOn=$FilterOn NumberOfDays=$NumberOfDays" $true
+                        Remove-files -Path $path -FilterOn $FilterOn -NumberOfDays $NumberOfDays -FolderIncluded $FolderIncluded -ForceEnable $ForceEnable -ReportOnly $reportOnly -ServerName $L.name
+                    }
+                } Catch {
+                    Write-Log "Error: $($L.name) - disk clean failed and was skipped: $($_.Exception.Message)" $true
                 }
             }
 
