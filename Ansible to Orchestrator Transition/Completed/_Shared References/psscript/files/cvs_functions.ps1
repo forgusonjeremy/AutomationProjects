@@ -80,7 +80,16 @@ param (
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
     [string]$DomainOUs,
     [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
-    [string]$DomainOUsFile
+    [string]$DomainOUsFile,
+    # S-22: look-ahead window for Get-ServiceAccountExpiration, in days. An account
+    # whose AccountExpirationDate falls within this many days of now is reported as
+    # EXPIRING and is called out at the top of the report and in the mail subject.
+    # Accounts already past their expiration date are reported as EXPIRED regardless
+    # of this value, and NOTHING is filtered out of the report by it - the full
+    # inventory is always listed. Passed as a string like every other parameter here
+    # (the vRO PowerShell plug-in sends strings) and parsed with an explicit guard.
+    [Parameter(Mandatory=$false, ValueFromPipeline=$true)]
+    [string]$ExpiringWithinDays = '30'
 )
 
 [string[]]$MailTo = $MailToString.split(',')
@@ -665,6 +674,34 @@ Function Invoke-Module{ # Invoke-Module
 }       # Invoke-Module
 
 function Get-ListOfUsers{
+    # ***  SUPERSEDED (S-22) - DO NOT USE IN NEW CODE, AND DO NOT "FIX" IT IN PLACE.  ***
+    #
+    # Single-domain / single-OU user query. Superseded by Get-ListOfUsers-MultiDomain,
+    # which takes a domain -> OU map, isolates per-OU failures, tags each account with
+    # SourceDomain/SourceOU, and reaches the all-accounts query path correctly.
+    #
+    # NO REACHABLE ACTION CALLS THIS ANY MORE. Its only two callers - 'Get-Users-SCenable'
+    # and 'Set-L3-Admin-Accounts' - are both ABSENT from the -Action ValidateSet, so the
+    # parameter is rejected before Main dispatches and neither case can execute. (For
+    # Set-L3-Admin-Accounts that omission is deliberate and load-bearing: it performs an
+    # unattended MASS WRITE of SmartcardLogonRequired. Do not add either name to the
+    # ValidateSet without a separate, reviewed change.)
+    #
+    # IT CARRIES A LIVE DEFECT, recorded here so nobody re-adopts it believing it works:
+    #
+    #   $SC is typed [bool] and is NOT mandatory, so an OMITTED -SC binds to $false
+    #   rather than staying null. The guard below - `if ($SC -eq $true -OR $SC -eq $false)`
+    #   - is therefore ALWAYS TRUE, and the -Filter * branch beneath it is UNREACHABLE
+    #   DEAD CODE. A caller that omitted -SC intending "every user in the OU" silently
+    #   got "only users where SmartcardLogonRequired is False".
+    #
+    #   That is exactly what Get-ServiceAccountExpiration did on every run before S-22:
+    #   the expiration report silently omitted every service account that DOES require a
+    #   smart card, and reported success. Get-ListOfUsers-MultiDomain declares $SC
+    #   untyped with a $null default, so omitting it genuinely reaches -Filter *.
+    #
+    # $OUPath - the script parameter this function reads - likewise has no reachable
+    # caller left. Both are retained only so the two disabled cases still parse.
     [CmdletBinding()]
     param( [parameter (Mandatory = $false)]
     [bool]$SC,
@@ -1662,6 +1699,116 @@ Function Format-PKIAccountTable { # S-19 helper: one styled account table
     }
 }       # Format-PKIAccountTable
 
+Function ConvertFrom-ADFileTime { # S-22 helper: pwdLastSet -> DateTime, or $null
+    # pwdLastSet is a Windows FILETIME (100ns ticks since 1601-01-01 UTC) held as an
+    # Int64 on the AD object. It has TWO sentinel values that are NOT timestamps:
+    #
+    #   0                    - the password has NEVER been set, or the account is
+    #                          flagged "user must change password at next logon".
+    #   0x7FFFFFFFFFFFFFFF   - "never" (seen on accountExpires; guarded here too).
+    #
+    # THE DEFECT THIS FIXES (see Change Register S-22). The original report computed
+    #   if($_.pwdLastSet -ne 0){ (New-TimeSpan ...).Days } else { 0 }
+    # so a password that had NEVER BEEN SET was reported as a password age of ZERO -
+    # rendered identically to a password changed this morning, and sorted to the very
+    # bottom of a report sorted by age descending. For a service-account hygiene
+    # report that inverts the meaning of the single most important column: the
+    # accounts most in need of attention looked like the freshest ones.
+    # It also called [datetime]::FromFileTime for display but FromFileTimeUTC for the
+    # age arithmetic, so the two columns disagreed by the host's UTC offset.
+    #
+    # Returns $null for every non-timestamp case. Callers render $null as text
+    # ("Never set"), which cannot be confused with a real age.
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$false)]
+        [AllowNull()]
+        $FileTime
+    )
+    Process{
+        if ($null -eq $FileTime) { return $null }
+
+        $raw = 0
+        # The property arrives as Int64 from Get-ADUser but as a string through a
+        # serialisation boundary (and in the test fixtures), so parse defensively
+        # rather than casting - a failed cast would be a terminating error here.
+        if (-not [Int64]::TryParse(("$FileTime").Trim(), [ref]$raw)) { return $null }
+
+        if ($raw -le 0 -or $raw -ge 0x7FFFFFFFFFFFFFFF) { return $null }
+
+        # FromFileTime (NOT FromFileTimeUTC) returns LOCAL time, which is what
+        # $Global:Today is. Both columns and the age arithmetic now use the same
+        # basis. An out-of-range tick count throws, so guard that too.
+        Try   { return [datetime]::FromFileTime($raw) }
+        Catch { return $null }
+    }
+}       # ConvertFrom-ADFileTime
+
+Function Get-AccountExpiryState { # S-22 helper: classify one account's expiry
+    # Turns AccountExpirationDate into the state the report is organised around:
+    #
+    #   Expired        - the expiration date is in the past. The account can no longer
+    #                    authenticate; if a service still depends on it, it is already
+    #                    broken or about to be.
+    #   Expiring       - expires within the look-ahead window (-ExpiringWithinDays).
+    #                    This is the actionable set - the whole point of the report.
+    #   Active         - has an expiration date, beyond the window.
+    #   Never expires  - AccountExpirationDate is not set. This is the DEFAULT for most
+    #                    accounts and is NOT a finding by itself; it is reported as its
+    #                    own state rather than being lumped in with 'Active' so the
+    #                    reader can see how much of the estate has no expiry at all.
+    #
+    # NOTHING IS FILTERED OUT by the window - it only decides which section an account
+    # is listed under and whether it is counted in the subject line.
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$false)]
+        [AllowNull()]
+        $ExpirationDate,
+
+        [Parameter(Mandatory=$false)]
+        [int] $WithinDays = 30,
+
+        # Injectable for testing; defaults to the run's own clock.
+        [Parameter(Mandatory=$false)]
+        [AllowNull()]
+        $Now = $null
+    )
+    Process{
+        if ($null -eq $Now) {
+            if ($null -ne $Global:Today) { $Now = $Global:Today } else { $Now = Get-Date }
+        }
+
+        $noExpiry = [PSCustomObject]@{ State = 'Never expires'; DaysToExpiry = $null; ExpiresOn = $null }
+
+        if ($null -eq $ExpirationDate -or [string]::IsNullOrWhiteSpace("$ExpirationDate")) { return $noExpiry }
+
+        $exp = $null
+        Try   { $exp = [datetime]$ExpirationDate }
+        Catch { return $noExpiry }
+
+        # AD's "never" sentinels surface as extreme dates if they ever reach here
+        # un-normalised. Treat them as no expiry rather than as an account that
+        # expired in 1601 or expires in 9999 - either would be a fictitious finding.
+        if ($exp.Year -le 1601 -or $exp.Year -ge 9999) { return $noExpiry }
+
+        # WHOLE DAYS REMAINING, ROUNDED DOWN - which makes the window INCLUSIVE at its
+        # edge: an account 29.6 days away reports 29 and IS flagged by a 29-day window.
+        # That is the deliberate direction for a warning report - warn slightly early
+        # rather than one scheduled run too late, by which point the account has
+        # already expired. An account that has expired reports a NEGATIVE number, read
+        # as days overdue.
+        $days  = [int][math]::Floor(($exp - $Now).TotalDays)
+
+        $state =
+            if     ($exp -lt $Now)       { 'Expired'  }
+            elseif ($days -le $WithinDays){ 'Expiring' }
+            else                          { 'Active'   }
+
+        return [PSCustomObject]@{ State = $state; DaysToExpiry = $days; ExpiresOn = $exp }
+    }
+}       # Get-AccountExpiryState
+
 Function GenerateReportPKI-v2($data, $DomainOUsMap, $Failures, $Duplicates){
     # S-16: multi-domain PKI/smartcard compliance report, merged in from
     # cvs_functions-v2.ps1 and then RESTRUCTURED for a management audience.
@@ -1970,27 +2117,470 @@ Function GenerateReportPKI-v2($data, $DomainOUsMap, $Failures, $Duplicates){
     if($eMailReport -eq 'yes'){ SendMail -MailBody $body }
 }       # GenerateReportPKI-v2
 
-function GenerateReportServiceAccountExpiration($data){
+Function Sort-ServiceAccountRows { # S-23 helper: one ordering, used by every section
+    # WORST FIRST, on every table, so a reader who stops after the first few rows has
+    # seen the accounts that matter most:
+    #   1. Expiry state - Expired, then Expiring, then Active, then Never expires.
+    #   2. Within a state, soonest to expire first.
+    #   3. Then OLDEST PASSWORD first, which is how the v1 report was sorted (descending
+    #      password age) and is the customer's existing habit. "Never set" sorts to the
+    #      TOP of that group - v1 gave it an age of 0 and buried it at the bottom.
+    #
+    # Sorting is on the NUMERIC fields, never their display strings: "9" sorts after
+    # "80" as text, and "Never set" would land wherever the alphabet put it.
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$false)]
+        [AllowNull()]
+        $Rows
+    )
+    Process{
+        $r = @($Rows)
+        if ($r.Count -eq 0) { return @() }
+        return @($r | Sort-Object `
+            @{Expression = { switch ("$($_.ExpiryState)") { 'Expired' {0} 'Expiring' {1} 'Active' {2} default {3} } }}, `
+            @{Expression = { if ($null -eq $_.DaysToExpiry) { [int]::MaxValue } else { [int]$_.DaysToExpiry } }}, `
+            @{Expression = { if ($null -eq $_.PWAgeDays)    { [int]::MaxValue } else { [int]$_.PWAgeDays    } }; Descending = $true }, `
+            SamAccountName)
+    }
+}       # Sort-ServiceAccountRows
 
-    $Style = "<style>"
-    $Style = $Style + "BODY{background-color:white;font-family:Segoe UI;font-size-adjust: .58}"
-    $Style = $Style + "TABLE{border-width: 1px;border-style: solid;border-color: black;border-collapse: collapse;}"
-    $Style = $Style + "TH{border-width: 1px;padding: 0px;border-style: solid;border-color: black;background-color:gray;color:white}"
-    $Style = $Style + "TD{border-width: 1px;padding: 0px;border-style: solid;border-color: black;background-color:lightgrey}"
-    $Style = $Style + "</style>"
+Function Get-ServiceAccountSectionNote { # S-23 helper: the one-line note above a table
+    # Every section carries its own composition so the reader never has to count rows
+    # to find out whether the table below holds anything actionable.
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$false)]
+        [AllowNull()]
+        $Rows,
 
-    [string]$body = $data | ConvertTo-Html -Property SamAccountName, DisplayName, Office, Enabled, Lockedout, "PW Age", "PW LastSet",Description, WhenCreated  -Head $Style
-    #$body = $body -replace 'Thieu N','<font color="red">Thieu N</font>'
+        # Overrides the leading "N account(s)" - used by the multi-OU heading, which
+        # needs to say "N account(s) across M OUs" without repeating the count.
+        [Parameter(Mandatory=$false)]
+        [string] $Prefix = ''
+    )
+    Process{
+        $r = @($Rows)
+        $e = @($r | Where-Object { $_.ExpiryState -eq 'Expired'       }).Count
+        $g = @($r | Where-Object { $_.ExpiryState -eq 'Expiring'      }).Count
+        $n = @($r | Where-Object { $_.ExpiryState -eq 'Never expires' }).Count
 
-    #$body = $body -replace 'SamAccountName', 'AccountName'
-    $body = $body -replace 'AccountExpirationDate', 'ExpirationDate'
-    $body = $body -replace 'WhenCreated', 'CreatedOn'
-    $body | out-File -append -FilePath "$($Global:DebugDir)\ServiceAccountExpiration_result.html"
+        $note = if ([string]::IsNullOrWhiteSpace($Prefix)) { "$($r.Count) account(s)" } else { $Prefix }
 
-    Write-Log "Info: $($body)" $true
-    if($eMailReport -eq 'yes'){ SendMail $body }
+        $parts = @()
+        if ($e -gt 0) { $parts += "$e expired" }
+        if ($g -gt 0) { $parts += "$g expiring" }
+        if ($n -gt 0) { $parts += "$n with no expiry date" }
+        if ($parts.Count -gt 0) { $note += " &#8212; " + ($parts -join ', ') }
 
-}
+        return "$note."
+    }
+}       # Get-ServiceAccountSectionNote
+
+Function Format-ServiceAccountTable { # S-23 helper: one styled service-account table
+    # Extracted so the action sections at the top of the report and the per-domain /
+    # per-OU inventory sections below it render IDENTICALLY - the only differences are
+    # which rows are passed in and whether a Domain column is wanted. Mirrors
+    # Format-PKIAccountTable (S-19), for the same reason: two hand-built tables drift.
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$false)]
+        [AllowNull()]
+        $Rows,
+
+        # The cross-domain action tables need a Domain column; the per-domain
+        # inventory sections do not - there the domain is the heading.
+        [Parameter(Mandatory=$false)]
+        [bool] $IncludeDomain = $false,
+
+        [Parameter(Mandatory=$false)]
+        [string] $HeaderColour = '#44546A'
+    )
+    Process{
+        $r = @($Rows)
+        if ($r.Count -eq 0) { return '' }
+
+        $cols = @('SamAccountName','DisplayName','Office','AccountState','ExpiresOn',
+                  'DaysToExpiryText','ExpiryState','PWAgeText','PWLastSetText','Description')
+        if ($IncludeDomain) { $cols = @('Domain') + $cols }
+
+        $frag = Format-HtmlTable -HeaderColour $HeaderColour -Fragment (
+            $r | ConvertTo-Html -Fragment -Property $cols
+        )
+
+        # Colour by WHOLE CELL VALUE, never by loose substring. The v1 report
+        # string-replaced across the entire document, so any column - or a description
+        # - containing the matched word was recoloured too. Anchoring on <td>...</td>
+        # keeps this to the status cells. (A Description whose ENTIRE text is one of
+        # these words would still match; that is a deliberate, bounded trade-off.)
+        $frag = $frag -replace '<td([^>]*)>Expired</td>',       '<td$1><font color="#C00000"><b>Expired</b></font></td>'
+        $frag = $frag -replace '<td([^>]*)>Expiring</td>',      '<td$1><font color="#B26B00"><b>Expiring</b></font></td>'
+        $frag = $frag -replace '<td([^>]*)>Never expires</td>', '<td$1><font color="#666666">Never expires</font></td>'
+        $frag = $frag -replace '<td([^>]*)>Disabled</td>',      '<td$1><font color="#808080">Disabled</font></td>'
+        $frag = $frag -replace '<td([^>]*)>Locked out</td>',    '<td$1><font color="#C00000"><b>Locked out</b></font></td>'
+        # "Never set" is the password column's version of a finding, not a formatting
+        # quirk - it means the password has never been set or must be changed at next
+        # logon. The v1 report showed it as an age of 0 (see ConvertFrom-ADFileTime).
+        $frag = $frag -replace '<td([^>]*)>Never set</td>',     '<td$1><font color="#C00000"><b>Never set</b></font></td>'
+
+        $frag = $frag -replace '<th([^>]*)>SamAccountName</th>',   '<th$1>Account</th>'
+        $frag = $frag -replace '<th([^>]*)>DisplayName</th>',      '<th$1>Name</th>'
+        $frag = $frag -replace '<th([^>]*)>AccountState</th>',     '<th$1>Account state</th>'
+        $frag = $frag -replace '<th([^>]*)>ExpiresOn</th>',        '<th$1>Expires on</th>'
+        $frag = $frag -replace '<th([^>]*)>DaysToExpiryText</th>', '<th$1>Days to expiry</th>'
+        $frag = $frag -replace '<th([^>]*)>ExpiryState</th>',      '<th$1>Status</th>'
+        $frag = $frag -replace '<th([^>]*)>PWAgeText</th>',        '<th$1>Password age (days)</th>'
+        $frag = $frag -replace '<th([^>]*)>PWLastSetText</th>',    '<th$1>Password last set</th>'
+        return $frag
+    }
+}       # Format-ServiceAccountTable
+
+function GenerateReportServiceAccountExpiration($data, $DomainOUsMap, $Failures, $Duplicates, $WithinDays){
+    # S-23: service-account expiration report, rebuilt for the same management
+    # audience as the PKI report (S-17) and using the same helpers, so the two
+    # deliverables look and behave like one product rather than two.
+    #
+    # WHAT THE V1 REPORT DID WRONG - all four are content defects, not cosmetics:
+    #
+    #  1. IT NEVER SHOWED AN EXPIRATION DATE. AccountExpirationDate was selected by
+    #     the action and then omitted from the ConvertTo-Html -Property list, so the
+    #     "Service Account Expiration Report" reported password age and nothing else.
+    #     The line `$body -replace 'AccountExpirationDate','ExpirationDate'` right
+    #     underneath had nothing to match and had presumably never worked.
+    #  2. A password that had never been set was rendered as an age of 0 - see
+    #     ConvertFrom-ADFileTime. The worst rows looked like the best ones.
+    #  3. It APPENDED to ServiceAccountExpiration_result.html, so the file grew without
+    #     bound across scheduled runs and every copy but the first was a concatenation
+    #     of reports. It also assumed $Global:DebugDir already existed.
+    #  4. It wrote the ENTIRE HTML BODY to the log with Write-Log "Info: $body", which
+    #     goes to stdout - the stream the vRO workflow parses - and SendMail then
+    #     logged the whole body a second time. A multi-kilobyte HTML blob in the
+    #     transcript buries the Error:/Warn: lines that the run is classified on.
+    #
+    # STRUCTURE (ordered by what a reader must not miss):
+    #   1. Data-quality alert   - only when an OU could not be read. FIRST, above the
+    #                             numbers, because every figure below is understated.
+    #   2. Overlapping-scope note - only when the OU list overlaps (S-19).
+    #   3. Executive summary    - accounts in scope / expired / expiring / no expiry.
+    #   4. ACTION REQUIRED      - the expired and expiring accounts, across all
+    #                             domains, soonest first. This is the part of the
+    #                             report anyone is expected to act on.
+    #   5. By domain            - one summary row per domain.
+    #   6. Full inventory       - every account, sectioned by domain and sub-sectioned
+    #                             by OU exactly as the PKI report (S-19).
+    #   7. Scope footnote       - exactly which OUs were searched, NOT READ flagged.
+    #
+    # The action tables are deliberately ABOVE the inventory and carry a Domain column:
+    # an expiring account is acted on by whoever owns the service, and they should not
+    # have to find it inside a per-domain table first. The inventory is retained in
+    # full below because dropping it would turn an empty report into an ambiguous one.
+
+    $fail       = @($Failures)
+    # Unlike the PKI sweep (twice per OU, once per smartcard state) this action queries
+    # each OU ONCE, so duplicate failure records are not expected. Collapsing anyway
+    # costs nothing and keeps the two reports' failure handling identical.
+    $failUnique = @($fail | Group-Object Domain, OU | ForEach-Object { $_.Group[0] })
+
+    # TryParse rather than a [int] cast in a try/catch: a caught exception is still
+    # recorded on $Error, which defeats the "did this run raise any non-terminating
+    # error?" guard the regression suite relies on (the S-17 lesson). Parsed the same
+    # way as the action case, so the two cannot disagree about what a window is.
+    $win = 30
+    $winParsed = 0
+    if ($null -ne $WithinDays -and [int]::TryParse(("$WithinDays").Trim(), [ref]$winParsed) -and $winParsed -ge 0) {
+        $win = $winParsed
+    }
+
+    # Defensive de-duplication (S-19). The action already did this before counting, so
+    # this is normally a no-op - Remove-DuplicateAccounts is idempotent - but it means
+    # ANY caller of this function gets a report in which each account appears once.
+    $data = @(Remove-DuplicateAccounts -Accounts $data)
+    if ($null -eq $Duplicates) { $Duplicates = $Global:DuplicateAccounts }
+
+    # -- Project once; every section below is a filter over $rows ------------------
+    # SourceOU MUST survive the projection - the per-OU sub-sections group on it.
+    # Numeric sort keys (DaysToExpiry, PWAgeDays) are carried ALONGSIDE their display
+    # strings: sorting on the display text would order "9" after "80" and put
+    # "Never set" wherever the alphabet happened to place it.
+    $rows = @($data) | ForEach-Object {
+        $exp = Get-AccountExpiryState -ExpirationDate $_.AccountExpirationDate -WithinDays $win
+        $pwSet = ConvertFrom-ADFileTime -FileTime $_.pwdLastSet
+        $pwAge = $null
+        if ($null -ne $pwSet) { $pwAge = [int][math]::Floor(((Get-Date) - $pwSet).TotalDays) }
+
+        [PSCustomObject]@{
+            Domain           = $_.SourceDomain
+            SourceOU         = $_.SourceOU
+            SamAccountName   = $_.SamAccountName
+            DisplayName      = $_.DisplayName
+            Office           = $_.Office
+            AccountState     = if ($_.LockedOut -eq $true) { 'Locked out' } elseif ($_.Enabled -eq $true) { 'Enabled' } else { 'Disabled' }
+            ExpiryState      = $exp.State
+            DaysToExpiry     = $exp.DaysToExpiry
+            DaysToExpiryText = if ($null -eq $exp.DaysToExpiry) { '' } else { "$($exp.DaysToExpiry)" }
+            ExpiresOn        = if ($null -eq $exp.ExpiresOn) { '' } else { (Get-Date $exp.ExpiresOn -Format 'yyyy-MM-dd') }
+            PWAgeDays        = $pwAge
+            PWAgeText        = if ($null -eq $pwAge) { 'Never set' } else { "$pwAge" }
+            PWLastSetText    = if ($null -eq $pwSet) { 'Never set' } else { (Get-Date $pwSet -Format 'yyyy-MM-dd') }
+            CreatedOn        = if ($_.WhenCreated) { (Get-Date $_.WhenCreated -Format 'yyyy-MM-dd') } else { '' }
+            Description      = $_.Description
+        }
+    }
+    $rows = @($rows)
+
+    $totalAll      = $rows.Count
+    $expiredRows   = @($rows | Where-Object { $_.ExpiryState -eq 'Expired'  } | Sort-Object DaysToExpiry, SamAccountName)
+    $expiringRows  = @($rows | Where-Object { $_.ExpiryState -eq 'Expiring' } | Sort-Object DaysToExpiry, SamAccountName)
+    $noExpiryCount = @($rows | Where-Object { $_.ExpiryState -eq 'Never expires' }).Count
+
+    $fnt   = 'font-family:Segoe UI,Arial,sans-serif;'
+    $body  = "<div style=`"$fnt font-size:12px;color:#1F1F1F;`">"
+    $body += "<h2 style=`"$fnt font-size:18px;margin:0 0 2px 0;`">Service Account Expiration Report</h2>"
+    $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:0 0 14px 0;`">Generated $((Get-Date).ToString('yyyy-MM-dd HH:mm')) &nbsp;|&nbsp; Source: $($env:COMPUTERNAME) &nbsp;|&nbsp; Look-ahead window: $win day(s)</p>"
+
+    # -- 1. Data-quality alert (only when something failed) -----------------------
+    # Identical in behaviour and wording to the PKI report (S-17/S-20): an OU that
+    # could not be read produces no rows, which is indistinguishable from an OU whose
+    # accounts are all healthy. The people who act on this read the email, not the
+    # Orchestrator transcript.
+    if ($failUnique.Count -gt 0) {
+        $affected = @($failUnique | Select-Object -ExpandProperty Domain -Unique)
+
+        $failRows = @($failUnique | Sort-Object Domain, OU | Select-Object -Property `
+            @{Name='Problem';   Expression={ if ([string]::IsNullOrWhiteSpace($_.Category)) { 'Unclassified' } else { $_.Category } }}, `
+            @{Name='Domain';    Expression={ $_.Domain }}, `
+            @{Name='OU';        Expression={ $_.OU }}, `
+            @{Name='Detail';    Expression={ $_.Reason }}, `
+            @{Name='What to do';Expression={ if ([string]::IsNullOrWhiteSpace($_.Guidance)) { 'Read the detail and the workflow transcript.' } else { $_.Guidance } }})
+
+        $byCat = @($failRows | Group-Object Problem | Sort-Object Name |
+                   ForEach-Object { "$($_.Count) $($_.Name.ToLower())" })
+
+        $body += "<div style=`"border:2px solid #C00000;background-color:#FDECEA;padding:10px 12px;margin:0 0 16px 0;`">"
+        $body += "<p style=`"$fnt font-size:14px;font-weight:700;color:#C00000;margin:0 0 6px 0;`">&#9888; THIS REPORT IS INCOMPLETE</p>"
+        $body += "<p style=`"$fnt font-size:12px;margin:0 0 8px 0;`">"
+        $body += "$($failUnique.Count) organisational unit(s) across $($affected.Count) domain(s) could not be read"
+        if ($byCat.Count -gt 0) { $body += " (" + ($byCat -join ', ') + ")" }
+        $body += ". <b>Service accounts in these OUs are NOT included in any figure below</b>. "
+        $body += "An account that is about to expire in an unread OU will not appear here and will not warn anyone before it stops working.</p>"
+
+        $failFrag = Format-HtmlTable -HeaderColour '#C00000' -Fragment (
+            $failRows | ConvertTo-Html -Fragment -Property Problem, Domain, OU, Detail, 'What to do'
+        )
+        $failFrag = $failFrag -replace '<td([^>]*)>Scope error</td>',   '<td$1><font color="#C00000"><b>Scope error</b></font></td>'
+        $failFrag = $failFrag -replace '<td([^>]*)>Access denied</td>', '<td$1><font color="#C00000"><b>Access denied</b></font></td>'
+        $failFrag = $failFrag -replace '<td([^>]*)>Authentication</td>','<td$1><font color="#C00000"><b>Authentication</b></font></td>'
+        $failFrag = $failFrag -replace '<td([^>]*)>Unreachable</td>',   '<td$1><font color="#B26B00"><b>Unreachable</b></font></td>'
+        $failFrag = $failFrag -replace '<td([^>]*)>Unclassified</td>',  '<td$1><font color="#666666">Unclassified</font></td>'
+        $body += $failFrag
+        $body += "</div>"
+    }
+
+    # -- 2. Overlapping-scope notice (S-19) ---------------------------------------
+    $dupSeen = @($Duplicates)
+    if ($dupSeen.Count -gt 0) {
+        $body += "<div style=`"border:1px solid #B26B00;background-color:#FFF6E5;padding:10px 12px;margin:0 0 16px 0;`">"
+        $body += "<p style=`"$fnt font-size:13px;font-weight:700;color:#8A5300;margin:0 0 6px 0;`">Note &#8212; overlapping OU list (totals are correct)</p>"
+        $body += "<p style=`"$fnt font-size:12px;margin:0 0 8px 0;`">"
+        $body += "$($dupSeen.Count) account(s) were returned by more than one of the OU searches, because the OU list contains "
+        $body += "an OU <b>and</b> one of its sub-OUs and searches include all sub-OUs. "
+        $body += "<b>Each account has been counted once</b> and is listed below under the most specific OU that returned it, so "
+        $body += "the figures on this report are accurate. Removing the redundant entry from the OU list will make this notice go away.</p>"
+        $body += Format-HtmlTable -HeaderColour '#8A5300' -Fragment (
+            $dupSeen | Sort-Object Domain, Account |
+            ConvertTo-Html -Fragment -Property Account, Domain, 'Counted under', 'Times returned', 'Returned by these OUs'
+        )
+        $body += "</div>"
+    }
+
+    # -- 3. Executive summary ------------------------------------------------------
+    $expiredColour  = if ($expiredRows.Count  -gt 0) { '#C00000' } else { '#107C10' }
+    $expiringColour = if ($expiringRows.Count -gt 0) { '#B26B00' } else { '#107C10' }
+    $body += "<h3 style=`"$fnt font-size:15px;margin:0 0 6px 0;`">Summary</h3>"
+    $body += "<table style=`"border-collapse:collapse;$fnt font-size:12px;margin:0 0 18px 0;`"><tr>"
+    $body += "<td style=`"border:1px solid #B4B4B4;padding:8px 16px;background-color:#F2F2F2;`">Accounts in scope<br><b style=`"font-size:20px;`">$totalAll</b></td>"
+    $body += "<td style=`"border:1px solid #B4B4B4;padding:8px 16px;background-color:#F2F2F2;`">Already expired<br><b style=`"font-size:20px;color:$expiredColour;`">$($expiredRows.Count)</b></td>"
+    $body += "<td style=`"border:1px solid #B4B4B4;padding:8px 16px;background-color:#F2F2F2;`">Expiring within $win day(s)<br><b style=`"font-size:20px;color:$expiringColour;`">$($expiringRows.Count)</b></td>"
+    $body += "<td style=`"border:1px solid #B4B4B4;padding:8px 16px;background-color:#F2F2F2;`">No expiry date set<br><b style=`"font-size:20px;color:#666666;`">$noExpiryCount</b></td>"
+    $body += "</tr></table>"
+
+    # -- 4. Action required --------------------------------------------------------
+    $body += "<h3 style=`"$fnt font-size:15px;margin:0 0 6px 0;`">Action required</h3>"
+
+    if ($expiredRows.Count -eq 0 -and $expiringRows.Count -eq 0) {
+        $body += "<p style=`"$fnt font-size:12px;color:#107C10;margin:0 0 18px 0;`">"
+        $body += "No account in scope has expired or expires within the next $win day(s)."
+        if ($failUnique.Count -gt 0) { $body += " <b>Note the incomplete-scope warning above &#8212; this statement covers only the OUs that could be read.</b>" }
+        $body += "</p>"
+    }
+
+    if ($expiredRows.Count -gt 0) {
+        $body += "<h4 style=`"$fnt font-size:13px;background-color:#C00000;color:#FFFFFF;padding:6px 9px;margin:0 0 6px 0;`">Already expired &#8212; $($expiredRows.Count) account(s)</h4>"
+        $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:0 0 5px 0;`">These accounts are past their expiration date and can no longer authenticate. Anything still depending on them has already stopped working, or is about to. Most overdue first.</p>"
+        $body += Format-ServiceAccountTable -Rows $expiredRows -IncludeDomain $true -HeaderColour '#C00000'
+        $body += "<div style=`"height:14px;`"></div>"
+    }
+
+    if ($expiringRows.Count -gt 0) {
+        $body += "<h4 style=`"$fnt font-size:13px;background-color:#B26B00;color:#FFFFFF;padding:6px 9px;margin:0 0 6px 0;`">Expiring within $win day(s) &#8212; $($expiringRows.Count) account(s)</h4>"
+        $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:0 0 5px 0;`">Soonest first. Renew or extend these before the date shown, or confirm the service they support has been retired.</p>"
+        $body += Format-ServiceAccountTable -Rows $expiringRows -IncludeDomain $true -HeaderColour '#B26B00'
+        $body += "<div style=`"height:14px;`"></div>"
+    }
+
+    # -- 5. Per-domain summary -----------------------------------------------------
+    # Driven from the SCOPE MAP, not the returned data, so a domain that returned
+    # nothing still gets a row saying so rather than vanishing and being mistaken for
+    # "not in scope".
+    $domainList = if ($null -eq $DomainOUsMap) {
+        @($rows | Select-Object -ExpandProperty Domain -Unique | Where-Object { $_ })
+    } else {
+        @($DomainOUsMap.PSObject.Properties.Name)
+    }
+
+    $summaryRows = @()
+    foreach ($dom in $domainList) {
+        $dRows     = @($rows | Where-Object { $_.Domain -eq $dom })
+        $dExpired  = @($dRows | Where-Object { $_.ExpiryState -eq 'Expired'  }).Count
+        $dExpiring = @($dRows | Where-Object { $_.ExpiryState -eq 'Expiring' }).Count
+        $dNone     = @($dRows | Where-Object { $_.ExpiryState -eq 'Never expires' }).Count
+        $dFail     = @($failUnique | Where-Object { $_.Domain -eq $dom }).Count
+
+        $status =
+            if     ($dFail -gt 0)        { 'INCOMPLETE - see alert above' }
+            elseif ($dRows.Count -eq 0)  { 'No accounts found' }
+            elseif ($dExpired -gt 0)     { 'Action required' }
+            elseif ($dExpiring -gt 0)    { 'Action soon' }
+            else                         { 'No action' }
+
+        $summaryRows += [PSCustomObject]@{
+            Domain          = $dom
+            Accounts        = $dRows.Count
+            'Expired'       = $dExpired
+            'Expiring'      = $dExpiring
+            'No expiry set' = $dNone
+            'OUs unread'    = $dFail
+            Status          = $status
+        }
+    }
+
+    $body += "<h3 style=`"$fnt font-size:15px;margin:0 0 6px 0;`">By domain</h3>"
+    $summaryHtml = Format-HtmlTable -Fragment (
+        $summaryRows | ConvertTo-Html -Fragment -Property Domain, Accounts, 'Expired', 'Expiring', 'No expiry set', 'OUs unread', Status
+    )
+    $summaryHtml = $summaryHtml -replace '<td([^>]*)>No action</td>',                   '<td$1><font color="#107C10"><b>No action</b></font></td>'
+    $summaryHtml = $summaryHtml -replace '<td([^>]*)>Action soon</td>',                 '<td$1><font color="#B26B00"><b>Action soon</b></font></td>'
+    $summaryHtml = $summaryHtml -replace '<td([^>]*)>Action required</td>',             '<td$1><font color="#C00000"><b>Action required</b></font></td>'
+    $summaryHtml = $summaryHtml -replace '<td([^>]*)>INCOMPLETE - see alert above</td>','<td$1><font color="#C00000"><b>INCOMPLETE &#8212; see alert above</b></font></td>'
+    $summaryHtml = $summaryHtml -replace '<td([^>]*)>No accounts found</td>',           '<td$1><font color="#666666">No accounts found</font></td>'
+    $body += $summaryHtml
+    $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:4px 0 20px 0;`">&quot;No expiry set&quot; means the account has no expiration date at all. That is the Active Directory default and is not a finding by itself, but a service account that never expires also never prompts a review.</p>"
+
+    # -- 6. Full inventory ---------------------------------------------------------
+    $body += "<h3 style=`"$fnt font-size:15px;margin:0 0 10px 0;`">Full inventory by domain</h3>"
+
+    foreach ($dom in $domainList) {
+        $dRows     = @($rows | Where-Object { $_.Domain -eq $dom })
+        $dFailRows = @($failUnique | Where-Object { $_.Domain -eq $dom })
+
+        $body += "<div style=`"margin:0 0 22px 0;`">"
+        $body += "<h4 style=`"$fnt font-size:13px;background-color:#44546A;color:#FFFFFF;padding:6px 9px;margin:0 0 6px 0;`">$dom</h4>"
+
+        if ($dFailRows.Count -gt 0) {
+            $body += "<p style=`"$fnt font-size:12px;color:#C00000;margin:0 0 6px 0;`">"
+            $body += "&#9888; $($dFailRows.Count) OU(s) in this domain could not be read - the accounts below are a PARTIAL list:</p><ul style=`"$fnt font-size:11px;color:#C00000;margin:0 0 8px 0;`">"
+            foreach ($fr in $dFailRows) { $body += "<li>$($fr.OU) &#8212; $($fr.Reason)</li>" }
+            $body += "</ul>"
+        }
+
+        # OU list from the SCOPE MAP in the operator's own order, so an OU that
+        # returned nothing still gets a heading saying so. Any SourceOU present in the
+        # data but absent from the map is appended defensively - dropping those rows
+        # would silently shorten the inventory.
+        $ouList = @()
+        if ($null -ne $DomainOUsMap) {
+            foreach ($p in @($DomainOUsMap.PSObject.Properties.Name)) {
+                if ($p -eq $dom) { $ouList = @(@($DomainOUsMap.$p) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) }
+            }
+        }
+        foreach ($sr in $dRows) {
+            if (-not [string]::IsNullOrWhiteSpace($sr.SourceOU) -and ($ouList -notcontains $sr.SourceOU)) {
+                $ouList += $sr.SourceOU
+            }
+        }
+
+        if ($dRows.Count -eq 0 -and $ouList.Count -le 1) {
+            $body += "<p style=`"$fnt font-size:12px;color:#666666;margin:0;`"><i>No accounts were returned from the OUs queried in this domain.</i></p>"
+        }
+        elseif ($ouList.Count -le 1) {
+            $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:0 0 5px 0;`">$(Get-ServiceAccountSectionNote -Rows $dRows)</p>"
+            $body += Format-ServiceAccountTable -Rows (Sort-ServiceAccountRows -Rows $dRows)
+        }
+        else {
+            $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:0 0 9px 0;`">$(Get-ServiceAccountSectionNote -Rows $dRows -Prefix "$($dRows.Count) account(s) across $($ouList.Count) OUs")</p>"
+
+            foreach ($ou in $ouList) {
+                $oRows  = @($dRows | Where-Object { $_.SourceOU -eq $ou })
+                $ouDead = @($failUnique | Where-Object { $_.Domain -eq $dom -and $_.OU -eq $ou })
+
+                $body += "<div style=`"margin:0 0 14px 18px;border-left:3px solid #C9D2E0;padding-left:12px;`">"
+                $body += "<p style=`"$fnt font-size:12px;font-weight:650;margin:0 0 3px 0;color:#44546A;word-break:break-all;`">$ou</p>"
+
+                if ($ouDead.Count -gt 0) {
+                    $ouCat = if ([string]::IsNullOrWhiteSpace($ouDead[0].Category)) { '' } else { "<b>$($ouDead[0].Category)</b> &#8212; " }
+                    $body += "<p style=`"$fnt font-size:11px;color:#C00000;margin:0;`">&#9888; This OU could not be read: $ouCat$($ouDead[0].Reason). Its accounts are absent from this report.</p>"
+                } elseif ($oRows.Count -eq 0) {
+                    $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:0;`"><i>No accounts found in this OU.</i></p>"
+                } else {
+                    $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:0 0 5px 0;`">$(Get-ServiceAccountSectionNote -Rows $oRows)</p>"
+                    $body += Format-ServiceAccountTable -Rows (Sort-ServiceAccountRows -Rows $oRows)
+                }
+                $body += "</div>"
+            }
+        }
+        $body += "</div>"
+    }
+
+    # -- 7. Scope footnote ---------------------------------------------------------
+    $body += "<hr style=`"border:none;border-top:1px solid #B4B4B4;margin:20px 0 10px 0;`">"
+    $body += "<p style=`"$fnt font-size:12px;font-weight:700;margin:0 0 4px 0;`">Scope - OUs queried</p>"
+    if ($null -eq $DomainOUsMap) {
+        $body += "<p style=`"$fnt font-size:12px;color:#C00000;margin:0;`">No domain/OU map was available - report scope unknown.</p>"
+    } else {
+        $body += "<ul style=`"$fnt font-size:11px;margin:0 0 8px 0;`">"
+        foreach ($domain in @($DomainOUsMap.PSObject.Properties.Name)) {
+            $body += "<li><b>$domain</b><ul>"
+            foreach ($ou in @($DomainOUsMap.$domain)) {
+                $isDead = @($failUnique | Where-Object { $_.Domain -eq $domain -and $_.OU -eq $ou }).Count -gt 0
+                if ($isDead) { $body += "<li><font color=`"#C00000`">$ou &#8212; NOT READ</font></li>" }
+                else         { $body += "<li>$ou</li>" }
+            }
+            $body += "</ul></li>"
+        }
+        $body += "</ul>"
+    }
+    $body += "<p style=`"$fnt font-size:11px;color:#666666;margin:0;`"><i>Searches include all sub-OUs. An OU listed as NOT READ could not be queried; its accounts are absent from this report. Automated report - do not reply.</i></p>"
+    $body += "</div>"
+
+    # Persist a copy on the PS host. Non-fatal: a report that cannot be written to
+    # disk must still be emailed. OVERWRITES - the v1 report appended, so the file
+    # grew without bound across scheduled runs.
+    Try {
+        if ( !(Test-Path -PathType Container $Global:DebugDir) ) {
+            New-Item -ItemType Directory -Path $Global:DebugDir -ErrorAction Stop | Out-Null
+        }
+        $body | Out-File -FilePath "$($Global:DebugDir)\ServiceAccountExpiration_result.html" -ErrorAction Stop
+    } Catch {
+        Write-Log "Warn: could not write service account report to $($Global:DebugDir): $($_.Exception.Message)" $true
+    }
+
+    # A ONE-LINE summary, not the HTML. v1 logged the entire body here and SendMail
+    # logged it again - a multi-kilobyte blob on stdout, which is the stream the vRO
+    # workflow classifies, burying the Error:/Warn: lines that decide the end state.
+    Write-Log "Info: service account report built - $totalAll account(s) in scope, $($expiredRows.Count) expired, $($expiringRows.Count) expiring within $win day(s), $noExpiryCount with no expiry date." $true
+
+    if($eMailReport -eq 'yes'){ SendMail -MailBody $body }
+}       # GenerateReportServiceAccountExpiration
 
 function Main($Action){
     $scriptDir = Get-ScriptDirectory
@@ -2057,9 +2647,12 @@ function Main($Action){
                 # available outcome - which is the same reasoning behind every other
                 # guard in this action.
                 #
-                # NOTE: the -OUPath and -DomainName PARAMETERS remain in the param block
-                # - Get-ServiceAccountExpiration still uses them via Get-ListOfUsers.
-                # Only this action's use of them is gone.
+                # NOTE (was): "-OUPath and -DomainName remain in the param block because
+                # Get-ServiceAccountExpiration still uses them via Get-ListOfUsers."
+                # THAT IS NO LONGER TRUE. S-22 moved Get-ServiceAccountExpiration onto
+                # the same OU map, so -OUPath is now read by NO reachable action - see
+                # the SUPERSEDED note on Get-ListOfUsers. -DomainName is still live for
+                # the server-side actions (Get-ListOfServers*, the reboot actions).
                 #
                 # Fail rather than send: an empty or partial report is actively
                 # misleading for a compliance deliverable.
@@ -2121,22 +2714,129 @@ function Main($Action){
             GenerateReportPKI-v2 $All $DomainOUsMap $Global:QueryFailures $Global:DuplicateAccounts
         }
         'Get-ServiceAccountExpiration'{
-            $strModule = 'ActiveDirectory' 
-            if (Invoke-Module $strModule){
-                $Result = Get-ListOfUsers -DomainName $DomainName | Select-object "SamAccountName","DisplayName","Office", "pwdLastSet","AccountExpirationDate","WhenCreated","Enabled","Lockedout","Description" |
-                    Select-Object -Property "SamAccountName","DisplayName","Office","Enabled","Lockedout",`
-                    @{Name="PW Age";Expression={if($_.pwdLastSet -ne 0){(new-TimeSpan([datetime]::FromFileTimeUTC($_.PwdLastSet)) $($Global:Today)).days}else{0}}},"AccountExpirationDate",`
-                    @{Name="PW LastSet";Expression={[datetime]::FromFileTime($_."pwdLastSet")}},"Description","WhenCreated" | Sort-Object -Property "PW Age" -Descending
-
-                Write-Log "Info: $($Result)" $true
-                $Global:MailSubject = "$($MailSubjectstring)"
-                $Result += $Result2
-                GenerateReportServiceAccountExpiration $Result
-
-            }else{ 
-                Write-Log "Error: Unable to import PS Modules $($strModule) or it is NOT install" $true 
+            # S-22: rebuilt on the SAME multi-domain, per-OU-isolated sweep the admin
+            # accounts report uses (Resolve-DomainOUsMap + Get-ListOfUsers-MultiDomain),
+            # and hardened to the standard set by the other actions in this transition.
+            #
+            # WHAT CHANGED FOR CALLERS: this action no longer reads -DomainName and
+            # -OUPath (one domain, one OU). It is driven by the domain -> OU-list map
+            # supplied via -DomainOUs (inline JSON, the vRO path) or -DomainOUsFile
+            # (a JSON file, the legacy Ansible path). Today's single OU is simply a map
+            # with one entry, so the customer's existing scope is expressible unchanged.
+            #
+            # DEFECTS FIXED HERE (all four were silent - the run reported success):
+            #
+            #  1. SILENT SCOPE NARROWING. The old code called
+            #       Get-ListOfUsers -DomainName $DomainName
+            #     with NO -SC argument. Get-ListOfUsers declares [bool]$SC, so the
+            #     unbound parameter BOUND TO $false rather than staying null, and its
+            #     guard `if ($SC -eq $true -OR $SC -eq $false)` is ALWAYS TRUE - making
+            #     the -Filter * branch underneath it unreachable dead code. Every run
+            #     therefore queried `SmartcardLogonRequired -eq $false` and silently
+            #     omitted every service account that DOES require a smart card. The
+            #     multi-domain function takes $SC as an UNTYPED $null-defaulted
+            #     parameter, so omitting it genuinely reaches -Filter * and returns
+            #     every account in the OU, which is what this report always intended.
+            #
+            #  2. NO PER-OU ERROR HANDLING. Get-ADUser ran without -ErrorAction Stop
+            #     inside no try/catch, so a bad OU DN or an unreachable DC raised a
+            #     NON-TERMINATING error on the PS error stream - invisible to the vRO
+            #     workflow, which classifies "Error:" lines on stdout. An empty report
+            #     was emailed and the run reported success. Get-ListOfUsers-MultiDomain
+            #     isolates and records each failure (S-16/S-20).
+            #
+            #  3. THE AD MODULE GUARD DID NOT FAIL THE RUN. A missing module logged an
+            #     "Error:" line and fell through, sending nothing - indistinguishable
+            #     from a report with no findings. Without the module NOTHING can be
+            #     queried, so this is a total failure and must throw (matches S-14/S-16).
+            #
+            #  4. `$Result += $Result2` - $Result2 IS NEVER ASSIGNED in this case. It is
+            #     copy-paste residue from the admin-accounts case, where it holds the
+            #     second sweep. Appending an unset variable adds a $null element to the
+            #     array, which ConvertTo-Html rendered as a blank row on every report.
+            $strModule = 'ActiveDirectory'
+            if (-not (Invoke-Module $strModule)) {
+                Write-Log "Error: Unable to import PS Module $($strModule) or it is NOT installed. Cannot query accounts - aborting." $true
+                throw "ActiveDirectory module not available on the PS host; cannot run Get-ServiceAccountExpiration."
             }
 
+            # Build the domain -> OU map. A malformed map or an unreadable file throws
+            # (see Resolve-DomainOUsMap) and terminates the run.
+            $DomainOUsMap = Resolve-DomainOUsMap -Json $DomainOUs -Path $DomainOUsFile
+
+            if ($null -eq $DomainOUsMap) {
+                # No silent fallback to -DomainName/-OUPath, for exactly the reason
+                # S-21 removed one from Get-AllAdmin-Accounts: $DomainName is a SHARED
+                # script parameter, so a caller that set the legacy pair but omitted
+                # the map would quietly produce a report covering ONE OU and report
+                # success. For an expiration report, a silently narrowed scope means an
+                # account expires without anyone being warned - the exact failure this
+                # report exists to prevent. No scope means the run FAILS and says so.
+                Write-Log "Error: Get-ServiceAccountExpiration - no scope supplied. Provide -DomainOUs (inline JSON) or -DomainOUsFile. No report produced." $true
+                throw "Get-ServiceAccountExpiration requires a domain/OU map via -DomainOUs or -DomainOUsFile."
+            }
+
+            # Look-ahead window. Bad input DEGRADES to the 30-day default with a Warn
+            # rather than failing the run: the window only decides which section an
+            # account is listed under and what the subject line says - nothing is
+            # filtered out by it - so a typo must not cost the customer the report.
+            # buildServiceAccountExpirationInvocation validates this properly upstream.
+            $win = 30
+            $winParsed = 0
+            if (-not [int]::TryParse(("$ExpiringWithinDays").Trim(), [ref]$winParsed)) {
+                Write-Log "Warn: -ExpiringWithinDays value '$ExpiringWithinDays' is not a whole number; using the default of 30 days." $true
+            } elseif ($winParsed -lt 0) {
+                Write-Log "Warn: -ExpiringWithinDays value '$ExpiringWithinDays' is negative; using 0 (accounts expiring today)." $true
+                $win = 0
+            } else {
+                $win = $winParsed
+            }
+
+            # NO -SC ARGUMENT: every account in the OU, whatever its smartcard setting.
+            # See defect 1 above - this is the whole scope fix.
+            $Accounts = @(Get-ListOfUsers-MultiDomain -DomainOUsMap $DomainOUsMap)
+
+            # DEDUPLICATE BEFORE COUNTING (S-19). Searches run at SearchScope Subtree,
+            # which is fully recursive, so an OU list holding an OU and one of its
+            # sub-OUs returns the deeper accounts twice. The counts below feed the
+            # SUBJECT LINE, so this must happen here and not only in the report -
+            # otherwise the subject would advertise figures the body contradicts.
+            $Accounts = @(Remove-DuplicateAccounts -Accounts $Accounts)
+
+            # Classified with the SAME function the report uses, so the subject line and
+            # the report body cannot disagree about what "expiring" means.
+            $expired  = 0
+            $expiring = 0
+            $noExpiry = 0
+            foreach ($a in $Accounts) {
+                $st = Get-AccountExpiryState -ExpirationDate $a.AccountExpirationDate -WithinDays $win
+                switch ($st.State) {
+                    'Expired'       { $expired++ }
+                    'Expiring'      { $expiring++ }
+                    'Never expires' { $noExpiry++ }
+                }
+            }
+            Write-Log "Info: Get-ServiceAccountExpiration - $($Accounts.Count) account(s) in scope; $expired expired, $expiring expiring within $win day(s), $noExpiry with no expiry date set." $true
+
+            # Flag an incomplete sweep in the SUBJECT LINE. A recipient triaging by
+            # subject must not read "0 expired" as a complete picture when some OUs
+            # never returned.
+            $failedOUs = @(@($Global:QueryFailures) | Group-Object Domain, OU).Count
+            $subjectPrefix = if ($failedOUs -gt 0) { "[INCOMPLETE] " } else { "" }
+            $Global:MailSubject = "$($subjectPrefix)$($MailSubjectstring) ( $expired expired - $expiring expiring within $win days )"
+            if ($failedOUs -gt 0) {
+                Write-Log "Error: Get-ServiceAccountExpiration - $failedOUs OU(s) could not be queried; the counts above are UNDERSTATED and the report is marked INCOMPLETE." $true
+            }
+
+            if ($Accounts.Count -eq 0) {
+                # Not an error: the scope was valid and was queried, it just held no
+                # accounts. Warn so it is obvious in the transcript, and still send the
+                # (empty) report WITH its scope footnote so the recipient can see which
+                # OUs were actually searched.
+                Write-Log "Warn: Get-ServiceAccountExpiration - the supplied OUs contain no user accounts. An empty report will be produced; check the scope footnote for the OUs actually queried." $true
+            }
+
+            GenerateReportServiceAccountExpiration $Accounts $DomainOUsMap $Global:QueryFailures $Global:DuplicateAccounts $win
         }
         'Set-L3-Admin-Accounts'{
             $strModule = 'ActiveDirectory' 
