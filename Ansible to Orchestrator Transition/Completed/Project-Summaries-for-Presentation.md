@@ -27,8 +27,8 @@ Each project section is therefore laid out in exactly three blocks:
 
 | | |
 |---|---|
-| **Automation processes transitioned** | **22 Ansible playbooks / job templates → 7 Orchestrator workflows** |
-| **Net-new capabilities delivered** | **2** — vCenter-native snapshot cleanup, and a self-service VM provisioning catalog (4 catalog items) |
+| **Automation processes transitioned** | **24 Ansible playbooks / job templates → 8 Orchestrator workflows** |
+| **Net-new capability delivered** | **1** — a self-service VM provisioning catalog (4 catalog items) |
 | **Shared PowerShell toolbox** | **24 hardening changes** (S-1 … S-24) |
 | **Pre-existing defects found and fixed** | **At least 15**, all silent — every one of them reported success |
 | **Divergent script copies eliminated** | A forked second copy of the shared toolbox merged back and retired |
@@ -44,7 +44,7 @@ Each project section is therefore laid out in exactly three blocks:
 | 4 | **Move Windows Event Logs** | 7 playbooks | 2 workflows |
 | 5 | **Windows Server Clean Disks** | 8 job templates | 1 workflow |
 | 6 | **Server Reboots** | 1 playbook | 1 workflow |
-| 7 | **Snapshot Cleanup** | *nothing — manual* | 1 vCenter-native workflow **(net-new)** |
+| 7 | **Snapshot Cleanup** | 2 playbooks — one a byte-identical copy of the other | 1 vCenter-native workflow |
 | 8 | **VM Deployment Automation** | *nothing — manual ticket-driven builds* | Self-service catalog, 4 items **(net-new)** |
 
 ## The three messages worth making up front
@@ -73,7 +73,7 @@ cheaper to build than the first.
 ## Suggested running order for the session
 
 Deliberately escalating: read-only first, then file operations, then destructive, then the
-two net-new set pieces as the finale.
+two set pieces as the finale.
 
 | Order | Project | Why here |
 |---|---|---|
@@ -83,7 +83,7 @@ two net-new set pieces as the finale.
 | 4 | Move Windows Event Logs | Moves to acting on servers, not just reading them |
 | 5 | Windows Server Clean Disks | First destructive action — introduces the safety gate |
 | 6 | Server Reboots | Most destructive; the biggest safety story of the programme |
-| 7 | Snapshot Cleanup | Net-new; technical showpiece |
+| 7 | Snapshot Cleanup | Technical showpiece — the widest gap between old and new |
 | 8 | VM Deployment Automation | Net-new; the finale, and the most visual demo |
 
 **A note that applies to every demo:** Orchestrator and the existing Ansible automation use
@@ -520,49 +520,73 @@ The naming of the script suggests it dates to Windows 2000 and may simply be obs
 
 ### What was
 
-**Nothing — this is net-new.** There was no Ansible predecessor. Snapshot cleanup was manual
-or ad-hoc.
+**Two Ansible playbooks** — `vm_remove_snapshot.yml` and `vm_remove_snapshot_v2.yml` — each
+calling its own role. Both do the same thing: list every snapshot in a datacenter whose name
+contains a given string, then delete any older than N days, skipping anything whose
+description mentions the Content Library.
 
-The reason it is not simply "run a script that deletes old snapshots" is that **consolidating
-a snapshot generates heavy storage I/O**. Doing it unthrottled, across an estate, on a
-schedule, is how a cleanup job becomes a production incident.
+**This is the naive implementation of snapshot cleanup**, and it is worth showing precisely
+because it looks reasonable. What is missing is everything that makes it safe to run against
+production on a schedule.
+
+| What was wrong | Why it matters |
+|---|---|
+| **No throttling of any kind** | Snapshots are deleted as fast as vCenter accepts them. **Consolidation is I/O-heavy** — this is the mechanism by which a routine cleanup job becomes a production storage incident |
+| **No ordering** | The delete loop walks the returned list in whatever order it arrived, so a **parent can be removed before its children** — forcing a larger merge than necessary, at the worst possible moment |
+| **No powered-on / powered-off distinction** | A powered-off VM consolidates cheaply; a running one does not. Both are treated identically |
+| **No preview** | The task always deletes. There is no way to see what a run would remove |
+| **One vCenter per run** | The vCenter is a single value — covering an estate means multiple runs |
+| **Certificate validation disabled** on every vCenter call | `validate_certs: no` throughout |
+| **Day-granularity age only** | The comparison truncates the creation timestamp to a date, so "older than N days" is the finest threshold expressible — and two snapshots created 23 hours apart on the same day are treated as the same age |
+| **One hardcoded exclusion** | Only Content Library snapshots can be protected, by a single literal string match. There is no way to mark anything else "keep this one" |
+| **No overlap protection** | Two scheduled runs can collide |
+| **One failure ends the run** | The delete loop has no rescue, so a single snapshot that will not remove stops the remaining ones for that datacenter |
+| **`v2` is a byte-identical copy of the original** | Two playbooks and two roles maintained where one would do — the standing risk of a fix landing in only one copy, with **nothing gained**, since they have not even diverged |
 
 ### What is
 
-A **vCenter-native Orchestrator workflow** — no PowerShell host dependency at all — that
+**One vCenter-native Orchestrator workflow** — no PowerShell host dependency at all — that
 finds and consolidates aged snapshots across **every vCenter registered to the appliance**,
 while actively protecting production storage.
 
-| Capability | What it does |
+| Enhancement | What it fixes |
 |---|---|
-| **Discovery across all vCenters** | Selects snapshots by age, a name whitelist, and a description skip-list — so a snapshot deliberately marked "keep" is left alone |
-| **Safe ordering** | Snapshots are grouped by VM and sorted so the newest is always removed before its parent. A chain is never broken. Filtered-out snapshots don't block the chain |
-| **Two execution lanes** | Powered-off VMs take a fast lane; powered-on and suspended VMs take a throttled lane with a per-vCenter concurrency limit |
-| **Adaptive I/O governor** | Before each consolidation, projects the I/O impact from the **measured** effect of the previous one on the same datastores — and **holds** the next task if the projection would breach the ceiling |
-| **Storage-type aware** | Traditional datastores are governed on **latency**; vSAN is governed on **congestion and resync queue depth**. These are genuinely different metrics, not one metric relabelled |
+| **Adaptive I/O governor** | Before each consolidation, projects the impact from the **measured** effect of the previous one on the same datastores — and **holds** the next task if the projection would breach the ceiling. Replaces *no throttling at all* |
+| **Storage-type aware** | Traditional datastores governed on **latency**; vSAN on **congestion and resync queue depth**. Genuinely different metrics, not one metric relabelled |
 | **Self-calibrating** | The fast lane inherits the throttled lane's measured impact, so it doesn't start from scratch on shared datastores |
-| **Run mutex** | A lock prevents two runs overlapping — and it is released on **every** exit path, including failures |
-| **Dry run by default** | Live deletion requires an explicit choice |
+| **Safe ordering** | Snapshots grouped by VM and sorted so the newest is always removed **before** its parent. A chain is never broken, and filtered-out snapshots don't block it |
+| **Two execution lanes** | Powered-off VMs take a fast lane; powered-on and suspended VMs take the throttled lane, with a per-vCenter concurrency cap |
+| **Dry run by default** | Live deletion is an explicit choice. Replaces *always deletes* |
+| **All vCenters in one run** | Every registered vCenter enumerated, with **per-vCenter error isolation** — one unreachable vCenter is logged, the rest still processed |
+| **Minute-granularity age** | Makes short test cycles possible, and removes the same-day ambiguity |
+| **Configurable skip-list** | A list of description substrings, not one hardcoded string — anything can be marked "keep" |
+| **Run mutex** | Prevents two runs overlapping, and is released on **every** exit path including failures |
 | **Auditable** | A per-snapshot run log plus a single human-readable completion summary, ingestible by Aria Operations for Logs |
-| **Per-vCenter error isolation** | One unreachable vCenter is logged; the remaining vCenters are still processed |
+| **One implementation** | The duplicate role is retired |
 
 ### Demo
 
-1. **Seed snapshots** using `Test Scripts/takeSnapshotsInFolder.js` against a lab VM folder.
-2. **Run with dry run left on — the default.** Show the full candidate list: what it found,
-   how old, which lane each would take, and the chain order within a VM.
-   **Point at the ordering explicitly** — newest first, parents last.
-3. **Show a snapshot excluded by the description skip-list**, to make the "keep this one"
-   control concrete.
-4. **Now the showpiece — put the storage under load.** Start
+1. **Open the old playbook first — briefly.** It is short and it reads as sensible, which is
+   the point. Say: *this deletes as fast as vCenter will accept, in whatever order the list
+   came back.*
+2. **Seed snapshots** using `Test Scripts/takeSnapshotsInFolder.js` against a lab VM folder.
+3. **Run with dry run left on — the default.** Show the candidate list: what it found, how
+   old, which lane each would take, and the **chain order within each VM**.
+   **Point at the ordering explicitly** — newest first, parents last. The old playbook had no
+   concept of this.
+4. **Show a snapshot excluded by the skip-list**, to make the "keep this one" control
+   concrete — and note the old version could only ever protect Content Library snapshots.
+5. **Now the showpiece — put the storage under load.** Start
    `Test Scripts/generate_datastore_latency.sh` (or the bulk variant) to drive latency up,
    then run live.
    **The moment that lands it:** show the governor **holding** the next consolidation, and
    the log line explaining *why* — the projected metric and the ceiling it would have
-   breached. Stop the load generator with the matching `Stop-` script and show it **resume
-   on its own**.
-5. **Show the completion summary block** and the per-snapshot log.
-6. **Optionally, kill the run mid-flight** and show that the lock is released anyway, so the
+   breached. Stop the load generator with the matching `Stop-` script and show it **resume on
+   its own**.
+   **Say:** under the old playbook, this is exactly the point at which the cleanup job would
+   have kept going.
+6. **Show the completion summary block** and the per-snapshot log.
+7. **Optionally, kill the run mid-flight** and show that the lock is released anyway, so the
    next scheduled run isn't blocked by a stuck lock.
 
 ---

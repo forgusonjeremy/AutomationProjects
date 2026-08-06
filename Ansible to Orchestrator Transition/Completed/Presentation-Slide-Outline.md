@@ -34,8 +34,8 @@ Ansible → VCF Orchestrator Transition, and Self-Service VM Provisioning
 
 ## Slide 3 — By the numbers
 
-- **22** Ansible playbooks and job templates → **7** Orchestrator workflows
-- **2** net-new capabilities — snapshot cleanup, self-service VM catalog
+- **24** Ansible playbooks and job templates → **8** Orchestrator workflows
+- **1** net-new capability — the self-service VM catalog
 - **24** hardening changes to the shared PowerShell toolbox
 - **15+** pre-existing defects found and fixed
 - **447** automated regression checks, all running offline
@@ -54,7 +54,7 @@ Ansible → VCF Orchestrator Transition, and Self-Service VM Provisioning
 | Move Windows Event Logs | 7 playbooks | 2 workflows |
 | Windows Server Clean Disks | 8 templates | 1 workflow |
 | Server Reboots | 1 playbook | 1 workflow |
-| Snapshot Cleanup | *manual* | 1 workflow — net-new |
+| Snapshot Cleanup | 2 playbooks — one a duplicate | 1 workflow |
 | VM Deployment Automation | *manual builds* | 4 catalog items — net-new |
 
 *Notes: Don't read it out. Let the right column do the work.*
@@ -113,7 +113,7 @@ Each of those now produces:
 
 ## Slide 9 — Running order
 
-**Read-only → file operations → destructive → net-new**
+**Read-only → file operations → destructive → the two set pieces**
 
 1. Server Reboot Report
 2. Admin Accounts Report
@@ -471,29 +471,37 @@ Physical and virtual alike. The most destructive workflow in the set.
 
 ## Slide 37 — Snapshot Cleanup
 
-**Net-new. There was no predecessor — snapshot cleanup was manual.**
+**Delete aged snapshots across the estate — without taking storage down with them.**
 
 ---
 
-## Slide 38 — Why this isn't just "delete old snapshots"
+## Slide 38 — What was
 
-**Consolidating a snapshot generates heavy storage I/O.**
+**Two playbooks: list snapshots older than N days, delete them.**
 
-Doing it unthrottled, across an estate, on a schedule, is how a cleanup job becomes a
-production incident.
+- **No throttling of any kind** — deletes as fast as vCenter accepts
+- **No ordering** — a parent can be deleted **before its children**, forcing a larger merge
+- **No powered-on / powered-off distinction** — a running VM costs far more to consolidate
+- **No preview.** The task always deletes
+- **One vCenter per run**; certificate validation **disabled**
+- **One hardcoded exclusion** — only Content Library snapshots can be protected
+- **`v2` is a byte-identical copy** — two playbooks maintained, nothing gained
+
+*Notes: Show the playbook. It's short and reads as sensible — that's the point. Consolidation is I/O-heavy; unthrottled, on a schedule, is how a cleanup job becomes a storage incident.*
 
 ---
 
 ## Slide 39 — What is
 
-**vCenter-native workflow across every registered vCenter. No PowerShell host at all.**
+**One vCenter-native workflow across every registered vCenter. No PowerShell host at all.**
 
 - **Adaptive I/O governor** — projects impact from the **measured** effect of the previous consolidation, and **holds** if it would breach the ceiling
 - **Storage-type aware** — latency for traditional datastores; **congestion and resync depth** for vSAN
-- **Safe ordering** — newest snapshot removed before its parent. A chain is never broken
+- **Safe ordering** — newest removed before its parent. A chain is never broken
 - **Two lanes** — powered-off fast; powered-on throttled, with a per-vCenter concurrency cap
+- **Dry run by default**; **configurable** skip-list, not one hardcoded string
+- **All vCenters in one run**, with per-vCenter error isolation
 - **Run mutex**, released on every exit path — including failures
-- **Dry run by default**
 
 ---
 
@@ -501,12 +509,13 @@ production incident.
 
 **Snapshot Cleanup**
 
+- The old playbook — brief, and deliberately unimpressive
 - Dry run — candidates, lanes, and **chain order within each VM**
 - A snapshot excluded by the "keep this" filter
 - **Storage put under load** → the governor **holds**, and logs why
 - Load removed → it **resumes on its own**
 
-*Notes: The governor holding under load is the showpiece of this demo. Make sure the load generator is ready beforehand.*
+*Notes: The governor holding under load is the showpiece. Have the load generator ready beforehand. Closing line — under the old playbook, this is exactly where the job would have kept going.*
 
 ---
 
