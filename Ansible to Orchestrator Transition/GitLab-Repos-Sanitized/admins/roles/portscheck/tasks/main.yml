@@ -1,0 +1,12 @@
+--- 
+- name: Run block check on windows ports
+  when: operating_system == "windows"
+  block:
+  - include_tasks: window_ports_check.yml
+    loop: "{{list_of_hosts}}"
+
+- name: Run block check on linux ports
+  when: operating_system == "linux"
+  block:
+  - include_tasks: linux_ports_check.yml
+    loop: "{{list_of_hosts}}"

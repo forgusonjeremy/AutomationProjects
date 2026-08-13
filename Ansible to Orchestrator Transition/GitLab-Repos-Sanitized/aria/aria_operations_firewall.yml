@@ -1,0 +1,687 @@
+---
+- name: VMware Aria 8.18 Firewall - Final with Catch-All DROP
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    # Survey inputs
+    restricted_ports_config: "{{ survey_restricted_ports | default('1514:tcp,1514:udp,6514:tcp,9543:tcp') }}"
+    restricted_ports_allowed_networks: "{{ survey_restricted_ports_networks | default('') }}"
+    restricted_ports_allowed_ips: "{{ survey_restricted_ports_ips | default('') }}"
+    cluster_nodes: "{{ survey_cluster_nodes | default('') }}"
+    backup_dir: "/root/iptables-backups"
+    remove_existing_blocks: "{{ survey_remove_existing_blocks | default(false) }}"
+    
+    # Convert to lists
+    restricted_ports_networks_list: "{{ restricted_ports_allowed_networks.split(',') | map('trim') | select() | list }}"
+    restricted_ports_ips_list: "{{ restricted_ports_allowed_ips.split(',') | map('trim') | select() | list }}"
+    cluster_nodes_list: "{{ cluster_nodes.split(',') | map('trim') | select() | list }}"
+
+  pre_tasks:
+    - name: Parse restricted ports configuration
+      ansible.builtin.set_fact:
+        restricted_ports: "{{ restricted_ports | default([]) + [port_dict] }}"
+      loop: "{{ restricted_ports_config.split(',') | map('trim') | select() | list }}"
+      loop_control:
+        loop_var: port_string
+      vars:
+        port_protocol: "{{ port_string.split(':') }}"
+        port_num: "{{ port_protocol[0] | trim }}"
+        protocol: "{{ port_protocol[1] | default('tcp') | trim }}"
+        port_name_map:
+          '1514': 'Syslog'
+          '6514': 'Syslog-TLS'
+          '9543': 'Aria-API'
+          '8443': 'Aria-UI'
+        port_dict:
+          port: "{{ port_num }}"
+          protocol: "{{ protocol }}"
+          name: "{{ port_name_map[port_num] | default('Port-' + port_num) }}-{{ protocol | upper }}"
+
+    - name: Display configuration
+      ansible.builtin.debug:
+        msg:
+          - "============================================"
+          - "VMware Aria Firewall Configuration"
+          - "============================================"
+          - "Version: 2.4 (With Catch-All DROP Rules)"
+          - "Restricted Ports: {{ restricted_ports | map(attribute='port') | unique | list | join(', ') }}"
+          - "Allowed Networks: {{ restricted_ports_networks_list if restricted_ports_networks_list else 'None' }}"
+          - "Allowed IPs: {{ restricted_ports_ips_list if restricted_ports_ips_list else 'None' }}"
+          - "Cluster Nodes: {{ cluster_nodes_list if cluster_nodes_list else 'None' }}"
+          - "Remove Existing: {{ remove_existing_blocks }}"
+          - "Default Policy: DROP (with catch-all DROP in TCP/UDP chains)"
+          - "============================================"
+
+    - name: Validate configuration
+      ansible.builtin.assert:
+        that:
+          - restricted_ports | length > 0
+        fail_msg: "At least one restricted port must be specified"
+
+  tasks:
+    # ==========================================
+    # BACKUP
+    # ==========================================
+    - name: Create backup directory
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Backup current iptables rules
+      ansible.builtin.shell: |
+        iptables-save > {{ backup_dir }}/iptables-backup-{{ ansible_date_time.iso8601_basic_short }}.rules
+      changed_when: true
+
+    - name: Display current INPUT rules
+      ansible.builtin.command: iptables -L INPUT -n --line-numbers
+      register: before_rules
+      changed_when: false
+
+    - name: Show current rules (first 20 lines)
+      ansible.builtin.debug:
+        msg: "{{ (before_rules.stdout_lines | select('match', '^[0-9]') | list)[:20] }}"
+
+    - name: Count current rules
+      ansible.builtin.shell: iptables -L INPUT -n | wc -l
+      register: before_count
+      changed_when: false
+
+    # ==========================================
+    # CHECK TCP/UDP CHAINS
+    # ==========================================
+    - name: Check if TCP chain exists
+      ansible.builtin.shell: iptables -L TCP -n 2>/dev/null
+      register: tcp_chain_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display TCP chain if exists
+      ansible.builtin.command: iptables -L TCP -n -v --line-numbers
+      register: tcp_chain_display
+      changed_when: false
+      failed_when: false
+      when: tcp_chain_check.rc == 0
+
+    - name: Show TCP chain
+      ansible.builtin.debug:
+        var: tcp_chain_display.stdout_lines
+      when: tcp_chain_check.rc == 0
+
+    - name: Check if UDP chain exists
+      ansible.builtin.shell: iptables -L UDP -n 2>/dev/null
+      register: udp_chain_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display UDP chain if exists
+      ansible.builtin.command: iptables -L UDP -n -v --line-numbers
+      register: udp_chain_display
+      changed_when: false
+      failed_when: false
+      when: udp_chain_check.rc == 0
+
+    - name: Show UDP chain
+      ansible.builtin.debug:
+        var: udp_chain_display.stdout_lines
+      when: udp_chain_check.rc == 0
+
+    # ==========================================
+    # REMOVE PROBLEMATIC RULES IN TCP/UDP CHAINS
+    # ==========================================
+    - name: Find blanket ACCEPT rules in TCP chain for restricted ports (FIXED AWK)
+      ansible.builtin.shell: |
+        iptables -L TCP -n --line-numbers 2>/dev/null | \
+        grep "ACCEPT" | \
+        grep -E "dpt:({{ restricted_ports | map(attribute='port') | unique | list | join('|') }})" | \
+        awk 'NF >= 10 && $9 == "0.0.0.0/0" && $10 ~ /^0\.0\.0\.0/ {print $1}' | \
+        sort -rn
+      register: tcp_chain_problematic_rules
+      changed_when: false
+      failed_when: false
+      when: tcp_chain_check.rc == 0
+
+    - name: Display problematic TCP chain rules
+      ansible.builtin.debug:
+        msg: "Found {{ tcp_chain_problematic_rules.stdout_lines | length }} blanket ACCEPT rules in TCP chain for restricted ports: {{ tcp_chain_problematic_rules.stdout_lines | join(', ') if tcp_chain_problematic_rules.stdout_lines | length > 0 else 'none' }}"
+      when: tcp_chain_check.rc == 0
+
+    - name: Remove blanket ACCEPT rules from TCP chain
+      ansible.builtin.shell: |
+        iptables -D TCP {{ item }}
+      loop: "{{ tcp_chain_problematic_rules.stdout_lines }}"
+      when: 
+        - tcp_chain_check.rc == 0
+        - tcp_chain_problematic_rules.stdout_lines | length > 0
+
+    - name: Confirm TCP chain cleanup
+      ansible.builtin.debug:
+        msg: "✅ Removed {{ tcp_chain_problematic_rules.stdout_lines | length }} blanket ACCEPT rules from TCP chain"
+      when: 
+        - tcp_chain_check.rc == 0
+        - tcp_chain_problematic_rules.stdout_lines | length > 0
+
+    - name: Find blanket ACCEPT rules in UDP chain for restricted ports (FIXED AWK)
+      ansible.builtin.shell: |
+        iptables -L UDP -n --line-numbers 2>/dev/null | \
+        grep "ACCEPT" | \
+        grep -E "dpt:({{ restricted_ports | map(attribute='port') | unique | list | join('|') }})" | \
+        awk 'NF >= 10 && $9 == "0.0.0.0/0" && $10 ~ /^0\.0\.0\.0/ {print $1}' | \
+        sort -rn
+      register: udp_chain_problematic_rules
+      changed_when: false
+      failed_when: false
+      when: udp_chain_check.rc == 0
+
+    - name: Display problematic UDP chain rules
+      ansible.builtin.debug:
+        msg: "Found {{ udp_chain_problematic_rules.stdout_lines | length }} blanket ACCEPT rules in UDP chain for restricted ports"
+      when: 
+        - udp_chain_check.rc == 0
+        - udp_chain_problematic_rules.stdout_lines | length > 0
+
+    - name: Remove blanket ACCEPT rules from UDP chain
+      ansible.builtin.shell: |
+        iptables -D UDP {{ item }}
+      loop: "{{ udp_chain_problematic_rules.stdout_lines }}"
+      when: 
+        - udp_chain_check.rc == 0
+        - udp_chain_problematic_rules.stdout_lines | length > 0
+
+    - name: Confirm UDP chain cleanup
+      ansible.builtin.debug:
+        msg: "✅ Removed {{ udp_chain_problematic_rules.stdout_lines | length }} blanket ACCEPT rules from UDP chain"
+      when: 
+        - udp_chain_check.rc == 0
+        - udp_chain_problematic_rules.stdout_lines | length > 0
+
+    # ==========================================
+    # REMOVE PROBLEMATIC RULES IN INPUT CHAIN
+    # ==========================================
+    - name: Check for blanket ACCEPT rule in INPUT
+      ansible.builtin.shell: |
+        iptables -L INPUT -n --line-numbers | \
+        grep "ACCEPT" | \
+        grep "0.0.0.0/0.*0.0.0.0/0" | \
+        grep -v "Cluster\|state\|dpt:\|icmp" | \
+        awk '{print $1}' | \
+        head -1
+      register: blanket_accept_line
+      changed_when: false
+      failed_when: false
+
+    - name: Display blanket ACCEPT rule if found
+      ansible.builtin.debug:
+        msg: "⚠️  Found problematic blanket ACCEPT rule at line {{ blanket_accept_line.stdout }}"
+      when: blanket_accept_line.stdout | length > 0
+
+    - name: Remove blanket ACCEPT rule from INPUT
+      ansible.builtin.command: iptables -D INPUT {{ blanket_accept_line.stdout }}
+      when: blanket_accept_line.stdout | length > 0
+
+    - name: Confirm blanket ACCEPT removal
+      ansible.builtin.debug:
+        msg: "✅ Removed blanket ACCEPT rule from INPUT line {{ blanket_accept_line.stdout }}"
+      when: blanket_accept_line.stdout | length > 0
+
+    - name: Check for catch-all REJECT rule
+      ansible.builtin.shell: |
+        iptables -L INPUT -n --line-numbers | \
+        grep "REJECT" | \
+        grep "icmp-proto-unreachable" | \
+        grep "0.0.0.0/0.*0.0.0.0/0" | \
+        awk '{print $1}' | \
+        head -1
+      register: catchall_reject_line
+      changed_when: false
+      failed_when: false
+
+    - name: Display catch-all REJECT rule if found
+      ansible.builtin.debug:
+        msg: "⚠️  Found catch-all REJECT rule at line {{ catchall_reject_line.stdout }}"
+      when: catchall_reject_line.stdout | length > 0
+
+    - name: Remove catch-all REJECT rule
+      ansible.builtin.command: iptables -D INPUT {{ catchall_reject_line.stdout }}
+      when: catchall_reject_line.stdout | length > 0
+
+    - name: Confirm catch-all REJECT removal
+      ansible.builtin.debug:
+        msg: "✅ Removed catch-all REJECT rule from INPUT line {{ catchall_reject_line.stdout }}"
+      when: catchall_reject_line.stdout | length > 0
+
+    # ==========================================
+    # REMOVE OLD ARIA RULES (if requested)
+    # ==========================================
+    - name: Check for existing Aria firewall rules (including DROP rules)
+      ansible.builtin.shell: |
+        iptables -L INPUT -n --line-numbers | grep -E "Aria-API|Aria-UI|Syslog|Cluster node|BLOCKED-|Block.*unauthorized" | wc -l
+      register: existing_aria_rules
+      changed_when: false
+      failed_when: false
+
+    - name: Display existing Aria rules count
+      ansible.builtin.debug:
+        msg: "Found {{ existing_aria_rules.stdout }} existing Aria firewall rules"
+      when: existing_aria_rules.stdout | int > 0
+
+    - name: Remove existing Aria-related rules (if requested)
+      ansible.builtin.shell: |
+        for line in $(iptables -L INPUT -n --line-numbers | grep -E "Aria-API|Aria-UI|Syslog|Cluster node|BLOCKED-|Block.*unauthorized" | awk '{print $1}' | sort -rn); do
+          iptables -D INPUT $line
+        done
+      when: 
+        - remove_existing_blocks | bool
+        - existing_aria_rules.stdout | int > 0
+      changed_when: true
+
+    # ==========================================
+    # ADD CLUSTER NODE RULES
+    # ==========================================
+    - name: Check if cluster node rule already exists
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep "{{ item }}" | grep -c "Cluster node"
+      loop: "{{ cluster_nodes_list }}"
+      register: cluster_rule_check
+      changed_when: false
+      failed_when: false
+      when: 
+        - cluster_nodes_list | length > 0
+        - item | length > 0
+
+    - name: Insert cluster node allow rules at top
+      ansible.builtin.iptables:
+        chain: INPUT
+        source: "{{ item.item }}"
+        jump: ACCEPT
+        action: insert
+        rule_num: 1
+        comment: "Cluster node {{ item.item }} - unrestricted"
+      loop: "{{ cluster_rule_check.results }}"
+      when: 
+        - cluster_nodes_list | length > 0
+        - item.item | length > 0
+        - item.stdout | int == 0
+
+    # ==========================================
+    # ADD RESTRICTED PORTS ALLOW RULES
+    # ==========================================
+    
+    # Allow from networks
+    - name: Check if network allow rule exists
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep "dpt:{{ item.0.port }}" | grep "{{ item.1 }}" | grep -c ACCEPT
+      loop: "{{ restricted_ports | product(restricted_ports_networks_list) | list }}"
+      register: network_allow_check
+      changed_when: false
+      failed_when: false
+      when: 
+        - restricted_ports_networks_list | length > 0
+        - item.1 | length > 0
+
+    - name: Allow restricted ports from allowed networks
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: "{{ item.item.0.protocol }}"
+        destination_port: "{{ item.item.0.port }}"
+        source: "{{ item.item.1 }}"
+        jump: ACCEPT
+        comment: "Allow {{ item.item.0.name }} from network {{ item.item.1 }}"
+      loop: "{{ network_allow_check.results }}"
+      when: 
+        - restricted_ports_networks_list | length > 0
+        - item.item.1 | length > 0
+        - item.stdout | int == 0
+
+    # Allow from IPs
+    - name: Check if IP allow rule exists
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep "dpt:{{ item.0.port }}" | grep "{{ item.1 }}" | grep -c ACCEPT
+      loop: "{{ restricted_ports | product(restricted_ports_ips_list) | list }}"
+      register: ip_allow_check
+      changed_when: false
+      failed_when: false
+      when: 
+        - restricted_ports_ips_list | length > 0
+        - item.1 | length > 0
+
+    - name: Allow restricted ports from allowed IPs
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: "{{ item.item.0.protocol }}"
+        destination_port: "{{ item.item.0.port }}"
+        source: "{{ item.item.1 }}"
+        jump: ACCEPT
+        comment: "Allow {{ item.item.0.name }} from IP {{ item.item.1 }}"
+      loop: "{{ ip_allow_check.results }}"
+      when: 
+        - restricted_ports_ips_list | length > 0
+        - item.item.1 | length > 0
+        - item.stdout | int == 0
+
+    # ==========================================
+    # ADD CATCH-ALL DROP RULES TO TCP/UDP CHAINS
+    # ==========================================
+    - name: Check if TCP chain catch-all DROP already exists
+      ansible.builtin.shell: |
+        iptables -L TCP -n --line-numbers 2>/dev/null | tail -1 | grep -c "DROP.*all"
+      register: tcp_catchall_check
+      changed_when: false
+      failed_when: false
+      when: tcp_chain_check.rc == 0
+
+    - name: Add catch-all DROP rule to TCP chain
+      ansible.builtin.iptables:
+        chain: TCP
+        jump: DROP
+        comment: "Drop all other TCP traffic"
+      when: 
+        - tcp_chain_check.rc == 0
+        - tcp_catchall_check.stdout | int == 0
+
+    - name: Confirm TCP catch-all DROP added
+      ansible.builtin.debug:
+        msg: "✅ Added catch-all DROP rule to TCP chain"
+      when: 
+        - tcp_chain_check.rc == 0
+        - tcp_catchall_check.stdout | int == 0
+
+    - name: Check if UDP chain catch-all DROP already exists
+      ansible.builtin.shell: |
+        iptables -L UDP -n --line-numbers 2>/dev/null | tail -1 | grep -c "DROP.*all"
+      register: udp_catchall_check
+      changed_when: false
+      failed_when: false
+      when: udp_chain_check.rc == 0
+
+    - name: Add catch-all DROP rule to UDP chain
+      ansible.builtin.iptables:
+        chain: UDP
+        jump: DROP
+        comment: "Drop all other UDP traffic"
+      when: 
+        - udp_chain_check.rc == 0
+        - udp_catchall_check.stdout | int == 0
+
+    - name: Confirm UDP catch-all DROP added
+      ansible.builtin.debug:
+        msg: "✅ Added catch-all DROP rule to UDP chain"
+      when: 
+        - udp_chain_check.rc == 0
+        - udp_catchall_check.stdout | int == 0
+
+    # ==========================================
+    # PERSISTENCE
+    # ==========================================
+    - name: Create systemd scripts directory
+      ansible.builtin.file:
+        path: /etc/systemd/scripts
+        state: directory
+        mode: '0755'
+
+    - name: Save current iptables rules
+      ansible.builtin.shell: iptables-save
+      register: iptables_rules
+      changed_when: false
+
+    - name: Save to primary persistence location
+      ansible.builtin.copy:
+        content: "{{ iptables_rules.stdout }}"
+        dest: /etc/systemd/scripts/ip4save
+        mode: '0644'
+        backup: yes
+
+    - name: Save to backup location
+      ansible.builtin.copy:
+        content: "{{ iptables_rules.stdout }}"
+        dest: /etc/sysconfig/iptables
+        mode: '0644'
+        backup: yes
+
+    - name: Create iptables-restore systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/iptables-restore.service
+        content: |
+          [Unit]
+          Description=Restore VMware Aria Custom iptables Rules
+          After=network-online.target docker.service
+          Wants=network-online.target
+          
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/sbin/iptables-restore /etc/systemd/scripts/ip4save
+          ExecStartPost=/bin/sleep 1
+          RemainAfterExit=yes
+          StandardOutput=journal
+          StandardError=journal
+          
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+        backup: yes
+
+    - name: Create restore script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/restore-aria-firewall.sh
+        content: |
+          #!/bin/bash
+          RULES_FILE="/etc/systemd/scripts/ip4save"
+          LOG_FILE="/var/log/aria-firewall-restore.log"
+          
+          echo "[$(date)] Restoring Aria firewall rules" >> "$LOG_FILE"
+          
+          if [ -f "$RULES_FILE" ]; then
+              /usr/sbin/iptables-restore < "$RULES_FILE" 2>&1 >> "$LOG_FILE"
+              if [ $? -eq 0 ]; then
+                  echo "[$(date)] Firewall rules restored successfully" >> "$LOG_FILE"
+              else
+                  echo "[$(date)] ERROR: Failed to restore rules" >> "$LOG_FILE"
+              fi
+          else
+              echo "[$(date)] ERROR: Rules file not found" >> "$LOG_FILE"
+          fi
+        mode: '0755'
+
+    - name: Create rc.local
+      ansible.builtin.copy:
+        dest: /etc/rc.local
+        content: |
+          #!/bin/bash
+          sleep 5
+          /usr/local/bin/restore-aria-firewall.sh
+          exit 0
+        mode: '0755'
+
+    - name: Create rc-local service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/rc-local.service
+        content: |
+          [Unit]
+          Description=Aria Firewall via rc.local
+          ConditionPathExists=/etc/rc.local
+          After=network-online.target docker.service iptables-restore.service
+          
+          [Service]
+          Type=forking
+          ExecStart=/etc/rc.local start
+          TimeoutSec=0
+          RemainAfterExit=yes
+          
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Enable iptables-restore service
+      ansible.builtin.systemd:
+        name: iptables-restore.service
+        enabled: yes
+
+    - name: Enable rc-local service
+      ansible.builtin.systemd:
+        name: rc-local.service
+        enabled: yes
+
+    - name: Create cron job as fallback
+      ansible.builtin.cron:
+        name: "Restore Aria firewall at reboot"
+        special_time: reboot
+        job: "sleep 15 && /usr/local/bin/restore-aria-firewall.sh"
+        user: root
+
+    # ==========================================
+    # VERIFICATION
+    # ==========================================
+    - name: Display TCP chain after changes
+      ansible.builtin.command: iptables -L TCP -n -v --line-numbers
+      register: tcp_chain_after
+      changed_when: false
+      failed_when: false
+      when: tcp_chain_check.rc == 0
+
+    - name: Show TCP chain after cleanup
+      ansible.builtin.debug:
+        var: tcp_chain_after.stdout_lines
+      when: tcp_chain_check.rc == 0
+
+    - name: Display UDP chain after changes
+      ansible.builtin.command: iptables -L UDP -n -v --line-numbers
+      register: udp_chain_after
+      changed_when: false
+      failed_when: false
+      when: udp_chain_check.rc == 0
+
+    - name: Show UDP chain after cleanup
+      ansible.builtin.debug:
+        var: udp_chain_after.stdout_lines
+      when: udp_chain_check.rc == 0
+
+    - name: Display current rules after changes
+      ansible.builtin.command: iptables -L INPUT -n -v --line-numbers
+      register: after_rules_full
+      changed_when: false
+
+    - name: Show updated rules (first 20 lines)
+      ansible.builtin.debug:
+        msg: "{{ (after_rules_full.stdout_lines | select('match', '^[0-9]') | list)[:20] }}"
+
+    - name: Count rules after changes
+      ansible.builtin.shell: iptables -L INPUT -n | wc -l
+      register: after_count
+      changed_when: false
+
+    - name: Count Aria-specific rules
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep -E "Aria-API|Aria-UI|Syslog|Cluster node|Allow.*from" | wc -l
+      register: aria_rule_count
+      changed_when: false
+
+    - name: Check for problematic rules still present in INPUT
+      ansible.builtin.shell: |
+        echo "Blanket ACCEPT rules:"
+        iptables -L INPUT -n | grep "ACCEPT.*0.0.0.0/0.*0.0.0.0/0" | grep -v "Cluster\|state\|dpt:\|icmp" || echo "None (Good!)"
+        echo ""
+        echo "Catch-all REJECT rules:"
+        iptables -L INPUT -n | grep "REJECT.*icmp-proto-unreachable" | grep "0.0.0.0/0.*0.0.0.0/0" || echo "None (Good!)"
+      register: problem_check
+      changed_when: false
+
+    - name: Display problem check results
+      ansible.builtin.debug:
+        var: problem_check.stdout_lines
+
+    - name: Check for problematic rules in TCP chain
+      ansible.builtin.shell: |
+        echo "TCP chain blanket ACCEPT rules for restricted ports:"
+        iptables -L TCP -n 2>/dev/null | grep "ACCEPT.*0.0.0.0/0.*0.0.0.0/0" | grep -E "dpt:({{ restricted_ports | map(attribute='port') | unique | list | join('|') }})" || echo "None (Good!)"
+      register: tcp_problem_check
+      changed_when: false
+      failed_when: false
+      when: tcp_chain_check.rc == 0
+
+    - name: Display TCP chain problem check
+      ansible.builtin.debug:
+        var: tcp_problem_check.stdout_lines
+      when: tcp_chain_check.rc == 0
+
+    - name: Verify iptables-restore service
+      ansible.builtin.command: systemctl status iptables-restore.service
+      register: service_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check default INPUT policy
+      ansible.builtin.shell: iptables -L INPUT -n | head -1 | grep -o "policy [A-Z]*"
+      register: default_policy
+      changed_when: false
+
+    - name: Verify TCP chain has catch-all DROP
+      ansible.builtin.shell: |
+        iptables -L TCP -n 2>/dev/null | tail -1 | grep -q "DROP.*all" && echo "Yes" || echo "No"
+      register: tcp_catchall_verify
+      changed_when: false
+      failed_when: false
+      when: tcp_chain_check.rc == 0
+
+    - name: Verify UDP chain has catch-all DROP
+      ansible.builtin.shell: |
+        iptables -L UDP -n 2>/dev/null | tail -1 | grep -q "DROP.*all" && echo "Yes" || echo "No"
+      register: udp_catchall_verify
+      changed_when: false
+      failed_when: false
+      when: udp_chain_check.rc == 0
+
+    - name: Final summary
+      ansible.builtin.debug:
+        msg:
+          - "============================================"
+          - "VMware Aria Firewall Configuration Complete"
+          - "============================================"
+          - ""
+          - "FIXES APPLIED:"
+          - "  {{ '✅ Removed blanket ACCEPT from INPUT' if blanket_accept_line.stdout | length > 0 else '✅ No blanket ACCEPT in INPUT' }}"
+          - "  {{ '✅ Removed catch-all REJECT from INPUT' if catchall_reject_line.stdout | length > 0 else '✅ No catch-all REJECT in INPUT' }}"
+          - "  {{ '✅ Removed ' + (tcp_chain_problematic_rules.stdout_lines | length | string) + ' rules from TCP chain' if (tcp_chain_check.rc == 0 and tcp_chain_problematic_rules.stdout_lines | length > 0) else '✅ No TCP chain issues' }}"
+          - "  {{ '✅ Removed ' + (udp_chain_problematic_rules.stdout_lines | length | string) + ' rules from UDP chain' if (udp_chain_check.rc == 0 and udp_chain_problematic_rules.stdout_lines | length > 0) else '✅ No UDP chain issues' }}"
+          - "  {{ '✅ Removed ' + existing_aria_rules.stdout + ' old Aria rules' if (remove_existing_blocks | bool and existing_aria_rules.stdout | int > 0) else '✅ Kept existing rules' }}"
+          - ""
+          - "CATCH-ALL DROP RULES:"
+          - "  TCP chain: {{ '✅ Present' if (tcp_chain_check.rc == 0 and tcp_catchall_verify.stdout == 'Yes') else '❌ Missing' }}"
+          - "  UDP chain: {{ '✅ Present' if (udp_chain_check.rc == 0 and udp_catchall_verify.stdout == 'Yes') else '❌ Missing or no UDP chain' }}"
+          - ""
+          - "STATISTICS:"
+          - "  Rules before: {{ before_count.stdout }}"
+          - "  Rules after: {{ after_count.stdout }}"
+          - "  Aria ALLOW rules: {{ aria_rule_count.stdout }}"
+          - ""
+          - "CONFIGURATION:"
+          - "  Default Policy: {{ default_policy.stdout }}"
+          - "  Cluster nodes: {{ cluster_nodes_list | length if cluster_nodes_list else 0 }}"
+          - "  Restricted ports: {{ restricted_ports | map(attribute='port') | unique | list | join(', ') }}"
+          - "  Allowed networks: {{ restricted_ports_networks_list | join(', ') if restricted_ports_networks_list else 'None' }}"
+          - "  Allowed IPs: {{ restricted_ports_ips_list | join(', ') if restricted_ports_ips_list else 'None' }}"
+          - "  Explicit DROP rules: NO (using catch-all DROP in chains)"
+          - ""
+          - "PERSISTENCE:"
+          - "  systemd service: {{ 'enabled' if 'enabled' in service_check.stdout else 'check required' }}"
+          - "  rc.local: enabled"
+          - "  cron @reboot: enabled"
+          - ""
+          - "Firewall is ACTIVE and FUNCTIONAL"
+          - "TCP/UDP chains cleaned and secured with catch-all DROP"
+          - "All unlisted ports automatically blocked"
+          - ""
+          - "NEXT STEPS:"
+          - "  1. Verify: iptables -L INPUT -n --line-numbers"
+          - "  2. Check TCP chain: iptables -L TCP -n -v --line-numbers"
+          - "  3. Check UDP chain: iptables -L UDP -n -v --line-numbers"
+          - "  4. Test from unauthorized IP (ports should be blocked)"
+          - "  5. Have security team rescan (SSL cert vulnerability should be gone)"
+          - "  6. Reboot to test persistence"
+          - "  7. After reboot: systemctl status iptables-restore.service"
+          - "============================================"

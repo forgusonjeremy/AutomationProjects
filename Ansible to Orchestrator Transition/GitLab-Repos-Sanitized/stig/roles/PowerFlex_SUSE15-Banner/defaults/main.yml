@@ -1,0 +1,13 @@
+##20251003 - APB v1.0 - AS IS direct translation 
+#SLES-15-010020 - The SUSE operating system must display the Standard Mandatory DOD Notice and Consent Banner before granting access via local console.
+sles15STIG_stigrule_234803_Manage: True
+sles15STIG_stigrule_234803__etc_issue_Dest: /etc/issue
+sles15STIG_stigrule_234803__etc_issue_Content: 'You are accessing a U.S. Government information system, which includes (1) this computer, (2) this computer network, (3) all computers connected to this network, and (4) all devices and storage media attached to this network or to a computer on this network. This information system is provided for U.S. Government-authorized use only. Unauthorized or improper use of this system may result in disciplinary action, as well as civil and criminal penalties. By using this information system, you understand and consent to the following. You have no reasonable expectation of privacy regarding any communications or data transiting or stored on this information system. At, any time, and for any lawful government purpose, the government may, monitor, intercept, and search and seize any communication or data transiting, or stored on this information system. Any communications or data transiting or stored on this information system may, be disclosed or used for any lawful government purpose. Nothing herein consents to the search or seizure of a privately-owned computer or other privately owned communications device, or the contents thereof, that is in the system users home.
+  eth0: \4{eth0} \6{eth0}
+  eth1: \4{eth1} \6{eth1}
+  eth2: \4{eth2} \6{eth2}
+  '
+#SLES-15-010040 - The SUSE operating system must display the Standard Mandatory DOD Notice and Consent Banner before granting access via SSH.
+sles15STIG_stigrule_234805_Manage: True
+sles15STIG_stigrule_234805__etc_issue_Dest: /etc/ssh/sshd_config
+sles15STIG_stigrule_234805__etc_issue_Content: 'Banner /etc/issue'

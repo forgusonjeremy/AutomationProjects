@@ -1,0 +1,20 @@
+hst:
+    children:
+        hst_stig:
+    
+mdc:
+    children:
+        mdc_stig:     
+
+ew:
+    hosts:
+        dom18.dom5.dom6.invalid:
+        dom17.dom5.dom6.invalid:
+    children:
+        ew_stig:    
+    
+all:
+    children:
+        hst:
+        mdc:
+        ew:  

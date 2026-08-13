@@ -1,0 +1,33 @@
+---
+- name: STIG VxRAIl Managers
+  hosts: all
+  any_errors_fatal: true
+  gather_facts: no
+  # vars_files:
+  #   "../../vars/main.yml"
+
+  tasks:
+
+    - name: Check python modules
+      shell: pip3 list
+      delegate_to: localhost
+      run_once: true
+      register: py_packs
+
+    - name: Show python module list
+      debug:
+        msg: "{{ py_packs.stdout }}"
+      delegate_to: localhost
+      run_once: true
+    
+    - name: Get information related to STIG regulations.
+      dellemc.vxrail.dellemc_vxrail_stig_get_info:
+        vxmip: dom1.dom2.dom3.invalid
+        vcadmin: "{{ AnsvCenterAdmin_password }}"
+        vcpasswd: "{{ AnsvCenterAdmin_username }}"
+        #timeout: "{{ timeout }}"
+        #api_version_number: "{{ api_version_number }}"
+      delegate_to: localhost
+      run_once: true
+
+    

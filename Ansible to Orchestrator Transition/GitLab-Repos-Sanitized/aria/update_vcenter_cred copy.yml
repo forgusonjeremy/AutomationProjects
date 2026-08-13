@@ -1,0 +1,243 @@
+---
+- name: Update VMware Aria Operations Credentials Account Password
+  hosts: localhost
+  gather_facts: false
+  environment:
+    PYTHONHTTPSVERIFY: 0
+    CURL_CA_BUNDLE: ""
+    REQUESTS_CA_BUNDLE: ""
+  vars:
+    # VMware Aria Operations connection details
+    ops_host: "{{ aria_ops_hostname }}"
+    ops_port: "{{ aria_ops_port | default(443) }}"
+    ops_username: "{{ aria_ops_user }}"
+    ops_password: "{{ aria_ops_pass }}"
+    
+    # vCenter credential account details to update
+    credential_identifier: "{{ target_credential_id }}"  # Can be UUID or name
+    new_vcenter_password: "{{ new_credential_password }}"
+    vcenter_username: "{{ vcenter_user | default('') }}"  # Optional: update username too
+    
+    # API endpoints
+    base_url: "https://{{ ops_host }}:{{ ops_port }}"
+    auth_url: "{{ base_url }}/suite-api/api/auth/token/acquire"
+    credentials_url: "{{ base_url }}/suite-api/api/credentials"
+    test_url: "{{ base_url }}/suite-api/api/credentials/test"
+    
+  tasks:
+    - name: Display SSL certificate bypass notice
+      debug:
+        msg:
+          - "WARNING: SSL certificate validation is disabled for this playbook"
+          - "This is necessary due to expired certificates on {{ ops_host }}"
+          - "In production, ensure certificates are valid and remove these bypasses"
+          
+    - name: Test basic connectivity to Aria Operations
+      uri:
+        url: "{{ base_url }}"
+        method: GET
+        validate_certs: false
+        timeout: 15
+        force: true
+        use_proxy: false
+      register: connectivity_test
+      ignore_errors: true
+      
+    - name: Display connectivity test result
+      debug:
+        msg:
+          - "Connectivity test to {{ base_url }}: {{ 'SUCCESS' if connectivity_test.status == 200 else 'FAILED' }}"
+          - "Status: {{ connectivity_test.status | default('No response') }}"
+          - "Response time: {{ connectivity_test.elapsed | default('N/A') }}s"
+          - "Certificate validation bypassed due to expired certificate"
+          
+    - name: Fail if basic connectivity is down
+      fail:
+        msg: "Cannot connect to Aria Operations at {{ base_url }}. Please check network connectivity and server status."
+      when: connectivity_test.status is not defined or connectivity_test.status not in [200, 302, 401, 403]
+      
+    - name: Authenticate with VMware Aria Operations (with retry)
+      uri:
+        url: "{{ auth_url }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+        body_format: json
+        body:
+          username: "{{ ops_username }}"
+          password: "{{ ops_password }}"
+        validate_certs: false
+        timeout: 45
+        force: true
+        use_proxy: false
+        status_code: 200
+      register: auth_response
+      retries: 3
+      delay: 10
+      until: auth_response.status == 200
+      
+    - name: Set authentication token
+      set_fact:
+        auth_token: "{{ auth_response.json.token }}"
+        
+    - name: Check if credential identifier is UUID or name
+      set_fact:
+        is_uuid: "{{ credential_identifier | regex_search('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', ignorecase=True) }}"
+        
+    - name: Get credential by UUID (if UUID provided)
+      uri:
+        url: "{{ credentials_url }}/{{ credential_identifier }}"
+        method: GET
+        headers:
+          Authorization: "vRealizeOpsToken {{ auth_token }}"
+          Accept: "application/json"
+        validate_certs: false
+        force: true
+        use_proxy: false
+        status_code: 200
+      register: credential_details_uuid
+      when: is_uuid is not none and is_uuid != ""
+      
+    - name: Get all credentials to find by name (if name provided)
+      uri:
+        url: "{{ credentials_url }}"
+        method: GET
+        headers:
+          Authorization: "vRealizeOpsToken {{ auth_token }}"
+          Accept: "application/json"
+        validate_certs: false
+        force: true
+        use_proxy: false
+        status_code: 200
+      register: all_credentials
+      when: is_uuid is none or is_uuid == ""
+      
+    - name: Find credential by name
+      set_fact:
+        credential_details_name: "{{ all_credentials.json.credentialInstances | selectattr('name', 'equalto', credential_identifier) | first }}"
+      when: is_uuid is none or is_uuid == ""
+      
+    - name: Set credential details (from UUID lookup)
+      set_fact:
+        credential_details:
+          json: "{{ credential_details_uuid.json }}"
+        credential_account_id: "{{ credential_details_uuid.json.id }}"
+      when: is_uuid is not none and is_uuid != ""
+      
+    - name: Set credential details (from name lookup)
+      set_fact:
+        credential_details:
+          json: "{{ credential_details_name }}"
+        credential_account_id: "{{ credential_details_name.id }}"
+      when: is_uuid is none or is_uuid == ""
+      
+    - name: Verify credential was found
+      fail:
+        msg: "Credential '{{ credential_identifier }}' not found. Please check the credential name or UUID."
+      when: credential_details is not defined or credential_details.json is not defined
+        
+    - name: Display found credential info
+      debug:
+        msg:
+          - "Found Credential:"
+          - "  ID: {{ credential_account_id }}"
+          - "  Name: {{ credential_details.json.name }}"
+          - "  Type: {{ credential_details.json.credentialKindKey }}"
+          - "  Search method: {{ 'UUID lookup' if (is_uuid is not none and is_uuid != '') else 'Name lookup' }}"
+      
+    - name: Verify credential type and display info
+      debug:
+        msg:
+          - "Credential Type: {{ credential_details.json.credentialKindKey }}"
+          - "Supported types: VMWARE (vCenter), PRINCIPALCREDENTIAL (Service Account)"
+          - "This playbook will proceed with password update for this credential type"
+      
+    - name: Verify this is a supported credential type
+      fail:
+        msg: "Unsupported credential type: {{ credential_details.json.credentialKindKey }}. Supported types: VMWARE, PRINCIPALCREDENTIAL"
+      when: credential_details.json.credentialKindKey not in ['VMWARE', 'PRINCIPALCREDENTIAL']
+      
+    - name: Display current credential info
+      debug:
+        msg:
+          - "Credential ID: {{ credential_details.json.id }}"
+          - "Credential Name: {{ credential_details.json.name }}"
+          - "Credential Kind: {{ credential_details.json.credentialKindKey }}"
+          - "Current Username: {{ (credential_details.json.fields | selectattr('name', 'equalto', 'USER') | first).value | default((credential_details.json.fields | selectattr('name', 'equalto', 'USERNAME') | first).value | default('N/A')) }}"
+
+    - name: Build updated credential fields
+      set_fact:
+        updated_fields: []
+        
+    - name: Process each credential field
+      set_fact:
+        updated_fields: "{{ updated_fields + [processed_field] }}"
+      vars:
+        processed_field: >-
+          {%- if field.name == 'PASSWORD' or field.name == 'password' or field.name == 'ACTION_PASSWORD' -%}
+            {{ {'name': field.name, 'value': new_vcenter_password} }}
+          {%- elif (field.name == 'USER' or field.name == 'USERNAME' or field.name == 'ACTION_USER') and vcenter_username != '' -%}
+            {{ {'name': field.name, 'value': vcenter_username} }}
+          {%- else -%}
+            {{ {'name': field.name, 'value': field.value | default('')} }}
+          {%- endif -%}
+      loop: "{{ credential_details.json.fields }}"
+      loop_control:
+        loop_var: field
+        
+    # - name: Debug updated fields before API call
+    #   debug:
+    #     msg:
+    #       - "Original fields:"
+    #       - "{{ credential_details.json.fields }}"
+    #       - "Updated fields:"
+    #       - "{{ updated_fields }}"
+          
+    - name: Update credential password using PUT API
+      uri:
+        url: "{{ credentials_url }}"
+        method: PUT
+        headers:
+          Authorization: "vRealizeOpsToken {{ auth_token }}"
+          Content-Type: "application/json"
+          Accept: "application/json"
+        body_format: json
+        body:
+          id: "{{ credential_account_id }}"
+          adapterKindKey: "{{ credential_details.json.adapterKindKey }}"
+          name: "{{ credential_details.json.name }}"
+          description: "{{ credential_details.json.description | default('Updated via Ansible') }}"
+          credentialKindKey: "{{ credential_details.json.credentialKindKey }}"
+          fields: "{{ updated_fields }}"
+        validate_certs: false
+        force: true
+        use_proxy: false
+        status_code: 200
+      register: update_response
+      
+    - name: Verify credential update was successful
+      fail:
+        msg: "Credential update failed. Response: {{ update_response.json | default('No response body') }}"
+      when: update_response.status != 200 or update_response.json is not defined
+      
+    - name: Display credential update result
+      debug:
+        msg:
+          - "Credential update completed successfully"
+          - "Credential ID: {{ credential_account_id }}"
+          - "Credential Name: {{ update_response.json.name }}"
+          - "Updated Fields: {{ updated_fields | length }} fields processed"
+          - "Status: Success"
+          
+    - name: Release authentication token
+      uri:
+        url: "{{ base_url }}/suite-api/api/auth/token/release"
+        method: POST
+        headers:
+          Authorization: "vRealizeOpsToken {{ auth_token }}"
+        validate_certs: false
+        force: true
+        use_proxy: false
+        status_code: [200, 204]
+      ignore_errors: true

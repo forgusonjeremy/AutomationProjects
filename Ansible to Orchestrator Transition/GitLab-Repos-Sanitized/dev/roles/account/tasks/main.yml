@@ -1,0 +1,33 @@
+---
+- name: Generate new password
+  ansible.builtin.set_fact:
+    acc_new_pw: >-
+      J1M!_{{ lookup('ansible.builtin.password', '/dev/null',
+                     chars=['ascii_lowercase', 'ascii_uppercase', 'digits'],
+                     length=34) }}
+  no_log: false
+
+- name: Print out for debug only
+  ansible.builtin.debug:
+    msg: "{{ acc_new_pw }}"
+  when: var_debug == 69
+  no_log: false
+
+- name: Assert password was generated
+  ansible.builtin.assert:
+    that:
+      - acc_new_pw is defined
+      - acc_new_pw | length > 0
+    fail_msg: "acc_new_pw is empty - refusing to continue"
+    quiet: true
+
+- name: "Update password for '{{ var_sAMAccountName }}' in ADDS"
+  ansible.builtin.debug:
+    msg: "{{ var_sAMAccountName }} - {{ var_LDAPUsername }} - {{ var_Credential_type }}"
+
+- name: Update AD account password in Active Directory
+  ansible.builtin.include_tasks: adds_password_reset.yml
+
+- name: Update AD account password in Ansible Controller
+  ansible.builtin.include_tasks: aap_password_reset.yml
+  loop: "{{ var_Credential_type }}"

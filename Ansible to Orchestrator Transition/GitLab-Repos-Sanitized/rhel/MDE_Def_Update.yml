@@ -1,0 +1,15 @@
+---
+- name: Update MDATP security definitions
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Run mdatp definitions update
+      ansible.builtin.command: /usr/bin/mdatp definitions update
+      register: result
+      changed_when: false
+
+    - name: Show output
+      ansible.builtin.debug:
+        var: result.stdout

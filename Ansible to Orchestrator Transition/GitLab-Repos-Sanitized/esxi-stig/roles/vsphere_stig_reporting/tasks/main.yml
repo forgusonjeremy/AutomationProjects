@@ -1,0 +1,17 @@
+---
+# roles/vsphere_stig_reporting/tasks/main.yml
+# - name: Load production STIG configuration
+#   ansible.builtin.include_vars:
+#     file: "config/production_stig_config.yml"
+#   tags: [config]
+  
+- name: Generate remediation summary
+  ansible.builtin.debug:
+    msg:
+      - "============================================="
+      - "VMware vSphere 8.0 STIG Remediation Complete"
+      - "============================================="
+      - "Processed {{ esxi_hosts | length }} ESXi host(s)"
+      - "Controls applied based on environment profile"
+      - "Review task output for any failures"
+      - "============================================="

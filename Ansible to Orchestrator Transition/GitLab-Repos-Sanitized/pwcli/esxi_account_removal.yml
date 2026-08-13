@@ -1,0 +1,197 @@
+---
+- name: Remove local accounts from ESXi hosts in staging cluster
+  hosts: localhost
+  gather_facts: false
+  vars:
+    vcenter_hostname: "{{ vcenter_server }}"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "{{ vcenter_password }}"
+    cluster_name: "staging"
+    # Define the local account to remove
+    local_username: "{{ esxi_local_username | default('localadmin') }}"
+    
+  tasks:
+    - name: Confirmation prompt
+      pause:
+        prompt: |
+          ========================================
+          WARNING: ACCOUNT REMOVAL OPERATION
+          ========================================
+          
+          This playbook will REMOVE the local account '{{ local_username }}' 
+          from ALL ESXi hosts in the '{{ cluster_name }}' cluster.
+          
+          vCenter: {{ vcenter_hostname }}
+          Cluster: {{ cluster_name }}
+          Account to remove: {{ local_username }}
+          
+          This action cannot be undone!
+          
+          Press ENTER to continue or Ctrl+C to abort
+      when: confirmation_required | default(true) | bool
+
+    - name: Gather cluster information from vCenter
+      community.vmware.vmware_cluster_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        cluster_name: "{{ cluster_name }}"
+      register: cluster_info
+      delegate_to: localhost
+
+    - name: Verify cluster exists
+      fail:
+        msg: "Cluster '{{ cluster_name }}' not found in vCenter"
+      when: cluster_name not in cluster_info.clusters
+
+    - name: Display cluster information
+      debug:
+        msg: "Found cluster '{{ cluster_name }}' with {{ cluster_info.clusters[cluster_name].hosts | length }} hosts"
+
+    - name: Check if local user exists on each ESXi host
+      community.vmware.vmware_local_user_info:
+        hostname: "{{ item }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+      loop: "{{ cluster_info.clusters[cluster_name].hosts }}"
+      register: user_info_results
+      delegate_to: localhost
+      ignore_errors: true
+
+    - name: Filter hosts where user exists
+      set_fact:
+        hosts_with_user: >-
+          {{
+            user_info_results.results
+            | selectattr('local_user_info', 'defined')
+            | selectattr('local_user_info', 'contains', local_username)
+            | map(attribute='item')
+            | list
+          }}
+
+    - name: Display hosts where user was found
+      debug:
+        msg: |
+          User '{{ local_username }}' found on {{ hosts_with_user | length }} out of {{ cluster_info.clusters[cluster_name].hosts | length }} hosts:
+          {% for host in hosts_with_user %}
+          - {{ host }}
+          {% endfor %}
+      when: hosts_with_user | length > 0
+
+    - name: No users to remove
+      debug:
+        msg: "No instances of user '{{ local_username }}' found on any ESXi hosts in cluster '{{ cluster_name }}'"
+      when: hosts_with_user | length == 0
+
+    - name: Remove role assignment from local user on each ESXi host
+      community.vmware.vmware_local_role_manager:
+        hostname: "{{ item }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        local_user_name: "{{ local_username }}"
+        local_role_name: "Admin"
+        state: absent
+      loop: "{{ hosts_with_user }}"
+      register: role_removal_results
+      delegate_to: localhost
+      ignore_errors: true
+      when: hosts_with_user | length > 0
+
+    - name: Remove local user account from each ESXi host
+      community.vmware.vmware_local_user_manager:
+        hostname: "{{ item }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        local_user_name: "{{ local_username }}"
+        state: absent
+      loop: "{{ hosts_with_user }}"
+      register: user_removal_results
+      delegate_to: localhost
+      ignore_errors: true
+      when: hosts_with_user | length > 0
+
+    - name: Display results of role removal
+      debug:
+        msg: |
+          Host: {{ item.item }}
+          Role Removal Status: {{ 'Success' if not item.failed else 'Failed' }}
+          {% if item.failed %}
+          Error: {{ item.msg | default('Unknown error') }}
+          {% endif %}
+      loop: "{{ role_removal_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: role_removal_results is defined
+
+    - name: Display results of user removal
+      debug:
+        msg: |
+          Host: {{ item.item }}
+          User Removal Status: {{ 'Success' if not item.failed else 'Failed' }}
+          {% if item.failed %}
+          Error: {{ item.msg | default('Unknown error') }}
+          {% endif %}
+      loop: "{{ user_removal_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: user_removal_results is defined
+
+    - name: Verify user removal
+      community.vmware.vmware_local_user_info:
+        hostname: "{{ item }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+      loop: "{{ hosts_with_user }}"
+      register: verification_results
+      delegate_to: localhost
+      ignore_errors: true
+      when: hosts_with_user | length > 0
+
+    - name: Check removal verification
+      set_fact:
+        still_exists: >-
+          {{
+            verification_results.results
+            | selectattr('local_user_info', 'defined')
+            | selectattr('local_user_info', 'contains', local_username)
+            | map(attribute='item')
+            | list
+          }}
+      when: verification_results is defined
+
+    - name: Final summary
+      debug:
+        msg: |
+          ========================================
+          REMOVAL SUMMARY
+          ========================================
+          Cluster: {{ cluster_name }}
+          Account removed: {{ local_username }}
+          Total ESXi hosts in cluster: {{ cluster_info.clusters[cluster_name].hosts | length }}
+          Hosts where user was found: {{ hosts_with_user | length }}
+          
+          {% if hosts_with_user | length > 0 %}
+          Role Removal Results:
+          {% for result in role_removal_results.results %}
+          - {{ result.item }}: {{ 'SUCCESS' if not result.failed else 'FAILED' }}
+          {% endfor %}
+          
+          User Removal Results:
+          {% for result in user_removal_results.results %}
+          - {{ result.item }}: {{ 'SUCCESS' if not result.failed else 'FAILED' }}
+          {% endfor %}
+          
+          {% if still_exists is defined and still_exists | length > 0 %}
+          ⚠️  WARNING: User still exists on these hosts:
+          {% for host in still_exists %}
+          - {{ host }}
+          {% endfor %}
+          {% else %}
+          ✅ User successfully removed from all hosts
+          {% endif %}
+          {% endif %}

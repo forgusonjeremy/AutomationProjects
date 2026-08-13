@@ -1,0 +1,44 @@
+﻿{
+    "SchemaVersion":  1,
+    "Created":  "2026-08-13T12:03:35.3671584-04:00",
+    "Updated":  "2026-08-13T12:03:35.4952354-04:00",
+    "EntryCount":  5,
+    "Counters":  [
+                     {
+                         "Type":  "DomainLabel",
+                         "Index":  3
+                     }
+                 ],
+    "Entries":  [
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "gitmgitlab01",
+                        "Key":  "gitmgitlab01",
+                        "Surrogate":  "dom1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "state",
+                        "Key":  "state",
+                        "Surrogate":  "dom3"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "washdc",
+                        "Key":  "washdc",
+                        "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "gitmgitlab01.washdc.state.sbu",
+                        "Key":  "gitmgitlab01.washdc.state.sbu",
+                        "Surrogate":  "dom1.dom2.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "sbu",
+                        "Key":  "sbu",
+                        "Surrogate":  "invalid"
+                    }
+                ]
+}

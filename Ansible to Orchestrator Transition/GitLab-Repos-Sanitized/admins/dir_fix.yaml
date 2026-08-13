@@ -1,0 +1,26 @@
+---
+- name: Create cvslocal home directory
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Ensure cvslocal group exists
+      ansible.builtin.group:
+        name: cvslocal
+        state: present
+
+    - name: Ensure cvslocal user exists
+      ansible.builtin.user:
+        name: cvslocal
+        group: cn1
+        home: /home/cvslocal
+        create_home: false
+        state: present
+
+    - name: Create /home/cvslocal directory
+      ansible.builtin.file:
+        path: /home/cvslocal
+        state: directory
+        owner: user2
+        group: cn1
+        mode: '0755'

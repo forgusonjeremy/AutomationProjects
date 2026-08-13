@@ -1,0 +1,135 @@
+---
+- name: Move log files to NFS archive mount point
+  hosts: all
+  become: yes
+  vars:
+    # Define the base mount point (hostname will be appended)
+    #base_mount_point: "/mnt/nfs-archive"
+    # Full mount point path including hostname
+    log_mount_point: "{{ base_mount_point }}/{{ inventory_hostname }}/system_logs"
+    # Source log file patterns (array) - Add more patterns as needed
+    #log_source_patterns:
+    #  - "messages-*"
+      # Example additional patterns:
+      # - "secure-*"
+      # - "maillog-*"
+      # - "cron-*"
+    # Optional: Backup before move
+    #create_backup: false
+
+  tasks:
+    - name: Check if base mount point exists
+      stat:
+        path: "{{ base_mount_point }}"
+      register: mount_point_stat
+
+    - name: Fail if base mount point doesn't exist
+      fail:
+        msg: "Base mount point {{ base_mount_point }} does not exist"
+      when: not mount_point_stat.stat.exists
+
+    - name: Check if base mount point is actually mounted
+      shell: mountpoint -q "{{ base_mount_point }}"
+      register: mount_check
+      failed_when: false
+      changed_when: false
+
+    - name: Warning if base mount point is not mounted
+      debug:
+        msg: "WARNING: {{ base_mount_point }} exists but may not be mounted"
+      when: mount_check.rc != 0
+
+    - name: Create hostname directory in mount point
+      file:
+        path: "{{ log_mount_point }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Set destination directory
+      set_fact:
+        dest_dir: "{{ log_mount_point }}"
+
+    - name: Find matching log files
+      find:
+        paths: /var/log
+        patterns: "{{ log_source_patterns }}"
+        file_type: file
+      register: log_files
+
+    - name: Display found log files
+      debug:
+        msg: "Found {{ log_files.files | length }} log files to move"
+
+    - name: List files that will be moved
+      debug:
+        msg: "Will move: {{ item.path }}"
+      loop: "{{ log_files.files }}"
+      when: log_files.files | length > 0
+
+    - name: Create backup of log files (if requested)
+      copy:
+        src: "{{ item.path }}"
+        dest: "{{ item.path }}.backup.{{ ansible_date_time.epoch }}"
+        remote_src: yes
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+        mode: "{{ item.mode }}"
+      loop: "{{ log_files.files }}"
+      when: 
+        - create_backup | bool
+        - log_files.files | length > 0
+      tags: backup
+
+    - name: Move log files to mount point
+      command: >
+        mv "{{ item.path }}" "{{ dest_dir }}/{{ item.path | basename }}"
+      loop: "{{ log_files.files }}"
+      when: log_files.files | length > 0
+      register: move_result
+
+    - name: Verify files were moved successfully
+      stat:
+        path: "{{ dest_dir }}/{{ item.path | basename }}"
+      loop: "{{ log_files.files }}"
+      register: verify_moved
+      when: log_files.files | length > 0
+
+    - name: Report move results
+      debug:
+        msg: "Successfully moved {{ log_files.files | length }} log files to {{ dest_dir }}"
+      when: log_files.files | length > 0
+
+    - name: Report when no files found
+      debug:
+        msg: "No log files matching patterns {{ log_source_patterns }} found in /var/log"
+      when: log_files.files | length == 0
+
+    - name: Set correct permissions on moved files
+      file:
+        path: "{{ dest_dir }}/{{ item.path | basename }}"
+        owner: root
+        group: root
+        mode: '0640'
+      loop: "{{ log_files.files }}"
+      when: log_files.files | length > 0
+      tags: permissions
+
+  handlers:
+    - name: Log move operation
+      lineinfile:
+        path: /var/log/ansible-log-moves.log
+        line: "{{ ansible_date_time.iso8601 }} - Moved {{ log_files.files | length }} log files to {{ dest_dir }}"
+        create: yes
+        owner: root
+        group: root
+        mode: '0640'
+      listen: "log operation"
+
+  post_tasks:
+    - name: Trigger logging handler
+      debug:
+        msg: "Move operation completed"
+      notify: log operation
+      when: log_files.files | length > 0

@@ -1,0 +1,26 @@
+---
+# - set_fact:
+#    acc_new_pw: "J1M!_{{ lookup('ansible.builtin.password', '/dev/null', chars=['punctuation','ascii_lowercase','ascii_Uppercase', 'digits'], length=34) }}"
+#   no_log: true
+
+- set_fact:
+   acc_new_pw: "J1M!_{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_lowercase','ascii_Uppercase', 'digits'], length=34) }}"
+  no_log: true
+
+- name: print out for debug only
+  debug:
+    msg: "{{  acc_new_pw }}"
+  when: var_debug == 69
+
+- name: "update password for '{{ var_sAMAccountName }}' in ADDS"
+  debug:
+    msg: "{{ var_sAMAccountName }} - {{ var_LDAPUsername }} - {{ var_Credential_type }}"
+
+- name: Run block to update AD account password in Active Directory
+  block:
+  - include_tasks: adds_password_reset.yml
+
+- name: Run block to update AD account password in Ansible Controller
+  block:
+  - include_tasks: aap_password_reset.yml
+    loop: "{{ var_Credential_type }}"

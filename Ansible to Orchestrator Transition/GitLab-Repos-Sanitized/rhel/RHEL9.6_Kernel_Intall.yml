@@ -1,0 +1,79 @@
+---
+- name: Install kernel RPMs on RHEL 9.6
+  hosts: all
+  become: true
+  vars:
+    rpm_src_dir: "files9.6/rpms"
+    rpm_dest_dir: "/home/cvslocal"
+
+  tasks:
+
+    - name: Verify OS is RHEL 9.6
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "RedHat"
+          - ansible_distribution_version == "9.6"
+        fail_msg: >
+          Expected RHEL 9.6, got {{ ansible_distribution }} {{ ansible_distribution_version }}.
+
+    - name: Verify architecture is x86_64
+      ansible.builtin.assert:
+        that:
+          - ansible_architecture == "x86_64"
+        fail_msg: "RPMs are x86_64 only. Target host is {{ ansible_architecture }}."
+
+    - name: Create temp directory for RPMs
+      ansible.builtin.file:
+        path: "{{ rpm_dest_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Copy all RPMs to remote host
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ rpm_dest_dir }}/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0644"
+      with_fileglob:
+        - "{{ rpm_src_dir }}/*.rpm"
+
+    - name: Find all RPMs in temp directory
+      ansible.builtin.find:
+        paths: "{{ rpm_dest_dir }}"
+        patterns: "*.rpm"
+      register: rpm_files
+
+    - name: Install all RPMs
+      ansible.builtin.dnf:
+        name: "{{ rpm_files.files | map(attribute='path') | list }}"
+        state: present
+        disable_gpg_check: true
+      register: dnf_result
+
+    - name: Clean up temp RPM directory
+      ansible.builtin.file:
+        path: "{{ rpm_dest_dir }}"
+        state: absent
+
+    - name: Reboot to load new kernel
+      ansible.builtin.reboot:
+        msg: "Rebooting to load updated kernel on RHEL 9.6"
+        reboot_timeout: 300
+        post_reboot_delay: 15
+        test_command: uname -r
+      when: dnf_result.changed
+
+    - name: Verify running kernel version post-reboot
+      ansible.builtin.command: uname -r
+      register: kernel_version
+      changed_when: false
+
+    - name: Assert expected kernel is running
+      ansible.builtin.assert:
+        that:
+          - "'el9' in kernel_version.stdout"
+        fail_msg: "Unexpected kernel running: {{ kernel_version.stdout }}"
+        success_msg: "Kernel verified: {{ kernel_version.stdout }}"

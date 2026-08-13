@@ -1,8 +1,0 @@
----
-- name: DNF update
-  hosts: all
-  become: yes
-
-  tasks:
-    - name: dnf install
-      command: dnf upgrade -y

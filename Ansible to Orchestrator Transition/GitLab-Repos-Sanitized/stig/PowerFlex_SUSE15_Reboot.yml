@@ -1,0 +1,50 @@
+---
+- name: Cleanly reboot SUSE hosts in PowerFlex role batch (serial)
+  hosts: all
+  become: true
+  gather_facts: false
+  serial: 1
+
+  vars:
+    reboot_connect_timeout: 5
+    reboot_timeout: 1800
+    post_reboot_settle_seconds: 180
+    reboot_test_command: "systemctl is-system-running --wait || true"
+
+  tasks:
+    - name: Pre-check connectivity (fast)
+      ansible.builtin.wait_for_connection:
+        timeout: 30
+        connect_timeout: "{{ reboot_connect_timeout }}"
+
+    - name: Reboot host (SUSE)
+      ansible.builtin.reboot:
+        msg: "Reboot initiated by Ansible for PowerFlex maintenance"
+        reboot_timeout: "{{ reboot_timeout }}"
+        connect_timeout: "{{ reboot_connect_timeout }}"
+        pre_reboot_delay: 0
+        post_reboot_delay: 0
+        test_command: "{{ reboot_test_command }}"
+
+    - name: Wait for SSH to be available again
+      ansible.builtin.wait_for_connection:
+        timeout: "{{ reboot_timeout }}"
+        connect_timeout: "{{ reboot_connect_timeout }}"
+
+    - name: Pause to allow cluster/services to settle
+      ansible.builtin.pause:
+        seconds: "{{ post_reboot_settle_seconds }}"
+
+    - name: Quick post-check (uptime + last boot)
+      ansible.builtin.shell: |
+        set -o pipefail
+        uptime
+        who -b || true
+      args:
+        executable: /bin/bash
+      register: postcheck
+      changed_when: false
+
+    - name: Show post-check output
+      ansible.builtin.debug:
+        var: postcheck.stdout_lines

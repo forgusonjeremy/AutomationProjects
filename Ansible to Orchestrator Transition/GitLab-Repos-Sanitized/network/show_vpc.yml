@@ -1,0 +1,15 @@
+---
+- name: Playbook to discovery
+  hosts: "{{ _groups }}"
+  gather_facts: False
+  
+  tasks:
+  # - name: show cdp
+  #   vars:
+  #    ansible_command_timeout: 1200
+  #   cisco.nxos.nxos_command:
+  #     commands: 'show cdp neighbor detail'
+
+  - name: show vpc
+    cisco.nxos.nxos_command:
+      commands: 'show vpc'

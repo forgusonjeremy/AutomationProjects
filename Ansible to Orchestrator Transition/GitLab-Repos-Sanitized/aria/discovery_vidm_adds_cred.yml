@@ -1,0 +1,118 @@
+---
+- name: Discover vIDM Directory Configurations
+  hosts: localhost
+  gather_facts: false
+  vars:
+    set_no_log: "{{ true | default(true) }}"
+    vidm_host: "{{ vidm_hostname }}"
+    vidm_port: "{{ vidm_port | default(443) }}"
+    vidm_username: "{{ vidm_admin_username }}"
+    vidm_password: "{{ vidm_admin_password }}"
+    validate_certs: "{{ vidm_validate_certs | default(true) }}"
+
+  tasks:
+    # - name: Get authentication token from vIDM
+    #   uri:
+    #     url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/auth/login"
+    #     method: POST
+    #     body_format: form-urlencoded
+    #     body:
+    #       username: "{{ vidm_username }}"
+    #       password: "{{ vidm_password }}"
+    #       issueToken: "true"
+    #     validate_certs: "{{ validate_certs }}"
+    #     status_code: [200, 302]
+    #     timeout: 30
+    #     return_content: yes
+    #     follow_redirects: none
+    #   register: auth_response
+    #   failed_when: false
+    #   no_log: "{{ set_no_log }}"
+
+    - name: Try alternative authentication endpoint if first fails
+      uri:
+        url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/API/1.0/REST/auth/system/login"
+        method: POST
+        body_format: json
+        body:
+          username: "{{ vidm_username }}"
+          password: "{{ vidm_password }}"
+          issueToken: true
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+        validate_certs: "{{ validate_certs }}"
+        status_code: [200]
+        timeout: 30
+        return_content: yes
+      register: alt_auth_response
+      #when: "'json' not in auth_response or auth_response.json.sessionToken is undefined"
+      failed_when: false
+      no_log: "{{ set_no_log }}"
+
+    - name: Extract session token
+      set_fact:
+        session_token: "{{ 
+          auth_response.json.sessionToken if (auth_response.json is defined and auth_response.json.sessionToken is defined)
+          else alt_auth_response.json.sessionToken if (alt_auth_response is defined and alt_auth_response.json is defined and alt_auth_response.json.sessionToken is defined)
+          else '' 
+        }}"
+      no_log: "{{ set_no_log }}"
+
+    - name: Verify authentication succeeded
+      fail:
+        msg: "Authentication failed. Could not obtain session token."
+      when: session_token == ''
+
+    - name: List all directory configurations
+      uri:
+        url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs"
+        method: GET
+        headers:
+          Authorization: "HZN {{ session_token }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ validate_certs }}"
+        status_code: 200
+        timeout: 30
+        return_content: yes
+      register: all_directories
+
+    - name: Display complete directory information
+      debug:
+        msg: |
+          ===========================================
+          AVAILABLE vIDM DIRECTORY CONFIGURATIONS
+          ===========================================
+          
+          Raw Response: {{ all_directories.json }}
+          
+          ===========================================
+          
+          {% if all_directories.json is iterable and all_directories.json is not string %}
+          {% for directory in all_directories.json %}
+          Directory {{ loop.index }}:
+            - ID: {{ directory.directoryConfigId | default('N/A') }}
+            - Name: {{ directory.name | default('N/A') }}
+            - Type: {{ directory.directoryType | default('N/A') }}
+            - Status: {{ directory.status | default('N/A') }}
+            - Domain: {{ directory.domains | default([]) | join(', ') if directory.domains is defined else 'N/A' }}
+          {% endfor %}
+          {% else %}
+          No directories found or unexpected response format.
+          {% endif %}
+          
+          ===========================================
+          
+          To use one of these directories, set:
+          vidm_directory_id: "DIRECTORY_ID_FROM_ABOVE"
+
+    - name: Logout from vIDM
+      uri:
+        url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/auth/logout"
+        method: POST
+        headers:
+          Authorization: "HZN {{ session_token }}"
+        validate_certs: "{{ validate_certs }}"
+        status_code: [200, 302]
+        timeout: 30
+      ignore_errors: true

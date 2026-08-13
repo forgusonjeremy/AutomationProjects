@@ -1,0 +1,74 @@
+---
+- name: VMware vSphere 8.0 STIG ESXi Remediation - Production
+  hosts: localhost
+  gather_facts: false
+  collections:
+    - community.vmware
+
+  vars:
+
+    # Connection parameters (from job template/survey)
+    vcenter_hostname: "{{ vcenter_server }}"
+    vcenter_username: "{{ vcenter_user }}"
+    vcenter_password: "{{ vcenter_pass }}"
+    
+    # Target configuration
+    target_hostname: "{{ esxi_hostname | default('') }}"
+    target_cluster: "{{ esxi_cluster | default('') }}"
+    
+    # Infrastructure settings
+    syslog_server: "{{ syslog_host | default('') }}"
+    ntp_servers: "{{ ntp_server_list | default([]) }}"
+    esx_admin_group: "{{ esxi_admin_group | default('root') }}"
+
+  tasks:
+
+    - name: Validate required parameters
+      ansible.builtin.assert:
+        that:
+          - vcenter_hostname is defined and vcenter_hostname | length > 0
+          - vcenter_username is defined and vcenter_username | length > 0
+          - vcenter_password is defined and vcenter_password | length > 0
+          - (target_hostname | length > 0) or (target_cluster | length > 0)
+        fail_msg: "Missing required parameters: vCenter details and target (hostname or cluster)"
+
+    - name: Load production STIG configuration
+      ansible.builtin.include_vars:
+        file: "config/production_stig_config.yml"
+      tags: [config]
+
+    - name: Verify STIG configuration is loaded
+      ansible.builtin.assert:
+        that:
+          - stig_config is defined
+          - stig_config.security is defined
+          - stig_config.logging is defined
+          - stig_config.services is defined
+        fail_msg: "STIG configuration not loaded properly or missing required sections"
+      tags: [config]
+
+    - name: Display job configuration
+      ansible.builtin.debug:
+        msg:
+          - "=== VMware vSphere 8.0 STIG Remediation - PRODUCTION ==="
+          - "vCenter: {{ vcenter_hostname }}"
+          - "Target Host: {{ target_hostname | default('N/A') }}"
+          - "Target Cluster: {{ target_cluster | default('N/A') }}"
+          - "Syslog: {{ syslog_server | default('Not configured') }}"
+          - "NTP: {{ ntp_servers | join(', ') if ntp_servers | length > 0 else 'Not configured' }}"
+
+  roles:
+    - role: vsphere_stig_discovery
+      tags: [discovery]
+      
+    - role: vsphere_stig_security
+      tags: [security]
+      
+    - role: vsphere_stig_logging
+      tags: [logging]
+      
+    - role: vsphere_stig_services
+      tags: [services]
+      
+    - role: vsphere_stig_reporting
+      tags: [reporting]

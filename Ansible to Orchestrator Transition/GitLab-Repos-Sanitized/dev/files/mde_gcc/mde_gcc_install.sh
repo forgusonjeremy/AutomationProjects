@@ -1,0 +1,2 @@
+/usr/bin/python3 MicrosoftDefenderATPOnboardingLinuxServer.py
+systemctl restart mdatp.service

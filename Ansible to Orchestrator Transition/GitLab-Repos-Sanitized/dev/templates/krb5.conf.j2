@@ -1,0 +1,20 @@
+[libdefaults]
+  default_realm = {{ var_krb5_realm }}
+  dns_lookup_realm = false
+  dns_lookup_kdc = false
+  rdns = false
+  forwardable = true
+  # Force TCP - avoids the UDP/88 MTU black-hole seen from the EE nodes
+  udp_preference_limit = 0
+  # Enctypes intentionally left unset so AES256-CTS-HMAC-SHA1-96 negotiates
+  # under the FIPS crypto policy. Do not pin default_tkt_enctypes here.
+
+[realms]
+  {{ var_krb5_realm }} = {
+    kdc = {{ var_krb5_kdc }}
+    admin_server = {{ var_krb5_kdc }}
+  }
+
+[domain_realm]
+  .{{ var_krb5_domain }} = {{ var_krb5_realm }}
+  {{ var_krb5_domain }} = {{ var_krb5_realm }}

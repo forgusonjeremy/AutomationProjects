@@ -1,5 +1,0 @@
-
-  - name: "Connecting to vCenter={{ vcenter_hostname }}"
-    ansible.builtin.include_tasks: remove_snapshot.yml
-    with_items:
-      - "{{ datacenter_name }}"

@@ -1,0 +1,200 @@
+﻿{
+    "SchemaVersion":  1,
+    "Created":  "2026-08-13T10:01:29.8098125-04:00",
+    "Updated":  "2026-08-13T12:04:27.0880570-04:00",
+    "EntryCount":  27,
+    "Counters":  [
+                     {
+                         "Type":  "DomainLabel",
+                         "Index":  7
+                     },
+                     {
+                         "Type":  "Guid",
+                         "Index":  4
+                     },
+                     {
+                         "Type":  "IPv4Subnet",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "OrganizationalUnit",
+                         "Index":  2
+                     },
+                     {
+                         "Type":  "Secret",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "Tld",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "Username",
+                         "Index":  2
+                     }
+                 ],
+    "Entries":  [
+                    {
+                        "Type":  "AdDomain",
+                        "Value":  "Connect.sbu",
+                        "Key":  "connect.sbu",
+                        "Surrogate":  "dom1.example"
+                    },
+                    {
+                        "Type":  "DistinguishedName",
+                        "Value":  "OU=State Dept, OU=Service Accounts, DC=Connect,DC=sbu",
+                        "Key":  "ou=state dept, ou=service accounts, dc=connect,dc=sbu",
+                        "Surrogate":  "OU=ou1, OU=ou2, DC=dom1,DC=example"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "CONNECT",
+                        "Key":  "connect",
+                        "Surrogate":  "dom1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsautomation",
+                        "Key":  "cvsautomation",
+                        "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsdowzbs007",
+                        "Key":  "cvsdowzbs007",
+                        "Surrogate":  "dom6"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "msconnectdc01",
+                        "Key":  "msconnectdc01",
+                        "Surrogate":  "dom5"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "pilot",
+                        "Key":  "pilot",
+                        "Surrogate":  "dom7"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "state",
+                        "Key":  "state",
+                        "Surrogate":  "dom4"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "washdc",
+                        "Key":  "washdc",
+                        "Surrogate":  "dom3"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "svc-CVSAnsWin@CONNECT.SBU",
+                        "Key":  "svc-cvsanswin@connect.sbu",
+                        "Surrogate":  "user2@dom1.example"
+                    },
+                    {
+                        "Type":  "EmailDomain",
+                        "Value":  "Connect.sbu",
+                        "Key":  "connect.sbu",
+                        "Surrogate":  "dom1.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsautomation.washdc.state.sbu",
+                        "Key":  "cvsautomation.washdc.state.sbu",
+                        "Surrogate":  "dom2.dom3.dom4.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsdowzbs007.pilot.dev",
+                        "Key":  "cvsdowzbs007.pilot.dev",
+                        "Surrogate":  "dom6.dom7.ex4"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "msconnectdc01.connect.sbu",
+                        "Key":  "msconnectdc01.connect.sbu",
+                        "Surrogate":  "dom5.dom1.example"
+                    },
+                    {
+                        "Type":  "Guid",
+                        "Value":  "1a209049-7b0c-4ce8-be4c-93559668b858",
+                        "Key":  "1a209049-7b0c-4ce8-be4c-93559668b858",
+                        "Surrogate":  "00000001-0000-4000-8000-000000000001"
+                    },
+                    {
+                        "Type":  "Guid",
+                        "Value":  "6b30dc60-dedf-4615-8903-9d9b9733f3e0",
+                        "Key":  "6b30dc60-dedf-4615-8903-9d9b9733f3e0",
+                        "Surrogate":  "00000004-0000-4000-8000-000000000004"
+                    },
+                    {
+                        "Type":  "Guid",
+                        "Value":  "8768e7b9-9c2e-4329-a7a0-772f58d2ddbf",
+                        "Key":  "8768e7b9-9c2e-4329-a7a0-772f58d2ddbf",
+                        "Surrogate":  "00000002-0000-4000-8000-000000000002"
+                    },
+                    {
+                        "Type":  "Guid",
+                        "Value":  "a904ea9b-86be-41f9-a025-be18df0cb4a3",
+                        "Key":  "a904ea9b-86be-41f9-a025-be18df0cb4a3",
+                        "Surrogate":  "00000003-0000-4000-8000-000000000003"
+                    },
+                    {
+                        "Key":  "10.68.54.24",
+                        "Value":  "10.68.54.24",
+                        "Type":  "IPv4",
+                        "Surrogate":  "100.64.0.24"
+                    },
+                    {
+                        "Key":  "10.68.54",
+                        "Value":  "10.68.54",
+                        "Type":  "IPv4Subnet",
+                        "Surrogate":  "100.64.0"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "Service Accounts",
+                        "Key":  "service accounts",
+                        "Surrogate":  "ou2"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "State Dept",
+                        "Key":  "state dept",
+                        "Surrogate":  "ou1"
+                    },
+                    {
+                        "Type":  "Secret",
+                        "Value":  "svc-CVSAnsWin@CONNECT",
+                        "Key":  "svc-CVSAnsWin@CONNECT",
+                        "Surrogate":  "REDACTED-SECRET-1"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "dev",
+                        "Key":  "dev",
+                        "Surrogate":  "ex4"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "SBU",
+                        "Key":  "sbu",
+                        "Surrogate":  "example"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "svc-CVSAnsWin",
+                        "Key":  "svc-cvsanswin",
+                        "Surrogate":  "user2"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "var_LDAPUsername",
+                        "Key":  "var_ldapusername",
+                        "Surrogate":  "user1"
+                    }
+                ]
+}

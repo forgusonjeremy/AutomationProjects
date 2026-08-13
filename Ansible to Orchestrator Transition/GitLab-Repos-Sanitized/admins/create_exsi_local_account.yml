@@ -1,0 +1,35 @@
+---
+- name: Create new or update user on ESXi
+  hosts: all #"{{ var_hostName }}"
+  become: true
+  collections:
+    - community.vmware
+
+  vars:
+    #users_accounts: "{{var_new_user}}"
+  tasks:     
+  # - name: Add local user to ESXi
+  #   community.vmware.vmware_local_user_manager:
+  #     hostname: dom19.dom3.example
+  #     username: administrator@vsphere.local
+  #     password: REDACTED-SECRET-1
+  #     local_user_name: ansiblelocal
+  #     local_user_password: REDACTED-SECRET-2
+  #     local_user_description: "created by Ansible Automation"
+  #     override_user_password: true
+  #     state: present
+  #     validate_certs: false
+  #   delegate_to: localhost
+
+  - name: Update the local user password in ESXi host
+    community.vmware.vmware_host_user_manager:
+      hostname: dom22.dom3.example
+      username: "root"
+      password: "REDACTED-SECRET-1"
+      validate_certs: false
+      esxi_hostname: dom19.dom3.example
+      user_name: ansiblelocal
+      user_description: "created by Ansible Automation"
+      user_password: REDACTED-SECRET-2
+      override_user_password: true
+      state: present

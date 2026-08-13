@@ -1,0 +1,25 @@
+---
+- name: Change password for cvslocal account
+  hosts: all
+  become: true
+  gather_facts: false
+ 
+
+  # new_password is expected to come from an encrypted vault file
+ 
+  tasks:
+    - name: Ensure cvslocal user exists
+      ansible.builtin.user:
+        name: cvslocal
+        state: present
+ 
+    - name: Change password for cvslocal
+      ansible.builtin.user:
+        name: cvslocal
+        password: "{{ new_password | password_hash('sha512') }}"
+        update_password: always
+      no_log: true
+ 
+    - name: Confirm password was updated
+      ansible.builtin.debug:
+        msg: "Password for 'cvslocal' has been successfully updated."

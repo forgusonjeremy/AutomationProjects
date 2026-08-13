@@ -1,0 +1,69 @@
+---
+- name: VMware SSL certificate report
+  hosts: all
+  gather_facts: false
+  become: true
+  become_method: runas
+  become_user: SYSTEM
+
+  vars:
+    collectArea: ALL
+    includeSts: false
+    includeTrustedRoots: false
+    includeVecs: false
+    skipIcmp: false
+    exclusiveBands: false
+    legacyColumns: false
+    noEmail: false
+    testing: false
+    scriptName: cvs_vmware_ssl_report.ps1
+
+  tasks:
+    - name: Validate collection area
+      ansible.builtin.assert:
+        that:
+          - collectArea in ['ALL', 'CONUS', 'OCONUS']
+        fail_msg: "collectArea must be ALL, CONUS or OCONUS."
+
+    - name: Create working directory
+      ansible.windows.win_tempfile:
+        state: directory
+        suffix: sslreport
+      register: workdir
+
+    - name: Stage report script
+      ansible.windows.win_copy:
+        src: "files/ps_scripts/{{ scriptName }}"
+        dest: "{{ workdir.path }}\\{{ scriptName }}"
+
+    - name: Run SSL certificate report
+      ansible.windows.win_command: >-
+        powershell.exe -ExecutionPolicy ByPass
+        -File {{ workdir.path }}\{{ scriptName }}
+        -collectArea {{ collectArea }}
+        {{ '-includeSts' if includeSts | bool else '' }}
+        {{ '-includeTrustedRoots' if includeTrustedRoots | bool else '' }}
+        {{ '-includeVecs' if includeVecs | bool else '' }}
+        {{ '-skipIcmp' if skipIcmp | bool else '' }}
+        {{ '-exclusiveBands' if exclusiveBands | bool else '' }}
+        {{ '-legacyColumns' if legacyColumns | bool else '' }}
+        {{ '-noEmail' if noEmail | bool else '' }}
+        {{ '-testing' if testing | bool else '' }}
+      environment:
+        VC_USER: "{{ lookup('env', 'VC_USER') }}"
+        VC_PASS: "{{ lookup('env', 'VC_PASS') }}"
+        VC_ROOT_PASS: "{{ lookup('env', 'VC_ROOT_PASS') | default('', true) }}"
+      register: sslrun
+      changed_when: false
+      timeout: 3600
+
+    - name: Show run summary
+      ansible.builtin.debug:
+        var: sslrun.stdout_lines
+
+  post_tasks:
+    - name: Cleanup staged script
+      ansible.windows.win_file:
+        path: "{{ workdir.path }}"
+        state: absent
+      when: workdir.path is defined

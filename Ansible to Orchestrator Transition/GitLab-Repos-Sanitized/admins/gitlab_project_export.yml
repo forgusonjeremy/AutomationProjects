@@ -1,0 +1,11 @@
+---
+- name: Exporting Gitlab project and copy to file share location
+  hosts: all
+  gather_facts: true
+
+  vars:
+ 
+  roles:
+    - gitlab
+      
+  tasks:

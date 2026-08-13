@@ -1,0 +1,116 @@
+---
+- name: Configure RHEL 9 firewall to allow SSH from specific IP addresses
+  hosts: all
+  become: yes
+  vars:
+    # Default values - can be overridden via extra vars
+    ssh_port: "{{ ssh_port | default(22) }}"
+    
+    # Admin IP addresses that must be included for SSH service removal
+    # If ANY of these IPs are in allowed_ssh_ips, SSH service will be removed
+    # admin_ips:
+    #   - "100.64.0.100"
+    #   - "100.64.0.101"
+    #   - "100.64.0.102"  # Add your other admin IPs here
+    admin_ips: []
+
+    # Default empty list - IP addresses must be provided via extra vars
+    # Supported formats:
+    # Individual IPs: "100.64.0.100"
+    # CIDR subnets: "100.64.0.0/24" (entire 100.64.0.x range)
+    # For IP ranges, use CIDR notation or list individual IPs
+    # Examples:
+    # - Individual + subnet: -e "allowed_ssh_ips=['100.64.0.0/24','100.64.1.100']"
+    # - Multiple individual IPs: -e "allowed_ssh_ips=['100.64.2.164','100.64.2.165','100.64.2.166']"
+    # - Custom port: -e "allowed_ssh_ips=['100.64.0.0/24'] ssh_port=2222"
+    allowed_ssh_ips: []
+
+  pre_tasks:
+    - name: Validate that allowed_ssh_ips is provided and not empty
+      fail:
+        msg: |
+          allowed_ssh_ips must be provided via extra vars and cannot be empty.
+          Supported formats:
+          - Individual IPs: "100.64.0.100"
+          - CIDR subnets: "100.64.0.0/24" (entire subnet)
+          
+          For IP ranges, use one of these approaches:
+          - CIDR notation: "100.64.2.0/28" (covers 100.64.2.1-100.64.2.14)
+          - Individual IPs: "100.64.2.164","100.64.2.165","100.64.2.166"
+          
+          NOTE: SSH service will only be removed if at least one admin IP is included.
+          Current admin IPs: {{ admin_ips | join(', ') }}
+          
+          Examples:
+          - Individual + subnet: -e "allowed_ssh_ips=['100.64.0.0/24','100.64.1.100']"
+          - Multiple individual: -e "allowed_ssh_ips=['100.64.2.164','100.64.2.165','100.64.2.166']"
+          - Custom SSH port: -e "allowed_ssh_ips=['100.64.0.0/24'] ssh_port=2222"
+      when: allowed_ssh_ips | length == 0
+
+  tasks:
+    - name: Ensure firewalld is installed
+      dnf:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld service is started and enabled
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Add rich rules to allow SSH from specific IP addresses
+      ansible.posix.firewalld:
+        rich_rule: "rule family='ipv4' source address='{{ item }}' port protocol='tcp' port='{{ ssh_port }}' accept"
+        permanent: yes
+        immediate: yes
+        state: enabled
+      loop: "{{ allowed_ssh_ips }}"
+      register: rich_rules_result
+      notify: reload firewalld
+
+    - name: Remove default SSH service from firewall (only if rich rules succeeded AND admin IP is included)
+      ansible.posix.firewalld:
+        service: ssh
+        permanent: yes
+        immediate: yes
+        state: disabled
+      when: 
+        - rich_rules_result is succeeded 
+        - admin_ips | intersect(allowed_ssh_ips) | length > 0
+      notify: reload firewalld
+
+    - name: Remove SSH port from firewall (only if rich rules succeeded AND admin IP is included)
+      ansible.posix.firewalld:
+        port: "{{ ssh_port }}/tcp"
+        permanent: yes
+        immediate: yes
+        state: disabled
+      when: 
+        - rich_rules_result is succeeded 
+        - admin_ips | intersect(allowed_ssh_ips) | length > 0
+      notify: reload firewalld
+
+    - name: Verify current firewall rich rules
+      command: firewall-cmd --list-rich-rules
+      register: current_rules
+      changed_when: false
+
+    - name: Verify current firewall services
+      command: firewall-cmd --list-services
+      register: current_services
+      changed_when: false
+
+    - name: Display current firewall rich rules
+      debug:
+        msg: "Current rich rules: {{ current_rules.stdout_lines }}"
+
+    - name: Display current firewall services
+      debug:
+        msg: "Current services: {{ current_services.stdout }}"
+
+  handlers:
+    - name: reload firewalld
+      systemd:
+        name: firewalld
+        state: reloaded

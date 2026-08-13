@@ -1,0 +1,259 @@
+---
+- name: Diagnose System Log Archiving Issues
+  hosts: all
+  become: yes
+  vars:
+    nfs_mount_point: "/nfsarchive"
+    host_archive_dir: "{{ nfs_mount_point }}/{{ inventory_hostname }}"
+    
+  tasks:
+    - name: Display diagnostic information
+      debug:
+        msg:
+          - "Diagnosing system log archiving for: {{ inventory_hostname }}"
+          - "Expected system log path: {{ host_archive_dir }}/system_logs/"
+
+    - name: Check current rsyslog configuration
+      shell: |
+        echo "=== Current rsyslog.conf content ==="
+        grep -A 10 -B 5 "{{ host_archive_dir }}" /etc/rsyslog.conf || echo "No NFS archive configuration found"
+        echo ""
+        echo "=== Full rsyslog.conf ANSIBLE MANAGED sections ==="
+        grep -A 15 "# BEGIN ANSIBLE MANAGED BLOCK" /etc/rsyslog.conf || echo "No Ansible managed blocks found"
+      register: rsyslog_check
+
+    - name: Display rsyslog configuration
+      debug:
+        msg: "{{ rsyslog_check.stdout_lines }}"
+
+    - name: Check rsyslog service status
+      systemd:
+        name: rsyslog
+      register: rsyslog_status
+
+    - name: Display rsyslog service status
+      debug:
+        msg:
+          - "Rsyslog service state: {{ rsyslog_status.status.ActiveState }}"
+          - "Rsyslog service enabled: {{ rsyslog_status.status.UnitFileState }}"
+
+    - name: Test rsyslog configuration syntax
+      shell: rsyslogd -N1
+      register: rsyslog_syntax
+      failed_when: false
+
+    - name: Display rsyslog syntax check
+      debug:
+        msg: 
+          - "Rsyslog syntax check (exit code {{ rsyslog_syntax.rc }}):"
+          - "{{ rsyslog_syntax.stderr_lines if rsyslog_syntax.stderr else ['No syntax errors'] }}"
+
+    - name: Check if system log directory exists and permissions
+      stat:
+        path: "{{ host_archive_dir }}/system_logs"
+      register: system_log_dir
+
+    - name: Display system log directory status
+      debug:
+        msg:
+          - "System log directory exists: {{ system_log_dir.stat.exists }}"
+          - "Directory permissions: {{ system_log_dir.stat.mode if system_log_dir.stat.exists else 'N/A' }}"
+          - "Directory owner: {{ system_log_dir.stat.pw_name if system_log_dir.stat.exists else 'N/A' }}"
+
+    - name: Create system log directory if missing
+      file:
+        path: "{{ host_archive_dir }}/system_logs"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      when: not system_log_dir.stat.exists
+
+    - name: Generate test log messages with different facilities
+      shell: |
+        logger -p local0.info "TEST: Local0 facility message $(date)"
+        logger -p auth.info "TEST: Auth facility message $(date)"
+        logger -p daemon.info "TEST: Daemon facility message $(date)"
+        logger -p mail.info "TEST: Mail facility message $(date)"
+        logger -p user.info "TEST: User facility message $(date)"
+        logger -p syslog.info "TEST: Syslog facility message $(date)"
+        logger "TEST: Default facility message $(date)"
+      register: test_logs
+
+    - name: Wait for log processing
+      pause:
+        seconds: 5
+
+    - name: Check where test messages went in local logs
+      shell: |
+        echo "=== Recent messages in /var/log/messages ==="
+        tail -20 /var/log/messages | grep "TEST:" || echo "No test messages in /var/log/messages"
+        echo ""
+        echo "=== Recent messages in /var/log/syslog ==="
+        tail -20 /var/log/syslog 2>/dev/null | grep "TEST:" || echo "No /var/log/syslog or no test messages"
+      register: local_logs
+
+    - name: Display local log check
+      debug:
+        msg: "{{ local_logs.stdout_lines }}"
+
+    - name: Check for any files in system_logs directory
+      shell: |
+        echo "=== Files in system_logs directory ==="
+        ls -la {{ host_archive_dir }}/system_logs/ || echo "Directory is empty or doesn't exist"
+        echo ""
+        echo "=== Any log files containing our test messages ==="
+        find {{ host_archive_dir }}/system_logs/ -name "*.log" -exec grep -l "TEST:" {} \; 2>/dev/null || echo "No log files with test messages found"
+      register: system_logs_check
+
+    - name: Display system logs check
+      debug:
+        msg: "{{ system_logs_check.stdout_lines }}"
+
+    - name: Check rsyslog error logs
+      shell: |
+        echo "=== Recent rsyslog errors ==="
+        journalctl -u rsyslog --since "10 minutes ago" --no-pager | tail -20
+      register: rsyslog_errors
+
+    - name: Display rsyslog error logs
+      debug:
+        msg: "{{ rsyslog_errors.stdout_lines }}"
+
+    - name: Test manual rsyslog restart and configuration reload
+      block:
+        - name: Restart rsyslog service
+          systemd:
+            name: rsyslog
+            state: restarted
+
+        - name: Wait for service to start
+          pause:
+            seconds: 3
+
+        - name: Generate new test messages after restart
+          shell: |
+            logger -p local0.info "POST-RESTART TEST: Local0 message $(date)"
+            logger "POST-RESTART TEST: Default message $(date)"
+
+        - name: Wait for log processing
+          pause:
+            seconds: 5
+
+        - name: Check for post-restart messages
+          shell: |
+            echo "=== Post-restart system logs ==="
+            ls -la {{ host_archive_dir }}/system_logs/
+            echo ""
+            echo "=== Content of any new log files ==="
+            find {{ host_archive_dir }}/system_logs/ -name "*.log" -newer /tmp -exec echo "File: {}" \; -exec tail -5 {} \; 2>/dev/null || echo "No new log files found"
+          register: post_restart_check
+
+        - name: Display post-restart results
+          debug:
+            msg: "{{ post_restart_check.stdout_lines }}"
+
+    - name: Fix rsyslog configuration if needed
+      block:
+        - name: Check if our configuration is properly formatted
+          shell: |
+            echo "=== Checking for configuration issues ==="
+            grep -n "{{ host_archive_dir }}" /etc/rsyslog.conf
+          register: config_line_check
+
+        - name: Display current configuration line
+          debug:
+            msg: "{{ config_line_check.stdout_lines }}"
+
+        - name: Create corrected rsyslog configuration
+          blockinfile:
+            path: /etc/rsyslog.conf
+            block: |
+              # Log archiving configuration - Updated
+              $WorkDirectory /var/lib/rsyslog
+              $ActionQueueFileName fwdRule1
+              $ActionQueueMaxDiskSpace 1g
+              $ActionQueueSaveOnShutdown on
+              $ActionQueueType LinkedList
+              $ActionResumeRetryCount -1
+              
+              # Archive all logs to hostname-specific NFS directory
+              *.* {{ host_archive_dir }}/system_logs/messages-%$YEAR%-%$MONTH%-%$DAY%.log
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - LOG ARCHIVING FIXED"
+            insertafter: EOF
+          notify: restart rsyslog
+
+        - name: Remove old configuration block if it exists
+          blockinfile:
+            path: /etc/rsyslog.conf
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - LOG ARCHIVING"
+            state: absent
+          notify: restart rsyslog
+
+    - name: Test alternative rsyslog configuration approach
+      copy:
+        dest: /etc/rsyslog.d/99-nfs-archive.conf
+        content: |
+          # NFS Archive configuration for {{ inventory_hostname }}
+          # Send all messages to NFS archive
+          *.* {{ host_archive_dir }}/system_logs/messages-%$YEAR%-%$MONTH%-%$DAY%.log
+        mode: '0644'
+        backup: yes
+      notify: restart rsyslog
+
+    - name: Final verification test
+      block:
+        - name: Generate final test messages
+          shell: |
+            logger -p local0.info "FINAL TEST: Configuration fixed $(date)"
+            logger "FINAL TEST: Default message $(date)"
+
+        - name: Wait for final processing
+          pause:
+            seconds: 5
+
+        - name: Check final results
+          shell: |
+            echo "=== Final system logs check ==="
+            ls -la {{ host_archive_dir }}/system_logs/
+            echo ""
+            echo "=== Content of today's log file ==="
+            TODAY_FILE="{{ host_archive_dir }}/system_logs/messages-$(date +%Y-%m-%d).log"
+            if [[ -f "$TODAY_FILE" ]]; then
+                echo "Found today's log file: $TODAY_FILE"
+                tail -10 "$TODAY_FILE"
+            else
+                echo "Today's log file not found: $TODAY_FILE"
+                echo "Available files:"
+                ls -la {{ host_archive_dir }}/system_logs/
+            fi
+          register: final_check
+
+        - name: Display final results
+          debug:
+            msg: "{{ final_check.stdout_lines }}"
+
+    - name: Generate diagnostic summary
+      debug:
+        msg:
+          - "========================================"
+          - "   SYSTEM LOG ARCHIVING DIAGNOSIS"
+          - "========================================"
+          - "Host: {{ inventory_hostname }}"
+          - "Expected path: {{ host_archive_dir }}/system_logs/"
+          - "Rsyslog service: {{ rsyslog_status.status.ActiveState }}"
+          - "System log directory: {{ 'EXISTS' if system_log_dir.stat.exists else 'MISSING' }}"
+          - "Configuration syntax: {{ 'OK' if rsyslog_syntax.rc == 0 else 'ERROR' }}"
+          - ""
+          - "Next steps if still not working:"
+          - "1. Check firewall/SELinux settings"
+          - "2. Verify NFS server allows file creation"
+          - "3. Check rsyslog file permissions"
+          - "4. Review system journal for errors"
+          - "========================================"
+
+  handlers:
+    - name: restart rsyslog
+      systemd:
+        name: rsyslog
+        state: restarted

@@ -1,3 +1,0 @@
-password_prefix: $encrypted$
-password_suffix: $encrypted$
-var_expose: $encrypted$

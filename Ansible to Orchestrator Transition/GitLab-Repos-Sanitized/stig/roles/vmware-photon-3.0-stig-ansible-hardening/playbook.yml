@@ -1,0 +1,4 @@
+- name: vmware-photon-3.0-stig-ansible-hardening
+  hosts: all
+  roles:
+    - role: photon3

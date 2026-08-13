@@ -1,0 +1,56 @@
+﻿{
+    "SchemaVersion":  1,
+    "Created":  "2026-08-13T12:03:34.6161396-04:00",
+    "Updated":  "2026-08-13T12:03:34.7538900-04:00",
+    "EntryCount":  7,
+    "Counters":  [
+                     {
+                         "Type":  "DomainLabel",
+                         "Index":  4
+                     }
+                 ],
+    "Entries":  [
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esocoewesx451",
+                        "Key":  "esocoewesx451",
+                        "Surrogate":  "dom1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "gitmgitlab01",
+                        "Key":  "gitmgitlab01",
+                        "Surrogate":  "dom4"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "state",
+                        "Key":  "state",
+                        "Surrogate":  "dom3"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "washdc",
+                        "Key":  "washdc",
+                        "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esocoewesx451.washdc.state.sbu",
+                        "Key":  "esocoewesx451.washdc.state.sbu",
+                        "Surrogate":  "dom1.dom2.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "gitmgitlab01.washdc.state.sbu",
+                        "Key":  "gitmgitlab01.washdc.state.sbu",
+                        "Surrogate":  "dom4.dom2.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "sbu",
+                        "Key":  "sbu",
+                        "Surrogate":  "invalid"
+                    }
+                ]
+}

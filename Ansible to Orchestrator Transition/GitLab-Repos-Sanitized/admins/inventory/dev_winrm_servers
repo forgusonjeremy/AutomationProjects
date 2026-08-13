@@ -1,0 +1,33 @@
+hst:
+    hosts:
+        dom26.dom3.example:
+        dom23.dom3.example:
+    children:
+        stig:
+
+mdc:
+    hosts:
+        dom25.dom3.example:
+        dom24.dom3.example:
+    children:
+        stig:     
+
+ew:
+    hosts:
+        dom27.dom3.example:
+        dom20.dom3.example:
+    children:
+        stig:    
+     
+all:
+    children:
+        hst:
+        mdc:
+        ew:   
+    vars:
+        var_os_family: Windows
+        ansible_connection: winrm
+        ansible_port: 5986
+        ansible_winrm_transport: kerberos
+        ansible_winrm_kerberos_delegation: yes
+        ansible_winrm_server_cert_validation: ignore         

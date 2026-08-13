@@ -1,0 +1,53 @@
+# setup-ansible-user.yml
+---
+- name: Create account 
+  hosts: all
+  become: yes
+  vars:
+    new_user: "{{var_new_user | default('cvslocal')}}"
+    user_group: "{{var_new_user | default('cvslocal')}}"
+    new_user_passwd: "{{ var_new_user_passwd }}"
+    
+  tasks:
+    - name: Debug variables
+      debug:
+        msg: |
+          Variables received:
+          - var_new_user: {{ var_new_user | default('NOT SET') }}
+          - new_user: {{ new_user }}
+          - user_group: {{ user_group }}
+
+    - name: Generate Secure Password Hash
+      set_fact:
+        hashed_password: "{{ new_user_passwd | password_hash('sha512') }}"
+      no_log: false
+
+
+    - name: Validate required variables
+      fail:
+        msg: "Required variable '{{ item }}' is not defined or empty"
+      when: vars[item] is not defined or vars[item] == ""
+      loop:
+        - var_new_user
+
+    - name: Create ansible service group
+      group:
+        name: "{{ user_group }}"
+        state: present
+
+    - name: Create ansible service user
+      user:
+        name: "{{ new_user }}"
+        group: "{{ user_group }}"
+        groups: "{{ 'wheel' }}"
+        password: "{{ hashed_password }}"
+        append: yes
+        shell: /bin/bash
+        home: "/home/{{ new_user }}"
+        create_home: yes
+        state: present
+
+
+
+
+

@@ -1,0 +1,628 @@
+---
+- name: VMware vSphere 8.0 STIG ESXi Remediation for AAP 2.5
+  hosts: localhost
+  gather_facts: false
+
+  collections:
+    - community.vmware
+
+  vars:
+    # These will be provided via job template survey or extra_vars
+    vcenter_hostname: "dom10.dom9.ex4" # "{{ vcenter_server }}"
+    vcenter_username: "administrator@vsphere.local" # "{{ vcenter_user }}"
+    vcenter_password: "REDACTED-SECRET-1" #{{ vcenter_pass }}
+    syslog_host: "100.64.0.54"
+    ntp_server_list: "100.64.1.128"
+    
+    # Target specification
+    target_hostname: "dom8.dom9.ex4" #"{{ esxi_hostname | default('') }}"
+    target_cluster: "VxRail-Virtual-SAN-Cluster-2f4158d4-ab51-4b26-8d2f-239810aecf13" #"{{ esxi_cluster | default('') }}"
+    
+    # Environment specific variables
+    syslog_server: "{{ syslog_host | default('') }}"
+    ntp_servers: "{{ ntp_server_list | default([]) }}"
+    allowed_ips: "{{ firewall_allowed_ips | default([]) }}"
+    esx_admin_group: "{{ esxi_admin_group | default('root') }}"
+    esxi_build: "{{ target_esxi_build | default('24022510') }}"
+    banner_preference: "{{ banner_pref | default('') }}"
+    log_insight_enabled: "{{ log_insight | default(false) }}"
+    
+    # STIG control settings
+    stig_settings:
+      account_lock_failures:
+        name: "Security.AccountLockFailures"
+        value: "3"
+      host_client_timeout:
+        name: "UserVars.HostClientSessionTimeout"
+        value: "900"
+      log_level:
+        name: "Config.HostAgent.log.level"
+        value: "info"
+      password_complexity:
+        name: "Security.PasswordQualityControl"
+        value: "similar=deny retry=3 min=disabled,disabled,disabled,disabled,15"
+      password_history:
+        name: "Security.PasswordHistory"
+        value: "5"
+      enable_mob:
+        name: "Config.HostAgent.plugins.solo.enableMob"
+        value: false
+      shell_int_timeout:
+        name: "UserVars.ESXiShellInteractiveTimeOut"
+        value: "900"
+      account_unlock_time:
+        name: "Security.AccountUnlockTime"
+        value: "900"
+      audit_record_storage_cap:
+        name: "Syslog.global.auditRecord.storageCapacity"
+        value: "100"
+      syslog_host:
+        name: "Syslog.global.logHost"
+        value: "{{ syslog_server }}"
+      vib_accept_level: "PartnerSupported"
+      dcui_access:
+        name: "DCUI.Access"
+        value: "root"
+      ssh_enabled: false
+      shell_enabled: false
+      shell_timeout:
+        name: "UserVars.ESXiShellTimeOut"
+        value: "600"
+      dcui_timeout:
+        name: "UserVars.DcuiTimeOut"
+        value: "600"
+      share_force_salting:
+        name: "Mem.ShareForceSalting"
+        value: "2"
+      block_guest_bpdu:
+        name: "Net.BlockGuestBPDU"
+        value: "1"
+      dvfilter_bind_ip:
+        name: "Net.DVFilterBindIpAddress"
+        value: ""
+      suppress_shell_warning:
+        name: "UserVars.SuppressShellWarning"
+        value: "0"
+      suppress_hyper_warning:
+        name: "UserVars.SuppressHyperthreadWarning"
+        value: "0"
+      syslog_cert_check:
+        name: "Syslog.global.certificate.checkSSLCerts"
+        value: "true"
+      mem_eager_zero:
+        name: "Mem.MemEagerZero"
+        value: "1"
+      api_timeout:
+        name: "Config.HostAgent.vmacore.soap.sessionTimeout"
+        value: "30"
+      password_max_age:
+        name: "Security.PasswordMaxDays"
+        value: "90"
+      cim_enabled: false
+      slpd_enabled: false
+      syslog_audit_enable:
+        name: "Syslog.global.auditRecord.storageEnable"
+        value: true
+      syslog_audit_remote:
+        name: "Syslog.global.auditRecord.remoteEnable"
+        value: true
+      syslog_cert_strict:
+        name: "Syslog.global.certificate.strictX509Compliance"
+        value: true
+      syslog_log_level:
+        name: "Syslog.global.logLevel"
+        value: "info"
+      esx_admins_group:
+        name: "Config.HostAgent.plugins.hostsvc.esxAdminsGroup"
+        value: "{{ esx_admin_group }}"
+      syslog_scratch:
+        name: "Syslog.global.logDir"
+        value: "[] /scratch/log"
+      execute_vibs:
+        name: "VMkernel.Boot.execInstalledOnly"
+        value: "true"
+      tls_server_profile: "NIST_2024"
+      bmc_network_enable:
+        name: "Net.BMCNetworkEnable"
+        value: 0
+      lockdown_level: "lockdownNormal"
+    
+    # Control enablement flags - can be overridden via extra_vars
+    controls_enabled:
+      ESXI80000005: "{{ enable_ESXI80000005 | default(true) | bool }}"   # Account Lock Failures
+      ESXI80000006: "{{ enable_ESXI80000006 | default(true) | bool }}"   # DoD Banner
+      ESXI80000008: "{{ enable_ESXI80000008 | default(true) | bool }}"  # Lockdown Mode
+      ESXI80000010: "{{ enable_ESXI80000010 | default(true) | bool }}"   # Host Client Timeout
+      ESXI80000015: "{{ enable_ESXI80000015 | default(true) | bool }}"   # Log Level
+      ESXI80000035: "{{ enable_ESXI80000035 | default(true) | bool }}"   # Password Complexity
+      ESXI80000043: "{{ enable_ESXI80000043 | default(true) | bool }}"   # Password History
+      ESXI80000047: "{{ enable_ESXI80000047 | default(true) | bool }}"   # Disable MOB
+      ESXI80000068: "{{ enable_ESXI80000068 | default(true) | bool }}"   # Shell Interactive Timeout
+      ESXI80000111: "{{ enable_ESXI80000111 | default(true) | bool }}"   # Account Unlock Time
+      ESXI80000113: "{{ enable_ESXI80000113 | default(true) | bool }}"   # Audit Storage Capacity
+      ESXI80000114: "{{ enable_ESXI80000114 | default(true) | bool }}"   # Syslog
+      ESXI80000124: "{{ enable_ESXI80000124 | default(true) | bool }}"   # NTP
+      ESXI80000133: "{{ enable_ESXI80000133 | default(true) | bool }}"   # VIB Acceptance Level
+      ESXI80000189: "{{ enable_ESXI80000189 | default(true) | bool }}"   # DCUI Access
+      ESXI80000193: "{{ enable_ESXI80000193 | default(true) | bool }}"   # SSH Disabled
+      ESXI80000194: "{{ enable_ESXI80000194 | default(true) | bool }}"   # Shell Disabled
+      ESXI80000195: "{{ enable_ESXI80000195 | default(true) | bool }}"   # Shell Timeout
+      ESXI80000196: "{{ enable_ESXI80000196 | default(true) | bool }}"   # DCUI Timeout
+      ESXI80000213: "{{ enable_ESXI80000213 | default(true) | bool }}"   # Memory Salting
+      ESXI80000214: "{{ enable_ESXI80000214 | default(true) | bool }}"   # Default Firewall
+      ESXI80000215: "{{ enable_ESXI80000215 | default(true) | bool }}"   # BPDU
+      ESXI80000216: "{{ enable_ESXI80000216 | default(true) | bool }}"   # Forged Transmits
+      ESXI80000217: "{{ enable_ESXI80000217 | default(true) | bool }}"   # MAC Changes
+      ESXI80000218: "{{ enable_ESXI80000218 | default(true) | bool }}"   # Promiscuous Mode
+      ESXI80000219: "{{ enable_ESXI80000219 | default(true) | bool }}"   # DVFilter
+      ESXI80000222: "{{ enable_ESXI80000222 | default(true) | bool }}"   # Suppress Shell Warning
+      ESXI80000223: "{{ enable_ESXI80000223 | default(true) | bool }}"   # Suppress Hyperthreading Warning
+      ESXI80000224: "{{ enable_ESXI80000224 | default(true) | bool }}"   # Syslog Cert Check
+      ESXI80000225: "{{ enable_ESXI80000225 | default(true) | bool }}"   # Memory Eager Zero
+      ESXI80000226: "{{ enable_ESXI80000226 | default(true) | bool }}"   # API Timeout
+      ESXI80000227: "{{ enable_ESXI80000227 | default(true) | bool }}"   # Password Age
+      ESXI80000228: "{{ enable_ESXI80000228 | default(true) | bool }}"   # CIM Service
+      ESXI80000231: "{{ enable_ESXI80000231 | default(true) | bool }}"   # SLPD Service
+      ESXI80000232: "{{ enable_ESXI80000232 | default(true) | bool }}"   # Syslog Audit Enable
+      ESXI80000233: "{{ enable_ESXI80000233 | default(true) | bool }}"   # Syslog Audit Remote
+      ESXI80000234: "{{ enable_ESXI80000234 | default(true) | bool }}"   # Syslog Cert Strict
+      ESXI80000235: "{{ enable_ESXI80000235 | default(true) | bool }}"   # Syslog Log Level
+      ESXI80000243: "{{ enable_ESXI80000243 | default(true) | bool }}"   # Persistent Logs
+      ESXI80000244: "{{ enable_ESXI80000244 | default(true) | bool }}"   # Execute VIBs
+      ESXI80000250: "{{ enable_ESXI80000250 | default(true) | bool }}"   # BMC Network
+    
+    # DoD Banner text
+    issue_banner: "You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only. By using this IS (which includes any device attached to this IS), you consent to the following conditions: -The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations. -At any time, the USG may inspect and seize data stored on this IS. -Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose. -This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy. -Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details."
+
+  tasks:
+    - setup:
+        gather_subset:
+          - min
+    - name: q
+      debug: 
+       var=ansible_date_time.epoch
+       var=ansible_date_time.iso8601
+
+    - name: Initialize variables
+      set_fact:
+        failed_count: 0
+        remediation_results: {}
+
+    # - name: Validate required parameters
+    #   assert:
+    #     that:
+    #       - vcenter_hostname is defined and vcenter_hostname != ""
+    #       - vcenter_username is defined and vcenter_username != ""
+    #       - vcenter_password is defined and vcenter_password != ""
+    #       - (target_hostname != "" and target_cluster == "") or (target_hostname == "" and target_cluster != "")
+    #     fail_msg: "Missing required parameters. Need vCenter details and either hostname or cluster."
+
+    - name: Display job information
+      debug:
+        msg:
+          - "=== VMware vSphere 8.0 STIG Remediation ==="
+          - "vCenter: {{ vcenter_hostname }}"
+          - "Target Host: {{ target_hostname if target_hostname != '' else 'N/A' }}"
+          - "Target Cluster: {{ target_cluster if target_cluster != '' else 'N/A' }}"
+          - "Syslog Server: {{ syslog_server if syslog_server != '' else 'Not configured' }}"
+          - "NTP Servers: {{ ntp_servers | join(', ') if ntp_servers | length > 0 else 'Not configured' }}"
+
+    - name: Gather ESXi host information
+      block:
+        - name: Get specific host by name
+          community.vmware.vmware_host_config_info:
+            hostname: "{{ vcenter_hostname }}"
+            username: "{{ vcenter_username }}"
+            password: "{{ vcenter_password }}"
+            validate_certs: false
+            esxi_hostname: "{{ target_hostname }}"
+          register: host_info
+          when: target_hostname != ""
+
+        - name: Get hosts by cluster
+          community.vmware.vmware_host_config_info:
+            hostname: "{{ vcenter_hostname }}"
+            username: "{{ vcenter_username }}"
+            password: "{{ vcenter_password }}"
+            validate_certs: false
+            cluster_name: "{{ target_cluster }}"
+          register: cluster_host_info
+          when: target_cluster != ""
+
+        - name: Set host facts
+          set_fact:
+            esxi_hosts: "{{ (host_info.hosts_info | default({})).keys() | list if target_hostname != '' else (cluster_host_info.hosts_info | default({})).keys() | list }}"
+
+    #     - name: Verify hosts found
+    #       assert:
+    #         that:
+    #           - esxi_hosts | length > 0
+    #         fail_msg: "No ESXi hosts found matching the specified criteria"
+
+    #     - name: Display discovered hosts
+    #       debug:
+    #         msg: "Found {{ esxi_hosts | length }} ESXi host(s): {{ esxi_hosts | join(', ') }}"
+
+    # Core STIG Controls Implementation
+    - name: "ESXI-80-000005: Account Lock Failures"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Security.AccountLockFailures: 3
+          #"{{ stig_settings.account_lock_failures.name }}: {{ stig_settings.account_lock_failures.value }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000005
+      register: result_005
+      ignore_errors: true
+      tags: [core_security, account_security]
+
+    # - name: "ESXI-80-000006: DoD Consent Banner"
+    #   shell: |
+    #     pwsh -Command "
+    #     Connect-VIServer -Server {{ vcenter_hostname }} -User '{{ vcenter_username }}' -Password '{{ vcenter_password }}' -Force
+    #     Get-VMHost '{{ item }}' | Get-AdvancedSetting -Name 'Annotations.WelcomeMessage' | Set-AdvancedSetting -Value '{{ issue_banner if banner_preference != 's' else '' }}' -Confirm:\$false
+    #     Disconnect-VIServer -Server {{ vcenter_hostname }} -Confirm:\$false
+    #     "
+    #   loop: "{{ esxi_hosts }}"
+    #   when: controls_enabled.ESXI80000006
+    #   register: result_006
+    #   ignore_errors: true
+    #   tags: [core_security, banner]
+
+    - name: "ESXI-80-000010: Host Client Timeout"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          UserVars.HostClientSessionTimeout: 900
+          #"{{ stig_settings.host_client_timeout.name }}": "{{ stig_settings.host_client_timeout.value }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000010
+      register: result_010
+      ignore_errors: true
+      tags: [core_security, timeouts]
+
+    - name: "ESXI-80-000015: Log Level"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Config.HostAgent.log.level: info
+          #"{{ stig_settings.log_level.name }}": "{{ stig_settings.log_level.value }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000015
+      register: result_015
+      ignore_errors: true
+      tags: [logging, core_security]
+
+    - name: "ESXI-80-000035: Password Complexity"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Security.PasswordQualityControl: "similar=deny retry=3 min=disabled,disabled,disabled,disabled,15"
+          #"{{ stig_settings.password_complexity.name }}": "{{ stig_settings.password_complexity.value }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000035
+      register: result_035
+      ignore_errors: true
+      tags: [core_security, password_policy]
+
+    - name: "ESXI-80-000043: Password History"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Security.PasswordHistory: 5
+          #"{{ stig_settings.password_history.name }}": "{{ stig_settings.password_history.value }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000043
+      register: result_043
+      ignore_errors: true
+      tags: [core_security, password_policy]
+
+    - name: "ESXI-80-000047: Disable MOB"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Config.HostAgent.plugins.solo.enableMob: false
+          #"{{ stig_settings.enable_mob.name }}": "{{ stig_settings.enable_mob.value }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000047
+      register: result_047
+      ignore_errors: true
+      tags: [core_security, services]
+
+    - name: "ESXI-80-000114: Syslog Configuration"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.logHost: "{{syslog_server}}"
+          #"{{ stig_settings.Syslog.global.logHost.name }}": "{{ stig_settings.syslog_host.value }}"
+      loop: "{{ esxi_hosts }}"
+      when: 
+        - controls_enabled.ESXI80000114
+        - syslog_server != ""
+        #- not (syslog_server is match('\\s+'))
+        #- not log_insight_enabled
+      register: result_114
+      ignore_errors: true
+      tags: [logging, syslog]
+
+    ## To remove ntp server
+    # - name: "ESXI-80-000124: NTP Configuration"
+    #   community.vmware.vmware_host_ntp:
+    #     hostname: "{{ vcenter_hostname }}"
+    #     username: "{{ vcenter_username }}"
+    #     password: "{{ vcenter_password }}"
+    #     validate_certs: false
+    #     esxi_hostname: "{{ item }}"
+    #     ntp_servers: "100.64.1.125"
+    #     state: absent
+    #   loop: "{{ esxi_hosts }}"
+    #   when: 
+    #     - controls_enabled.ESXI80000124
+    #     - ntp_servers | length > 0
+    #   register: result_124
+    #   ignore_errors: true
+    #   tags: [time_sync, ntp]
+
+    - name: "ESXI-80-000124: NTP Configuration"
+      community.vmware.vmware_host_ntp:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        ntp_servers: "{{ ntp_servers }}"
+        state: present
+      loop: "{{ esxi_hosts }}"
+      when: 
+        - controls_enabled.ESXI80000124
+        - ntp_servers | length > 0
+      register: result_124
+      ignore_errors: true
+      tags: [time_sync, ntp]
+
+    ## This module did not work
+    # - name: "ESXI-80-000133: VIB Acceptance Level"
+    #   community.vmware.vmware_host_acceptance:
+    #     hostname: "{{ vcenter_hostname }}"
+    #     username: "{{ vcenter_username }}"
+    #     password: "{{ vcenter_password }}"
+    #     validate_certs: false
+    #     esxi_hostname: "{{ item }}"
+    #     acceptance_level: "PartnerSupported"
+    #     #acceptance_level: "{{ stig_settings.vib_accept_level }}"
+    #     state: present
+    #   loop: "{{ esxi_hosts }}"
+    #   when: controls_enabled.ESXI80000133
+    #   register: result_133
+    #   ignore_errors: true
+    #   tags: [vib_management, security]
+
+    - name: "ESXI-80-000193: SSH Service Disable"
+      community.vmware.vmware_host_service_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        service_name: TSM-SSH
+        state: "{{ 'started' if stig_settings.ssh_enabled else 'stop' }}"
+        service_policy: "{{ 'on' if stig_settings.ssh_enabled else 'off' }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000193
+      register: result_193
+      ignore_errors: true
+      tags: [services, ssh]
+
+    - name: "ESXI-80-000194: ESXi Shell Service Disable"
+      community.vmware.vmware_host_service_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        service_name: TSM
+        state: "{{ 'started' if stig_settings.shell_enabled else 'stop' }}"
+        service_policy: "{{ 'on' if stig_settings.shell_enabled else 'off' }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000194
+      register: result_194
+      ignore_errors: true
+      tags: [services, shell]
+
+    # - name: "ESXI-80-000214: Default Firewall Policy"
+    #   shell: |
+    #     pwsh -Command "
+    #     Connect-VIServer -Server {{ vcenter_hostname }} -User '{{ vcenter_username }}' -Password '{{ vcenter_password }}' -Force
+    #     \$esxcli = Get-EsxCli -VMHost '{{ item }}' -V2
+    #     \$results = \$esxcli.network.firewall.get.invoke()
+    #     if (\$results.DefaultAction -ne 'DROP' -or \$results.Enabled -ne 'true') {
+    #       \$fwargs = \$esxcli.network.firewall.set.CreateArgs()
+    #       \$fwargs.enabled = \$true
+    #       \$fwargs.defaultaction = \$false
+    #       \$esxcli.network.firewall.set.Invoke(\$fwargs)
+    #       Write-Host 'Configured firewall on {{ item }}'
+    #     }
+    #     Disconnect-VIServer -Server {{ vcenter_hostname }} -Confirm:\$false
+    #     "
+    #   loop: "{{ esxi_hosts }}"
+    #   when: controls_enabled.ESXI80000214
+    #   register: result_214
+    #   ignore_errors: true
+    #   tags: [network_security, firewall]
+
+    # - name: "ESXI-80-000216: Forged Transmits"
+    #   shell: |
+    #     pwsh -Command "
+    #     Connect-VIServer -Server {{ vcenter_hostname }} -User '{{ vcenter_username }}' -Password '{{ vcenter_password }}' -Force
+    #     Get-VirtualSwitch -VMHost '{{ item }}' -Standard | Get-SecurityPolicy | Set-SecurityPolicy -ForgedTransmits \$false -Confirm:\$false
+    #     Get-VirtualPortGroup -VMHost '{{ item }}' -Standard | Get-SecurityPolicy | Set-SecurityPolicy -ForgedTransmitsInherited \$true -Confirm:\$false
+    #     Disconnect-VIServer -Server {{ vcenter_hostname }} -Confirm:\$false
+    #     "
+    #   loop: "{{ esxi_hosts }}"
+    #   when: controls_enabled.ESXI80000216
+    #   register: result_216
+    #   ignore_errors: true
+    #   tags: [network_security, virtual_switch]
+
+    # - name: "ESXI-80-000217: MAC Changes"
+    #   shell: |
+    #     pwsh -Command "
+    #     Connect-VIServer -Server {{ vcenter_hostname }} -User '{{ vcenter_username }}' -Password '{{ vcenter_password }}' -Force
+    #     Get-VirtualSwitch -VMHost '{{ item }}' -Standard | Get-SecurityPolicy | Set-SecurityPolicy -MacChanges \$false -Confirm:\$false
+    #     Get-VirtualPortGroup -VMHost '{{ item }}' -Standard | Get-SecurityPolicy | Set-SecurityPolicy -MacChangesInherited \$true -Confirm:\$false
+    #     Disconnect-VIServer -Server {{ vcenter_hostname }} -Confirm:\$false
+    #     "
+    #   loop: "{{ esxi_hosts }}"
+    #   when: controls_enabled.ESXI80000217
+    #   register: result_217
+    #   ignore_errors: true
+    #   tags: [network_security, virtual_switch]
+
+    # - name: "ESXI-80-000218: Promiscuous Mode"
+    #   shell: |
+    #     pwsh -Command "
+    #     Connect-VIServer -Server {{ vcenter_hostname }} -User '{{ vcenter_username }}' -Password '{{ vcenter_password }}' -Force
+    #     Get-VirtualSwitch -VMHost '{{ item }}' -Standard | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuous \$false -Confirm:\$false
+    #     Get-VirtualPortGroup -VMHost '{{ item }}' -Standard | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuousInherited \$true -Confirm:\$false
+    #     Disconnect-VIServer -Server {{ vcenter_hostname }} -Confirm:\$false
+    #     "
+    #   loop: "{{ esxi_hosts }}"
+    #   when: controls_enabled.ESXI80000218
+    #   register: result_218
+    #   ignore_errors: true
+    #   tags: [network_security, virtual_switch]
+
+    # Lockdown Mode (if enabled) - should be last
+    - name: "ESXI-80-000008: Enable Lockdown Mode"
+      shell: |
+        pwsh -Command "
+        Connect-VIServer -Server {{ vcenter_hostname }} -User '{{ vcenter_username }}' -Password '{{ vcenter_password }}' -Force
+        \$vmhostv = Get-VMHost '{{ item }}' | Get-View
+        if (\$vmhostv.config.LockdownMode -ne '{{ stig_settings.lockdown_level }}') {
+          \$lockdown = Get-View \$vmhostv.ConfigManager.HostAccessManager
+          \$lockdown.ChangeLockdownMode('{{ stig_settings.lockdown_level }}')
+          Write-Host 'Enabled lockdown mode on {{ item }}'
+        }
+        Disconnect-VIServer -Server {{ vcenter_hostname }} -Confirm:\$false
+        "
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000008
+      register: result_008
+      ignore_errors: true
+      tags: [lockdown_mode, security]
+
+    # Summary and reporting
+    # - name: Calculate remediation results
+    #   set_fact:
+    #     remediation_summary:
+    #       total_hosts: "{{ esxi_hosts | length }}"
+    #       controls_applied:
+    #         ESXI80000005: "{{ 'SUCCESS' if result_005 is succeeded else ('FAILED' if result_005 is defined else 'SKIPPED') }}"
+    #         ESXI80000006: "{{ 'SUCCESS' if result_006 is succeeded else ('FAILED' if result_006 is defined else 'SKIPPED') }}"
+    #         ESXI80000010: "{{ 'SUCCESS' if result_010 is succeeded else ('FAILED' if result_010 is defined else 'SKIPPED') }}"
+    #         ESXI80000015: "{{ 'SUCCESS' if result_015 is succeeded else ('FAILED' if result_015 is defined else 'SKIPPED') }}"
+    #         ESXI80000035: "{{ 'SUCCESS' if result_035 is succeeded else ('FAILED' if result_035 is defined else 'SKIPPED') }}"
+    #         ESXI80000043: "{{ 'SUCCESS' if result_043 is succeeded else ('FAILED' if result_043 is defined else 'SKIPPED') }}"
+    #         ESXI80000047: "{{ 'SUCCESS' if result_047 is succeeded else ('FAILED' if result_047 is defined else 'SKIPPED') }}"
+    #         ESXI80000114: "{{ 'SUCCESS' if result_114 is succeeded else ('FAILED' if result_114 is defined else 'SKIPPED') }}"
+    #         ESXI80000124: "{{ 'SUCCESS' if result_124 is succeeded else ('FAILED' if result_124 is defined else 'SKIPPED') }}"
+    #         ESXI80000133: "{{ 'SUCCESS' if result_133 is succeeded else ('FAILED' if result_133 is defined else 'SKIPPED') }}"
+    #         ESXI80000193: "{{ 'SUCCESS' if result_193 is succeeded else ('FAILED' if result_193 is defined else 'SKIPPED') }}"
+    #         ESXI80000194: "{{ 'SUCCESS' if result_194 is succeeded else ('FAILED' if result_194 is defined else 'SKIPPED') }}"
+    #         ESXI80000214: "{{ 'SUCCESS' if result_214 is succeeded else ('FAILED' if result_214 is defined else 'SKIPPED') }}"
+    #         ESXI80000216: "{{ 'SUCCESS' if result_216 is succeeded else ('FAILED' if result_216 is defined else 'SKIPPED') }}"
+    #         ESXI80000217: "{{ 'SUCCESS' if result_217 is succeeded else ('FAILED' if result_217 is defined else 'SKIPPED') }}"
+    #         ESXI80000218: "{{ 'SUCCESS' if result_218 is succeeded else ('FAILED' if result_218 is defined else 'SKIPPED') }}"
+    #         ESXI80000008: "{{ 'SUCCESS' if result_008 is succeeded else ('FAILED' if result_008 is defined else 'SKIPPED') }}"
+
+    # - name: Generate final STIG remediation report
+    #   debug:
+    #     msg:
+    #       - "============================================="
+    #       - "VMware vSphere 8.0 STIG Remediation Report"
+    #       - "============================================="
+    #       - "vCenter Server: {{ vcenter_hostname }}"
+    #       - "Target Hosts: {{ esxi_hosts | join(', ') }}"
+    #       - "Total Hosts Processed: {{ remediation_summary.total_hosts }}"
+    #       - ""
+    #       - "Control Remediation Status:"
+    #       - "  ESXI-80-000005 (Account Lock Failures): {{ remediation_summary.controls_applied.ESXI80000005 }}"
+    #       - "  ESXI-80-000006 (DoD Banner): {{ remediation_summary.controls_applied.ESXI80000006 }}"
+    #       - "  ESXI-80-000010 (Host Client Timeout): {{ remediation_summary.controls_applied.ESXI80000010 }}"
+    #       - "  ESXI-80-000015 (Log Level): {{ remediation_summary.controls_applied.ESXI80000015 }}"
+    #       - "  ESXI-80-000035 (Password Complexity): {{ remediation_summary.controls_applied.ESXI80000035 }}"
+    #       - "  ESXI-80-000043 (Password History): {{ remediation_summary.controls_applied.ESXI80000043 }}"
+    #       - "  ESXI-80-000047 (Disable MOB): {{ remediation_summary.controls_applied.ESXI80000047 }}"
+    #       - "  ESXI-80-000114 (Syslog): {{ remediation_summary.controls_applied.ESXI80000114 }}"
+    #       - "  ESXI-80-000124 (NTP): {{ remediation_summary.controls_applied.ESXI80000124 }}"
+    #       - "  ESXI-80-000133 (VIB Acceptance): {{ remediation_summary.controls_applied.ESXI80000133 }}"
+    #       - "  ESXI-80-000193 (SSH Service): {{ remediation_summary.controls_applied.ESXI80000193 }}"
+    #       - "  ESXI-80-000194 (Shell Service): {{ remediation_summary.controls_applied.ESXI80000194 }}"
+    #       - "  ESXI-80-000214 (Firewall Policy): {{ remediation_summary.controls_applied.ESXI80000214 }}"
+    #       - "  ESXI-80-000216 (Forged Transmits): {{ remediation_summary.controls_applied.ESXI80000216 }}"
+    #       - "  ESXI-80-000217 (MAC Changes): {{ remediation_summary.controls_applied.ESXI80000217 }}"
+    #       - "  ESXI-80-000218 (Promiscuous Mode): {{ remediation_summary.controls_applied.ESXI80000218 }}"
+    #       - "  ESXI-80-000008 (Lockdown Mode): {{ remediation_summary.controls_applied.ESXI80000008 }}"
+    #       - ""
+    #       - "Remediation completed successfully!"
+    #       - "Review any FAILED items and apply manual remediation as needed."
+    #       - "============================================="
+
+    # - name: Save remediation results to artifact
+    #   copy:
+    #     content: |
+    #       # VMware vSphere 8.0 STIG Remediation Results
+          
+    #       **Job Information:**
+    #       - Job Template: {{ tower_job_template_name | default('N/A') }}
+    #       - Job ID: {{ tower_job_id | default('N/A') }}
+    #       - Execution Date: {{ ansible_date_time.iso8601 }}
+    #       - vCenter Server: {{ vcenter_hostname }}
+          
+    #       **Target Information:**
+    #       - Target Hosts: {{ esxi_hosts | join(', ') }}
+    #       - Total Hosts: {{ remediation_summary.total_hosts }}
+          
+    #       **Control Results:**
+    #       {% for control, status in remediation_summary.controls_applied.items() %}
+    #       - {{ control }}: {{ status }}
+    #       {% endfor %}
+          
+    #       **Manual Remediation Required:**
+    #       - ESXI-80-000049: Active Directory integration
+    #       - ESXI-80-000094: Secure Boot (BIOS/UEFI level)
+    #       - ESXI-80-000145: iSCSI CHAP authentication
+    #       - ESXI-80-000198: Management traffic isolation
+    #       - ESXI-80-000199: Storage traffic isolation
+    #       - ESXI-80-000229: DoD certificate replacement
+    #     dest: "/tmp/stig-remediation-{{ ansible_date_time.epoch }}.md"
+    #   delegate_to: localhost
+    #   tags: [reporting]

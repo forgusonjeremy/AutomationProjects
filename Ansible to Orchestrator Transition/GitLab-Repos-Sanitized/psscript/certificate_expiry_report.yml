@@ -1,0 +1,72 @@
+---
+- name: playbook to run powershell script remotely
+  hosts: all
+  become_method: runas
+  gather_facts: yes
+  connection: winrm
+  port: 5986
+
+  vars:
+    var_ps_folder:        'ps_scripts'                       # root folder under files/
+    var_ps_script_file:   'cvs_certificate_expiry.ps1'
+    var_parameter_action: 'get_certificate_expiry'
+
+    var_vCenterList:      'dom10.dom5.dom3.invalid, dom14.dom5.dom3.invalid, dom9.dom5.dom3.invalid, dom8.dom5.dom3.invalid, dom11.dom5.dom3.invalid'   # <-- your vCenters, comma-separated
+
+    var_eMailReport:      'yes'                              # 'yes' to actually send
+    var_SMTPServer:       'dom1.dom2.dom3.example'        # <-- your relay
+    var_MailToString:     'user3@dom3.example'
+    var_MailCcString:     ''
+    var_MailSubjectstring: 'Ansible-Report: VMware Certificate Expiry'
+
+    var_ExpiryDays: '90'
+    var_CheckEsxi: 'yes'
+    var_CheckRegisteredSolutions: 'yes'
+    var_ConnectionTimeoutMs: '5000'
+
+  tasks:
+  - name: "Create temporary directory"
+    ansible.windows.win_tempfile:
+      state: directory
+    register: tempdir
+
+  - name: "Script Operations"
+    block:
+    - name: "Copy Scripts to Host"
+      ansible.windows.win_copy:
+        src: "files/{{ var_ps_folder }}"
+        dest: "{{ tempdir.path }}"
+
+    - name: check if file exist
+      ansible.windows.win_stat:
+        path: '{{ tempdir.path }}\{{ var_ps_folder }}\{{ var_ps_script_file }}'
+      register: file_data
+
+    - name: Run PowerShell script
+      when: file_data.stat.exists == true
+      no_log: false
+      environment:
+        VC_USER: "{{ vcenter_username }}"
+        VC_PASS: "{{ vcenter_password }}"
+      ansible.windows.win_command: >
+        powershell.exe -ExecutionPolicy ByPass
+        -File "{{ tempdir.path }}\{{ var_ps_folder }}\{{ var_ps_script_file }}"
+        -Action "{{ var_parameter_action }}" -eMailReport "{{ var_eMailReport }}"
+        -SMTPServer "{{ var_SMTPServer }}"
+        -MailToString "{{ var_MailToString }}"
+        -MailCcString "{{ var_MailCcString }}"
+        -MailSubjectstring "{{ var_MailSubjectstring }}"
+        -vCenterList "{{ var_vCenterList }}"
+        -ExpiryDays "{{ var_ExpiryDays }}"
+        -CheckEsxi "{{ var_CheckEsxi }}"
+        -CheckRegisteredSolutions "{{ var_CheckRegisteredSolutions }}"
+        -ConnectionTimeoutMs "{{ var_ConnectionTimeoutMs }}"
+
+    - name: "List the debug folder content"
+      ansible.windows.win_shell: 'ls -Recurse {{ tempdir.path }}\{{ var_ps_folder }}'
+
+    always:
+    - name: "Cleanup Temporary Files"
+      ansible.windows.win_file:
+        state: absent
+        path: "{{ tempdir.path }}"

@@ -1,0 +1,115 @@
+---
+- name: "Admin PKI Card Status report"
+  hosts: all
+  gather_facts: false
+  connection: winrm
+  port: "{{ var_winrm_port | default(5985) }}"
+
+  vars:
+    var_ps_folder: ps_scripts
+    var_ps_script_file: cvs_admin_pki_report.ps1
+    var_eMailReport: 'yes'
+    var_IncludeDisabled: 'yes'
+    var_FailOnQueryError: 'no'
+    var_MailCcString: ''
+    var_ReportTitle: 'Admin Account PKI Report'
+
+  tasks:
+
+    - name: "Build domain to OU map from var_domains"
+      ansible.builtin.set_fact:
+        cvs_domain_ou_map: >-
+          {{ cvs_domain_ou_map | default({}) | combine({
+               item.name: {
+                 'ous': item.ous | default(
+                   var_ou_templates | map('replace', '__DC__',
+                     ('DC=' ~ (item.name.split('.') | join(',DC=')))) | list ),
+                 'departments': item.departments | default([]),
+                 'credential': item.credential | default('')
+               }
+             }) }}
+      loop: "{{ var_domains | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "Use explicit var_DomainOUs when supplied"
+      ansible.builtin.set_fact:
+        cvs_domain_ou_map: "{{ var_DomainOUs }}"
+      when: var_DomainOUs is defined
+
+    - name: "Validate job inputs before touching the host"
+      ansible.builtin.assert:
+        that:
+          - cvs_domain_ou_map | default({}) | length > 0
+          - var_SMTPServer | default('', true) | length > 0
+          - var_MailToString | default('', true) | length > 0
+          - var_MailSubjectstring | default('', true) | length > 0
+        fail_msg: >-
+          Missing required input. Need at least one domain (var_domains or
+          var_DomainOUs), var_SMTPServer, var_MailToString and var_MailSubjectstring.
+        success_msg: "Inputs valid - {{ cvs_domain_ou_map | length }} domain(s)"
+
+    - name: "Create temporary directory"
+      ansible.windows.win_tempfile:
+        state: directory
+      register: tempdir
+
+    - name: "Script operations"
+      block:
+
+        - name: "Copy scripts to host"
+          ansible.windows.win_copy:
+            src: "files/{{ var_ps_folder }}"
+            dest: "{{ tempdir.path }}"
+
+        - name: "Write domain/OU map JSON to host"
+          ansible.windows.win_copy:
+            content: "{{ cvs_domain_ou_map | to_nice_json }}"
+            dest: "{{ tempdir.path }}\\domain_ous.json"
+
+        - name: "Verify the script landed"
+          ansible.windows.win_stat:
+            path: "{{ tempdir.path }}\\{{ var_ps_folder }}\\{{ var_ps_script_file }}"
+          register: file_data
+
+        - name: "Fail if the script is missing"
+          ansible.builtin.fail:
+            msg: "{{ var_ps_script_file }} was not found under files/{{ var_ps_folder }}"
+          when: not file_data.stat.exists
+
+        - name: "Run PKI report script"
+          ansible.windows.win_command: >-
+            powershell.exe -ExecutionPolicy Bypass -NonInteractive -NoProfile
+            -File "{{ tempdir.path }}\\{{ var_ps_folder }}\\{{ var_ps_script_file }}"
+            -Action "Get-AllAdmin-Accounts"
+            -DomainOUsFile "{{ tempdir.path }}\\domain_ous.json"
+            -DefaultCredentialKey "{{ var_default_credential_key | default('') }}"
+            -IncludeDisabled "{{ var_IncludeDisabled }}"
+            -FailOnQueryError "{{ var_FailOnQueryError }}"
+            -eMailReport "{{ var_eMailReport }}"
+            -SMTPServer "{{ var_SMTPServer }}"
+            -MailToString "{{ var_MailToString }}"
+            -MailCcString "{{ var_MailCcString }}"
+            -MailSubjectstring "{{ var_MailSubjectstring }}"
+            -ReportTitle "{{ var_ReportTitle }}"
+          environment: "{{ var_domain_cred_env | default({}) }}"
+          register: ps_run
+          failed_when: false
+          changed_when: ps_run.rc == 0
+          no_log: true   # keeps injected credentials out of the job log
+
+        - name: "Script output"
+          ansible.builtin.debug:
+            msg: "{{ ps_run.stdout_lines | default([]) }}"
+
+        - name: "Fail on script error"
+          ansible.builtin.fail:
+            msg: "Script exited rc={{ ps_run.rc }} - {{ ps_run.stderr | default('see output above') }}"
+          when: ps_run.rc != 0
+
+      always:
+
+        - name: "Cleanup temporary files"
+          ansible.windows.win_file:
+            state: absent
+            path: "{{ tempdir.path }}"

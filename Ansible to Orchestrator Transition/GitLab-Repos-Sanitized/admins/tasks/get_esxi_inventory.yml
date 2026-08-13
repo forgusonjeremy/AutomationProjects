@@ -1,0 +1,30 @@
+  - name: "Gather DC: '{{ var_datacenter_name }}' and Cluster: '{{ item }}'"
+    community.vmware.vmware_cluster_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ AnsvCenterAdmin_username }}"
+      password: "{{ AnsvCenterAdmin_password }}"
+      datacenter: "{{ var_datacenter_name }}"
+      cluster_name: "{{ item }}"
+      validate_certs: no
+    delegate_to: localhost
+    register: cluster_info
+  - name: debug
+    debug:
+      var: cluster_info
+
+  - name: "get ESXi host on Cluster: '{{ item }}'"
+    ansible.builtin.set_fact:
+      cluster_hosts: "{{ cluster_host_item.value.hosts | map(attribute='name') | list | sort }}"
+    with_dict: "{{ cluster_info.clusters }}"
+    loop_control:
+      loop_var: cluster_host_item
+      label: '{{ cluster_host_item.key }}'      
+    tags:
+      - dynamic_inventory
+
+  - name: Test port against host
+    include_tasks: tasks/ports_check.yml
+    loop: "{{ cluster_hosts }}"
+    loop_control:
+      loop_var: port_task_item
+

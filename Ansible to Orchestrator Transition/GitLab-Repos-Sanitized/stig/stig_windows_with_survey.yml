@@ -1,0 +1,32 @@
+---
+- name: stig-ansible-hardening ( Windows 2022, RHEL 8 and vCenter 8)
+  hosts: all
+  gather_facts: false
+  vars:
+    # RHEL 8, Windows 2022, vCenter 8 U1, vCenter 8 U2
+    var_platform_selected: "{{ var_platform }}"
+    var_SystemFQDN_selected: "{{ var_SystemFQDN }}"
+    listOf_hosts: "{{ var_SystemFQDN.split('\n') }}"
+    
+
+  tasks:   
+  - name: make host group from survey hosts list
+    add_host:
+      hostname: "{{ item }}"
+      groupname: new_group      
+    loop: "{{ listOf_hosts }}"    
+
+- name: Gather facts on hosts
+  hosts: new_group
+  gather_facts: yes
+
+  vars:
+    var_os_family: Windows
+    ansible_connection: winrm
+    ansible_port: 5986
+    ansible_winrm_server_cert_validation: ignore  
+  
+  tasks:
+  - name: import role
+    include_role:
+      name: win2022STIG

@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  author: Infrastructure Team
+  description: Production VMware ESXi host discovery for STIG remediation
+  company: Your Company
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - vmware
+    - vsphere
+    - esxi
+    - discovery
+    - stig
+    - production
+
+dependencies: []

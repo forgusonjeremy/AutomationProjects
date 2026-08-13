@@ -1,0 +1,5 @@
+- name: "check ping status on target {{ item }}"
+  ignore_errors: true
+  shell: "ping -c 1 {{ item }}"
+
+

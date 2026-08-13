@@ -1,0 +1,29 @@
+---
+- name: Inventory installed applications
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Read uninstall registry keys
+      ansible.windows.win_powershell:
+        script: |
+          $paths = @(
+            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+          )
+          Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
+            Where-Object DisplayName |
+            Select-Object @{N='Name';E={$_.DisplayName}},
+                          @{N='Version';E={$_.DisplayVersion}},
+                          @{N='Publisher';E={$_.Publisher}},
+                          @{N='InstallDate';E={$_.InstallDate}} |
+            Sort-Object Name -Unique
+      register: apps
+
+    - name: Report count
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ apps.output | length }} applications"
+
+    - name: List applications
+      ansible.builtin.debug:
+        var: apps.output

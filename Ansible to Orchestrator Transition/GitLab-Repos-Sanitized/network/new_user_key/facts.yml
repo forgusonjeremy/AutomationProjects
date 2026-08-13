@@ -1,0 +1,10 @@
+---
+- name: Playbook to gather basic facts from a  N9k switch
+  hosts: "{{ _groups }}"
+  gather_facts: False
+  
+  tasks:
+  - name: Click for basic facts
+    cisco.nxos.nxos_facts:
+    
+      

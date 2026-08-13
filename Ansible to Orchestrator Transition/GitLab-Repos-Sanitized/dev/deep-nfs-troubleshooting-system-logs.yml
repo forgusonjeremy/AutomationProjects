@@ -1,0 +1,279 @@
+---
+- name: Deep Troubleshooting for NFS System Log Issues
+  hosts: all
+  become: yes
+  vars:
+    nfs_mount_point: "/nfsarchive"
+    host_archive_dir: "{{ nfs_mount_point }}/{{ inventory_hostname }}"
+    
+  tasks:
+    - name: Check SELinux status and context
+      block:
+        - name: Get SELinux status
+          shell: getenforce
+          register: selinux_status
+          failed_when: false
+
+        - name: Check SELinux context of NFS mount
+          shell: ls -laZ {{ nfs_mount_point }}
+          register: nfs_selinux_context
+          failed_when: false
+
+        - name: Check SELinux context of host archive directory
+          shell: ls -laZ {{ host_archive_dir }}
+          register: host_selinux_context
+          failed_when: false
+
+        - name: Display SELinux information
+          debug:
+            msg:
+              - "SELinux status: {{ selinux_status.stdout }}"
+              - "NFS mount SELinux context:"
+              - "{{ nfs_selinux_context.stdout_lines }}"
+              - "Host archive directory SELinux context:"
+              - "{{ host_selinux_context.stdout_lines }}"
+
+        - name: Check for SELinux denials related to rsyslog
+          shell: |
+            ausearch -m avc -ts recent | grep rsyslog || echo "No recent SELinux denials for rsyslog"
+          register: selinux_denials
+          failed_when: false
+
+        - name: Display SELinux denials
+          debug:
+            msg: "{{ selinux_denials.stdout_lines }}"
+
+    - name: Test NFS server write permissions thoroughly
+      block:
+        - name: Test basic file creation as root
+          shell: |
+            echo "Test from root user $(date)" > {{ host_archive_dir }}/system_logs/root_test.log
+            echo "Root test result: $?"
+          register: root_write_test
+          failed_when: false
+
+        - name: Test file creation as syslog user (if exists)
+          shell: |
+            if id syslog >/dev/null 2>&1; then
+              sudo -u syslog sh -c 'echo "Test from syslog user $(date)" > {{ host_archive_dir }}/system_logs/syslog_test.log 2>&1; echo "Syslog user test result: $?"'
+            else
+              echo "Syslog user does not exist"
+            fi
+          register: syslog_write_test
+          failed_when: false
+
+        - name: Test file creation with specific rsyslog user/group
+          shell: |
+            # Check what user rsyslog runs as
+            RSYSLOG_USER=$(ps aux | grep rsyslogd | grep -v grep | awk '{print $1}' | head -1)
+            echo "Rsyslog process runs as user: $RSYSLOG_USER"
+            
+            if [[ "$RSYSLOG_USER" != "root" ]] && id "$RSYSLOG_USER" >/dev/null 2>&1; then
+              sudo -u "$RSYSLOG_USER" sh -c 'echo "Test from rsyslog process user $(date)" > {{ host_archive_dir }}/system_logs/rsyslog_user_test.log 2>&1; echo "Rsyslog process user test result: $?"'
+            else
+              echo "Rsyslog runs as root or user check failed"
+            fi
+          register: rsyslog_user_test
+          failed_when: false
+
+        - name: Display write permission tests
+          debug:
+            msg:
+              - "Root write test: {{ root_write_test.stdout }}"
+              - "Syslog user write test: {{ syslog_write_test.stdout }}"
+              - "Rsyslog process user test: {{ rsyslog_user_test.stdout }}"
+
+    - name: Check NFS mount options and behavior
+      block:
+        - name: Get detailed mount information
+          shell: |
+            echo "=== Mount details ==="
+            mount | grep {{ nfs_mount_point }}
+            echo ""
+            echo "=== NFS mount statistics ==="
+            nfsstat -m | grep -A 5 {{ nfs_mount_point }} || echo "No NFS stats available"
+          register: mount_details
+
+        - name: Check for NFS errors
+          shell: |
+            echo "=== Recent NFS client errors ==="
+            dmesg | grep -i nfs | tail -10 || echo "No recent NFS messages in dmesg"
+            echo ""
+            echo "=== NFS client issues in journal ==="
+            journalctl --since "1 hour ago" | grep -i nfs || echo "No recent NFS messages in journal"
+          register: nfs_errors
+
+        - name: Display NFS diagnostics
+          debug:
+            msg:
+              - "{{ mount_details.stdout_lines }}"
+              - "{{ nfs_errors.stdout_lines }}"
+
+    - name: Detailed rsyslog debugging
+      block:
+        - name: Enable rsyslog debug mode temporarily
+          shell: |
+            echo "=== Current rsyslog process ==="
+            ps aux | grep rsyslog
+            echo ""
+            echo "=== Rsyslog configuration test ==="
+            rsyslogd -N1 -f /etc/rsyslog.conf
+          register: rsyslog_debug
+
+        - name: Check rsyslog working directory permissions
+          shell: |
+            echo "=== Rsyslog working directory ==="
+            ls -la /var/lib/rsyslog/
+            echo ""
+            echo "=== Rsyslog spool files ==="
+            find /var/lib/rsyslog/ -name "*fwdRule*" -ls 2>/dev/null || echo "No spool files found"
+          register: rsyslog_workdir
+
+        - name: Test rsyslog configuration directly
+          shell: |
+            echo "=== Testing rsyslog output manually ==="
+            # Create a simple test config
+            cat > /tmp/rsyslog_test.conf << EOF
+            \$ModLoad imuxsock
+            \$WorkDirectory /var/lib/rsyslog
+            *.* {{ host_archive_dir }}/system_logs/manual_test.log
+            EOF
+            
+            echo "Test message $(date)" | rsyslogd -f /tmp/rsyslog_test.conf -N1 2>&1 || echo "Manual test failed"
+            
+            # Check if file was created
+            if [[ -f "{{ host_archive_dir }}/system_logs/manual_test.log" ]]; then
+              echo "Manual test file created successfully"
+              cat {{ host_archive_dir }}/system_logs/manual_test.log
+            else
+              echo "Manual test file was NOT created"
+            fi
+          register: manual_rsyslog_test
+          failed_when: false
+
+        - name: Display rsyslog debugging info
+          debug:
+            msg:
+              - "Rsyslog debug: {{ rsyslog_debug.stdout_lines }}"
+              - "Working directory: {{ rsyslog_workdir.stdout_lines }}"
+              - "Manual test: {{ manual_rsyslog_test.stdout_lines }}"
+
+    - name: Test with alternative logging approach
+      block:
+        - name: Create a simple forwarding rule using omfile
+          copy:
+            dest: /etc/rsyslog.d/98-debug-nfs.conf
+            content: |
+              # Debug NFS logging
+              $ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat
+              *.* {{ host_archive_dir }}/system_logs/debug-test-%$YEAR%-%$MONTH%-%$DAY%.log
+            mode: '0644'
+            backup: yes
+
+        - name: Restart rsyslog with new debug config
+          systemd:
+            name: rsyslog
+            state: restarted
+
+        - name: Wait and generate test messages
+          pause:
+            seconds: 3
+
+        - name: Generate test messages for debug config
+          shell: |
+            logger -p local0.info "DEBUG CONFIG TEST: Message 1 $(date)"
+            logger -p user.info "DEBUG CONFIG TEST: Message 2 $(date)"
+            logger "DEBUG CONFIG TEST: Message 3 $(date)"
+
+        - name: Wait for log processing
+          pause:
+            seconds: 5
+
+        - name: Check debug test results
+          shell: |
+            echo "=== Debug test files ==="
+            ls -la {{ host_archive_dir }}/system_logs/debug-test-*
+            echo ""
+            echo "=== Debug test content ==="
+            find {{ host_archive_dir }}/system_logs/ -name "debug-test-*" -exec echo "File: {}" \; -exec cat {} \;
+          register: debug_test_results
+          failed_when: false
+
+        - name: Display debug test results
+          debug:
+            msg: "{{ debug_test_results.stdout_lines }}"
+
+    - name: Check system journal for detailed rsyslog errors
+      shell: |
+        echo "=== Rsyslog service logs (last 50 lines) ==="
+        journalctl -u rsyslog --no-pager -n 50
+        echo ""
+        echo "=== System messages about file writes ==="
+        journalctl --since "30 minutes ago" | grep -E "(rsyslog|write|permission|nfs)" || echo "No relevant system messages"
+      register: system_journal
+
+    - name: Display system journal information
+      debug:
+        msg: "{{ system_journal.stdout_lines }}"
+
+    - name: Check if rsyslog is actually reading our configuration
+      shell: |
+        echo "=== Active rsyslog configuration ==="
+        rsyslogd -N1 2>&1 | grep -E "({{ host_archive_dir }}|nfs)" || echo "NFS archive path not found in active config"
+        echo ""
+        echo "=== All loaded configuration files ==="
+        rsyslogd -N1 2>&1 | grep "config file" || echo "No config file info available"
+      register: active_config
+
+    - name: Display active configuration check
+      debug:
+        msg: "{{ active_config.stdout_lines }}"
+
+    - name: Final comprehensive test with strace
+      block:
+        - name: Test file creation with strace to see system calls
+          shell: |
+            echo "=== Testing file creation with strace ==="
+            timeout 10s strace -e trace=openat,write -f -o /tmp/rsyslog_strace.out rsyslogd -N1 -f /etc/rsyslog.conf 2>/dev/null &
+            sleep 2
+            logger "STRACE TEST: $(date)"
+            sleep 3
+            pkill rsyslogd || true
+            echo "=== Strace results for our NFS path ==="
+            grep "{{ host_archive_dir }}" /tmp/rsyslog_strace.out || echo "No attempts to write to NFS path found"
+          register: strace_test
+          failed_when: false
+
+        - name: Display strace results
+          debug:
+            msg: "{{ strace_test.stdout_lines }}"
+
+    - name: Clean up test files
+      shell: |
+        rm -f {{ host_archive_dir }}/system_logs/*_test.log
+        rm -f {{ host_archive_dir }}/system_logs/manual_test.log
+        rm -f /tmp/rsyslog_test.conf
+        rm -f /tmp/rsyslog_strace.out
+      failed_when: false
+
+    - name: Generate comprehensive diagnosis
+      debug:
+        msg:
+          - "========================================"
+          - "      DEEP TROUBLESHOOTING RESULTS"
+          - "========================================"
+          - "SELinux Status: {{ selinux_status.stdout | default('Unknown') }}"
+          - "Root Write Access: {{ 'OK' if 'result: 0' in root_write_test.stdout else 'FAILED' }}"
+          - "Debug Config Test: {{ 'SUCCESS' if debug_test_results.rc == 0 and 'DEBUG CONFIG TEST' in debug_test_results.stdout else 'FAILED' }}"
+          - ""
+          - "Likely Issues:"
+          - "1. If SELinux=Enforcing: SELinux blocking rsyslog NFS writes"
+          - "2. If root write OK but rsyslog fails: User permission issue"
+          - "3. If debug config worked: Original config syntax problem"
+          - "4. If strace shows no NFS attempts: Config not loaded"
+          - ""
+          - "Recommended fixes:"
+          - "- If SELinux issue: setsebool -P rsyslog_use_nfs on"
+          - "- If permission issue: check NFS export options"
+          - "- If config issue: use simpler debug config format"
+          - "========================================"

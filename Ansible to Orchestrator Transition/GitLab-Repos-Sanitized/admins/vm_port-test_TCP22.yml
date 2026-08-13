@@ -1,0 +1,25 @@
+---
+- name: port test from the inventory list
+  hosts: all
+  run_once: true
+
+  vars:
+    # var_list_vm:
+    #     - 'dom22.dom3.example'
+    #     - 'dom28.dom3.example'
+    #     - 'dom33.dom3.example'
+    #     - 'dom29.dom3.example'
+    #     - 'dom37.dom3.example'
+    #     - dom35.dom3.example
+    #     - dom36.dom3.example
+
+  tasks:
+  - name: "check if port 22 is accessible"
+    ignore_errors: true
+    wait_for:
+      host: "{{ item }}"
+      port: 22
+      state: started
+      delay: 0
+      timeout: 1
+    loop: "{{var_list_vm}}"

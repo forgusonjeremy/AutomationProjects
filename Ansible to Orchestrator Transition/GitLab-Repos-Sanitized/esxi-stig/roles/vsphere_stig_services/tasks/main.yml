@@ -1,0 +1,58 @@
+---
+# roles/vsphere_stig_services/tasks/main.yml
+# - name: Load production STIG configuration
+#   ansible.builtin.include_vars:
+#     file: "config/production_stig_config.yml"
+#   tags: [config]
+  
+- name: Configure production services STIG controls
+  block:
+
+    - name: "ESXI80000124: NTP configuration"
+      community.vmware.vmware_host_ntp:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        ntp_servers: "{{ ntp_servers }}"
+        state: present
+      loop: "{{ esxi_hosts }}"
+      when: 
+        - ntp_servers | length > 0
+        - controls_enabled.ESXI80000124
+      ignore_errors: true
+      tags: [ntp]
+
+    - name: "ESXI80000193: SSH Disabled"
+      community.vmware.vmware_host_service_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        service_name: TSM-SSH
+        state: "{{ 'started' if services.ssh_enabled else 'stop' }}"
+        service_policy: "{{ 'on' if services.ssh_enabled else 'off' }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000193
+      ignore_errors: true
+      tags: [ssh]
+
+    - name: "ESXI80000194: Shell Disabled"
+      community.vmware.vmware_host_service_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        service_name: TSM
+        state: "{{ 'started' if services.shell_enabled else 'stop' }}"
+        service_policy: "{{ 'on' if services.shell_enabled else 'off' }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000194
+      ignore_errors: true
+      tags: [shell]
+  
+  when: 
+    - services is defined

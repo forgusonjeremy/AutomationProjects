@@ -1,0 +1,538 @@
+- name: populate package facts
+  package_facts:
+# R-234899 SLES-15-030000
+- name: stigrule_234899__etc_audit_rules_d_audit_rules__etc_passwd
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /etc/passwd -p wa -k account_mod$'
+    line: "{{ sles15STIG_stigrule_234899__etc_audit_rules_d_audit_rules__etc_passwd_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234899_Manage
+# R-234900 SLES-15-030010
+- name: stigrule_234900__etc_audit_rules_d_audit_rules__etc_group
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /etc/group -p wa -k account_mod$'
+    line: "{{ sles15STIG_stigrule_234900__etc_audit_rules_d_audit_rules__etc_group_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234900_Manage
+# R-234901 SLES-15-030020
+- name: stigrule_234901__etc_audit_rules_d_audit_rules__etc_shadow
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /etc/shadow -p wa -k account_mod$'
+    line: "{{ sles15STIG_stigrule_234901__etc_audit_rules_d_audit_rules__etc_shadow_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234901_Manage
+# R-234902 SLES-15-030030
+- name: stigrule_234902__etc_audit_rules_d_audit_rules__etc_security_opasswd
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /etc/security/opasswd -p wa -k account_mod$'
+    line: "{{ sles15STIG_stigrule_234902__etc_audit_rules_d_audit_rules__etc_security_opasswd_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234902_Manage
+# R-234903 SLES-15-030040
+- name: stigrule_234903__etc_audit_rules_d_audit_rules__etc_gshadow
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /etc/gshadow -p wa -k account_mod$'
+    line: "{{ sles15STIG_stigrule_234903__etc_audit_rules_d_audit_rules__etc_gshadow_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234903_Manage
+# R-234906 SLES-15-030070
+- name: stigrule_234906__etc_audit_rules_d_audit_rules_passwd
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/passwd -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-passwd$'
+    line: "{{ sles15STIG_stigrule_234906__etc_audit_rules_d_audit_rules_passwd_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234906_Manage
+# R-234910 SLES-15-030110
+- name: stigrule_234910__etc_audit_rules_d_audit_rules_unix_chkpwd
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/sbin/unix_chkpwd -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-unix-chkpwd$'
+    line: "{{ sles15STIG_stigrule_234910__etc_audit_rules_d_audit_rules_unix_chkpwd_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234910_Manage
+# R-234910 SLES-15-030110
+- name: stigrule_234910__etc_audit_rules_d_audit_rules_unix2_chkpwd
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/sbin/unix2_chkpwd -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-unix2-chkpwd$'
+    line: "{{ sles15STIG_stigrule_234910__etc_audit_rules_d_audit_rules_unix2_chkpwd_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234910_Manage
+# R-234911 SLES-15-030120
+- name: stigrule_234911__etc_audit_rules_d_audit_rules_chage
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/chage -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-chage$'
+    line: "{{ sles15STIG_stigrule_234911__etc_audit_rules_d_audit_rules_chage_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234911_Manage
+# R-234912 SLES-15-030130
+- name: stigrule_234912__etc_audit_rules_d_audit_rules_crontab
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/crontab -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-crontab$'
+    line: "{{ sles15STIG_stigrule_234912__etc_audit_rules_d_audit_rules_crontab_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234912_Manage
+# R-234913 SLES-15-030140
+- name: stigrule_234913__etc_audit_rules_d_audit_rules_sudoers
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /etc/sudoers -p wa -k privileged-actions$'
+    line: "{{ sles15STIG_stigrule_234913__etc_audit_rules_d_audit_rules_sudoers_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234913_Manage
+# R-234913 SLES-15-030140
+- name: stigrule_234913__etc_audit_rules_d_audit_rules_sudoers_d
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /etc/sudoers.d -p wa -k privileged-actions$'
+    line: "{{ sles15STIG_stigrule_234913__etc_audit_rules_d_audit_rules_sudoers_d_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234913_Manage
+# R-234914 SLES-15-030150
+- name: stigrule_234914__etc_audit_rules_d_audit_rules_b32_EPERM_creat
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b32 -S creat,open,openat,open_by_handle_at,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k perm_access$'
+    line: "{{ sles15STIG_stigrule_234914__etc_audit_rules_d_audit_rules_b32_EPERM_creat_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234914_Manage
+# R-234914 SLES-15-030150
+- name: stigrule_234914__etc_audit_rules_d_audit_rules_b64_EPERM_creat
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b64 -S creat,open,openat,open_by_handle_at,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k perm_access$'
+    line: "{{ sles15STIG_stigrule_234914__etc_audit_rules_d_audit_rules_b64_EPERM_creat_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234914_Manage
+# R-234914 SLES-15-030150
+- name: stigrule_234914__etc_audit_rules_d_audit_rules_b32_EACCES_creat
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b32 -S creat,open,openat,open_by_handle_at,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k perm_access$'
+    line: "{{ sles15STIG_stigrule_234914__etc_audit_rules_d_audit_rules_b32_EACCES_creat_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234914_Manage
+# R-234914 SLES-15-030150
+- name: stigrule_234914__etc_audit_rules_d_audit_rules_b64_EACCES_creat
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b64 -S creat,open,openat,open_by_handle_at,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k perm_access$'
+    line: "{{ sles15STIG_stigrule_234914__etc_audit_rules_d_audit_rules_b64_EACCES_creat_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234914_Manage
+# R-234918 SLES-15-030190
+- name: stigrule_234918__etc_audit_rules_d_audit_rules_b32_setxattr
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b32 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod$'
+    line: "{{ sles15STIG_stigrule_234918__etc_audit_rules_d_audit_rules_b32_setxattr_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234918_Manage
+# R-234924 SLES-15-030250
+- name: stigrule_234924__etc_audit_rules_d_audit_rules_b32_chown
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b32 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod$'
+    line: "{{ sles15STIG_stigrule_234924__etc_audit_rules_d_audit_rules_b32_chown_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234924_Manage
+# R-234924 SLES-15-030250
+- name: stigrule_234924__etc_audit_rules_d_audit_rules_b64_chown
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b64 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod$'
+    line: "{{ sles15STIG_stigrule_234924__etc_audit_rules_d_audit_rules_b64_chown_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234924_Manage
+# R-234928 SLES-15-030290
+- name: stigrule_234928__etc_audit_rules_d_audit_rules_b32_chmod
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod$'
+    line: "{{ sles15STIG_stigrule_234928__etc_audit_rules_d_audit_rules_b32_chmod_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234928_Manage
+# R-234928 SLES-15-030290
+- name: stigrule_234928__etc_audit_rules_d_audit_rules_b64_chmod
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod$'
+    line: "{{ sles15STIG_stigrule_234928__etc_audit_rules_d_audit_rules_b64_chmod_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234928_Manage
+# R-234932 SLES-15-030330
+- name: stigrule_234932__etc_audit_rules_d_audit_rules_sudoedit
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/sudoedit -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-sudoedit$'
+    line: "{{ sles15STIG_stigrule_234932__etc_audit_rules_d_audit_rules_sudoedit_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234932_Manage
+# R-234939 SLES-15-030400
+- name: stigrule_234939__etc_audit_rules_d_audit_rules_modprobe
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /sbin/modprobe -p x -k modules$'
+    line: "{{ sles15STIG_stigrule_234939__etc_audit_rules_d_audit_rules_modprobe_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234939_Manage
+# R-234940 SLES-15-030410
+- name: stigrule_234940__etc_audit_rules_d_audit_rules_kmod
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /usr/bin/kmod -p x -k modules$'
+    line: "{{ sles15STIG_stigrule_234940__etc_audit_rules_d_audit_rules_kmod_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234940_Manage
+# R-234941 SLES-15-030420
+- name: stigrule_234941__etc_audit_rules_d_audit_rules_chmod
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/chmod -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod$'
+    line: "{{ sles15STIG_stigrule_234941__etc_audit_rules_d_audit_rules_chmod_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234941_Manage
+# R-234942 SLES-15-030430
+- name: stigrule_234942__etc_audit_rules_d_audit_rules_setfacl
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod$'
+    line: "{{ sles15STIG_stigrule_234942__etc_audit_rules_d_audit_rules_setfacl_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234942_Manage
+# R-234943 SLES-15-030440
+- name: stigrule_234943__etc_audit_rules_d_audit_rules_chacl
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod$'
+    line: "{{ sles15STIG_stigrule_234943__etc_audit_rules_d_audit_rules_chacl_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234943_Manage
+# R-234944 SLES-15-030450
+- name: stigrule_234944__etc_audit_rules_d_audit_rules_chcon
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod$'
+    line: "{{ sles15STIG_stigrule_234944__etc_audit_rules_d_audit_rules_chcon_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234944_Manage
+# R-234945 SLES-15-030460
+- name: stigrule_234945__etc_audit_rules_d_audit_rules_rm
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/rm -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod$'
+    line: "{{ sles15STIG_stigrule_234945__etc_audit_rules_d_audit_rules_rm_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234945_Manage
+# R-234946 SLES-15-030470
+- name: stigrule_234946__etc_audit_rules_d_audit_rules_tallylog
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /var/log/tallylog -p wa -k logins$'
+    line: "{{ sles15STIG_stigrule_234946__etc_audit_rules_d_audit_rules_tallylog_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234946_Manage
+# R-234947 SLES-15-030480
+- name: stigrule_234947__etc_audit_rules_d_audit_rules_lastlog
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /var/log/lastlog -p wa -k logins$'
+    line: "{{ sles15STIG_stigrule_234947__etc_audit_rules_d_audit_rules_lastlog_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234947_Manage
+# R-234948 SLES-15-030490
+- name: stigrule_234948__etc_audit_rules_d_audit_rules_passmass
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/passmass -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-passmass$'
+    line: "{{ sles15STIG_stigrule_234948__etc_audit_rules_d_audit_rules_passmass_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234948_Manage
+# R-234949 SLES-15-030500
+- name: stigrule_234949__etc_audit_rules_d_audit_rules_usermod
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-usermod$'
+    line: "{{ sles15STIG_stigrule_234949__etc_audit_rules_d_audit_rules_usermod_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234949_Manage
+# R-234951 SLES-15-030520
+- name: stigrule_234951__etc_audit_rules_d_audit_rules_b32_delete_module
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b32 -S delete_module -F auid>=1000 -F auid!=4294967295 -k unload_module$'
+    line: "{{ sles15STIG_stigrule_234951__etc_audit_rules_d_audit_rules_b32_delete_module_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234951_Manage
+# R-234951 SLES-15-030520
+- name: stigrule_234951__etc_audit_rules_d_audit_rules_b64_delete_module
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b64 -S delete_module -F auid>=1000 -F auid!=4294967295 -k unload_module$'
+    line: "{{ sles15STIG_stigrule_234951__etc_audit_rules_d_audit_rules_b64_delete_module_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234951_Manage
+# R-234952 SLES-15-030530
+- name: stigrule_234952__etc_audit_rules_d_audit_rules_b32_init_module
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b32 -S init_module,finit_module -F auid>=1000 -F auid!=4294967295 -k moduleload$'
+    line: "{{ sles15STIG_stigrule_234952__etc_audit_rules_d_audit_rules_b32_init_module_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234952_Manage
+# R-234952 SLES-15-030530
+- name: stigrule_234952__etc_audit_rules_d_audit_rules_b64_init_module
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b64 -S init_module,finit_module -F auid>=1000 -F auid!=4294967295 -k moduleload$'
+    line: "{{ sles15STIG_stigrule_234952__etc_audit_rules_d_audit_rules_b64_init_module_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234952_Manage
+# R-234954 SLES-15-030550
+- name: stigrule_234954__etc_audit_rules_d_audit_rules_su
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/su -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-priv_change$'
+    line: "{{ sles15STIG_stigrule_234954__etc_audit_rules_d_audit_rules_su_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234954_Manage
+# R-234973 SLES-15-030740
+- name: stigrule_234973__etc_audit_rules_d_audit_rules_b32_unlink
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat,rmdir -F auid>=1000 -F auid!=4294967295 -k perm_mod$'
+    line: "{{ sles15STIG_stigrule_234973__etc_audit_rules_d_audit_rules_b32_unlink_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234973_Manage
+# R-234973 SLES-15-030740
+- name: stigrule_234973__etc_audit_rules_d_audit_rules_b64_unlink
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat,rmdir -F auid>=1000 -F auid!=4294967295 -k perm_mod$'
+    line: "{{ sles15STIG_stigrule_234973__etc_audit_rules_d_audit_rules_b64_unlink_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234973_Manage
+# R-234975 SLES-15-030760
+- name: stigrule_234975__etc_audit_rules_d_audit_rules_utmp
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /run/utmp -p wa -k login_mod$'
+    line: "{{ sles15STIG_stigrule_234975__etc_audit_rules_d_audit_rules_utmp_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234975_Manage
+# R-234976 SLES-15-030770
+- name: stigrule_234976__etc_audit_rules_d_audit_rules_wtmp
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /var/log/wtmp -p wa -k login_mod$'
+    line: "{{ sles15STIG_stigrule_234976__etc_audit_rules_d_audit_rules_wtmp_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234976_Manage
+# R-234977 SLES-15-030780
+- name: stigrule_234977__etc_audit_rules_d_audit_rules_btmp
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /var/log/btmp -p wa -k login_mod$'
+    line: "{{ sles15STIG_stigrule_234977__etc_audit_rules_d_audit_rules_btmp_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234977_Manage
+# R-234912 SLES-15-030130
+- name: stigrule_234912__etc_audit_rules_d_audit_rules_crontab
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-a always,exit -F path=/usr/bin/crontab -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-crontab$'
+    line: "{{ sles15STIG_stigrule_234912__etc_audit_rules_d_audit_rules_crontab_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234912_Manage
+# R-234813 SLES-15-010130
+- name: stigrule_234813__etc_profile_d_autologout_sh
+  copy:
+    dest: "{{ sles15STIG_stigrule_234813__etc_profile_d_autologout_sh_Dest }}"
+    content: "{{ sles15STIG_stigrule_234813__etc_profile_d_autologout_sh_Content }}"
+  when:
+    - sles15STIG_stigrule_234813_Manage
+# R-234815 SLES-15-010150
+- name: stigrule_234815_LogLevel
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*LogLevel\s+'
+    line: "{{ sles15STIG_stigrule_234815_LogLevel_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_234815_Manage
+    - "'openssh' in packages"
+# R-234816 SLES-15-010160
+- name: stigrule_234816_Ciphers
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*Ciphers\s+'
+    line: "{{ sles15STIG_stigrule_234816_Ciphers_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_234816_Manage
+    - "'openssh' in packages"
+# R-234826 SLES-15-010270
+- name: stigrule_234826_MACs
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*MACs\s+'
+    line: "{{ sles15STIG_stigrule_234826_MACs_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_234826_Manage
+    - "'openssh' in packages"
+# R-234827 SLES-15-010280
+- name: stigrule_234827_ClientAliveInterval
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*ClientAliveInterval\s+'
+    line: "{{ sles15STIG_stigrule_234827_ClientAliveInterval_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_234827_Manage
+    - "'openssh' in packages"
+# R-234830 SLES-15-010320
+- name: stigrule_234830_ClientAliveCountMax
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*ClientAliveCountMax\s+'
+    line: "{{ sles15STIG_stigrule_234830_ClientAliveCountMax_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_234830_Manage
+    - "'openssh' in packages"
+# R-234881 SLES-15-020120
+- name: stigrule_234881_PrintLastLog
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*PrintLastLog\s+'
+    line: "{{ sles15STIG_stigrule_234881_PrintLastLog_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_234881_Manage
+    - "'openssh' in packages"
+# R-234852 SLES-15-010430
+- name: stigrule_234852__etc_zypp_zypp_conf
+  ini_file:
+    path: /etc/zypp/zypp.conf
+    section: main
+    option: gpgcheck
+    value: "{{ sles15STIG_stigrule_234852__etc_zypp_zypp_conf_Value }}"
+    no_extra_spaces: yes
+  when:
+    - sles15STIG_stigrule_234852_Manage
+# R-234990 SLES-15-040062
+- name: stigrule_234990__etc_systemd_system_conf_d_55_CtrlAltDel_BurstAction
+  ini_file:
+    path: /etc/systemd/system.conf.d/55-CtrlAltDel-BurstAction
+    section: Manager
+    option: CtrlAltDelBurstAction
+    value: "{{ sles15STIG_stigrule_234990__etc_systemd_system_conf_d_55_CtrlAltDel_BurstAction_Value }}"
+    no_extra_spaces: yes
+  notify: dconf_update
+  when:
+    - sles15STIG_stigrule_234990_Manage
+# R-235032 SLES-15-040440
+- name: stigrule_235032_PermitEmptyPasswords
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*PermitEmptyPasswords\s+'
+    line: "{{ sles15STIG_stigrule_235032_PermitEmptyPasswords_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_235032_Manage
+    - "'openssh' in packages"
+# R-235032 SLES-15-040440
+- name: stigrule_235032_PermitUserEnvironment
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*PermitUserEnvironment\s+'
+    line: "{{ sles15STIG_stigrule_235032_PermitUserEnvironment_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_235032_Manage
+    - "'openssh' in packages"
+# R-234982 SLES-15-040000
+- name: stigrule_234982__etc_login_defs
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^FAIL_DELAY'
+    line: "{{ sles15STIG_stigrule_234982__etc_login_defs_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234982_Manage
+# R-235010 SLES-15-040260
+- name: stigrule_235010_StrictModes
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*StrictModes\s+'
+    line: "{{ sles15STIG_stigrule_235010_StrictModes_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_235010_Manage
+    - "'openssh' in packages"
+# R-235013 SLES-15-040290
+- name: stigrule_235013_X11Forwarding
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*X11Forwarding\s+'
+    line: "{{ sles15STIG_stigrule_235013_X11Forwarding_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_235013_Manage
+    - "'openssh' in packages"
+# R-235022 SLES-15-040360
+- name: stigrule_235022_net_ipv4_conf_default_send_redirects
+  sysctl:
+    name: net.ipv4.conf.default.send_redirects
+    value: "{{ sles15STIG_stigrule_235022_net_ipv4_conf_default_send_redirects_Value }}"
+  when:
+    - sles15STIG_stigrule_235022_Manage
+  
+# R-235023 SLES-15-040370
+- name: stigrule_235023_net_ipv4_conf_all_send_redirects
+  sysctl:
+    name: net.ipv4.conf.all.send_redirects
+    value: "{{ sles15STIG_stigrule_235023_net_ipv4_conf_all_send_redirects_Value }}"
+  when:
+    - sles15STIG_stigrule_235023_Manage
+# R-234888 SLES-15-020190
+- name: stigrule_234888__etc_login_defs
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^SHA_CRYPT_MIN_ROUNDS'
+    line: "{{ sles15STIG_stigrule_234888__etc_login_defs_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234888_Manage
+# R-234889 SLES-15-020200
+- name: stigrule_234889__etc_login_defs
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MIN_DAYS'
+    line: "{{ sles15STIG_stigrule_234889__etc_login_defs_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234889_Manage
+# R-234891 SLES-15-020220
+- name: stigrule_234891__etc_login_defs
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MAX_DAYS'
+    line: "{{ sles15STIG_stigrule_234891__etc_login_defs_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234891_Manage
+# Restart system-daemon
+- name: restart_system-daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: yes

@@ -1,0 +1,84 @@
+---
+- name: Playbook to stage/scp to N9kv bootflash
+  hosts: "{{ _groups }}"
+  gather_facts: False
+  
+  tasks:
+
+  - name: Enable SCP for N9kv
+    ansible.netcommon.cli_config:
+      config: "feature scp-server"
+      commit: True
+    
+  - name: Check if image already exists in bootflash
+    cisco.nxos.nxos_command:
+      commands: 'dir bootflash: | include {{ new_image }}'
+    register: check_image
+
+  - block:
+      - name: Get the size of the image file on the SCP server
+        ansible.builtin.stat:
+          path: "{{ remote_file }}"
+        delegate_to: "{{ remote_scp_server }}"
+        register: image_stat
+
+      - name: Check available space in bootflash
+        cisco.nxos.nxos_command:
+          commands: 'dir bootflash:'
+        register: bootflash_dir
+
+      - name: Parse available space in bootflash
+        set_fact:
+          available_space: "{{ bootflash_dir.stdout[0].split()[-3] | int }}"
+
+      - name: Fail if there is not enough space in bootflash
+        fail:
+          msg: "Not enough space in bootflash to copy the new image. Required: {{ image_stat.stat.size // 1024 }} KB, Available: {{ available_space }} KB"
+        when: available_space < (image_stat.stat.size // 1024)
+    when: check_image.stdout[0].find(new_image) == -1
+
+  - name: Prompt for approval to continue if image does not exist
+    ansible.builtin.pause:
+      prompt: "The image {{ new_image }} does not exist in bootflash. Do you want to continue with the file transfer? (yes/no)"
+    when: check_image.stdout[0].find(new_image) == -1
+
+  - name: Copy image from server to device if not present
+    cisco.nxos.nxos_file_copy:
+      file_pull: true
+      file_pull_protocol: scp
+      file_pull_kstack: true
+      local_file: "{{ new_image }}"
+      remote_file: "{{ remote_file }}"
+      remote_scp_server: "{{ remote_scp_server }}"
+      remote_scp_server_user: "{{ cvs_username }}"
+      remote_scp_server_password: '{{ cvs_password }}'
+      vrf: "{{ cisco_vrf }}"
+    when: check_image.stdout[0].find(new_image) == -1
+    vars:
+      ansible_connect_timeout: 1200
+      ansible_command_timeout: 1200
+    changed_when: 
+      - transfer_status == 'Received: File copied/pulled to nxos device from remote scp server.'
+    register: result
+    failed_when:
+      - result == ''
+
+  - name: Reset connection
+    ansible.builtin.meta: reset_connection
+ 
+  - name: Verify SHA512 hash of image file
+    cisco.nxos.nxos_command:
+      commands: 'sh file bootflash:{{ new_image }} sha512sum'
+    register: sha_hash_verification_results
+    vars:
+      ansible_command_timeout: 1200
+  
+  - name: Set SHA512 hash verification to pass if hash matches
+    ansible.builtin.set_fact:
+      sha_hash_verification: "pass"
+    when: sha_hash_verification_results.stdout[0] == sha_hash
+      
+  - name: Fail task if SHA512 hash check fails
+    fail:
+      msg: "SHA512 Hash Check Fails. Please check the uploaded image!"
+    when: sha_hash_verification_results.stdout[0] != sha_hash

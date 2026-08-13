@@ -1,0 +1,14 @@
+---
+- name: check ports status
+  hosts: all
+  gather_facts: false
+  collections:
+    - cyberark.pas  
+
+  tasks:
+    - name: credential retrival basic
+      cyberark.pas.cyberark_credential:
+        api_base_url: "https://dom13.dom14.dom6.invalid"
+        app_id: "ESOCD"
+        query: "Safe=WASHDC-ESOC-P-Monitoring;UserName=user1"
+      register: result

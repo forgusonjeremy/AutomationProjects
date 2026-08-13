@@ -1,0 +1,15 @@
+---
+- name: stig-ansible-hardening ( RHEL 8)
+  hosts: all
+  gather_facts: no
+  strategy: free
+  vars:
+    # RHEL 8, Windows 2022, vCenter 8 U1, vCenter 8 U2
+    var_platform_selected: "{{ var_platform }}"
+    #var_SystemFQDN_selected: "{{ var_SystemFQDN }}"
+    #listOf_hosts: "{{ var_SystemFQDN.split('\n') }}"
+    
+  tasks:
+  - name: import role
+    include_role:
+      name: rhel8STIG

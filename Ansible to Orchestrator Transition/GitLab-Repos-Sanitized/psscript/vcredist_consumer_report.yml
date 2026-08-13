@@ -1,0 +1,41 @@
+---
+- name: VC++ runtime consumer report
+  hosts: all
+  gather_facts: false
+  become: true
+  become_method: runas
+
+  vars:
+    outputDirectory: 'C:\Temp'
+    targetComputers: 'dom29.dom4.invalid, dom27.dom4.invalid, dom19.dom4.invalid, dom32.dom4.invalid, dom36.dom4.invalid, dom23.dom4.invalid, dom28.dom4.invalid, dom20.dom4.invalid, dom34.dom4.invalid, dom35.dom4.invalid, dom37.dom4.invalid, dom26.dom4.invalid, dom22.dom4.invalid, dom16.dom4.invalid, dom15.dom4.invalid, dom13.dom4.invalid, dom18.dom4.invalid, dom21.dom4.invalid, dom31.dom4.invalid, dom33.dom4.invalid, dom30.dom4.invalid, dom17.dom4.invalid'
+
+  tasks:
+    - block:
+        - name: Create temp working directory
+          ansible.windows.win_tempfile:
+            state: directory
+          register: tempDir
+
+        - name: Stage script
+          ansible.windows.win_copy:
+            src: files/ps_scripts/get_vcredist_consumers.ps1
+            dest: '{{ tempDir.path }}\get_vcredist_consumers.ps1'
+
+        - name: Run VC++ runtime consumer report against targets
+          ansible.windows.win_command: >-
+            powershell.exe -ExecutionPolicy ByPass
+            -File "{{ tempDir.path }}\get_vcredist_consumers.ps1"
+            -ComputerName "{{ targetComputers }}"
+            -OutputDirectory "{{ outputDirectory }}"
+          register: reportRun
+
+        - name: Show script output
+          ansible.builtin.debug:
+            var: reportRun.stdout_lines
+
+      always:
+        - name: Cleanup temp directory
+          ansible.windows.win_file:
+            path: '{{ tempDir.path }}'
+            state: absent
+          when: tempDir is defined

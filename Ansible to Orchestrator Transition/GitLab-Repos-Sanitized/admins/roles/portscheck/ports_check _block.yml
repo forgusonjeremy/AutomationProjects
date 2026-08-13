@@ -1,0 +1,66 @@
+---
+- name: check ports status
+  hosts: all
+  gather_facts: false
+    
+  vars:
+    #var_hostName: "100.64.0.40"
+
+  tasks:
+    - name: Windows block run
+      when: var_os == "windows"
+      block:
+        - name: check ping status on target host
+          ignore_errors: true
+          loop: "{{var_hostName}}"
+          shell: "ping -c 1 {{ item }}"
+
+        - name: check if port 5986 is accessible on target host
+          ignore_errors: true
+          loop: "{{var_hostName}}"
+          wait_for:
+            host: "{{ item }}"
+            port: 5986
+            state: started
+            delay: 0
+            timeout: 1
+          
+        - name: check if port 445 is accessible on target host
+          ignore_errors: true
+          loop: "{{var_hostName}}"
+          wait_for:
+            host: "{{ item }}"
+            port: 445
+            state: started
+            delay: 0
+            sleep: 1
+            timeout: 2
+
+    - name: linux block run
+      when: var_os == "linux"
+      block:
+        - name: check ping status on target host
+          ignore_errors: true
+          loop: "{{var_hostName}}"
+          shell: "ping -c 1 {{ item }}"
+
+        - name: check if port 22 is accessible on target host
+          ignore_errors: true
+          loop: "{{var_hostName}}"
+          wait_for:
+            host: "{{ item }}"
+            port: 22
+            state: started
+            delay: 0
+            timeout: 1
+          
+        # - name: check if port 443 is accessible on target host
+        #   ignore_errors: true
+        #   loop: "{{var_hostName}}"
+        #   wait_for:
+        #     host: "{{ item }}"
+        #     port: 443
+        #     state: started
+        #     delay: 0
+        #     sleep: 1
+        #     timeout: 2

@@ -1,0 +1,1004 @@
+﻿{
+    "SchemaVersion":  1,
+    "Created":  "2026-08-13T10:06:12.4354134-04:00",
+    "Updated":  "2026-08-13T12:06:38.5413329-04:00",
+    "EntryCount":  161,
+    "Counters":  [
+                     {
+                         "Type":  "CommonName",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "DomainLabel",
+                         "Index":  46
+                     },
+                     {
+                         "Type":  "Guid",
+                         "Index":  2
+                     },
+                     {
+                         "Type":  "IPv4Subnet",
+                         "Index":  4
+                     },
+                     {
+                         "Type":  "OrganizationalUnit",
+                         "Index":  7
+                     },
+                     {
+                         "Type":  "Tld",
+                         "Index":  4
+                     },
+                     {
+                         "Type":  "Username",
+                         "Index":  24
+                     }
+                 ],
+    "Entries":  [
+                    {
+                        "Type":  "AdDomain",
+                        "Value":  "connect.lab",
+                        "Key":  "connect.lab",
+                        "Surrogate":  "dom4.test"
+                    },
+                    {
+                        "Type":  "AdDomain",
+                        "Value":  "pilot.dev",
+                        "Key":  "pilot.dev",
+                        "Surrogate":  "dom6.ex4"
+                    },
+                    {
+                        "Type":  "AdDomain",
+                        "Value":  "washdc.state.sbu",
+                        "Key":  "washdc.state.sbu",
+                        "Surrogate":  "dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "CommonName",
+                        "Value":  "CVS-Monitoring-Servers",
+                        "Key":  "cvs-monitoring-servers",
+                        "Surrogate":  "cn1"
+                    },
+                    {
+                        "Type":  "DistinguishedName",
+                        "Value":  "CN=CVS-Monitoring-Servers,OU=Servers,OU=CVS-MA,OU=Enterprise Services,DC=connect,DC=lab",
+                        "Key":  "cn=cvs-monitoring-servers,ou=servers,ou=cvs-ma,ou=enterprise services,dc=connect,dc=lab",
+                        "Surrogate":  "CN=cn1,OU=ou1,OU=ou2,OU=ou3,DC=dom4,DC=test"
+                    },
+                    {
+                        "Type":  "DistinguishedName",
+                        "Value":  "OU=Service Accounts,OU=ESOC,OU=IRM,DC=pilot,DC=dev",
+                        "Key":  "ou=service accounts,ou=esoc,ou=irm,dc=pilot,dc=dev",
+                        "Surrogate":  "OU=ou4,OU=ou5,OU=ou7,DC=dom6,DC=ex4"
+                    },
+                    {
+                        "Type":  "DistinguishedName",
+                        "Value":  "OU=Service Accounts,OU=ESOC,OU=M,OU=IRM,DC=washdc,DC=state,DC=sbu",
+                        "Key":  "ou=service accounts,ou=esoc,ou=m,ou=irm,dc=washdc,dc=state,dc=sbu",
+                        "Surrogate":  "OU=ou4,OU=ou5,OU=ou6,OU=ou7,DC=dom5,DC=dom3,DC=invalid"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "af",
+                        "Key":  "af",
+                        "Surrogate":  "dom45"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "afvc60",
+                        "Key":  "afvc60",
+                        "Surrogate":  "dom44"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "connect",
+                        "Key":  "connect",
+                        "Surrogate":  "dom4"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvso26dynag01",
+                        "Key":  "cvso26dynag01",
+                        "Surrogate":  "dom29"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvso26dynag02",
+                        "Key":  "cvso26dynag02",
+                        "Surrogate":  "dom27"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvso26dynsag01",
+                        "Key":  "cvso26dynsag01",
+                        "Surrogate":  "dom19"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvso26vara01",
+                        "Key":  "cvso26vara01",
+                        "Surrogate":  "dom32"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvso26vara02",
+                        "Key":  "cvso26vara02",
+                        "Surrogate":  "dom36"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoewdynag01",
+                        "Key":  "cvsoewdynag01",
+                        "Surrogate":  "dom23"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoewdynag02",
+                        "Key":  "cvsoewdynag02",
+                        "Surrogate":  "dom28"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoewdynsag01",
+                        "Key":  "cvsoewdynsag01",
+                        "Surrogate":  "dom20"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoewvara01",
+                        "Key":  "cvsoewvara01",
+                        "Surrogate":  "dom34"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoewvara02",
+                        "Key":  "cvsoewvara02",
+                        "Surrogate":  "dom35"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowdb01",
+                        "Key":  "cvsoowdb01",
+                        "Surrogate":  "dom37"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowdynag01",
+                        "Key":  "cvsoowdynag01",
+                        "Surrogate":  "dom26"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowdynag02",
+                        "Key":  "cvsoowdynag02",
+                        "Surrogate":  "dom22"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowdyncgfsag",
+                        "Key":  "cvsoowdyncgfsag",
+                        "Surrogate":  "dom16"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowdynntag01",
+                        "Key":  "cvsoowdynntag01",
+                        "Surrogate":  "dom15"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowdynntag02",
+                        "Key":  "cvsoowdynntag02",
+                        "Surrogate":  "dom13"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowdynsag01",
+                        "Key":  "cvsoowdynsag01",
+                        "Surrogate":  "dom18"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowdynsag02",
+                        "Key":  "cvsoowdynsag02",
+                        "Surrogate":  "dom21"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowmgt004",
+                        "Key":  "cvsoowmgt004",
+                        "Surrogate":  "dom31"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowvara01",
+                        "Key":  "cvsoowvara01",
+                        "Surrogate":  "dom33"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsoowvara02",
+                        "Key":  "cvsoowvara02",
+                        "Surrogate":  "dom30"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsvgebmczbx02",
+                        "Key":  "cvsvgebmczbx02",
+                        "Surrogate":  "dom17"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "eap",
+                        "Key":  "eap",
+                        "Surrogate":  "dom41"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "eapvc60",
+                        "Key":  "eapvc60",
+                        "Surrogate":  "dom40"
+                    },
+                    {
+                        "Key":  "esoco26cdt3-100",
+                        "Value":  "esoco26cdt3-100",
+                        "Type":  "DomainLabel",
+                        "Surrogate":  "dom46"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esoco26vcs01",
+                        "Key":  "esoco26vcs01",
+                        "Surrogate":  "dom10"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esoco26vcs02",
+                        "Key":  "esoco26vcs02",
+                        "Surrogate":  "dom11"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esocoeentap101",
+                        "Key":  "esocoeentap101",
+                        "Surrogate":  "dom7"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esocoewvcs",
+                        "Key":  "esocoewvcs",
+                        "Surrogate":  "dom14"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esocoewvcs01",
+                        "Key":  "esocoewvcs01",
+                        "Surrogate":  "dom9"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esocoewvcs02",
+                        "Key":  "esocoewvcs02",
+                        "Surrogate":  "dom8"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "eur",
+                        "Key":  "eur",
+                        "Surrogate":  "dom39"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "eurvc60",
+                        "Key":  "eurvc60",
+                        "Surrogate":  "dom38"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "gitmvc651st",
+                        "Key":  "gitmvc651st",
+                        "Surrogate":  "dom12"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "irm",
+                        "Key":  "irm",
+                        "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "nccsmtprelay",
+                        "Key":  "nccsmtprelay",
+                        "Surrogate":  "dom1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "neasa",
+                        "Key":  "neasa",
+                        "Surrogate":  "dom25"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "neasavc60",
+                        "Key":  "neasavc60",
+                        "Surrogate":  "dom24"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "pilot",
+                        "Key":  "pilot",
+                        "Surrogate":  "dom6"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "state",
+                        "Key":  "state",
+                        "Surrogate":  "dom3"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "washdc",
+                        "Key":  "washdc",
+                        "Surrogate":  "dom5"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "wha",
+                        "Key":  "wha",
+                        "Surrogate":  "dom43"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "whavc60",
+                        "Key":  "whavc60",
+                        "Surrogate":  "dom42"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "_Do_Not_Reply@state.gov",
+                        "Key":  "_do_not_reply@state.gov",
+                        "Surrogate":  "user6@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "AultRD@state.gov",
+                        "Key":  "aultrd@state.gov",
+                        "Surrogate":  "user19@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "barattija@state.gov",
+                        "Key":  "barattija@state.gov",
+                        "Surrogate":  "user9@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "BenjapathmongkolMA@state.gov",
+                        "Key":  "benjapathmongkolma@state.gov",
+                        "Surrogate":  "user15@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "CarswellJ@state.gov",
+                        "Key":  "carswellj@state.gov",
+                        "Surrogate":  "user22@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "COMPUTERNAME@state.gov",
+                        "Key":  "computername@state.gov",
+                        "Surrogate":  "user7@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "CVS-HealthCheck@state.gov",
+                        "Key":  "cvs-healthcheck@state.gov",
+                        "Surrogate":  "user24@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "CVSOOWVARA01_Do_Not_Reply@state.gov",
+                        "Key":  "cvsoowvara01_do_not_reply@state.gov",
+                        "Surrogate":  "user5@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "DayEA@state.gov",
+                        "Key":  "dayea@state.gov",
+                        "Surrogate":  "user20@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "dt-cvs-data-protection-team-fl@state.gov",
+                        "Key":  "dt-cvs-data-protection-team-fl@state.gov",
+                        "Surrogate":  "user17@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "dtcvsmonitoring@state.gov",
+                        "Key":  "dtcvsmonitoring@state.gov",
+                        "Surrogate":  "user2@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "dtcvson-premengineering@state.gov",
+                        "Key":  "dtcvson-premengineering@state.gov",
+                        "Surrogate":  "user1@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "DTCVSVGEFL@state.gov",
+                        "Key":  "dtcvsvgefl@state.gov",
+                        "Surrogate":  "user12@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "esocesxteam@state.gov",
+                        "Key":  "esocesxteam@state.gov",
+                        "Surrogate":  "user18@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "ESOCMonitoring@state.gov",
+                        "Key":  "esocmonitoring@state.gov",
+                        "Surrogate":  "user16@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "FiorenzanoR1@state.gov",
+                        "Key":  "fiorenzanor1@state.gov",
+                        "Surrogate":  "user23@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "GoernerHR@state.gov",
+                        "Key":  "goernerhr@state.gov",
+                        "Surrogate":  "user3@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "LoueyRA@state.gov",
+                        "Key":  "loueyra@state.gov",
+                        "Surrogate":  "user21@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "LoverD@state.gov",
+                        "Key":  "loverd@state.gov",
+                        "Surrogate":  "user10@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "MillerAG2@state.gov",
+                        "Key":  "millerag2@state.gov",
+                        "Surrogate":  "user13@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "NguyenTD4@state.gov",
+                        "Key":  "nguyentd4@state.gov",
+                        "Surrogate":  "user4@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "ReskoEJ@state.gov",
+                        "Key":  "reskoej@state.gov",
+                        "Surrogate":  "user11@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "SweetAR@state.gov",
+                        "Key":  "sweetar@state.gov",
+                        "Surrogate":  "user14@dom3.example"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "WalterAR@state.gov",
+                        "Key":  "walterar@state.gov",
+                        "Surrogate":  "user8@dom3.example"
+                    },
+                    {
+                        "Type":  "EmailDomain",
+                        "Value":  "state.gov",
+                        "Key":  "state.gov",
+                        "Surrogate":  "dom3.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "afvc60.af.state.sbu",
+                        "Key":  "afvc60.af.state.sbu",
+                        "Surrogate":  "dom44.dom45.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "connect.lab",
+                        "Key":  "connect.lab",
+                        "Surrogate":  "dom4.test"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvso26dynag01.connect.sbu",
+                        "Key":  "cvso26dynag01.connect.sbu",
+                        "Surrogate":  "dom29.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvso26dynag02.connect.sbu",
+                        "Key":  "cvso26dynag02.connect.sbu",
+                        "Surrogate":  "dom27.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvso26dynsag01.connect.sbu",
+                        "Key":  "cvso26dynsag01.connect.sbu",
+                        "Surrogate":  "dom19.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvso26vara01.connect.sbu",
+                        "Key":  "cvso26vara01.connect.sbu",
+                        "Surrogate":  "dom32.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvso26vara02.connect.sbu",
+                        "Key":  "cvso26vara02.connect.sbu",
+                        "Surrogate":  "dom36.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoewdynag01.connect.sbu",
+                        "Key":  "cvsoewdynag01.connect.sbu",
+                        "Surrogate":  "dom23.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoewdynag02.connect.sbu",
+                        "Key":  "cvsoewdynag02.connect.sbu",
+                        "Surrogate":  "dom28.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoewdynsag01.connect.sbu",
+                        "Key":  "cvsoewdynsag01.connect.sbu",
+                        "Surrogate":  "dom20.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoewvara01.connect.sbu",
+                        "Key":  "cvsoewvara01.connect.sbu",
+                        "Surrogate":  "dom34.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoewvara02.connect.sbu",
+                        "Key":  "cvsoewvara02.connect.sbu",
+                        "Surrogate":  "dom35.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowdb01.connect.sbu",
+                        "Key":  "cvsoowdb01.connect.sbu",
+                        "Surrogate":  "dom37.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowdynag01.connect.sbu",
+                        "Key":  "cvsoowdynag01.connect.sbu",
+                        "Surrogate":  "dom26.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowdynag02.connect.sbu",
+                        "Key":  "cvsoowdynag02.connect.sbu",
+                        "Surrogate":  "dom22.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowdyncgfsag.connect.sbu",
+                        "Key":  "cvsoowdyncgfsag.connect.sbu",
+                        "Surrogate":  "dom16.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowdynntag01.connect.sbu",
+                        "Key":  "cvsoowdynntag01.connect.sbu",
+                        "Surrogate":  "dom15.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowdynntag02.connect.sbu",
+                        "Key":  "cvsoowdynntag02.connect.sbu",
+                        "Surrogate":  "dom13.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowdynsag01.connect.sbu",
+                        "Key":  "cvsoowdynsag01.connect.sbu",
+                        "Surrogate":  "dom18.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowdynsag02.connect.sbu",
+                        "Key":  "cvsoowdynsag02.connect.sbu",
+                        "Surrogate":  "dom21.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowmgt004.connect.sbu",
+                        "Key":  "cvsoowmgt004.connect.sbu",
+                        "Surrogate":  "dom31.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowvara01.connect.sbu",
+                        "Key":  "cvsoowvara01.connect.sbu",
+                        "Surrogate":  "dom33.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsoowvara02.connect.sbu",
+                        "Key":  "cvsoowvara02.connect.sbu",
+                        "Surrogate":  "dom30.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsvgebmczbx02.connect.sbu",
+                        "Key":  "cvsvgebmczbx02.connect.sbu",
+                        "Surrogate":  "dom17.dom4.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "eapvc60.eap.state.sbu",
+                        "Key":  "eapvc60.eap.state.sbu",
+                        "Surrogate":  "dom40.dom41.dom3.invalid"
+                    },
+                    {
+                        "Key":  "esoco26cdt3-100.washdc.state.sbu",
+                        "Value":  "esoco26cdt3-100.washdc.state.sbu",
+                        "Type":  "Fqdn",
+                        "Surrogate":  "dom46.dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esoco26vcs01.washdc.state.sbu",
+                        "Key":  "esoco26vcs01.washdc.state.sbu",
+                        "Surrogate":  "dom10.dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esoco26vcs02.washdc.state.sbu",
+                        "Key":  "esoco26vcs02.washdc.state.sbu",
+                        "Surrogate":  "dom11.dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esocoeentap101.washdc.state.sbu",
+                        "Key":  "esocoeentap101.washdc.state.sbu",
+                        "Surrogate":  "dom7.dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esocoewvcs.washdc.state.sbu",
+                        "Key":  "esocoewvcs.washdc.state.sbu",
+                        "Surrogate":  "dom14.dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esocoewvcs01.washdc.state.sbu",
+                        "Key":  "esocoewvcs01.washdc.state.sbu",
+                        "Surrogate":  "dom9.dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esocoewvcs02.washdc.state.sbu",
+                        "Key":  "esocoewvcs02.washdc.state.sbu",
+                        "Surrogate":  "dom8.dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "eurvc60.eur.state.sbu",
+                        "Key":  "eurvc60.eur.state.sbu",
+                        "Surrogate":  "dom38.dom39.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "gitmvc651st.washdc.state.sbu",
+                        "Key":  "gitmvc651st.washdc.state.sbu",
+                        "Surrogate":  "dom12.dom5.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "nccsmtprelay.irm.state.gov",
+                        "Key":  "nccsmtprelay.irm.state.gov",
+                        "Surrogate":  "dom1.dom2.dom3.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "neasavc60.neasa.state.sbu",
+                        "Key":  "neasavc60.neasa.state.sbu",
+                        "Surrogate":  "dom24.dom25.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "whavc60.wha.state.sbu",
+                        "Key":  "whavc60.wha.state.sbu",
+                        "Surrogate":  "dom42.dom43.dom3.invalid"
+                    },
+                    {
+                        "Type":  "Guid",
+                        "Value":  "0a7293a9-a10f-4313-903a-f845603d16ee",
+                        "Key":  "0a7293a9-a10f-4313-903a-f845603d16ee",
+                        "Surrogate":  "00000001-0000-4000-8000-000000000001"
+                    },
+                    {
+                        "Type":  "Guid",
+                        "Value":  "5cb04a76-2c39-45ad-ba26-9dbc724cd437",
+                        "Key":  "5cb04a76-2c39-45ad-ba26-9dbc724cd437",
+                        "Surrogate":  "00000002-0000-4000-8000-000000000002"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.60.55.100",
+                        "Key":  "10.60.55.100",
+                        "Surrogate":  "100.64.2.100"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.64.45.100",
+                        "Key":  "10.64.45.100",
+                        "Surrogate":  "100.64.3.100"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.65.89.70",
+                        "Key":  "10.65.89.70",
+                        "Surrogate":  "100.64.1.70"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.68.44.20",
+                        "Key":  "10.68.44.20",
+                        "Surrogate":  "100.64.0.20"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.68.44.87",
+                        "Key":  "10.68.44.87",
+                        "Surrogate":  "100.64.0.87"
+                    },
+                    {
+                        "Type":  "IPv4Subnet",
+                        "Value":  "10.60.55",
+                        "Key":  "10.60.55",
+                        "Surrogate":  "100.64.2"
+                    },
+                    {
+                        "Type":  "IPv4Subnet",
+                        "Value":  "10.64.45",
+                        "Key":  "10.64.45",
+                        "Surrogate":  "100.64.3"
+                    },
+                    {
+                        "Type":  "IPv4Subnet",
+                        "Value":  "10.65.89",
+                        "Key":  "10.65.89",
+                        "Surrogate":  "100.64.1"
+                    },
+                    {
+                        "Type":  "IPv4Subnet",
+                        "Value":  "10.68.44",
+                        "Key":  "10.68.44",
+                        "Surrogate":  "100.64.0"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "CVS-MA",
+                        "Key":  "cvs-ma",
+                        "Surrogate":  "ou2"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "Enterprise Services",
+                        "Key":  "enterprise services",
+                        "Surrogate":  "ou3"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "ESOC",
+                        "Key":  "esoc",
+                        "Surrogate":  "ou5"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "IRM",
+                        "Key":  "irm",
+                        "Surrogate":  "ou7"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "M",
+                        "Key":  "m",
+                        "Surrogate":  "ou6"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "Servers",
+                        "Key":  "servers",
+                        "Surrogate":  "ou1"
+                    },
+                    {
+                        "Type":  "OrganizationalUnit",
+                        "Value":  "Service Accounts",
+                        "Key":  "service accounts",
+                        "Surrogate":  "ou4"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "dev",
+                        "Key":  "dev",
+                        "Surrogate":  "ex4"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "gov",
+                        "Key":  "gov",
+                        "Surrogate":  "example"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "lab",
+                        "Key":  "lab",
+                        "Surrogate":  "test"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "sbu",
+                        "Key":  "sbu",
+                        "Surrogate":  "invalid"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "_Do_Not_Reply",
+                        "Key":  "_do_not_reply",
+                        "Surrogate":  "user6"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "AultRD",
+                        "Key":  "aultrd",
+                        "Surrogate":  "user19"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "barattija",
+                        "Key":  "barattija",
+                        "Surrogate":  "user9"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "BenjapathmongkolMA",
+                        "Key":  "benjapathmongkolma",
+                        "Surrogate":  "user15"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "CarswellJ",
+                        "Key":  "carswellj",
+                        "Surrogate":  "user22"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "COMPUTERNAME",
+                        "Key":  "computername",
+                        "Surrogate":  "user7"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "CVS-HealthCheck",
+                        "Key":  "cvs-healthcheck",
+                        "Surrogate":  "user24"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "CVSOOWVARA01_Do_Not_Reply",
+                        "Key":  "cvsoowvara01_do_not_reply",
+                        "Surrogate":  "user5"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "DayEA",
+                        "Key":  "dayea",
+                        "Surrogate":  "user20"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "dt-cvs-data-protection-team-fl",
+                        "Key":  "dt-cvs-data-protection-team-fl",
+                        "Surrogate":  "user17"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "dtcvsmonitoring",
+                        "Key":  "dtcvsmonitoring",
+                        "Surrogate":  "user2"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "dtcvson-premengineering",
+                        "Key":  "dtcvson-premengineering",
+                        "Surrogate":  "user1"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "DTCVSVGEFL",
+                        "Key":  "dtcvsvgefl",
+                        "Surrogate":  "user12"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "esocesxteam",
+                        "Key":  "esocesxteam",
+                        "Surrogate":  "user18"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "ESOCMonitoring",
+                        "Key":  "esocmonitoring",
+                        "Surrogate":  "user16"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "FiorenzanoR1",
+                        "Key":  "fiorenzanor1",
+                        "Surrogate":  "user23"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "goernerhr",
+                        "Key":  "goernerhr",
+                        "Surrogate":  "user3"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "LoueyRA",
+                        "Key":  "loueyra",
+                        "Surrogate":  "user21"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "LoverD",
+                        "Key":  "loverd",
+                        "Surrogate":  "user10"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "MillerAG2",
+                        "Key":  "millerag2",
+                        "Surrogate":  "user13"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "NguyenTD4",
+                        "Key":  "nguyentd4",
+                        "Surrogate":  "user4"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "ReskoEJ",
+                        "Key":  "reskoej",
+                        "Surrogate":  "user11"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "SweetAR",
+                        "Key":  "sweetar",
+                        "Surrogate":  "user14"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "WalterAR",
+                        "Key":  "walterar",
+                        "Surrogate":  "user8"
+                    }
+                ]
+}

@@ -1,0 +1,33 @@
+hst:
+    hosts:
+        dom9.dom5.dom6.invalid:
+        dom12.dom5.dom6.invalid:
+    children:
+        hst_stig:
+        hst_win:       
+mdc:
+    hosts:
+        dom10.dom5.dom6.invalid:
+        dom7.dom5.dom6.invalid:
+    children:
+        mdc_stig:     
+        mdc_win:
+ew:
+    hosts:
+        dom4.dom5.dom6.invalid:
+        dom11.dom5.dom6.invalid:
+    children:
+        ew_stig:    
+        ew_win:       
+all:
+    children:
+        hst:
+        mdc:
+        ew:   
+    vars:
+        var_os_family: Windows
+        ansible_connection: winrm
+        ansible_port: 5986
+        ansible_winrm_transport: kerberos
+        ansible_winrm_kerberos_delegation: yes
+        ansible_winrm_server_cert_validation: ignore         

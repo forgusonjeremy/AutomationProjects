@@ -1,0 +1,39 @@
+---
+- name: Clean up MDE temp files
+  hosts: all
+  become: true
+ 
+  tasks:
+    - name: Remove JSON files from /tmp/mde/
+      ansible.builtin.find:
+        paths: /tmp/mde
+        patterns: "*.json"
+        file_type: file
+      register: json_files
+ 
+    - name: Remove Python files from /tmp/mde/
+      ansible.builtin.find:
+        paths: /tmp/mde
+        patterns: "*.py"
+        file_type: file
+      register: py_files
+ 
+    - name: Delete found JSON files
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ json_files.files }}"
+      when: json_files.matched > 0
+ 
+    - name: Delete found Python files
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ py_files.files }}"
+      when: py_files.matched > 0
+ 
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >
+          Removed {{ json_files.matched }} JSON file(s) and
+          {{ py_files.matched }} Python file(s) from /tmp/mde/

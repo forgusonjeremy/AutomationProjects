@@ -1,0 +1,16 @@
+# - name: "check ping status on target {{ item }}"
+#   ignore_errors: true
+#   shell: "ping -c 1 {{ item }}"
+
+- name: "testing port '{{ var_test_port }}' access to target {{ port_task_item }}"
+  ignore_errors: true
+  wait_for:
+    host: "{{ port_task_item }}"
+    port: "{{ port_item }}"
+    state: started
+    delay: 0
+    timeout: 1
+  loop: "{{ var_test_port }}"
+  loop_control:
+    loop_var: port_item
+

@@ -1,0 +1,140 @@
+---
+# One-for-one host mirror: SOURCE -> DEST.
+#   * Creates/updates on DEST every plain host that exists on SOURCE
+#   * Deletes from DEST every plain host that SOURCE does not have (prune)
+#
+# Reads full inventory from each server via the Zabbix JSON-RPC API,
+#
+# Auth: create an API token on each server (Users > API tokens) and store
+# both in vault as vault_zbx_src_token / vault_zbx_dst_token.
+
+- name: Read host inventory from both Zabbix servers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    src_host: "zabbix-src.example.mil"
+    dst_host: "zabbix-dst.example.mil"
+    src_token: "{{ vault_zbx_src_token }}"
+    dst_token: "{{ vault_zbx_dst_token }}"
+    validate_certs: true
+    prune: true                      # set false to add/update only, never delete
+    mirror_macros: true              # text macros only (secret/vault can't be read back)
+    mirror_inventory: true           # host inventory fields + inventory mode
+    protect_hosts:                   # never create, update, or delete these on DEST
+      - "Zabbix server"
+  tasks:
+
+    - name: Pull every host + config from SOURCE
+      ansible.builtin.uri:
+        url: "https://{{ src_host }}/api_jsonrpc.php"
+        method: POST
+        headers:
+          Content-Type: application/json-rpc
+          Authorization: "Bearer {{ src_token }}"
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          id: 1
+          method: host.get
+          params:
+            output: [host, name, status, description, flags, inventory_mode]
+            selectHostGroups: [name]          
+            selectParentTemplates: [host]
+            selectInterfaces: [type, main, useip, ip, dns, port, details]
+            selectTags: [tag, value]
+            selectMacros: [macro, value, type, description]
+            selectInventory: extend
+        validate_certs: "{{ validate_certs }}"
+      register: src_raw
+      failed_when: "'error' in src_raw.json"
+
+    - name: Pull host list from DEST
+      ansible.builtin.uri:
+        url: "https://{{ dst_host }}/api_jsonrpc.php"
+        method: POST
+        headers:
+          Content-Type: application/json-rpc
+          Authorization: "Bearer {{ dst_token }}"
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          id: 1
+          method: host.get
+          params:
+            output: [host, flags]
+        validate_certs: "{{ validate_certs }}"
+      register: dst_raw
+      failed_when: "'error' in dst_raw.json"
+
+    - name: Compute mirror sets (ignore LLD-discovered hosts, flags != 0)
+      ansible.builtin.set_fact:
+        src_hosts: >-
+          {{ src_raw.json.result
+             | selectattr('flags', 'equalto', '0')
+             | rejectattr('host', 'in', protect_hosts) | list }}
+        prune_names: >-
+          {{ (dst_raw.json.result
+              | selectattr('flags', 'equalto', '0')
+              | map(attribute='host') | list)
+             | difference(src_raw.json.result | map(attribute='host') | list)
+             | difference(protect_hosts) }}
+
+    - name: Hand DEST connection + data to the write phase
+      ansible.builtin.add_host:
+        name: zabbix_dest
+        groups: zabbix_targets
+        ansible_network_os: community.zabbix.zabbix
+        ansible_connection: httpapi
+        ansible_host: "{{ dst_host }}"
+        ansible_httpapi_port: 443
+        ansible_httpapi_use_ssl: true
+        ansible_httpapi_validate_certs: "{{ validate_certs }}"
+        ansible_zabbix_auth_key: "{{ dst_token }}"
+        src_hosts: "{{ src_hosts }}"
+        prune_names: "{{ prune | ternary(prune_names, []) }}"
+        mirror_macros: "{{ mirror_macros }}"
+        mirror_inventory: "{{ mirror_inventory }}"
+
+    - name: Mirror summary
+      ansible.builtin.debug:
+        msg: "SOURCE hosts to sync: {{ src_hosts | length }} | to prune from DEST: {{ (prune | ternary(prune_names, [])) | length }}"
+
+- name: Apply mirror to DEST
+  hosts: zabbix_dest
+  gather_facts: false
+  tasks:
+
+    - name: Create/update hosts present on SOURCE
+      community.zabbix.zabbix_host:
+        host_name: "{{ item.host }}"
+        visible_name: "{{ item.name | default(omit) }}"
+        description: "{{ item.description | default(omit) }}"
+        status: "{{ 'disabled' if item.status == '1' else 'enabled' }}"
+        state: present
+        host_groups: "{{ item.hostgroups | map(attribute='name') | list }}"
+        link_templates: "{{ item.parentTemplates | map(attribute='host') | list }}"
+        interfaces: "{{ item.interfaces }}"
+        tags: "{{ item.tags | default([]) }}"
+        macros: >-
+          {{ (item.macros | selectattr('type', 'equalto', '0')
+                          | map('combine', {'type': 'text'}) | list)
+             if mirror_macros | bool else omit }}
+        inventory_mode: >-
+          {{ ({'-1': 'disabled', '0': 'manual', '1': 'automatic'}[item.inventory_mode | string])
+             if mirror_inventory | bool else omit }}
+        inventory_zabbix: >-
+          {{ (item.inventory | dict2items
+                             | rejectattr('key', 'equalto', 'inventory_mode') | items2dict)
+             if (mirror_inventory | bool and item.inventory is mapping) else omit }}
+      loop: "{{ src_hosts }}"
+      loop_control:
+        label: "{{ item.host }}"
+
+    - name: Delete hosts on DEST that SOURCE does not have
+      community.zabbix.zabbix_host:
+        host_name: "{{ item }}"
+        state: absent
+      loop: "{{ prune_names }}"
+      loop_control:
+        label: "{{ item }}"

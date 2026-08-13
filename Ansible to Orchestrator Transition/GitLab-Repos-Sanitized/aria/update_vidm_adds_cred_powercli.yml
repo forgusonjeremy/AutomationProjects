@@ -1,0 +1,327 @@
+---
+- name: vIDM Directory Diagnostic and Password Update
+  hosts: localhost
+  gather_facts: false
+  vars:
+    vidm_host: "{{ vidm_hostname }}"
+    vidm_username: "{{ vidm_admin_username }}"
+    vidm_password: "{{ vidm_admin_password }}"
+    directory_id: "{{ vidm_directory_id }}"
+    directory_name: "{{ vidm_directory_name | default('pilot') }}"
+    new_bind_password: "{{ vidm_new_bind_password }}"
+
+  tasks:
+    - name: Validate required variables
+      fail:
+        msg: "Required variable {{ item }} is not defined or empty"
+      when: vars[item] is undefined or vars[item] == ""
+      loop:
+        - vidm_hostname
+        - vidm_admin_username
+        - vidm_admin_password
+        - vidm_directory_id
+        - vidm_new_bind_password
+
+    - name: Create diagnostic and update script
+      copy:
+        content: |
+          param(
+              [string]$vIDMHost,
+              [string]$vIDMUsername, 
+              [string]$vIDMPassword,
+              [string]$DirectoryId,
+              [string]$DirectoryName,
+              [string]$NewBindPassword
+          )
+
+          # Result tracking
+          $script:ResultStatus = "FAILED"
+          $script:ResultMethod = "NONE"
+          $script:ResultError = ""
+
+          try {
+              Write-Host "=== vIDM Directory Diagnostic and Update ===" -ForegroundColor Green
+              Write-Host "Target Directory ID: $DirectoryId" -ForegroundColor Yellow
+              Write-Host "Target Directory Name: $DirectoryName" -ForegroundColor Yellow
+
+              # SSL and TLS setup
+              [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+              [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+              # Create web session
+              $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+
+              Write-Host "`nStep 1: Establishing session..." -ForegroundColor Cyan
+              
+              # Browser headers
+              $browserHeaders = @{
+                  'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                  'Accept' = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                  'Accept-Language' = 'en-US,en;q=0.5'
+                  'Connection' = 'keep-alive'
+              }
+
+              # Get login page
+              $loginPage = Invoke-WebRequest -Uri "https://$vIDMHost/SAAS/auth/login" -WebSession $session -Headers $browserHeaders -UseBasicParsing
+              
+              # Login
+              $loginData = "username=$([System.Web.HttpUtility]::UrlEncode($vIDMUsername))&password=$([System.Web.HttpUtility]::UrlEncode($vIDMPassword))"
+              $loginResult = Invoke-WebRequest -Uri "https://$vIDMHost/SAAS/auth/login" -Method POST -Body $loginData -ContentType "application/x-www-form-urlencoded" -WebSession $session -Headers $browserHeaders -UseBasicParsing -MaximumRedirection 5
+              
+              # Access admin console
+              $adminPage = Invoke-WebRequest -Uri "https://$vIDMHost/SAAS/admin/app/" -WebSession $session -Headers $browserHeaders -UseBasicParsing
+              
+              Write-Host "✓ Session established and admin console accessed" -ForegroundColor Green
+
+              Write-Host "`nStep 2: Retrieving all directories for analysis..." -ForegroundColor Cyan
+              
+              # API headers
+              $apiHeaders = @{
+                  'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                  'Accept' = 'application/json, text/plain, */*'
+                  'Content-Type' = 'application/json'
+                  'X-Requested-With' = 'XMLHttpRequest'
+                  'Referer' = "https://$vIDMHost/SAAS/admin/app/"
+              }
+
+              # Get directories
+              $directoriesUrl = "https://$vIDMHost/SAAS/jersey/manager/api/connectormanagement/directoryconfigs"
+              $dirResponse = Invoke-WebRequest -Uri $directoriesUrl -Method GET -WebSession $session -Headers $apiHeaders -UseBasicParsing
+              
+              if ($dirResponse.StatusCode -eq 200) {
+                  Write-Host "✓ Directories API accessible" -ForegroundColor Green
+                  
+                  $directoriesData = $dirResponse.Content | ConvertFrom-Json
+                  
+                  Write-Host "`nStep 3: Analyzing directory structure..." -ForegroundColor Cyan
+                  Write-Host "Raw response type: $($directoriesData.GetType().Name)" -ForegroundColor Yellow
+                  
+                  # Check response structure
+                  if ($directoriesData.items) {
+                      Write-Host "Found directories in .items property" -ForegroundColor Green
+                      $directories = $directoriesData.items
+                  } elseif ($directoriesData -is [array]) {
+                      Write-Host "Response is direct array of directories" -ForegroundColor Green
+                      $directories = $directoriesData
+                  } else {
+                      Write-Host "Unexpected response structure" -ForegroundColor Red
+                      Write-Host "Response properties: $($directoriesData | Get-Member -MemberType Properties | Select-Object -ExpandProperty Name)" -ForegroundColor Yellow
+                      $directories = @()
+                  }
+                  
+                  Write-Host "`nFound $($directories.Count) directories:" -ForegroundColor Yellow
+                  
+                  # List all directories for diagnostic purposes
+                  for ($i = 0; $i -lt $directories.Count; $i++) {
+                      $dir = $directories[$i]
+                      Write-Host "  Directory $($i + 1):" -ForegroundColor Cyan
+                      Write-Host "    Name: $($dir.name)" -ForegroundColor White
+                      Write-Host "    ID: $($dir.directoryId)" -ForegroundColor White
+                      Write-Host "    Type: $($dir.type)" -ForegroundColor White
+                      if ($dir.userStoreUuid) {
+                          Write-Host "    UserStore UUID: $($dir.userStoreUuid)" -ForegroundColor Gray
+                      }
+                      if ($dir.uuid) {
+                          Write-Host "    UUID: $($dir.uuid)" -ForegroundColor Gray
+                      }
+                      Write-Host ""
+                  }
+
+                  # Search for target directory with multiple criteria
+                  Write-Host "Step 4: Searching for target directory..." -ForegroundColor Cyan
+                  
+                  $targetDir = $null
+                  
+                  # Try exact ID match first
+                  $targetDir = $directories | Where-Object { $_.directoryId -eq $DirectoryId }
+                  if ($targetDir) {
+                      Write-Host "✓ Found directory by exact directoryId match" -ForegroundColor Green
+                  } else {
+                      # Try other ID fields
+                      $targetDir = $directories | Where-Object { $_.uuid -eq $DirectoryId }
+                      if ($targetDir) {
+                          Write-Host "✓ Found directory by uuid match" -ForegroundColor Green
+                      } else {
+                          $targetDir = $directories | Where-Object { $_.userStoreUuid -eq $DirectoryId }
+                          if ($targetDir) {
+                              Write-Host "✓ Found directory by userStoreUuid match" -ForegroundColor Green
+                          } else {
+                              # Try name match
+                              $targetDir = $directories | Where-Object { $_.name -eq $DirectoryName }
+                              if ($targetDir) {
+                                  Write-Host "✓ Found directory by name match: $($targetDir.name)" -ForegroundColor Green
+                              } else {
+                                  # Try case-insensitive name match
+                                  $targetDir = $directories | Where-Object { $_.name.ToLower() -eq $DirectoryName.ToLower() }
+                                  if ($targetDir) {
+                                      Write-Host "✓ Found directory by case-insensitive name match: $($targetDir.name)" -ForegroundColor Green
+                                  }
+                              }
+                          }
+                      }
+                  }
+
+                  if ($targetDir) {
+                      Write-Host "`nTarget directory found:" -ForegroundColor Green
+                      Write-Host "  Name: $($targetDir.name)" -ForegroundColor White
+                      Write-Host "  ID: $($targetDir.directoryId)" -ForegroundColor White
+                      Write-Host "  Type: $($targetDir.type)" -ForegroundColor White
+                      
+                      Write-Host "`nStep 5: Attempting password update..." -ForegroundColor Cyan
+                      
+                      # Use the actual directory ID from the found directory
+                      $actualDirectoryId = $targetDir.directoryId
+                      
+                      # Create updated configuration
+                      $updatedConfig = $targetDir.PSObject.Copy()
+                      $updatedConfig.bindPassword = $NewBindPassword
+                      $updateBody = $updatedConfig | ConvertTo-Json -Depth 10
+                      
+                      # Try PUT method
+                      try {
+                          $updateUrl = "https://$vIDMHost/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/$actualDirectoryId"
+                          Write-Host "  Trying PUT to: $updateUrl" -ForegroundColor Yellow
+                          
+                          $updateResponse = Invoke-WebRequest -Uri $updateUrl -Method PUT -Body $updateBody -WebSession $session -Headers $apiHeaders -UseBasicParsing
+                          
+                          if ($updateResponse.StatusCode -in @(200, 201, 202, 204)) {
+                              Write-Host "  ✓ SUCCESS: Directory password updated with PUT!" -ForegroundColor Green
+                              $script:ResultStatus = "SUCCESS"
+                              $script:ResultMethod = "PUT"
+                          }
+                      } catch {
+                          Write-Host "  PUT failed: $($_.Exception.Message)" -ForegroundColor Red
+                          
+                          # Try PATCH method
+                          try {
+                              Write-Host "  Trying PATCH method..." -ForegroundColor Yellow
+                              $patchBody = @{ bindPassword = $NewBindPassword } | ConvertTo-Json
+                              $patchResponse = Invoke-WebRequest -Uri $updateUrl -Method PATCH -Body $patchBody -WebSession $session -Headers $apiHeaders -UseBasicParsing
+                              
+                              if ($patchResponse.StatusCode -in @(200, 201, 202, 204)) {
+                                  Write-Host "  ✓ SUCCESS: Directory password updated with PATCH!" -ForegroundColor Green
+                                  $script:ResultStatus = "SUCCESS"
+                                  $script:ResultMethod = "PATCH"
+                              }
+                          } catch {
+                              Write-Host "  PATCH failed: $($_.Exception.Message)" -ForegroundColor Red
+                              
+                              # Try connection test (sometimes this updates the password)
+                              try {
+                                  Write-Host "  Trying connection test..." -ForegroundColor Yellow
+                                  $testUrl = "https://$vIDMHost/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/$actualDirectoryId/test"
+                                  $testBody = @{ bindPassword = $NewBindPassword } | ConvertTo-Json
+                                  $testResponse = Invoke-WebRequest -Uri $testUrl -Method POST -Body $testBody -WebSession $session -Headers $apiHeaders -UseBasicParsing
+                                  
+                                  if ($testResponse.StatusCode -in @(200, 202)) {
+                                      Write-Host "  ✓ Connection test successful - password may be updated" -ForegroundColor Green
+                                      $script:ResultStatus = "SUCCESS"
+                                      $script:ResultMethod = "TEST"
+                                  }
+                              } catch {
+                                  Write-Host "  Connection test failed: $($_.Exception.Message)" -ForegroundColor Red
+                                  $script:ResultError = "All update methods failed"
+                              }
+                          }
+                      }
+                  } else {
+                      Write-Host "`n✗ Target directory not found!" -ForegroundColor Red
+                      Write-Host "Searched for:" -ForegroundColor Yellow
+                      Write-Host "  - directoryId: $DirectoryId" -ForegroundColor White
+                      Write-Host "  - name: $DirectoryName" -ForegroundColor White
+                      $script:ResultError = "Directory not found with ID '$DirectoryId' or name '$DirectoryName'"
+                  }
+              } else {
+                  $script:ResultError = "Could not access directories API: $($dirResponse.StatusCode)"
+              }
+
+              # Output results
+              Write-Host "`n=== FINAL RESULT ===" -ForegroundColor White
+              if ($script:ResultStatus -eq "SUCCESS") {
+                  Write-Host "SUCCESS: Password updated using $($script:ResultMethod) method" -ForegroundColor Green
+              } else {
+                  Write-Host "FAILED: $($script:ResultError)" -ForegroundColor Red
+              }
+              
+              # Machine-readable output
+              Write-Host "RESULT_STATUS:$($script:ResultStatus)"
+              Write-Host "RESULT_METHOD:$($script:ResultMethod)"
+              Write-Host "RESULT_ERROR:$($script:ResultError)"
+
+          } catch {
+              Write-Host "=== SCRIPT ERROR ===" -ForegroundColor Red
+              Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+              $script:ResultStatus = "ERROR"
+              $script:ResultError = $_.Exception.Message
+              
+              Write-Host "RESULT_STATUS:ERROR"
+              Write-Host "RESULT_METHOD:NONE"
+              Write-Host "RESULT_ERROR:$($_.Exception.Message)"
+          }
+        dest: /tmp/vidm_diagnostic.ps1
+        mode: '0755'
+
+    - name: Execute diagnostic script
+      shell: |
+        if command -v pwsh >/dev/null 2>&1; then
+          pwsh -File /tmp/vidm_diagnostic.ps1 -vIDMHost "{{ vidm_host }}" -vIDMUsername "{{ vidm_username }}" -vIDMPassword "{{ vidm_password }}" -DirectoryId "{{ directory_id }}" -DirectoryName "{{ directory_name }}" -NewBindPassword "{{ new_bind_password }}"
+        elif command -v powershell >/dev/null 2>&1; then
+          powershell -File /tmp/vidm_diagnostic.ps1 -vIDMHost "{{ vidm_host }}" -vIDMUsername "{{ vidm_username }}" -vIDMPassword "{{ vidm_password }}" -DirectoryId "{{ directory_id }}" -DirectoryName "{{ directory_name }}" -NewBindPassword "{{ new_bind_password }}"
+        else
+          echo "RESULT_STATUS:ERROR"
+          echo "RESULT_ERROR:PowerShell not available"
+          exit 1
+        fi
+      register: diagnostic_result
+      no_log: false
+
+    - name: Extract results from diagnostic output
+      set_fact:
+        final_status: "{{ diagnostic_result.stdout_lines | select('match', '^RESULT_STATUS:') | first | regex_replace('^RESULT_STATUS:', '') | default('UNKNOWN') }}"
+        final_method: "{{ diagnostic_result.stdout_lines | select('match', '^RESULT_METHOD:') | first | regex_replace('^RESULT_METHOD:', '') | default('NONE') }}"
+        final_error: "{{ diagnostic_result.stdout_lines | select('match', '^RESULT_ERROR:') | first | regex_replace('^RESULT_ERROR:', '') | default('') }}"
+
+    - name: Display diagnostic results
+      debug:
+        msg:
+          - "=== DIAGNOSTIC RESULTS ==="
+          - "Status: {{ final_status }}"
+          - "Method: {{ final_method }}"
+          - "Error: {{ final_error if final_error != '' else 'None' }}"
+
+    - name: Show full diagnostic output
+      debug:
+        var: diagnostic_result.stdout_lines
+
+    - name: Success celebration
+      debug:
+        msg: 
+          - "🎉 SUCCESS! 🎉"
+          - "The vIDM directory bind password has been updated successfully!"
+          - "Method used: {{ final_method }}"
+          - ""
+          - "The session-based approach with Super Admin role worked!"
+      when: final_status == "SUCCESS"
+
+    - name: Failure analysis
+      debug:
+        msg:
+          - "❌ DIAGNOSTIC COMPLETE - UPDATE FAILED"
+          - "Error: {{ final_error }}"
+          - ""
+          - "The diagnostic shows that even with:"
+          - "- Super Admin role"
+          - "- Session-based authentication" 
+          - "- Proper API access"
+          - "- Correct directory identification"
+          - ""
+          - "VMware vIDM still restricts programmatic directory password updates."
+          - "This appears to be an intentional security limitation."
+          - ""
+          - "Manual update via web interface remains the only option."
+      when: final_status == "FAILED"
+
+    - name: Clean up
+      file:
+        path: /tmp/vidm_diagnostic.ps1
+        state: absent

@@ -1,0 +1,62 @@
+---
+- name: Delete user accounts from Ansible Automation Platform
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  vars:
+    controller_hostname: "{{ CONTROLLER_HOST }}"
+    controller_username: "{{ CONTROLLER_USERNAME }}"
+    controller_password: "{{ CONTROLLER_PASSWORD }}"
+    validate_certs: false
+    skip_confirm: true
+
+   
+  tasks:
+    - name: Query all users from Gateway API
+      uri:
+        url: "https://{{ controller_hostname }}/api/gateway/v1/users/"
+        method: GET
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: yes
+        validate_certs: "{{ validate_certs }}"
+        status_code: 200
+      register: gateway_users
+      
+    - name: Filter users to delete
+      set_fact:
+        users_to_delete: "{{ gateway_users.json.results | 
+                           selectattr('username', 'ne', 'admin') | 
+                           rejectattr('username', 'match', '^cvs.*') |
+                           rejectattr('username', 'match', '^CVS.*') | 
+                           list }}"
+                           
+    - name: Display users that will be deleted
+      debug:
+        msg: "Will delete user: {{ item.username }} (ID: {{ item.id }})"
+      loop: "{{ users_to_delete }}"
+      
+    - name: Confirm deletion
+      pause:
+        prompt: "Press ENTER to proceed with deletion or Ctrl+C to abort"
+      when: 
+        - users_to_delete | length > 0
+        - not skip_confirm | bool
+      
+    - name: Delete users via Gateway API
+      uri:
+        url: "https://{{ controller_hostname }}/api/gateway/v1/users/{{ item.id }}/"
+        method: DELETE
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: yes
+        validate_certs: "{{ validate_certs }}"
+        status_code: [204, 202, 200]
+      loop: "{{ users_to_delete }}"
+      when: users_to_delete | length > 0
+      register: delete_results
+      
+    - name: Summary
+      debug:
+        msg: "Deleted {{ users_to_delete | length }} user account(s)"

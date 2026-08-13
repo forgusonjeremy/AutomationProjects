@@ -1,0 +1,24 @@
+hst:
+    hosts:
+        dom34.dom3.example:
+        dom32.dom3.example:
+    children:
+        stig:
+
+mdc:
+    hosts:
+        dom2.dom3.example:
+        dom30.dom3.example:
+    children:
+        stig:   
+
+ew:
+    children:
+        stig:
+
+    
+all:
+    children:
+        hst:
+        mdc:
+        ew:  

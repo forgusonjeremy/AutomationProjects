@@ -1,0 +1,181 @@
+---
+# check_ssl_certs.yml
+# Checks the Common Name (CN) and Subject Alternative Names (SANs)
+# of SSL certificates on RHEL servers.
+ 
+- name: Check SSL Certificate Common Names and SANs
+  hosts: all
+  gather_facts: true
+  become: true
+ 
+  vars:
+    cert_search_paths: "{{ cert_paths | default('/etc/pki/tls/certs,/etc/ssl/certs') }}"
+    find_depth: "{{ search_depth | default(3) }}"
+    expiry_warn_days: "{{ warn_days | default(30) }}"
+    report_dir: /tmp/ssl_cert_reports
+ 
+  tasks:
+ 
+    # ------------------------------------------------------------------ #
+    # 1. Pre checks
+    # ------------------------------------------------------------------ #
+    - name: Ensure openssl is installed
+      ansible.builtin.package:
+        name: openssl
+        state: present
+ 
+    - name: Create local report directory (on control node)
+      ansible.builtin.file:
+        path: "{{ report_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      run_once: true
+      become: false
+ 
+    # ------------------------------------------------------------------ #
+    # 2. Discover certificate files
+    # ------------------------------------------------------------------ #
+    - name: Find all .pem, .crt, and .cer files in cert search paths
+      ansible.builtin.find:
+        paths: "{{ cert_search_paths.split(',') | map('trim') | list }}"
+        patterns:
+          - "*.pem"
+          - "*.crt"
+          - "*.cer"
+        recurse: true
+        depth: "{{ find_depth | int }}"
+        file_type: file
+      register: found_certs
+ 
+    - name: Show number of cert files discovered
+      ansible.builtin.debug:
+        msg: "Found {{ found_certs.files | length }} certificate file(s) on {{ inventory_hostname }}"
+ 
+    # ------------------------------------------------------------------ #
+    # 3. Extract CN and SANs from each certificate
+    # ------------------------------------------------------------------ #
+    - name: Extract CN and SANs from each certificate
+      ansible.builtin.shell: |
+        set -o pipefail
+        FILE="{{ item.path }}"
+ 
+        # Verify it is a valid PEM certificate (skip private keys / bundles)
+        if ! openssl x509 -in "$FILE" -noout 2>/dev/null; then
+          echo "SKIP: Not a valid single PEM certificate"
+          exit 0
+        fi
+ 
+        CN=$(openssl x509 -in "$FILE" -noout -subject 2>/dev/null \
+             | sed -n 's/.*CN\s*=\s*\([^,/]*\).*/\1/p' | xargs)
+ 
+        SANS=$(openssl x509 -in "$FILE" -noout -ext subjectAltName 2>/dev/null \
+               | grep -v "Subject Alternative Name" \
+               | tr ',' '\n' \
+               | sed 's/^\s*//' \
+               | grep -v '^$' \
+               | tr '\n' '|' \
+               | sed 's/|$//')
+ 
+        ISSUER=$(openssl x509 -in "$FILE" -noout -issuer 2>/dev/null \
+                 | sed 's/issuer=//' | xargs)
+ 
+        NOT_AFTER=$(openssl x509 -in "$FILE" -noout -enddate 2>/dev/null \
+                    | sed 's/notAfter=//')
+ 
+        # Days until expiry
+        EXPIRY_EPOCH=$(date -d "$NOT_AFTER" +%s 2>/dev/null || date -j -f "%b %d %T %Y %Z" "$NOT_AFTER" +%s 2>/dev/null)
+        NOW_EPOCH=$(date +%s)
+        DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+ 
+        echo "FILE=$FILE"
+        echo "CN=${CN:-<not set>}"
+        echo "SANS=${SANS:-<none>}"
+        echo "ISSUER=$ISSUER"
+        echo "NOT_AFTER=$NOT_AFTER"
+        echo "DAYS_LEFT=$DAYS_LEFT"
+      args:
+        executable: /bin/bash
+      loop: "{{ found_certs.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      register: cert_details
+      changed_when: false
+ 
+    # ------------------------------------------------------------------ #
+    # 4. Parse results into a structured fact
+    # ------------------------------------------------------------------ #
+    - name: Build structured cert info list
+      ansible.builtin.set_fact:
+        cert_info: >-
+          {{
+            cert_info | default([]) + [{
+              'file':       (item.stdout_lines | select('match', '^FILE=')    | first | default('FILE=') | regex_replace('^FILE=', '')),
+              'cn':         (item.stdout_lines | select('match', '^CN=')      | first | default('CN=')   | regex_replace('^CN=', '')),
+              'sans':       (item.stdout_lines | select('match', '^SANS=')    | first | default('SANS=') | regex_replace('^SANS=', '') | split('|')),
+              'issuer':     (item.stdout_lines | select('match', '^ISSUER=')  | first | default('ISSUER=')| regex_replace('^ISSUER=', '')),
+              'not_after':  (item.stdout_lines | select('match', '^NOT_AFTER=')| first | default('NOT_AFTER=')| regex_replace('^NOT_AFTER=', '')),
+              'days_left':  (item.stdout_lines | select('match', '^DAYS_LEFT=')| first | default('DAYS_LEFT=0')| regex_replace('^DAYS_LEFT=', '') | int),
+              'skipped':    (item.stdout is search('SKIP:'))
+            }]
+          }}
+      loop: "{{ cert_details.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+      when: item.stdout_lines | length > 0
+ 
+    # ------------------------------------------------------------------ #
+    # 5. Display results
+    # ------------------------------------------------------------------ #
+    - name: Print certificate details
+      ansible.builtin.debug:
+        msg: |
+          ──────────────────────────────────────────────────────────
+          Host      : {{ inventory_hostname }}
+          File      : {{ item.file }}
+          {% if item.skipped %}
+          Status    : SKIPPED (not a valid single PEM cert)
+          {% else %}
+          CN        : {{ item.cn }}
+          SANs      : {{ item.sans | join(', ') if item.sans != ['<none>'] else '<none>' }}
+          Issuer    : {{ item.issuer }}
+          Expires   : {{ item.not_after }} ({{ item.days_left }} days)
+          {% if item.days_left <= expiry_warn_days | int %}
+          *** WARNING: Certificate expires in {{ item.days_left }} days! ***
+          {% endif %}
+          {% endif %}
+          ──────────────────────────────────────────────────────────
+      loop: "{{ cert_info | default([]) }}"
+      loop_control:
+        label: "{{ item.file }}"
+ 
+    # ------------------------------------------------------------------ #
+    # 6. Warn on expiring or expired certs
+    # ------------------------------------------------------------------ #
+    - name: Warn about expiring certificates
+      ansible.builtin.debug:
+        msg: >-
+          WARNING on {{ inventory_hostname }}:
+          {{ item.file }} (CN={{ item.cn }}) expires in {{ item.days_left }} days
+          ({{ item.not_after }})
+      loop: "{{ cert_info | default([]) }}"
+      loop_control:
+        label: "{{ item.file }}"
+      when:
+        - not item.skipped
+        - item.days_left <= expiry_warn_days | int
+ 
+    # ------------------------------------------------------------------ #
+    # 7. Write a per-host JSON report to the control node
+    # ------------------------------------------------------------------ #
+    - name: Save JSON report to control node
+      ansible.builtin.copy:
+        content: "{{ cert_info | default([]) | to_nice_json }}"
+        dest: "{{ report_dir }}/{{ inventory_hostname }}_ssl_report.json"
+        mode: "0644"
+      delegate_to: dom16.dom5.dom6.invalid
+      become: true
+ 
+    - name: Report saved
+      ansible.builtin.debug:
+        msg: "JSON report saved to {{ report_dir }}/{{ inventory_hostname }}_ssl_report.json on the control node"

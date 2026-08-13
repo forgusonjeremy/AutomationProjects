@@ -1,0 +1,19 @@
+hst:
+    hosts:
+        dom21.dom3.example:
+    children:
+        vxrmanagers:
+
+mdc:
+    children:
+        vxrmanagers:     
+
+ew:
+    children:
+        vxrmanagers:    
+    
+all:
+    children:
+        hst:
+        mdc:
+        ew:  

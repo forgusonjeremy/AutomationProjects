@@ -1,0 +1,41 @@
+---
+# roles/vsphere_stig_discovery/tasks/main.yml
+- name: Discover ESXi hosts for production remediation
+  block:
+    - name: Initialize esxi_hosts variable
+      ansible.builtin.set_fact:
+        esxi_hosts: []
+
+    - name: Parse hostname list
+      ansible.builtin.set_fact:
+        esxi_hosts: "{{ target_hostname.split(',') | map('trim') | select | list }}"
+      when: target_hostname | length > 0
+
+    - name: Get hosts from cluster
+      community.vmware.vmware_host_config_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        cluster_name: "{{ target_cluster }}"
+      register: cluster_info
+      when: 
+        - target_cluster | length > 0
+        - esxi_hosts | length == 0
+
+    - name: Extract cluster hostnames
+      ansible.builtin.set_fact:
+        esxi_hosts: "{{ cluster_info.hosts_info.keys() | list }}"
+      when:
+        - cluster_info is defined
+        - cluster_info.hosts_info is defined
+
+    - name: Validate hosts discovered
+      ansible.builtin.assert:
+        that:
+          - esxi_hosts | length > 0
+        fail_msg: "No ESXi hosts found with the provided criteria"
+
+    - name: Display discovered hosts
+      ansible.builtin.debug:
+        msg: "Found {{ esxi_hosts | length }} production ESXi host(s): {{ esxi_hosts | join(', ') }}"

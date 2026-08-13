@@ -1,0 +1,24 @@
+- name: "check ping status on target {{ item }}"
+  ignore_errors: true
+  shell: "ping -c 1 {{ item }}"
+
+- name: "check if port 5986 is accessible on target {{ item }}"
+  ignore_errors: true
+  wait_for:
+    host: "{{ item }}"
+    port: 5986
+    state: started
+    delay: 0
+    timeout: 1
+  
+- name: "check if port 445 is accessible on target {{ item }}"
+  ignore_errors: true
+  wait_for:
+    host: "{{ item }}"
+    port: 445
+    state: started
+    delay: 0
+    sleep: 1
+    timeout: 2
+
+

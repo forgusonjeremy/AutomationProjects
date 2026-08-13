@@ -1,2 +1,0 @@
-_groups: n9kv
-new_image: nxos64-cs.10.5.5.M.bin
