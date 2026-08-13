@@ -1,0 +1,25 @@
+---
+- name: play to run powershell script on windows
+  hosts: all
+  gather_facts: no
+  connection: winrm
+  port: 5986
+  
+  vars:
+    winrm_transport: kerberos
+    winrm_server_cert_validation: ignore
+    # ansible_user: "{{ WinRM_username }}"
+    # ansible_password: "{{ WinRM_password }}"
+
+  tasks:
+    - name: Run PowerShell script with parameters
+      ansible.windows.win_powershell:
+        script: |
+            {{ lookup('ansible.builtin.file', var_PS_script) }}
+        parameters: # parameters supplied because the example script takes parameters  
+      register: result  # output captured so we can use it later
+
+    # script output results
+    - name: win_powershell output 
+      debug:
+        var: result.output 

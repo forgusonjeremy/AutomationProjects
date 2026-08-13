@@ -1,0 +1,156 @@
+{
+    "SchemaVersion":  1,
+    "Created":  "2026-08-13T10:07:34.3579110-04:00",
+    "Updated":  "2026-08-13T10:07:37.1553047-04:00",
+    "EntryCount":  21,
+    "Counters":  [
+                     {
+                         "Type":  "CommonName",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "DomainLabel",
+                         "Index":  7
+                     },
+                     {
+                         "Type":  "IPv4Subnet",
+                         "Index":  2
+                     },
+                     {
+                         "Type":  "Secret",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "Tld",
+                         "Index":  1
+                     }
+                 ],
+    "Entries":  [
+                    {
+                        "Type":  "CommonName",
+                        "Value":  "ESXi-Admins",
+                        "Key":  "esxi-admins",
+                        "Surrogate":  "cn1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "company",
+                        "Key":  "company",
+                        "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esxi01",
+                        "Key":  "esxi01",
+                        "Surrogate":  "dom1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esxi02",
+                        "Key":  "esxi02",
+                        "Surrogate":  "dom3"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "gitlab",
+                        "Key":  "gitlab",
+                        "Surrogate":  "dom4"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "ntp1",
+                        "Key":  "ntp1",
+                        "Surrogate":  "dom6"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "ntp2",
+                        "Key":  "ntp2",
+                        "Surrogate":  "dom7"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "syslog",
+                        "Key":  "syslog",
+                        "Surrogate":  "dom5"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esxi01.company.com",
+                        "Key":  "esxi01.company.com",
+                        "Surrogate":  "dom1.dom2.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esxi02.company.com",
+                        "Key":  "esxi02.company.com",
+                        "Surrogate":  "dom3.dom2.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "gitlab.company.com",
+                        "Key":  "gitlab.company.com",
+                        "Surrogate":  "dom4.dom2.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "ntp1.company.com",
+                        "Key":  "ntp1.company.com",
+                        "Surrogate":  "dom6.dom2.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "ntp2.company.com",
+                        "Key":  "ntp2.company.com",
+                        "Surrogate":  "dom7.dom2.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "syslog.company.com",
+                        "Key":  "syslog.company.com",
+                        "Surrogate":  "dom5.dom2.example"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.100.222.125",
+                        "Key":  "10.100.222.125",
+                        "Surrogate":  "100.64.1.125"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.100.222.128",
+                        "Key":  "10.100.222.128",
+                        "Surrogate":  "100.64.1.128"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.100.7.54",
+                        "Key":  "10.100.7.54",
+                        "Surrogate":  "100.64.0.54"
+                    },
+                    {
+                        "Type":  "IPv4Subnet",
+                        "Value":  "10.100.222",
+                        "Key":  "10.100.222",
+                        "Surrogate":  "100.64.1"
+                    },
+                    {
+                        "Type":  "IPv4Subnet",
+                        "Value":  "10.100.7",
+                        "Key":  "10.100.7",
+                        "Surrogate":  "100.64.0"
+                    },
+                    {
+                        "Type":  "Secret",
+                        "Value":  "V1rtu@1c3!",
+                        "Key":  "V1rtu@1c3!",
+                        "Surrogate":  "REDACTED-SECRET-1"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "com",
+                        "Key":  "com",
+                        "Surrogate":  "example"
+                    }
+                ]
+}

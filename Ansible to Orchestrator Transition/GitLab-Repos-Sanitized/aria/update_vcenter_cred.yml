@@ -1,0 +1,291 @@
+---
+- name: Update vIDM Directory Domain Bind User Password
+  hosts: localhost
+  gather_facts: false
+  vars:
+    set_no_log: "{{ true | default(true) }}"
+    vidm_host: "{{ vidm_hostname }}"
+    vidm_port: "{{ vidm_port | default(443) }}"
+    vidm_username: "{{ vidm_admin_username }}"
+    vidm_password: "{{ vidm_admin_password }}"
+    directory_id: "{{ vidm_directory_id }}"
+    new_bind_password: "{{ vidm_new_bind_password }}"
+    validate_certs: "{{ vidm_validate_certs | default(true) }}"
+
+  tasks:
+    - name: Validate required variables
+      fail:
+        msg: "Required variable {{ item }} is not defined or empty"
+      when: vars[item] is undefined or vars[item] == ""
+      loop:
+        - vidm_hostname
+        - vidm_admin_username
+        - vidm_admin_password
+        - vidm_directory_id
+        - vidm_new_bind_password
+
+    - block:
+        - name: Get authentication token from vIDM
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/auth/login"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              username: "{{ vidm_username }}"
+              password: "{{ vidm_password }}"
+              issueToken: "true"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 302]
+            timeout: 30
+            return_content: yes
+            follow_redirects: none
+          register: auth_response
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+
+        - name: Debug authentication response
+          debug:
+            msg: 
+              - "Status Code: {{ auth_response.status }}"
+              - "Content Type: {{ auth_response.content_type | default('unknown') }}"
+              - "Response Keys: {{ auth_response.keys() | join(', ') }}"
+              - "Has headers: {{ 'headers' in auth_response }}"
+              - "Has cookies: {{ 'cookies' in auth_response }}"
+              - "Response Content (first 200 chars): {{ (auth_response.content | default('No content'))[:200] }}"
+
+        - name: Extract session token or cookie
+          block:
+            - name: Try to extract JSON session token
+              set_fact:
+                session_token: "{{ auth_response.json.sessionToken }}"
+              when: "'json' in auth_response and auth_response.json.sessionToken is defined"
+              no_log: "{{ set_no_log }}"
+
+            - name: Extract session from headers if available
+              set_fact:
+                session_cookie: "{{ auth_response.headers['Set-Cookie'] | regex_search('([^;]+)') }}"
+              when: 
+                - session_token is undefined 
+                - auth_response.headers is defined
+                - "'Set-Cookie' in auth_response.headers"
+              no_log: "{{ set_no_log }}"
+
+            - name: Extract session from cookies if available
+              set_fact:
+                session_cookie: "{{ auth_response.cookies.keys() | first }}={{ auth_response.cookies[auth_response.cookies.keys() | first] }}"
+              when: 
+                - session_token is undefined
+                - session_cookie is undefined
+                - auth_response.cookies is defined
+                - auth_response.cookies | length > 0
+              no_log: "{{ set_no_log }}"
+
+            - name: Use alternative API endpoint for token-based auth
+              uri:
+                url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/API/1.0/REST/auth/system/login"
+                method: POST
+                body_format: json
+                body:
+                  username: "{{ vidm_username }}"
+                  password: "{{ vidm_password }}"
+                  issueToken: true
+                headers:
+                  Content-Type: "application/json"
+                  Accept: "application/json"
+                validate_certs: "{{ validate_certs }}"
+                status_code: [200, 400, 401]
+                timeout: 30
+                return_content: yes
+              register: alt_auth_response
+              when: session_token is undefined and session_cookie is undefined
+              failed_when: false
+              no_log: "{{ set_no_log }}"
+
+            - name: Extract token from alternative endpoint
+              set_fact:
+                session_token: "{{ alt_auth_response.json.sessionToken }}"
+              when: 
+                - session_token is undefined
+                - alt_auth_response is defined
+                - "'json' in alt_auth_response"
+                - alt_auth_response.json.sessionToken is defined
+              no_log: "{{ set_no_log }}"
+
+          rescue:
+            - name: Authentication method failed
+              debug:
+                msg: "Failed to extract authentication token or cookie"
+
+        - name: Verify we have authentication credentials
+          fail:
+            msg: |
+              Authentication failed. Could not obtain session token or valid cookie.
+              Status: {{ auth_response.status }}
+              Try checking:
+              1. Username and password are correct
+              2. User has admin privileges in vIDM
+              3. vIDM version and API compatibility
+              4. Network connectivity to {{ vidm_host }}:{{ vidm_port }}
+          when: session_token is undefined and session_cookie is undefined
+
+        - name: List all directory configurations to find the correct ID
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs"
+            method: GET
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: 200
+            timeout: 30
+            return_content: yes
+          register: all_directories
+
+        - name: Debug API response structure
+          debug:
+            msg: 
+              - "API Response Status: {{ all_directories.status }}"
+              - "Response Content Type: {{ all_directories.content_type | default('unknown') }}"
+              - "Response JSON Keys: {{ all_directories.json.keys() | join(', ') if all_directories.json is defined else 'No JSON response' }}"
+              - "Response JSON Type: {{ all_directories.json | type_debug }}"
+              - "Raw Response Content: {{ all_directories.content[:500] if all_directories.content is defined else 'No content' }}"
+
+        # BYPASS ALL DIRECTORY EXTRACTION - Use direct UUID approach
+        - name: Bypass directory extraction completely
+          debug:
+            msg: 
+              - "BYPASSING all directory extraction due to template parsing issues"
+              - "Provided directory_id: {{ directory_id }}"
+              - "Will attempt to use as UUID directly"
+
+        - name: Check if provided directory_id is UUID format
+          set_fact:
+            resolved_directory_id: "{{ directory_id }}"
+          when: directory_id | regex_search('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+
+        - name: Fail if directory_id is not UUID format
+          fail:
+            msg: |
+              The provided directory_id '{{ directory_id }}' is not in UUID format.
+              
+              Due to template parsing issues, this playbook cannot automatically resolve directory names to UUIDs.
+              
+              Please provide the directory UUID directly. To find it:
+              1. Log into vIDM web interface
+              2. Navigate to Identity & Access Management > Directories  
+              3. Click on your directory
+              4. The UUID is typically shown in the URL or directory details
+              5. Re-run with: vidm_directory_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              
+              Example UUID format: 12345678-1234-1234-1234-123456789abc
+          when: resolved_directory_id is undefined
+
+        - name: Confirm directory UUID to use
+          debug:
+            msg: "Will use directory UUID: {{ resolved_directory_id }}"
+
+        - name: Get current directory configuration
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}"
+            method: GET
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/vnd.vmware.horizon.manager.connector.management.directory.ad.over.ldap+json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: 200
+            timeout: 30
+            return_content: yes
+          register: directory_config
+
+        - name: Verify directory config was retrieved
+          fail:
+            msg: "Failed to retrieve directory configuration. Status: {{ directory_config.status }}"
+          when: directory_config.json is undefined
+
+        - name: Update directory configuration with new bind password
+          set_fact:
+            updated_config: "{{ directory_config.json | combine({'bindPassword': new_bind_password}) }}"
+          no_log: "{{ set_no_log }}"
+
+        - name: Apply updated directory configuration
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}"
+            method: PUT
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/vnd.vmware.horizon.manager.connector.management.directory.ad.over.ldap+json"
+            body_format: json
+            body: "{{ updated_config }}"
+            validate_certs: "{{ validate_certs }}"
+            status_code: 200
+            timeout: 30
+            return_content: yes
+          register: update_result
+
+        - name: Test directory connection with new password
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}/test"
+            method: POST
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: 200
+            timeout: 30
+            return_content: yes
+          register: connection_test
+          retries: 3
+          delay: 5
+
+        - name: Verify connection test success
+          fail:
+            msg: "Directory connection test failed: {{ connection_test.json | default('No JSON response') }}"
+          when: connection_test.json is undefined or not (connection_test.json.success | default(false))
+
+        - name: Display connection test results
+          debug:
+            msg: "Directory connection test: {{ 'PASSED' if connection_test.json.success else 'FAILED' }}"
+
+        - name: Sync directory to apply changes
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}/sync"
+            method: POST
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/json"
+            body_format: json
+            body:
+              syncType: "FULL"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 202]
+            timeout: 60
+            return_content: yes
+          register: sync_result
+
+        - name: Display success message
+          debug:
+            msg: "vIDM directory bind password has been successfully updated and directory sync initiated"
+
+      rescue:
+        - name: Display error information
+          debug:
+            msg: "Playbook execution failed. Check the error messages above for details."
+
+      always:
+        - name: Logout from vIDM
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/auth/logout"
+            method: POST
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 302]
+            timeout: 30
+          ignore_errors: true
+          when: session_token is defined or session_cookie is defined

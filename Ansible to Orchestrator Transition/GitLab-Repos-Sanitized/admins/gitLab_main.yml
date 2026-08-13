@@ -1,0 +1,81 @@
+---
+- name: Exporting Gitlab project and copy to file share location
+  hosts: all
+  gather_facts: true
+
+  vars:
+    # gitlab_endpoint: "{{ var_Gitlab_Project_Site }}"
+    # Project_IDs: "{{ var_Gitlab_Project_ID.split(',') }}"
+
+    # var_username: "{{ Gitlab_http_username }}"
+    # var_password: "{{ Gitlab_http_password }}"
+    # var_destfolder: "~/ansibleTemp"
+    # var_shareLocation: "/mnt/winShare/ansibleDir/ProjectExports/"
+  roles:
+    - gitlab
+      
+  tasks:
+  # # ensure local folder exist
+  # - name: Creates directory
+  #   ansible.builtin.file:
+  #     path: "{{ var_destfolder }}"
+  #     state: directory
+
+  # # Authenticate to Gitlab
+  # - name: Authentication block
+  #   block:
+  #   - name: obtain Access Token
+  #     uri:
+  #       url: "{{ gitlab_endpoint }}/oauth/token"
+  #       method: POST
+  #       status_code: 200
+  #       validate_certs: false
+  #       body_format: json
+  #       headers:
+  #         Content-Type: application/json
+  #       body: >
+  #         {
+  #           "grant_type": "password",
+  #           "username": "{{ var_username }}",
+  #           "password": "{{ var_password }}"
+  #         }
+  #     register: gitlab_AccessToken
+
+  #   - name: Set facts
+  #     ansible.builtin.set_fact:
+  #       Auth_token: "{{ gitlab_AccessToken.json.access_token }}"
+
+  # # kick off the export process 
+  # - include_tasks: gitLab_export_task.yml
+  #   loop: "{{ Project_IDs }}"
+
+  # # # pause and give export process to finish
+  # # - name: Pause for 10 seconds to build app cache
+  # #   ansible.builtin.pause:
+  # #     seconds: 4
+
+  # # Download export file and move to local share location        
+  # - include_tasks: gitLab_download_task.yml
+  #   loop: "{{ Project_IDs }}"
+
+  # # move file form local share to Network Share location
+  # - name: get file names to copy
+  #   command: "find {{ var_destfolder }} -type f"
+  #   register: files_to_copy
+
+  # - name: Copy file to the Share location
+  #   copy:
+  #     src: "{{ item }}" 
+  #     dest: "{{ var_shareLocation }}/"
+  #     remote_src: True
+  #     mode: 0644
+  #   become: true
+  #   with_items:
+  #   - "{{ files_to_copy.stdout_lines }}"
+
+  # - name: remove files
+  #   ansible.builtin.file:
+  #     state: absent
+  #     path: "{{ item }}"
+  #   with_items:
+  #     - "{{ files_to_copy.stdout_lines }}"

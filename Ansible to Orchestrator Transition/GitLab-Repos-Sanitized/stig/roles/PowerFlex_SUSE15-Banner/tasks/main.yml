@@ -1,0 +1,14 @@
+# R-234803 SLES-15-010020
+- name: stigrule_234803__etc_issue
+  copy:
+    dest: "{{ sles15STIG_stigrule_234803__etc_issue_Dest }}"
+    content: "{{ sles15STIG_stigrule_234803__etc_issue_Content }}"
+  when:
+    - sles15STIG_stigrule_234803_Manage
+# R-234805 SLES-15-010040
+- name: stigrule_234805__etc_issue
+  copy:
+    dest: "{{ sles15STIG_stigrule_234805__etc_issue_Dest }}"
+    content: "{{ sles15STIG_stigrule_234805__etc_issue_Content }}"
+  when:
+    - sles15STIG_stigrule_234805_Manage

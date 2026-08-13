@@ -1,0 +1,114 @@
+---
+# config/production_stig_config.yml
+# VMware vSphere 8.0 STIG Configuration for Production Environment
+
+stig_config:
+  security:
+    # Account Security (ESXI-80-000005, ESXI-80-000111)
+    account_lock_failures: 3
+    account_unlock_time: 900
+    
+    # Password Policies (ESXI-80-000035, ESXI-80-000043, ESXI-80-000227)
+    password_complexity: "similar=deny retry=3 min=disabled,disabled,disabled,disabled,15"
+    password_history: 5
+    password_max_age: 90
+    
+    # Session Timeouts (ESXI-80-000010, ESXI-80-000068, ESXI-80-000195, ESXI-80-000196, ESXI-80-000226)
+    host_client_timeout: 900
+    shell_interactive_timeout: 900
+    shell_timeout: 600
+    dcui_timeout: 600
+    api_timeout: 30
+    
+    # Memory Security (ESXI-80-000213, ESXI-80-000225)
+    share_force_salting: 2
+    mem_eager_zero: 1
+    
+    # Network Security (ESXI-80-000215, ESXI-80-000250)
+    block_guest_bpdu: 1
+    bmc_network_enable: 0
+    
+    # Security Features (ESXI-80-000047, ESXI-80-000222, ESXI-80-000223, ESXI-80-000244)
+    enable_mob: false
+    suppress_shell_warning: 0
+    suppress_hyper_warning: 0
+    execute_vibs: "true"
+    
+    # Lockdown Mode (ESXI-80-000008) - PRODUCTION ENFORCED
+    lockdown_level: "normal"
+    
+  logging:
+    # Log Configuration (ESXI-80-000015, ESXI-80-000235)
+    log_level: "info"
+    syslog_log_level: "info"
+    syslog_scratch: "[] /scratch/log"
+    
+    # Audit Logging (ESXI-80-000113, ESXI-80-000232, ESXI-80-000233)
+    audit_storage_capacity: 100
+    syslog_audit_enable: true
+    syslog_audit_remote: true
+    
+    # SSL Certificate Checking (ESXI-80-000224, ESXI-80-000234)
+    syslog_cert_check: true
+    syslog_cert_strict: true
+    
+  services:
+    # Production Services - ALL DISABLED for security
+    ssh_enabled: false      # ESXI-80-000193
+    shell_enabled: false    # ESXI-80-000194
+    cim_enabled: false      # ESXI-80-000228
+    slpd_enabled: false     # ESXI-80-000231
+    
+  compliance:
+    # VIB and Build Requirements (ESXI-80-000133)
+    vib_accept_level: "PartnerSupported"
+    esxi_build: "24022510"
+    
+    # Network Security Profile
+    tls_server_profile: "NIST_2024"
+
+  # Control enablement flags - can be overridden via extra_vars
+  controls_enabled:
+    ESXI80000005: "{{ enable_ESXI80000005 | default(true) | bool }}"   # Account Lock Failures
+    ESXI80000006: "{{ enable_ESXI80000006 | default(true) | bool }}"   # DoD Banner
+    ESXI80000008: "{{ enable_ESXI80000008 | default(true) | bool }}"  # Lockdown Mode
+    ESXI80000010: "{{ enable_ESXI80000010 | default(true) | bool }}"   # Host Client Timeout
+    ESXI80000015: "{{ enable_ESXI80000015 | default(true) | bool }}"   # Log Level
+    ESXI80000035: "{{ enable_ESXI80000035 | default(true) | bool }}"   # Password Complexity
+    ESXI80000043: "{{ enable_ESXI80000043 | default(true) | bool }}"   # Password History
+    ESXI80000047: "{{ enable_ESXI80000047 | default(true) | bool }}"   # Disable MOB
+    ESXI80000068: "{{ enable_ESXI80000068 | default(true) | bool }}"   # Shell Interactive Timeout
+    ESXI80000111: "{{ enable_ESXI80000111 | default(true) | bool }}"   # Account Unlock Time
+    ESXI80000113: "{{ enable_ESXI80000113 | default(true) | bool }}"   # Audit Storage Capacity
+    ESXI80000114: "{{ enable_ESXI80000114 | default(true) | bool }}"   # Syslog
+    ESXI80000124: "{{ enable_ESXI80000124 | default(true) | bool }}"   # NTP
+    ESXI80000133: "{{ enable_ESXI80000133 | default(true) | bool }}"   # VIB Acceptance Level
+    ESXI80000189: "{{ enable_ESXI80000189 | default(true) | bool }}"   # DCUI Access
+    ESXI80000193: "{{ enable_ESXI80000193 | default(true) | bool }}"   # SSH Disabled
+    ESXI80000194: "{{ enable_ESXI80000194 | default(true) | bool }}"   # Shell Disabled
+    ESXI80000195: "{{ enable_ESXI80000195 | default(true) | bool }}"   # Shell Timeout
+    ESXI80000196: "{{ enable_ESXI80000196 | default(true) | bool }}"   # DCUI Timeout
+    ESXI80000213: "{{ enable_ESXI80000213 | default(true) | bool }}"   # Memory Salting
+    ESXI80000214: "{{ enable_ESXI80000214 | default(true) | bool }}"   # Default Firewall
+    ESXI80000215: "{{ enable_ESXI80000215 | default(true) | bool }}"   # BPDU
+    ESXI80000216: "{{ enable_ESXI80000216 | default(true) | bool }}"   # Forged Transmits
+    ESXI80000217: "{{ enable_ESXI80000217 | default(true) | bool }}"   # MAC Changes
+    ESXI80000218: "{{ enable_ESXI80000218 | default(true) | bool }}"   # Promiscuous Mode
+    ESXI80000219: "{{ enable_ESXI80000219 | default(true) | bool }}"   # DVFilter
+    ESXI80000222: "{{ enable_ESXI80000222 | default(true) | bool }}"   # Suppress Shell Warning
+    ESXI80000223: "{{ enable_ESXI80000223 | default(true) | bool }}"   # Suppress Hyperthreading Warning
+    ESXI80000224: "{{ enable_ESXI80000224 | default(true) | bool }}"   # Syslog Cert Check
+    ESXI80000225: "{{ enable_ESXI80000225 | default(true) | bool }}"   # Memory Eager Zero
+    ESXI80000226: "{{ enable_ESXI80000226 | default(true) | bool }}"   # API Timeout
+    ESXI80000227: "{{ enable_ESXI80000227 | default(true) | bool }}"   # Password Age
+    ESXI80000228: "{{ enable_ESXI80000228 | default(true) | bool }}"   # CIM Service
+    ESXI80000231: "{{ enable_ESXI80000231 | default(true) | bool }}"   # SLPD Service
+    ESXI80000232: "{{ enable_ESXI80000232 | default(true) | bool }}"   # Syslog Audit Enable
+    ESXI80000233: "{{ enable_ESXI80000233 | default(true) | bool }}"   # Syslog Audit Remote
+    ESXI80000234: "{{ enable_ESXI80000234 | default(true) | bool }}"   # Syslog Cert Strict
+    ESXI80000235: "{{ enable_ESXI80000235 | default(true) | bool }}"   # Syslog Log Level
+    ESXI80000241: "{{ enable_ESXI80000241 | default(true) | bool }}"   # The ESXi host must not use the default Active Directory ESX Admin group
+    ESXI80000243: "{{ enable_ESXI80000243 | default(true) | bool }}"   # Persistent Logs
+    ESXI80000244: "{{ enable_ESXI80000244 | default(true) | bool }}"   # Execute VIBs
+    ESXI80000250: "{{ enable_ESXI80000250 | default(true) | bool }}"   # BMC Network
+  

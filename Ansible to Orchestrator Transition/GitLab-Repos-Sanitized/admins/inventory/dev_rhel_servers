@@ -1,0 +1,24 @@
+hst:
+    hosts:
+        cvsdans01.pilot.dev:
+        cvsdgit01.pilot.dev:
+    children:
+        stig:
+
+mdc:
+    hosts:
+        cvsdans02.pilot.dev:
+        cvsdgit02.pilot.dev:
+    children:
+        stig:   
+
+ew:
+    children:
+        stig:
+
+    
+all:
+    children:
+        hst:
+        mdc:
+        ew:  

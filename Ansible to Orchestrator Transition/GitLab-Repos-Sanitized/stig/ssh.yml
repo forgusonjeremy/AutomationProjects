@@ -1,0 +1,75 @@
+---
+- name: Restrict SSH access to allowed IPs only
+  hosts: all
+  become: yes
+
+  vars:
+    allowed_ssh_ips:
+      - "100.64.0.26"
+      - "100.64.0.25"
+      - "100.64.1.0/24"
+      - "100.64.2.239"
+      - "100.64.3.162"
+      - "100.64.3.163"
+      - "100.64.3.164"
+      - "100.64.3.165"
+      - "100.64.3.166"
+      - "100.64.3.169"
+      - "100.64.3.171"
+      - "100.64.4.0/23"
+      - "100.64.4.230"
+      - "100.64.5.92"
+      - "100.64.5.93"
+      - "100.64.5.95"
+      - "100.64.5.96"
+      - "100.64.5.97"
+      - "100.64.5.100"
+      - "100.64.6.0/24"
+      - "100.64.7.0/24"
+      - "100.64.8.72"
+      - "100.64.8.73"
+      - "100.64.8.77"
+      - "100.64.8.78"
+      - "100.64.8.79"
+      - "100.64.9.5"
+      - "100.64.9.6"
+      - "100.64.10.0/24"
+      - "100.64.11.41"
+      - "100.64.11.42"
+      - "100.64.11.43"
+      - "100.64.11.44"
+      - "100.64.11.45"
+      - "100.64.11.46"
+      - "100.64.8.82"
+      - "100.64.2.239"
+      - "100.64.2.240"
+      - "100.64.2.242"   
+    ssh_port: 22
+
+  tasks:
+
+    - name: Flush existing SSH iptables ACCEPT rules
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ ssh_port }}"
+        source: "{{ item }}"
+        jump: ACCEPT
+        state: absent
+      loop: "{{ allowed_ssh_ips }}"
+
+    - name: Allow SSH from each whitelisted IP
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ ssh_port }}"
+        source: "{{ item }}"
+        jump: ACCEPT
+        state: present
+        comment: "Allow SSH from {{ item }}"
+      loop: "{{ allowed_ssh_ips }}"
+
+    - name: Save iptables rules (RHEL)
+      ansible.builtin.command: service iptables save
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes

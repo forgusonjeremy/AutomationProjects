@@ -1,0 +1,17 @@
+---
+- name: Test PowerCLI
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Test PowerCLI installation
+      shell: |
+        pwsh -c "
+        Import-Module VMware.PowerCLI -ErrorAction Stop
+        Get-PowerCLIVersion
+        Get-Module VMware* | Select-Object Name, Version
+        "
+      register: powercli_test
+
+    - name: Display results
+      debug:
+        var: powercli_test.stdout_lines

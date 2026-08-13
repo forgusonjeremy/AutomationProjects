@@ -1,0 +1,106 @@
+---
+# ============================================================================
+# vmware_rightsizing.yml
+# ============================================================================
+
+- name: playbook to run powershell script remotely
+  hosts: all
+  become_method: runas
+  gather_facts: yes
+  connection: winrm
+  port: 5986
+
+  vars:
+    var_ps_folder:        'ps_scripts'                        # root folder under files/
+    var_ps_script_file:   'cvs_vmware_rightsizing.ps1'        # dedicated rightsizing script
+
+    var_vCenterList:      'esoco26vcs01.washdc.state.sbu, esocoewvcs.washdc.state.sbu, esocoewvcs01.washdc.state.sbu, esocoewvcs02.washdc.state.sbu, esoco26vcs02.washdc.state.sbu'   # <-- your vCenters, comma-separated
+
+    # ---- sampling window ----
+    var_LookbackDays:     '30'                                # perf history to pull
+    var_IntervalMins:     '1440'                              # sample rollup (1440 = daily)
+    var_MinSampleDays:    '3'                                 # skip VMs with < this many days of data
+    var_QueryVmChunkSize: '25'                                # QueryPerf VM batch size; keeps 25 x 7 counters = ~175 metric series under common vCenter limits
+
+    # ---- CPU rightsizing thresholds ----
+    var_CpuDownsizeP95Pct: '40'                               # p95 CPU% below this = downsize candidate
+    var_CpuReadyWarnPct:   '5'                                # CPU ready % warn
+    var_CpuReadyCritPct:   '10'                               # CPU ready % crit
+    var_CostopWarnPct:     '3'                                # co-stop % warn (wide-VM contention)
+    var_MinVcpu:           '1'                                # never recommend below this vCPU count
+
+    # ---- memory rightsizing thresholds ----
+    var_MemDownsizeP95Pct: '50'                               # p95 active mem% below this = downsize candidate
+    var_HeadroomPct:       '30'                               # headroom left on top of observed peak
+
+    # ---- reclaim floors  ----
+    var_MinVcpuReclaim:    '1'                                # min vCPU reclaim to report
+    var_MinRamReclaimGB:   '1'                                # min RAM reclaim (GB) to report
+    var_MinRamReclaimPct:  '5'                                # min RAM reclaim (% of allocated) to report
+
+    var_ClusterFilter:    '*'                                 # cluster name glob
+    var_OutputFolder:     'D:\Scripts\vmware\out'             # persistent output path (survives temp cleanup)
+
+    # ---- email ----
+    var_eMailReport:      'yes'                               # 'yes' to actually send
+    var_SMTPServer:       'dom1.dom2.dom3.example'        # <-- your relay
+    var_MailFrom:         'user5@dom3.example'               # from address
+    var_MailToString:     'user3@dom3.example'               # recipients, comma-separated
+
+  tasks:
+    - name: "Create temporary directory"
+      ansible.windows.win_tempfile:
+        state: directory
+      register: tempdir
+
+    - name: "Script Operations"
+      block:
+        - name: "Copy Scripts to Host"
+          ansible.windows.win_copy:
+            src: "files/{{ var_ps_folder }}"
+            dest: "{{ tempdir.path }}"
+
+        - name: check if file exist
+          ansible.windows.win_stat:
+            path: "{{ tempdir.path }}\\{{ var_ps_folder }}\\{{ var_ps_script_file }}"
+          register: file_data
+
+        - name: Run PowerShell script
+          when: file_data.stat.exists == true
+          no_log: false
+          environment:
+            VC_USER: "{{ vcenter_username }}"
+            VC_PASS: "{{ vcenter_password }}"
+          ansible.windows.win_command: >-
+            powershell.exe -ExecutionPolicy ByPass
+            -File "{{ tempdir.path }}\\{{ var_ps_folder }}\\{{ var_ps_script_file }}"
+            -vCenterList "{{ var_vCenterList }}"
+            -LookbackDays "{{ var_LookbackDays }}"
+            -IntervalMins "{{ var_IntervalMins }}"
+            -MinSampleDays "{{ var_MinSampleDays }}"
+            -QueryVmChunkSize "{{ var_QueryVmChunkSize }}"
+            -CpuDownsizeP95Pct "{{ var_CpuDownsizeP95Pct }}"
+            -CpuReadyWarnPct "{{ var_CpuReadyWarnPct }}"
+            -CpuReadyCritPct "{{ var_CpuReadyCritPct }}"
+            -CostopWarnPct "{{ var_CostopWarnPct }}"
+            -MinVcpu "{{ var_MinVcpu }}"
+            -MemDownsizeP95Pct "{{ var_MemDownsizeP95Pct }}"
+            -HeadroomPct "{{ var_HeadroomPct }}"
+            -MinVcpuReclaim "{{ var_MinVcpuReclaim }}"
+            -MinRamReclaimGB "{{ var_MinRamReclaimGB }}"
+            -MinRamReclaimPct "{{ var_MinRamReclaimPct }}"
+            -ClusterFilter "{{ var_ClusterFilter }}"
+            -OutputFolder "{{ var_OutputFolder }}"
+            -eMailReport "{{ var_eMailReport }}"
+            -SMTPServer "{{ var_SMTPServer }}"
+            -MailFrom "{{ var_MailFrom }}"
+            -MailToString "{{ var_MailToString }}"
+
+        - name: "List the persistent output folder content"
+          ansible.windows.win_shell: "ls -Recurse '{{ var_OutputFolder }}'"
+
+      always:
+        - name: "Cleanup Temporary Files"
+          ansible.windows.win_file:
+            state: absent
+            path: "{{ tempdir.path }}"

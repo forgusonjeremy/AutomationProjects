@@ -1,0 +1,29 @@
+---
+- name: stig-ansible-hardening ( RHEL 8)
+  hosts: all
+  gather_facts: no
+  vars:
+    # RHEL 8, Windows 2022, vCenter 8 U1, vCenter 8 U2
+    var_platform_selected: "{{ var_platform }}"
+    var_SystemFQDN_selected: "{{ var_SystemFQDN }}"
+    listOf_hosts: "{{ var_SystemFQDN.split('\n') }}"
+    
+  tasks:
+
+  - name: import host(s) from survey hosts list
+    add_host:
+      hostname: "{{ item }}"
+      groupname: new_group      
+    loop: "{{ listOf_hosts }}" 
+    when:
+     - var_SystemFQDN | length > 0
+   
+
+- name: run playbook against the host from survey
+  hosts: new_group
+  gather_facts: yes
+  
+  tasks:
+  - name: import role
+    include_role:
+      name: rhel8STIG

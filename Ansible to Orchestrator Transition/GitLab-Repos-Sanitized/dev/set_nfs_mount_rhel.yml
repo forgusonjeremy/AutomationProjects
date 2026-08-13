@@ -1,0 +1,60 @@
+---
+- name: Configure RHEL 9 Log Archiving to NFS Share
+  hosts: all
+  become: yes
+  vars:
+    nfs_server: "10.68.54.24"  # Replace with your NFS server
+    nfs_export: "/vol/ewnfsarchive"                # Replace with your NFS export path
+    nfs_mount_point: "/mnt/nfs-archive"
+    nfs_mount_options: "rw,sync,hard,intr"
+    host_archive_dir: "{{ nfs_mount_point }}/{{ inventory_hostname }}"
+
+  tasks:
+
+    - name: Install NFS utilities
+      dnf:
+        name:
+          - nfs-utils
+          - nfs4-acl-tools
+        state: present
+
+    - name: Start and enable rpcbind service
+      systemd:
+        name: rpcbind
+        state: started
+        enabled: yes
+
+    - name: Create NFS mount point directory
+      file:
+        path: "{{ nfs_mount_point }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create hostname-based directory structure on NFS
+      file:
+        path: "{{ host_archive_dir }}/{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      loop:
+        - system_logs
+        - journal_logs
+        - audit_logs
+        - temp
+
+    - name: Add NFS mount to /etc/fstab
+      mount:
+        path: "{{ nfs_mount_point }}"
+        src: "{{ nfs_server }}:{{ nfs_export }}"
+        fstype: nfs
+        opts: "{{ nfs_mount_options }}"
+        state: mounted
+
+    - name: Verify hostname-based NFS directory structure
+      file:
+        path: "{{ host_archive_dir }}/system_logs"
+        state: directory
+        mode: '0755'

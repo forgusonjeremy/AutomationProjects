@@ -1,0 +1,41 @@
+---
+- name: a play that cisco running version
+  hosts: nexus9k
+  gather_facts: no
+
+  vars:
+    controller_validate_certs: true
+  collections:
+    - infra.controller_configuration
+    - ansible.controller
+
+  tasks:
+    - name: ping device
+      ping:
+      register: ping_response
+
+    - name: Gather all legacy facts
+      cisco.nxos.nxos_facts:
+        #gather_subset: all
+    - name: Gather only the config and default facts
+      cisco.nxos.nxos_facts:
+        gather_subset:
+          - config
+    - name: Do not gather hardware facts
+      cisco.nxos.nxos_facts:
+        gather_subset:
+          - '!hardware'
+    # - name: Gather legacy and resource facts
+    #   cisco.nxos.nxos_facts:
+    #     gather_network_resources: all
+    - name: Gather only the interfaces resource facts and no legacy facts
+      cisco.nxos.nxos_facts:
+        gather_subset:
+          - '!all'
+          - '!min'
+        gather_network_resources:
+          - interfaces
+    - name: Gather interfaces resource and minimal legacy facts
+      cisco.nxos.nxos_facts:
+        gather_subset: min
+        gather_network_resources: interfaces

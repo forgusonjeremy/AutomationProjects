@@ -1,0 +1,32 @@
+---
+- name: Register RHEL host to Satellite/Katello
+  hosts: all
+  become: true
+  gather_facts: false
+ 
+  vars:
+    katello_rpm_url: "http://cvsoowsat01.washdc.state.sbu/pub/katello-ca-consumer-latest.noarch.rpm"
+    satellite_org: "dos-cvs"
+    satellite_activation_key: "ak_rhel9.6"
+ 
+  tasks:
+ 
+    - name: Clean existing subscription-manager registrations
+      ansible.builtin.command:
+        cmd: subscription-manager clean
+      changed_when: true
+      ignore_errors: true  # Non-fatal if host was never registered
+ 
+    - name: Install Katello CA consumer RPM
+      ansible.builtin.dnf:
+        name: "{{ katello_rpm_url }}"
+        state: present
+        disable_gpg_check: true
+        validate_certs: false
+ 
+    - name: Register host with Satellite using activation key
+      community.general.redhat_subscription:
+        state: present
+        org_id: "{{ satellite_org }}"
+        activationkey: "{{ satellite_activation_key }}"
+        force_register: true

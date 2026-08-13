@@ -1,0 +1,305 @@
+---
+- name: Configure RHEL 9 Log Archiving to NFS Share
+  hosts: all
+  become: yes
+  vars:
+    nfs_server: "10.68.54.24"  # Replace with your NFS server
+    nfs_export: "/vol/ewnfsarchive"                # Replace with your NFS export path
+    nfs_mount_point: "/nfsarchive"
+    nfs_mount_options: "rw,sync,hard,intr"
+    log_archive_retention_days: 90
+    host_archive_dir: "{{ nfs_mount_point }}/{{ inventory_hostname }}"
+
+  tasks:
+
+    - name: Install NFS utilities
+      dnf:
+        name:
+          - nfs-utils
+          - nfs4-acl-tools
+        state: present
+
+    - name: Start and enable rpcbind service
+      systemd:
+        name: rpcbind
+        state: started
+        enabled: yes
+
+    - name: Create NFS mount point directory
+      file:
+        path: "{{ nfs_mount_point }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create hostname-based directory structure on NFS
+      file:
+        path: "{{ host_archive_dir }}/{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      loop:
+        - system_logs
+        - journal_logs
+        - audit_logs
+        - temp
+
+    - name: Add NFS mount to /etc/fstab
+      mount:
+        path: "{{ nfs_mount_point }}"
+        src: "{{ nfs_server }}:{{ nfs_export }}"
+        fstype: nfs
+        opts: "{{ nfs_mount_options }}"
+        state: mounted
+
+    - name: Verify hostname-based NFS directory structure
+      file:
+        path: "{{ host_archive_dir }}/system_logs"
+        state: directory
+        mode: '0755'
+
+    - name: Configure rsyslog for log archiving
+      blockinfile:
+        path: /etc/rsyslog.conf
+        block: |
+          # Log archiving configuration
+          $WorkDirectory /var/lib/rsyslog # where to place spool files
+          $ActionQueueFileName fwdRule1   # unique name prefix for spool files
+          $ActionQueueMaxDiskSpace 1g     # 1gb space limit (use as much as possible)
+          $ActionQueueSaveOnShutdown on   # save messages to disk on shutdown
+          $ActionQueueType LinkedList     # run asynchronously
+          $ActionResumeRetryCount -1      # infinite retries if host is down
+          
+          # Archive all logs to hostname-specific NFS directory
+          *.* {{ host_archive_dir }}/system_logs/messages-%$YEAR%-%$MONTH%-%$DAY%.log
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - LOG ARCHIVING"
+        insertafter: EOF
+      notify: restart rsyslog
+
+    - name: Configure logrotate for archived logs
+      copy:
+        dest: /etc/logrotate.d/nfs-archive
+        content: |
+          {{ host_archive_dir }}/system_logs/*.log {
+              daily
+              rotate {{ log_archive_retention_days }}
+              compress
+              delaycompress
+              missingok
+              notifempty
+              create 0644 root root
+              postrotate
+                  /bin/kill -HUP `cat /var/run/rsyslogd.pid 2> /dev/null` 2> /dev/null || true
+              endscript
+          }
+        mode: '0644'
+
+    - name: Configure systemd-journald for persistent logging
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^#?Storage='
+        line: 'Storage=persistent'
+        backup: yes
+      notify: restart systemd-journald
+
+    - name: Configure journal archiving script
+      copy:
+        dest: /usr/local/bin/archive-journal-logs.sh
+        content: |
+          #!/bin/bash
+          # Script to archive systemd journal logs to hostname-specific NFS directory
+          
+          ARCHIVE_DIR="{{ host_archive_dir }}/journal_logs"
+          DATE=$(date +%Y-%m-%d)
+          JOURNAL_EXPORT_FILE="$ARCHIVE_DIR/journal-$DATE.export"
+          
+          # Ensure archive directory exists
+          mkdir -p "$ARCHIVE_DIR"
+          
+          # Export yesterday's journal entries
+          YESTERDAY=$(date -d "yesterday" +%Y-%m-%d)
+          journalctl --since="$YESTERDAY 00:00:00" --until="$DATE 00:00:00" --output=export > "$JOURNAL_EXPORT_FILE"
+          
+          # Compress the export file
+          gzip "$JOURNAL_EXPORT_FILE"
+          
+          # Clean up old archive files (older than retention period)
+          find "$ARCHIVE_DIR" -name "journal-*.export.gz" -mtime +{{ log_archive_retention_days }} -delete
+          
+          echo "Journal logs archived to $JOURNAL_EXPORT_FILE.gz for {{ inventory_hostname }}"
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create cron job for daily journal archiving
+      cron:
+        name: "Archive journal logs to NFS"
+        minute: "30"
+        hour: "2"
+        job: "/usr/local/bin/archive-journal-logs.sh >> /var/log/journal-archive.log 2>&1"
+        user: root
+
+    - name: Configure audit log archiving
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: '^log_file ='
+        line: 'log_file = /var/log/audit/audit.log'
+        backup: yes
+
+    - name: Create audit log archiving script
+      copy:
+        dest: /usr/local/bin/archive-audit-logs.sh
+        content: |
+          #!/bin/bash
+          # Script to archive audit logs to hostname-specific NFS directory
+          
+          ARCHIVE_DIR="{{ host_archive_dir }}/audit_logs"
+          AUDIT_LOG_DIR="/var/log/audit"
+          DATE=$(date +%Y-%m-%d)
+          
+          # Ensure archive directory exists
+          mkdir -p "$ARCHIVE_DIR"
+          
+          # Archive rotated audit logs
+          for log_file in $AUDIT_LOG_DIR/audit.log.*; do
+              if [[ -f "$log_file" && ! "$log_file" =~ \.gz$ ]]; then
+                  filename=$(basename "$log_file")
+                  cp "$log_file" "$ARCHIVE_DIR/$filename-$DATE"
+                  gzip "$ARCHIVE_DIR/$filename-$DATE"
+                  rm "$log_file"
+              fi
+          done
+          
+          # Clean up old archive files
+          find "$ARCHIVE_DIR" -name "audit.log.*-*.gz" -mtime +{{ log_archive_retention_days }} -delete
+          
+          echo "Audit logs archived to $ARCHIVE_DIR for {{ inventory_hostname }}"
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create cron job for audit log archiving
+      cron:
+        name: "Archive audit logs to NFS"
+        minute: "45"
+        hour: "2"
+        job: "/usr/local/bin/archive-audit-logs.sh >> /var/log/audit-archive.log 2>&1"
+        user: root
+
+    - name: Set up log monitoring and alerting
+      copy:
+        dest: /usr/local/bin/check-nfs-archive.sh
+        content: |
+          #!/bin/bash
+          # Script to check hostname-specific NFS archive accessibility
+          
+          NFS_MOUNT="{{ nfs_mount_point }}"
+          HOST_ARCHIVE_DIR="{{ host_archive_dir }}"
+          TEST_FILE="$HOST_ARCHIVE_DIR/temp/.archive_test_$(hostname)_$(date +%s)"
+          
+          # Ensure hostname directory exists
+          mkdir -p "$HOST_ARCHIVE_DIR/temp"
+          
+          # Test if NFS mount is accessible for this hostname
+          if ! touch "$TEST_FILE" 2>/dev/null; then
+              echo "ERROR: Cannot write to NFS archive at $HOST_ARCHIVE_DIR"
+              logger -p local0.error "NFS archive directory $HOST_ARCHIVE_DIR is not accessible"
+              exit 1
+          else
+              rm -f "$TEST_FILE"
+              echo "NFS archive directory $HOST_ARCHIVE_DIR is accessible for {{ inventory_hostname }}"
+          fi
+          
+          # Check available space
+          AVAILABLE_SPACE=$(df -h "$NFS_MOUNT" | awk 'NR==2 {print $4}')
+          echo "Available space on NFS archive: $AVAILABLE_SPACE"
+          
+          # Check individual log directories
+          for log_dir in system_logs journal_logs audit_logs; do
+              if [[ -d "$HOST_ARCHIVE_DIR/$log_dir" ]]; then
+                  LOG_COUNT=$(find "$HOST_ARCHIVE_DIR/$log_dir" -type f | wc -l)
+                  echo "Files in $log_dir: $LOG_COUNT"
+              fi
+          done
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create cron job for NFS archive monitoring
+      cron:
+        name: "Monitor NFS archive accessibility"
+        minute: "*/15"
+        job: "/usr/local/bin/check-nfs-archive.sh >> /var/log/nfs-archive-check.log 2>&1"
+        user: root
+
+    - name: Gather service facts
+      service_facts:
+
+    - name: Check if firewalld is active
+      systemd:
+        name: firewalld
+      register: firewalld_status
+      ignore_errors: yes
+
+    - name: Configure firewall for NFS client (if firewalld is active)
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - nfs
+        - rpc-bind
+        - mountd
+      when: 
+        - ansible_facts.services['firewalld.service'] is defined
+        - ansible_facts.services['firewalld.service'].state == 'running'
+      ignore_errors: yes
+
+  handlers:
+    - name: restart rsyslog
+      systemd:
+        name: rsyslog
+        state: restarted
+
+    - name: restart systemd-journald
+      systemd:
+        name: systemd-journald
+        state: restarted
+
+# Post-installation verification tasks
+- name: Verify log archiving configuration
+  hosts: all
+  become: yes
+  vars:
+    nfs_mount_point: "/nfsarchive"
+    host_archive_dir: "{{ nfs_mount_point }}/{{ inventory_hostname }}"
+  tasks:
+    - name: Test log generation and archiving
+      shell: |
+        logger "Test message for NFS archive verification - $(date)"
+        sleep 2
+        echo "=== Hostname-specific directory structure ==="
+        ls -la {{ host_archive_dir }}/
+        echo "=== System logs ==="
+        ls -la {{ host_archive_dir }}/system_logs/ 2>/dev/null || echo "No system logs yet"
+        echo "=== Journal logs ==="
+        ls -la {{ host_archive_dir }}/journal_logs/ 2>/dev/null || echo "No journal logs yet"
+        echo "=== Audit logs ==="
+        ls -la {{ host_archive_dir }}/audit_logs/ 2>/dev/null || echo "No audit logs yet"
+      register: test_result
+
+    - name: Display test results
+      debug:
+        var: test_result.stdout_lines
+
+    - name: Verify NFS mount
+      shell: mount | grep {{ nfs_mount_point }}
+      register: mount_check
+      failed_when: false
+      
+    - name: Display mount status
+      debug:
+        msg: "NFS mount status: {{ mount_check.stdout }}"

@@ -1,0 +1,118 @@
+---
+- name: Windows Server Security Hardening
+  hosts: all
+  gather_facts: yes
+  
+  vars:
+    reboot_required: false
+
+  tasks:
+    - name: Configure TLS 1.2 and 1.3 Only
+      block:
+        - name: Apply TLS registry settings
+          ansible.windows.win_regedit:
+            path: "{{ item.path }}"
+            name: "{{ item.name }}"
+            data: "{{ item.data }}"
+            type: dword
+            state: present
+          loop:
+            # Internet Settings
+            - { path: 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\Internet Settings', name: 'SecureProtocols', data: 2560 }
+            # SSL 2.0
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 2.0\Client', name: 'DisabledByDefault', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 2.0\Client', name: 'Enabled', data: 0 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 2.0\Server', name: 'DisabledByDefault', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 2.0\Server', name: 'Enabled', data: 0 }
+            # SSL 3.0
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 3.0\Client', name: 'DisabledByDefault', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 3.0\Client', name: 'Enabled', data: 0 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 3.0\Server', name: 'DisabledByDefault', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 3.0\Server', name: 'Enabled', data: 0 }
+            # TLS 1.0
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.0\Client', name: 'DisabledByDefault', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.0\Client', name: 'Enabled', data: 0 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.0\Server', name: 'DisabledByDefault', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.0\Server', name: 'Enabled', data: 0 }
+            # TLS 1.1
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.1\Client', name: 'DisabledByDefault', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.1\Client', name: 'Enabled', data: 0 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.1\Server', name: 'DisabledByDefault', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.1\Server', name: 'Enabled', data: 0 }
+            # TLS 1.2
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client', name: 'DisabledByDefault', data: 0 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client', name: 'Enabled', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Server', name: 'DisabledByDefault', data: 0 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Server', name: 'Enabled', data: 1 }
+            # TLS 1.3
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.3\Client', name: 'DisabledByDefault', data: 0 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.3\Client', name: 'Enabled', data: 1 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.3\Server', name: 'DisabledByDefault', data: 0 }
+            - { path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.3\Server', name: 'Enabled', data: 1 }
+          register: tls_registry_changes
+
+        - name: Set reboot flag for TLS changes
+          ansible.builtin.set_fact:
+            reboot_required: true
+          when: tls_registry_changes.changed
+
+      rescue:
+        - name: Error handling - TLS configuration failed
+          ansible.builtin.debug:
+            msg: "WARNING: Failed to configure TLS settings on {{ inventory_hostname }}"
+
+    - name: Memory Management
+      block:
+        - name: Configure Memory Management security settings
+          ansible.windows.win_regedit:
+            path: HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management
+            name: "{{ item.name }}"
+            data: "{{ item.data }}"
+            type: dword
+            state: present
+          loop:
+            - { name: 'FeatureSettings', data: 1 }
+            - { name: 'FeatureSettingsOverride', data: 72 }
+            - { name: 'FeatureSettingsOverrideMask', data: 3 }
+          register: memory_registry_changes
+
+        - name: Set reboot flag for Memory Management changes
+          ansible.builtin.set_fact:
+            reboot_required: true
+          when: memory_registry_changes.changed
+
+      rescue:
+        - name: Error handling - Memory Management configuration failed
+          ansible.builtin.debug:
+            msg: "WARNING: Failed to configure Memory Management settings on {{ inventory_hostname }}"
+
+    - name: Enable Network Level Authentication for RDP
+      block:
+        - name: Configure RDP Network Level Authentication (NLA)
+          ansible.windows.win_regedit:
+            path: HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp
+            name: "{{ item.name }}"
+            data: "{{ item.data }}"
+            type: dword
+            state: present
+          loop:
+            - { name: 'UserAuthentication', data: 1 }
+            - { name: 'SecurityLayer', data: 2 }
+            - { name: 'MinEncryptionLevel', data: 3 }
+          register: nla_registry_changes
+
+        - name: Restart Terminal Services to apply NLA changes
+          ansible.windows.win_service:
+            name: TermService
+            state: restarted
+            force_dependent_services: true
+          when: nla_registry_changes.changed
+
+      rescue:
+        - name: Error handling - NLA configuration failed
+          ansible.builtin.debug:
+            msg: "WARNING: Failed to configure Network Level Authentication on {{ inventory_hostname }}"
+
+    - name: Display completion status
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} - Configuration completed. Reboot required: {{ reboot_required }}"

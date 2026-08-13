@@ -1,0 +1,20 @@
+{
+    "SchemaVersion":  1,
+    "Created":  "2026-08-13T10:02:26.9141974-04:00",
+    "Updated":  "2026-08-13T10:02:29.4156208-04:00",
+    "EntryCount":  1,
+    "Counters":  [
+                     {
+                         "Type":  "Username",
+                         "Index":  1
+                     }
+                 ],
+    "Entries":  [
+                    {
+                        "Type":  "Username",
+                        "Value":  "admin",
+                        "Key":  "admin",
+                        "Surrogate":  "user1"
+                    }
+                ]
+}

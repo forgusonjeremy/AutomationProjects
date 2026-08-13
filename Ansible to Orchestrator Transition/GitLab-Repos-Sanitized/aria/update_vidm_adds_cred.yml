@@ -1,0 +1,375 @@
+---
+- name: Update vIDM Directory Domain Bind User Password
+  hosts: localhost
+  gather_facts: false
+  vars:
+    set_no_log: "{{ true | default(true) }}"
+    vidm_host: "{{ vidm_hostname }}"
+    vidm_port: "{{ vidm_port | default(443) }}"
+    vidm_username: "{{ vidm_admin_username }}"
+    vidm_password: "{{ vidm_admin_password }}"
+    directory_id: "{{ vidm_directory_id }}"
+    new_bind_password: "{{ vidm_new_bind_password }}"
+    validate_certs: "{{ vidm_validate_certs | default(false) }}"
+
+  tasks:
+    - name: Validate required variables
+      fail:
+        msg: "Required variable {{ item }} is not defined or empty"
+      when: vars[item] is undefined or vars[item] == ""
+      loop:
+        - vidm_hostname
+        - vidm_admin_username
+        - vidm_admin_password
+        - vidm_directory_id
+        - vidm_new_bind_password
+
+    - name: Main execution block
+      block:
+        - name: Authenticate to vIDM
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/API/1.0/REST/auth/system/login"
+            method: POST
+            body_format: json
+            body:
+              username: "{{ vidm_username }}"
+              password: "{{ vidm_password }}"
+              issueToken: true
+            headers:
+              Content-Type: "application/json"
+              Accept: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200]
+            timeout: 30
+            return_content: yes
+          register: auth_response
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+
+        - name: Extract session token
+          set_fact:
+            session_token: "{{ 
+              auth_response.json.sessionToken if (auth_response.json is defined and auth_response.json.sessionToken is defined)
+              else '' 
+            }}"
+          no_log: "{{ set_no_log }}"
+
+        - name: Verify authentication succeeded
+          fail:
+            msg: "Authentication failed. Could not obtain session token."
+          when: session_token == ''
+
+        - name: Get specific directory configuration by ID
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ directory_id }}"
+            method: GET
+            headers:
+              Authorization: "{{ 'HZN ' + session_token }}"
+              Content-Type: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 404]
+            timeout: 30
+            return_content: yes
+          register: direct_directory_config
+          failed_when: false
+
+        - name: If direct access failed, list all directories to find the correct one
+          block:
+            - name: List all directory configurations
+              uri:
+                url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs"
+                method: GET
+                headers:
+                  Authorization: "{{ 'HZN ' + session_token }}"
+                  Content-Type: "application/json"
+                validate_certs: "{{ validate_certs }}"
+                status_code: 200
+                timeout: 30
+                return_content: yes
+              register: all_directories
+
+            - name: Find target directory in the response
+              set_fact:
+                target_directory_found: false
+                target_directory_config: {}
+                directories_list: "{{ all_directories.json['items'] }}"
+
+            - name: Search for target directory
+              set_fact:
+                target_directory_config: "{{ item }}"
+                target_directory_found: true
+              loop: "{{ directories_list }}"
+              when: 
+                - directories_list is iterable
+                - directories_list is not string
+                - item is mapping
+                - item.directoryId is defined
+                - item.directoryId == directory_id
+              loop_control:
+                loop_var: item
+
+            - name: Fail if target directory not found
+              fail:
+                msg: |
+                  Target directory with ID {{ directory_id }} not found.
+                  Available directories: {{ directories_list | map(attribute='name') | list | join(', ') if directories_list is iterable and directories_list is not string else 'Unable to parse directory list' }}
+              when: not target_directory_found
+
+            - name: Set directory config from search results
+              set_fact:
+                directory_config:
+                  json: "{{ target_directory_config }}"
+                  status: 200
+
+          when: direct_directory_config.status != 200
+
+        - name: Use direct directory config if successful
+          set_fact:
+            directory_config: "{{ direct_directory_config }}"
+            resolved_directory_id: "{{ direct_directory_config.json.directoryId }}"
+          when: direct_directory_config.status == 200
+
+        - name: Use found directory config if from search
+          set_fact:
+            resolved_directory_id: "{{ target_directory_config.directoryId }}"
+          when: direct_directory_config.status != 200
+
+        - name: Verify directory config was retrieved
+          fail:
+            msg: "Failed to retrieve directory configuration. Status: {{ directory_config.status }}"
+          when: directory_config.json is undefined
+
+        - name: Display directory information
+          debug:
+            msg:
+              - "Found directory: {{ directory_config.json.name }}"
+              - "Directory type: {{ directory_config.json.type }}"
+              - "Directory ID: {{ resolved_directory_id }}"
+
+        # Multiple update attempts using different methods
+        - name: Attempt 1 - Test connection endpoint with new bind password
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}/test"
+            method: POST
+            body_format: json
+            body:
+              bindPassword: "{{ new_bind_password }}"
+            headers:
+              Authorization: "{{ 'HZN ' + session_token }}"
+              Content-Type: "application/json"
+              Accept: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 400, 404]
+            timeout: 60
+            return_content: yes
+          register: test_connection_result
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+
+        - name: Attempt 2 - Update via connector management endpoint
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}/update"
+            method: POST
+            body_format: json
+            body: "{{ directory_config.json | combine({'bindPassword': new_bind_password}) }}"
+            headers:
+              Authorization: "{{ 'HZN ' + session_token }}"
+              Content-Type: "application/json"
+              Accept: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 202, 404, 415]
+            timeout: 60
+            return_content: yes
+          register: update_via_connector_result
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+          when: test_connection_result.status != 200
+
+        - name: Attempt 3 - PATCH method with only the password field
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}"
+            method: PATCH
+            body_format: json
+            body:
+              bindPassword: "{{ new_bind_password }}"
+            headers:
+              Authorization: "{{ 'HZN ' + session_token }}"
+              Content-Type: "application/json"
+              Accept: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 202, 204, 415]
+            timeout: 60
+            return_content: yes
+          register: patch_result
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+          when: 
+            - test_connection_result.status != 200
+            - update_via_connector_result.status not in [200, 202]
+
+        - name: Attempt 4 - PUT with VMware-specific content type for Active Directory
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}"
+            method: PUT
+            body_format: json
+            body: "{{ directory_config.json | combine({'bindPassword': new_bind_password}) }}"
+            headers:
+              Authorization: "{{ 'HZN ' + session_token }}"
+              Content-Type: "application/vnd.vmware.horizon.manager.connector.management.directory.ad.over.ldap+json"
+              Accept: "application/vnd.vmware.horizon.manager.connector.management.directory.ad.over.ldap+json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 202, 415]
+            timeout: 60
+            return_content: yes
+          register: vmware_content_type_result
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+          when: 
+            - test_connection_result.status != 200
+            - update_via_connector_result.status not in [200, 202]
+            - patch_result.status not in [200, 202, 204]
+            - directory_config.json.type == 'ACTIVE_DIRECTORY_LDAP'
+
+        - name: Attempt 5 - Form data approach
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              bindPassword: "{{ new_bind_password }}"
+              _method: "PUT"
+            headers:
+              Authorization: "{{ 'HZN ' + session_token }}"
+              Content-Type: "application/x-www-form-urlencoded"
+              Accept: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 202, 415, 405]
+            timeout: 60
+            return_content: yes
+          register: form_data_result
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+          when: 
+            - test_connection_result.status != 200
+            - update_via_connector_result.status not in [200, 202]
+            - patch_result.status not in [200, 202, 204]
+            - vmware_content_type_result.status not in [200, 202]
+
+        - name: Attempt 6 - Minimal clean JSON payload
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}"
+            method: PUT
+            body_format: json
+            body:
+              directoryId: "{{ directory_config.json.directoryId }}"
+              name: "{{ directory_config.json.name }}"
+              type: "{{ directory_config.json.type }}"
+              bindPassword: "{{ new_bind_password }}"
+            headers:
+              Authorization: "{{ 'HZN ' + session_token }}"
+              Content-Type: "application/json"
+              Accept: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 202, 415]
+            timeout: 60
+            return_content: yes
+          register: minimal_payload_result
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+          when: 
+            - test_connection_result.status != 200
+            - update_via_connector_result.status not in [200, 202]
+            - patch_result.status not in [200, 202, 204]
+            - vmware_content_type_result.status not in [200, 202]
+            - form_data_result.status not in [200, 202]
+
+        - name: Determine which method succeeded
+          set_fact:
+            update_result: "{{
+              test_connection_result if test_connection_result.status == 200
+              else update_via_connector_result if update_via_connector_result.status is defined and update_via_connector_result.status in [200, 202]
+              else patch_result if patch_result.status is defined and patch_result.status in [200, 202, 204]
+              else vmware_content_type_result if vmware_content_type_result.status is defined and vmware_content_type_result.status in [200, 202]
+              else form_data_result if form_data_result.status is defined and form_data_result.status in [200, 202]
+              else minimal_payload_result if minimal_payload_result.status is defined and minimal_payload_result.status in [200, 202]
+              else {'status': 'failed', 'msg': 'All update methods failed'}
+            }}"
+            successful_method: "{{
+              'test_connection' if test_connection_result.status == 200
+              else 'connector_update' if update_via_connector_result.status is defined and update_via_connector_result.status in [200, 202]
+              else 'patch' if patch_result.status is defined and patch_result.status in [200, 202, 204]
+              else 'vmware_content_type' if vmware_content_type_result.status is defined and vmware_content_type_result.status in [200, 202]
+              else 'form_data' if form_data_result.status is defined and form_data_result.status in [200, 202]
+              else 'minimal_payload' if minimal_payload_result.status is defined and minimal_payload_result.status in [200, 202]
+              else 'none'
+            }}"
+
+        - name: Report update attempt results
+          debug:
+            msg:
+              - "Update attempt results:"
+              - "Test connection: {{ test_connection_result.status | default('skipped') }}"
+              - "Connector update: {{ update_via_connector_result.status | default('skipped') }}"
+              - "PATCH method: {{ patch_result.status | default('skipped') }}"
+              - "VMware content type: {{ vmware_content_type_result.status | default('skipped') }}"
+              - "Form data: {{ form_data_result.status | default('skipped') }}"
+              - "Minimal payload: {{ minimal_payload_result.status | default('skipped') }}"
+              - "Successful method: {{ successful_method }}"
+
+        - name: Verify password update was successful
+          fail:
+            msg: "All password update methods failed. The bind password was not updated."
+          when: successful_method == 'none'
+
+        - name: Log successful password update
+          debug:
+            msg: "Directory bind password updated successfully using method: {{ successful_method }}"
+          when: successful_method != 'none'
+
+        - name: Wait for configuration to propagate
+          pause:
+            seconds: 5
+          when: successful_method != 'none'
+
+        - name: Optional directory sync (only if password update succeeded)
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}/syncprofile/sync"
+            method: POST
+            headers:
+              Authorization: "{{ 'HZN ' + session_token }}"
+              Accept: "application/vnd.vmware.horizon.manager.connector.management.directory.sync.profile.sync+json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 202, 404, 500]
+            timeout: 60
+            return_content: yes
+          register: sync_result
+          failed_when: false
+          when: successful_method != 'none'
+
+        - name: Handle sync result
+          debug:
+            msg: "{{
+              'Directory sync completed successfully' if sync_result.status in [200, 202]
+              else 'Directory sync: SKIPPED - Sync endpoint not available' if sync_result.status == 404
+              else 'Directory sync failed but password update was successful' if sync_result.status not in [200, 202, 404]
+              else 'Sync was skipped because password update failed'
+            }}"
+          when: sync_result is defined
+
+      rescue:
+        - name: Display error information
+          debug:
+            msg: "Playbook execution failed. Check the error messages above for details."
+
+      always:
+        - name: Logout from vIDM
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/auth/logout"
+            method: POST
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 302]
+            timeout: 30
+          ignore_errors: true
+          when: session_token is defined

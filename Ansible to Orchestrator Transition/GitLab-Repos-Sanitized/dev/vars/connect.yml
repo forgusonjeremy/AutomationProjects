@@ -1,0 +1,24 @@
+---
+# CONNECT.SBU
+var_sAMAccountName: user2
+var_LDAPUsername: user2@dom1.example        # realm must be UPPERCASE
+var_domain_server: MSCONNECTDC01.CONNECT.SBU
+var_LDAPBaseDN: OU=ou1, OU=ou2, DC=dom1,DC=example
+
+# Kerberos
+var_krb5_realm: CONNECT.SBU
+var_krb5_domain: CONNECT.SBU
+var_krb5_kdc: MSCONNECTDC01.CONNECT.SBU
+
+# AAP
+# Name must be unique within the org, otherwise the ?name= lookup
+# returns both domains' credentials and results[0] patches the wrong one.
+var_AAP_Credentials: REDACTED-SECRET-1
+var_AAP_VCenter_Host: ''
+var_AAP_organization: cvs
+var_Credential_type:
+  - Machine
+  - cvs-WinRM_Cred-Connect
+controller_host: https://cvsautomation.washdc.state.sbu
+
+var_debug: 123

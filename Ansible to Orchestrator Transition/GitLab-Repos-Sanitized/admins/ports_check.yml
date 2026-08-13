@@ -1,0 +1,13 @@
+---
+- name: check ports status
+  hosts: all
+  gather_facts: false
+    
+  vars:
+    operating_system: "{{var_os}}"
+    list_of_hosts: "{{var_hostName}}"
+
+  roles:
+    - portscheck
+
+  tasks:

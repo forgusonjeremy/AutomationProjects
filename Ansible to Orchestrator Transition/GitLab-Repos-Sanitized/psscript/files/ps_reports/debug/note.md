@@ -1,0 +1,1 @@
+debug folder is use for output result from script instead of emailing.

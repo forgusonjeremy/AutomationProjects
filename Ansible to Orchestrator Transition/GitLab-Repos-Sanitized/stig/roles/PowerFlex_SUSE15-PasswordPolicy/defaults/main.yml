@@ -1,0 +1,33 @@
+#SLES-15-020020 - The SUSE operating system must limit the number of concurrent sessions to 10 for all accounts and/or account types.
+sles15STIG_stigrule_234868_Manage: True
+sles15STIG_stigrule_234868__etc_security_limits_conf_Line: '* hard maxlogins 10'
+##SLES-15-020030 - The SUSE operating system must implement multifactor authentication for access to privileged accounts via pluggable authentication modules (PAM).
+#SLES-15-020040 - The SUSE operating system must deny direct logons to the root account using remote access via SSH.
+sles15STIG_stigrule_234870_Manage: True
+sles15STIG_stigrule_234870_PermitRootLogin_Line: PermitRootLogin no
+##SLES-15-020050 - The SUSE operating system must disable account identifiers (individuals, groups, roles, and devices) after 35 days of inactivity after password expiration.
+#SLES-15-020110 - All SUSE operating system local interactive user accounts, upon creation, must be assigned a home directory.
+sles15STIG_stigrule_234880_Manage: True
+sles15STIG_stigrule_234880__etc_login_defs_Line: 'CREATE_HOME yes'
+#SLES-15-020120 - The SUSE operating system must display the date and time of the last successful account logon upon an SSH logon.
+sles15STIG_stigrule_234881_Manage: True
+sles15STIG_stigrule_234881_PrintLastLog_Line: PrintLastLog yes
+##SLES-15-020130 - The SUSE operating system must enforce passwords that contain at least one uppercase character.
+##SLES-15-020140 - The SUSE operating system must enforce passwords that contain at least one lowercase character.
+##SLES-15-020150 - The SUSE operating system must enforce passwords that contain at least one numeric character.
+##SLES-15-020160 - The SUSE operating system must require the change of at least eight of the total number of characters when passwords are changed.
+##SLES-15-020170 - The SUSE operating system must configure the Linux Pluggable Authentication Modules (PAM) to only store encrypted representations of passwords.
+#SLES-15-020190 - The SUSE operating system must employ FIPS 140-3 approved cryptographic hashing algorithms for all stored passwords.
+sles15STIG_stigrule_234888_Manage: True
+sles15STIG_stigrule_234888__etc_login_defs_Line: 'SHA_CRYPT_MIN_ROUNDS 10000'
+#SLES-15-020200 - The SUSE operating system must be configured to create or update passwords with a minimum lifetime of 24 hours (one day).
+sles15STIG_stigrule_234889_Manage: True
+sles15STIG_stigrule_234889__etc_login_defs_Line: 'PASS_MIN_DAYS 1'
+#SLES-15-020220 - The SUSE operating system must be configured to create or update passwords with a maximum lifetime of 60 days.
+sles15STIG_stigrule_234891_Manage: True
+sles15STIG_stigrule_234891__etc_login_defs_Line: 'PASS_MAX_DAYS 60'
+##SLES-15-020260 - The SUSE operating system must employ passwords with a minimum of 15 characters.
+##SLES-15-020270 - The SUSE operating system must enforce passwords that contain at least one special character.
+#SLES-15-020300 - The SUSE operating system must not be configured to allow blank or null passwords.
+sles15STIG_stigrule_234899_Manage: True
+sles15STIG_stigrule_234899__etc_audit_rules_d_audit_rules__etc_passwd_Line: '-w /etc/passwd -p wa -k account_mod'

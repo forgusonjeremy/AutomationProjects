@@ -1,0 +1,173 @@
+##20250917 - APB v1.0 - AS IS direct translation 
+# R-234899 SLES-15-030000
+sles15STIG_stigrule_234899_Manage: True
+sles15STIG_stigrule_234899__etc_audit_rules_d_audit_rules__etc_passwd_Line: '-w /etc/passwd -p wa -k account_mod'
+# R-234900 SLES-15-030010
+sles15STIG_stigrule_234900_Manage: True
+sles15STIG_stigrule_234900__etc_audit_rules_d_audit_rules__etc_group_Line: '-w /etc/group -p wa -k account_mod'
+# R-234901 SLES-15-030020
+sles15STIG_stigrule_234901_Manage: True
+sles15STIG_stigrule_234901__etc_audit_rules_d_audit_rules__etc_shadow_Line: '-w /etc/shadow -p wa -k account_mod'
+# R-234902 SLES-15-030030
+sles15STIG_stigrule_234902_Manage: True
+sles15STIG_stigrule_234902__etc_audit_rules_d_audit_rules__etc_security_opasswd_Line: '-w /etc/security/opasswd -p wa -k account_mod'
+# R-234903 SLES-15-030040
+sles15STIG_stigrule_234903_Manage: True
+sles15STIG_stigrule_234903__etc_audit_rules_d_audit_rules__etc_gshadow_Line: '-w /etc/gshadow -p wa -k account_mod'
+# R-234906 SLES-15-030070
+sles15STIG_stigrule_234906_Manage: True
+sles15STIG_stigrule_234906__etc_audit_rules_d_audit_rules_passwd_Line: '-a always,exit -F path=/usr/bin/passwd -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-passwd'
+# R-234910 SLES-15-030110
+sles15STIG_stigrule_234910_Manage: True
+sles15STIG_stigrule_234910__etc_audit_rules_d_audit_rules_unix_chkpwd_Line: '-a always,exit -F path=/sbin/unix_chkpwd -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-unix-chkpwd'
+sles15STIG_stigrule_234910__etc_audit_rules_d_audit_rules_unix2_chkpwd_Line: '-a always,exit -F path=/sbin/unix2_chkpwd -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-unix2-chkpwd'
+# R-234911 SLES-15-030120
+sles15STIG_stigrule_234911_Manage: True
+sles15STIG_stigrule_234911__etc_audit_rules_d_audit_rules_chage_Line: '-a always,exit -F path=/usr/bin/chage -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-chage'
+# R-234912 SLES-15-030130
+sles15STIG_stigrule_234912_Manage: True
+sles15STIG_stigrule_234912__etc_audit_rules_d_audit_rules_crontab_Line: '-a always,exit -F path=/usr/bin/crontab -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-crontab'
+# R-234913 SLES-15-030140
+sles15STIG_stigrule_234913_Manage: True
+sles15STIG_stigrule_234913__etc_audit_rules_d_audit_rules_sudoers_Line: '-w /etc/sudoers -p wa -k privileged-actions'
+sles15STIG_stigrule_234913__etc_audit_rules_d_audit_rules_sudoers_d_Line: '-w /etc/sudoers.d -p wa -k privileged-actions'
+# R-234914 SLES-15-030150
+sles15STIG_stigrule_234914_Manage: True
+sles15STIG_stigrule_234914__etc_audit_rules_d_audit_rules_b32_EPERM_creat_Line: '-a always,exit -F arch=b32 -S creat,open,openat,open_by_handle_at,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k perm_access'
+sles15STIG_stigrule_234914__etc_audit_rules_d_audit_rules_b64_EPERM_creat_Line: '-a always,exit -F arch=b64 -S creat,open,openat,open_by_handle_at,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k perm_access'
+sles15STIG_stigrule_234914__etc_audit_rules_d_audit_rules_b32_EACCES_creat_Line: '-a always,exit -F arch=b32 -S creat,open,openat,open_by_handle_at,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k perm_access'
+sles15STIG_stigrule_234914__etc_audit_rules_d_audit_rules_b64_EACCES_creat_Line: '-a always,exit -F arch=b64 -S creat,open,openat,open_by_handle_at,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k perm_access'
+# R-234918 SLES-15-030190
+sles15STIG_stigrule_234918_Manage: True
+sles15STIG_stigrule_234918__etc_audit_rules_d_audit_rules_b32_setxattr_Line: '-a always,exit -F arch=b32 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+sles15STIG_stigrule_234918__etc_audit_rules_d_audit_rules_b64_setxattr_Line: '-a always,exit -F arch=b64 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+# R-234924 SLES-15-030250
+sles15STIG_stigrule_234924_Manage: True
+sles15STIG_stigrule_234924__etc_audit_rules_d_audit_rules_b32_chown_Line: '-a always,exit -F arch=b32 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+sles15STIG_stigrule_234924__etc_audit_rules_d_audit_rules_b64_chown_Line: '-a always,exit -F arch=b64 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+# R-234928 SLES-15-030290
+sles15STIG_stigrule_234928_Manage: True
+sles15STIG_stigrule_234928__etc_audit_rules_d_audit_rules_b32_chmod_Line: '-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+sles15STIG_stigrule_234928__etc_audit_rules_d_audit_rules_b64_chmod_Line: '-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+# R-234932 SLES-15-030330
+sles15STIG_stigrule_234932_Manage: True
+sles15STIG_stigrule_234932__etc_audit_rules_d_audit_rules_sudoedit_Line: '-a always,exit -F path=/usr/bin/sudoedit -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-sudoedit'
+# R-234939 SLES-15-030400
+sles15STIG_stigrule_234939_Manage: True
+sles15STIG_stigrule_234939__etc_audit_rules_d_audit_rules_modprobe_Line: '-w /sbin/modprobe -p x -k modules'
+# R-234940 SLES-15-030410
+sles15STIG_stigrule_234940_Manage: True
+sles15STIG_stigrule_234940__etc_audit_rules_d_audit_rules_kmod_Line: '-w /usr/bin/kmod -p x -k modules'
+# R-234941 SLES-15-030420
+sles15STIG_stigrule_234941_Manage: True
+sles15STIG_stigrule_234941__etc_audit_rules_d_audit_rules_chmod_Line: '-a always,exit -F path=/usr/bin/chmod -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod'
+# R-234942 SLES-15-030430
+sles15STIG_stigrule_234942_Manage: True
+sles15STIG_stigrule_234942__etc_audit_rules_d_audit_rules_setfacl_Line: '-a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod'
+# R-234943 SLES-15-030440
+sles15STIG_stigrule_234943_Manage: True
+sles15STIG_stigrule_234943__etc_audit_rules_d_audit_rules_chacl_Line: '-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod'
+# R-234944 SLES-15-030450
+sles15STIG_stigrule_234944_Manage: True
+sles15STIG_stigrule_234944__etc_audit_rules_d_audit_rules_chcon_Line: '-a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod'
+# R-234945 SLES-15-030460
+sles15STIG_stigrule_234945_Manage: True
+sles15STIG_stigrule_234945__etc_audit_rules_d_audit_rules_rm_Line: '-a always,exit -F path=/usr/bin/rm -F perm=x -F auid>=1000 -F auid!=4294967295 -k prim_mod'
+# R-234946 SLES-15-030470
+sles15STIG_stigrule_234946_Manage: True
+sles15STIG_stigrule_234946__etc_audit_rules_d_audit_rules_tallylog_Line: '-w /var/log/tallylog -p wa -k logins'
+# R-234947 SLES-15-030480
+sles15STIG_stigrule_234947_Manage: True
+sles15STIG_stigrule_234947__etc_audit_rules_d_audit_rules_lastlog_Line: '-w /var/log/lastlog -p wa -k logins'
+# R-234948 SLES-15-030490
+sles15STIG_stigrule_234948_Manage: True
+sles15STIG_stigrule_234948__etc_audit_rules_d_audit_rules_passmass_Line: '-a always,exit -F path=/usr/bin/passmass -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-passmass'
+# R-234949 SLES-15-030500
+sles15STIG_stigrule_234949_Manage: True
+sles15STIG_stigrule_234949__etc_audit_rules_d_audit_rules_usermod_Line: '-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-usermod'
+# R-234951 SLES-15-030520
+sles15STIG_stigrule_234951_Manage: True
+sles15STIG_stigrule_234951__etc_audit_rules_d_audit_rules_b32_delete_module_Line: '-a always,exit -F arch=b32 -S delete_module -F auid>=1000 -F auid!=4294967295 -k unload_module'
+sles15STIG_stigrule_234951__etc_audit_rules_d_audit_rules_b64_delete_module_Line: '-a always,exit -F arch=b64 -S delete_module -F auid>=1000 -F auid!=4294967295 -k unload_module'
+# R-234952 SLES-15-030530
+sles15STIG_stigrule_234952_Manage: True
+sles15STIG_stigrule_234952__etc_audit_rules_d_audit_rules_b32_init_module_Line: '-a always,exit -F arch=b32 -S init_module,finit_module -F auid>=1000 -F auid!=4294967295 -k moduleload'
+sles15STIG_stigrule_234952__etc_audit_rules_d_audit_rules_b64_init_module_Line: '-a always,exit -F arch=b64 -S init_module,finit_module -F auid>=1000 -F auid!=4294967295 -k moduleload'
+# R-234954 SLES-15-030550
+sles15STIG_stigrule_234954_Manage: True
+sles15STIG_stigrule_234954__etc_audit_rules_d_audit_rules_su_Line: '-a always,exit -F path=/usr/bin/su -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-priv_change'
+# R-234973 SLES-15-030740
+sles15STIG_stigrule_234973_Manage: True
+sles15STIG_stigrule_234973__etc_audit_rules_d_audit_rules_b32_unlink_Line: '-a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat,rmdir -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+sles15STIG_stigrule_234973__etc_audit_rules_d_audit_rules_b64_unlink_Line: '-a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat,rmdir -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+# R-234975 SLES-15-030760
+sles15STIG_stigrule_234975_Manage: True
+sles15STIG_stigrule_234975__etc_audit_rules_d_audit_rules_utmp_Line: '-w /run/utmp -p wa -k login_mod'
+# R-234976 SLES-15-030770
+sles15STIG_stigrule_234976_Manage: True
+sles15STIG_stigrule_234976__etc_audit_rules_d_audit_rules_wtmp_Line: '-w /var/log/wtmp -p wa -k login_mod'
+# R-234977 SLES-15-030780
+sles15STIG_stigrule_234977_Manage: True
+sles15STIG_stigrule_234977__etc_audit_rules_d_audit_rules_btmp_Line: '-w /var/log/btmp -p wa -k login_mod'
+# R-234813 SLES-15-010130
+sles15STIG_stigrule_234813_Manage: True
+sles15STIG_stigrule_234813__etc_profile_d_autologout_sh_Dest: /etc/profile.d/autologout.sh
+sles15STIG_stigrule_234813__etc_profile_d_autologout_sh_Content: 'TMOUT=600
+readonly TMOUT
+export TMOUT'
+# R-234815 SLES-15-010150
+sles15STIG_stigrule_234815_Manage: True
+sles15STIG_stigrule_234815_LogLevel_Line: LogLevel VERBOSE
+# R-234816 SLES-15-010160
+sles15STIG_stigrule_234816_Manage: True
+sles15STIG_stigrule_234816_Ciphers_Line: Ciphers aes256-ctr,aes192-ctr,aes128-ctr
+# R-234826 SLES-15-010270
+sles15STIG_stigrule_234826_Manage: True
+sles15STIG_stigrule_234826_MACs_Line: MACs hmac-sha2-512,hmac-sha2-256
+# R-234827 SLES-15-010280
+sles15STIG_stigrule_234827_Manage: True
+sles15STIG_stigrule_234827_ClientAliveInterval_Line: ClientAliveInterval 600
+# R-234830 SLES-15-010320
+sles15STIG_stigrule_234830_Manage: True
+sles15STIG_stigrule_234830_ClientAliveCountMax_Line: ClientAliveCountMax 1
+# R-234881 SLES-15-020120
+sles15STIG_stigrule_234881_Manage: True
+sles15STIG_stigrule_234881_PrintLastLog_Line: PrintLastLog yes
+##CAT 1
+# R-234852 SLES-15-010430
+sles15STIG_stigrule_234852_Manage: True
+sles15STIG_stigrule_234852__etc_zypp_zypp_conf_Value: '1'
+# R-234990 SLES-15-040062
+sles15STIG_stigrule_234990_Manage: True
+sles15STIG_stigrule_234990__etc_systemd_system_conf_d_55_CtrlAltDel_BurstAction_Value: 'none'
+# R-235032 SLES-15-040440
+sles15STIG_stigrule_235032_Manage: True
+sles15STIG_stigrule_235032_PermitEmptyPasswords_Line: PermitEmptyPasswords no
+sles15STIG_stigrule_235032_PermitUserEnvironment_Line: PermitUserEnvironment no
+##Cat 2
+# R-234982 SLES-15-040000
+sles15STIG_stigrule_234982_Manage: True
+sles15STIG_stigrule_234982__etc_login_defs_Line: 'FAIL_DELAY 4'
+# R-235010 SLES-15-040260
+sles15STIG_stigrule_235010_Manage: True
+sles15STIG_stigrule_235010_StrictModes_Line: StrictModes yes
+# R-235013 SLES-15-040290
+sles15STIG_stigrule_235013_Manage: True
+sles15STIG_stigrule_235013_X11Forwarding_Line: X11Forwarding no
+# R-235022 SLES-15-040360
+sles15STIG_stigrule_235022_Manage: False
+sles15STIG_stigrule_235022_net_ipv4_conf_default_send_redirects_Value: 0
+# R-235023 SLES-15-040370
+sles15STIG_stigrule_235023_Manage: False
+sles15STIG_stigrule_235023_net_ipv4_conf_all_send_redirects_Value: 0
+# R-234888 SLES-15-020190
+sles15STIG_stigrule_234888_Manage: True
+sles15STIG_stigrule_234888__etc_login_defs_Line: 'SHA_CRYPT_MIN_ROUNDS 10000'
+# R-234889 SLES-15-020200
+sles15STIG_stigrule_234889_Manage: True
+sles15STIG_stigrule_234889__etc_login_defs_Line: 'PASS_MIN_DAYS 1'
+# R-234891 SLES-15-020220
+sles15STIG_stigrule_234891_Manage: True
+sles15STIG_stigrule_234891__etc_login_defs_Line: 'PASS_MAX_DAYS 60'
+#Retart core services
+sles15STIG_restart_system-daemon: True

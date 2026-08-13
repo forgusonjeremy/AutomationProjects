@@ -1,0 +1,62 @@
+---
+- name: Audit and remove unused legacy VC++ redistributables (2005-2013)
+  hosts: all
+  gather_facts: false
+  vars:
+    vc_remove: true          # false = audit only; set true to actually uninstall
+
+  tasks:
+    - name: Detect installed VC++ redists not currently in use
+      ansible.windows.win_powershell:
+        script: |
+          $legacyMap = @{
+            msvcr80='2005'; msvcp80='2005'; mfc80='2005'; atl80='2005'
+            msvcr90='2008'; msvcp90='2008'; mfc90='2008'; atl90='2008'
+            msvcr100='2010'; msvcp100='2010'; mfc100='2010'; atl100='2010'
+            msvcr110='2012'; msvcp110='2012'; mfc110='2012'; atl110='2012'
+            msvcr120='2013'; msvcp120='2013'; mfc120='2013'; atl120='2013'
+          }
+
+          # Families with a currently-loaded runtime DLL
+          $inUse = @{}
+          foreach ($p in Get-Process) {
+            try {
+              foreach ($m in $p.Modules) {
+                $b = [IO.Path]::GetFileNameWithoutExtension($m.ModuleName).ToLower()
+                if ($legacyMap.ContainsKey($b)) { $inUse[$legacyMap[$b]] = $true }
+              }
+            } catch { }
+          }
+
+          $keys = @(
+            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+          )
+          Get-ItemProperty $keys -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -match 'Microsoft Visual C\+\+ (2005|2008|2010|2012|2013)' } |
+            ForEach-Object {
+              $year = [regex]::Match($_.DisplayName,'2005|2008|2010|2012|2013').Value
+              [PSCustomObject]@{
+                DisplayName = $_.DisplayName
+                Family      = $year
+                ProductCode = $_.PSChildName
+              }
+            } |
+            Where-Object { -not $inUse[$_.Family] }
+      register: vc_scan
+
+    - name: Removable packages (installed, no live consumer)
+      ansible.builtin.debug:
+        msg: "{{ item.DisplayName }}  [{{ item.ProductCode }}]"
+      loop: "{{ vc_scan.output }}"
+      loop_control:
+        label: "{{ item.Family }}"
+
+    - name: Uninstall unused VC++ redistributables
+      ansible.windows.win_package:
+        product_id: "{{ item.ProductCode }}"
+        state: absent
+      loop: "{{ vc_scan.output }}"
+      loop_control:
+        label: "{{ item.DisplayName }}"
+      when: vc_remove | bool

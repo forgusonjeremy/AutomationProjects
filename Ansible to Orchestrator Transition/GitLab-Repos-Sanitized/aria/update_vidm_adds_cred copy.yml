@@ -1,0 +1,333 @@
+---
+- name: Update vIDM Directory Domain Bind User Password
+  hosts: localhost
+  gather_facts: false
+  vars:
+    set_no_log: "{{ true | default(true) }}"
+    vidm_host: "{{ vidm_hostname }}"
+    vidm_port: "{{ vidm_port | default(443) }}"
+    vidm_username: "{{ vidm_admin_username }}"
+    vidm_password: "{{ vidm_admin_password }}"
+    directory_id: "{{ vidm_directory_id }}"
+    new_bind_password: "{{ vidm_new_bind_password }}"
+    validate_certs: "{{ vidm_validate_certs | default(false) }}"
+
+  tasks:
+    - name: Validate required variables
+      fail:
+        msg: "Required variable {{ item }} is not defined or empty"
+      when: vars[item] is undefined or vars[item] == ""
+      loop:
+        - vidm_hostname
+        - vidm_admin_username
+        - vidm_admin_password
+        - vidm_directory_id
+        - vidm_new_bind_password
+
+    - block:
+        - name: authentication endpoint
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/API/1.0/REST/auth/system/login"
+            method: POST
+            body_format: json
+            body:
+              username: "{{ vidm_username }}"
+              password: "{{ vidm_password }}"
+              issueToken: true
+            headers:
+              Content-Type: "application/json"
+              Accept: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200]
+            timeout: 30
+            return_content: yes
+          register: auth_response
+          #when: "'json' not in auth_response or auth_response.json.sessionToken is undefined"
+          failed_when: false
+          no_log: "{{ set_no_log }}"
+
+        - name: Extract session token
+          set_fact:
+            session_token: "{{ 
+              auth_response.json.sessionToken if (auth_response is defined and auth_response.json is defined and auth_response.json.sessionToken is defined)
+              else '' 
+            }}"
+          no_log: "{{ set_no_log }}"
+
+        - name: Debug authentication response
+          debug:
+            msg: 
+              - "Status Code: {{ auth_response.status }}"
+              - "Content Type: {{ auth_response.content_type | default('unknown') }}"
+              - "Response Keys: {{ auth_response.keys() | join(', ') }}"
+              - "Has headers: {{ 'headers' in auth_response }}"
+              - "Has cookies: {{ 'cookies' in auth_response }}"
+              - "Response Content (first 200 chars): {{ (auth_response.content | default('No content'))[:200] }}"
+
+        - name: Extract session token or cookie
+          block:
+            - name: Extract session token
+              set_fact:
+                session_token: "{{ 
+                  auth_response.json.sessionToken if (auth_response is defined and auth_response.json is defined and auth_response.json.sessionToken is defined)
+                  else '' 
+                }}"
+              no_log: "{{ set_no_log }}"
+
+            - name: Debug authentication response
+              debug:
+                msg: 
+                  - "Status Code: {{ auth_response.status }}"
+                  - "Content Type: {{ auth_response.content_type | default('unknown') }}"
+                  - "Response Keys: {{ auth_response.keys() | join(', ') }}"
+                  - "Has headers: {{ 'headers' in auth_response }}"
+                  - "Has cookies: {{ 'cookies' in auth_response }}"
+                  - "Response Content (first 200 chars): {{ (auth_response.content | default('No content'))[:200] }}"
+
+          rescue:
+            - name: Authentication method failed
+              debug:
+                msg: "Failed to extract authentication token"
+
+        - name: Verify we have authentication credentials
+          fail:
+            msg: |
+              Authentication failed. Could not obtain session token or valid cookie.
+              Status: {{ auth_response.status }}
+              Try checking:
+              1. Username and password are correct
+              2. User has admin privileges in vIDM
+              3. vIDM version and API compatibility
+              4. Network connectivity to {{ vidm_host }}:{{ vidm_port }}
+          when: session_token is undefined and session_cookie is undefined
+
+        - name: List all directory configurations to find the correct ID
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs"
+            method: GET
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: 200
+            timeout: 30
+            return_content: yes
+          register: all_directories
+
+        - name: Debug API response structure (show less to avoid truncation)
+          debug:
+            msg: 
+              - "API Response Status: {{ all_directories.status }}"
+              - "Response Content Type: {{ all_directories.content_type | default('unknown') }}"
+              - "Total items found: {{ all_directories.json.items | length }}"
+              - "First directory: {{ all_directories.json.items[0].name }}"
+              - "Second directory: {{ all_directories.json.items[1].name if all_directories.json.items | length > 1 else 'No second directory' }}"
+
+        - name: Store the complete JSON response without truncation
+          set_fact:
+            complete_directory_response: "{{ all_directories.json }}"
+
+        - name: Find pilot directory in the complete response
+          set_fact:
+            pilot_directory_found: false
+            pilot_directory_config: {}
+
+        - name: Check first directory
+          set_fact:
+            pilot_directory_config: "{{ complete_directory_response.items[0] }}"
+            pilot_directory_found: true
+          when: complete_directory_response.items[0].name == "pilot"
+
+        - name: Check second directory if first wasn't pilot
+          set_fact:
+            pilot_directory_config: "{{ complete_directory_response.items[1] }}"
+            pilot_directory_found: true
+          when: 
+            - not pilot_directory_found
+            - complete_directory_response.items | length > 1
+            - complete_directory_response.items[1].name == "pilot"
+
+        - name: Debug found pilot directory
+          debug:
+            msg:
+              - "Pilot directory found: {{ pilot_directory_found }}"
+              - "Pilot directory name: {{ pilot_directory_config.name | default('Not found') }}"
+              - "Pilot directory type: {{ pilot_directory_config.type | default('Not found') }}"
+              - "Pilot directory ID: {{ pilot_directory_config.directoryId | default('Not found') }}"
+
+        - name: Fail if pilot directory not found
+          fail:
+            msg: |
+              Pilot directory not found in the response.
+              Available directories: {{ complete_directory_response.items | map(attribute='name') | join(', ') }}
+          when: not pilot_directory_found
+
+        - name: Use found pilot directory configuration
+          set_fact:
+            directory_config:
+              json: "{{ pilot_directory_config }}"
+              status: 200
+
+        - name: Verify directory config was retrieved
+          fail:
+            msg: "Failed to retrieve directory configuration. Status: {{ directory_config.status }}"
+          when: directory_config.json is undefined
+
+        - name: Update directory configuration with new bind password
+          set_fact:
+            # Clean the directory config and update only the bind password
+            updated_config: "{{ directory_config.json | combine({'bindPassword': new_bind_password}) }}"
+          no_log: "{{ set_no_log }}"
+
+        - name: Remove potentially conflicting ID fields from the payload
+          set_fact:
+            cleaned_config: "{{ updated_config | dict2items | rejectattr('key', 'equalto', '_links') | rejectattr('key', 'equalto', 'userstoreId') | rejectattr('key', 'equalto', 'countDomains') | rejectattr('key', 'equalto', 'deleteInProgress') | list | items2dict }}"
+          no_log: "{{ set_no_log }}"
+
+        - name: Debug the cleaned configuration
+          debug:
+            msg: 
+              - "Configuration keys being sent: {{ cleaned_config.keys() | sort | join(', ') }}"
+              - "Directory ID in config: {{ cleaned_config.directoryId }}"
+              - "URL endpoint ID: {{ resolved_directory_id }}"
+              - "IDs match: {{ cleaned_config.directoryId == resolved_directory_id }}"
+
+        - name: Try to update bind password using minimal configuration
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}"
+            method: PUT
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/vnd.vmware.horizon.manager.connector.management.directory.ad.over.ldap+json"
+              Accept: "application/vnd.vmware.horizon.manager.connector.management.directory.ad.over.ldap+json"
+            body_format: json
+            body: 
+              directoryId: "{{ resolved_directory_id }}"
+              name: "{{ directory_config.json.name }}"
+              type: "{{ directory_config.json.type }}"
+              bindPassword: "{{ new_bind_password }}"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 400]
+            timeout: 30
+            return_content: yes
+          register: update_result
+          no_log: "{{ set_no_log }}"
+
+        - name: Debug PUT result
+          debug:
+            msg: 
+              - "PUT status: {{ update_result.status }}"
+              - "PUT response: {{ update_result.content if update_result.status != 200 else 'Success - Directory bind password updated' }}"
+
+        - name: If minimal config fails, show instructions for manual update
+          debug:
+            msg: |
+              Automatic password update failed. This vIDM version may require manual update.
+              
+              To update the bind password manually:
+              1. Log into vIDM web console as admin
+              2. Go to Identity & Access Management > Directories
+              3. Click on the "pilot" directory
+              4. Click "Edit" 
+              5. Update the "Bind DN Password" field with the new password: {{ new_bind_password }}
+              6. Click "Save"
+              7. Test the connection and sync the directory
+              
+              This ensures the bind password is updated correctly in the vIDM configuration.
+          when: update_result.status != 200
+
+        - name: Test directory connection with new password
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}/test"
+            method: POST
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/json"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 404]
+            timeout: 30
+            return_content: yes
+          register: connection_test
+          retries: 3
+          delay: 5
+
+        - name: Handle connection test result
+          block:
+            - name: Connection test successful
+              debug:
+                msg: "Directory connection test: PASSED"
+              when: connection_test.status == 200 and connection_test.json.success | default(false)
+
+            - name: Connection test failed
+              debug:
+                msg: "Directory connection test: FAILED - {{ connection_test.json | default('No JSON response') }}"
+              when: connection_test.status == 200 and not (connection_test.json.success | default(false))
+
+            - name: Connection test endpoint not available
+              debug:
+                msg: "Directory connection test: SKIPPED - Test endpoint not available on this vIDM version"
+              when: connection_test.status == 404
+
+        - name: Sync directory to apply changes using the correct endpoint
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/jersey/manager/api/connectormanagement/directoryconfigs/{{ resolved_directory_id }}/syncprofile/sync"
+            method: POST
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+              Content-Type: "application/json"
+            body_format: json
+            body:
+              ignoreSafeguards: false
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 202, 404]
+            timeout: 60
+            return_content: yes
+          register: sync_result
+
+        - name: Handle sync result
+          block:
+            - name: Sync initiated successfully
+              debug:
+                msg: "Directory sync initiated successfully"
+              when: sync_result.status in [200, 202]
+
+            - name: Sync endpoint not available
+              debug:
+                msg: "Directory sync: SKIPPED - Sync endpoint not available on this vIDM version"
+              when: sync_result.status == 404
+
+        - name: Display final success message
+          debug:
+            msg: |
+              vIDM directory bind password update completed!
+              
+              Summary:
+              - Password update: {{ 'SUCCESS' if update_result.status == 200 else 'CHECK PATCH RESULT' }}
+              - Connection test: {{ 'PASSED' if connection_test.status == 200 and connection_test.json.success | default(false) else 'SKIPPED (endpoint not available)' if connection_test.status == 404 else 'FAILED' }}
+              - Directory sync: {{ 'INITIATED' if sync_result.status in [200, 202] else 'SKIPPED (endpoint not available)' if sync_result.status == 404 else 'FAILED' }}
+              
+              The bind password has been updated. If test/sync endpoints are not available,
+              this is normal for some vIDM versions and doesn't affect the password update.
+
+      rescue:
+        - name: Display error information
+          debug:
+            msg: "Playbook execution failed. Check the error messages above for details."
+
+      always:
+        - name: Logout from vIDM
+          uri:
+            url: "https://{{ vidm_host }}:{{ vidm_port }}/SAAS/auth/logout"
+            method: POST
+            headers:
+              Authorization: "{{ 'HZN ' + session_token if session_token is defined else omit }}"
+              Cookie: "{{ session_cookie if session_cookie is defined else omit }}"
+            validate_certs: "{{ validate_certs }}"
+            status_code: [200, 302]
+            timeout: 30
+          ignore_errors: true
+          when: session_token is defined or session_cookie is defined

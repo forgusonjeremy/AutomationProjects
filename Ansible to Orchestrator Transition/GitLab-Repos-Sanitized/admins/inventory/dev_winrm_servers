@@ -1,0 +1,33 @@
+hst:
+    hosts:
+        cvsdwinrm01.pilot.dev:
+        esocdwinrm01.pilot.dev:
+    children:
+        stig:
+
+mdc:
+    hosts:
+        cvsdwinrm02.pilot.dev:
+        esocdwinrm02.pilot.dev:
+    children:
+        stig:     
+
+ew:
+    hosts:
+        cvsdwinrm03.pilot.dev:
+        esocdwinrm03.pilot.dev:
+    children:
+        stig:    
+     
+all:
+    children:
+        hst:
+        mdc:
+        ew:   
+    vars:
+        var_os_family: Windows
+        ansible_connection: winrm
+        ansible_port: 5986
+        ansible_winrm_transport: kerberos
+        ansible_winrm_kerberos_delegation: yes
+        ansible_winrm_server_cert_validation: ignore         

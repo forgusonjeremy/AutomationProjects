@@ -1,0 +1,75 @@
+- name: populate package facts
+  package_facts:
+# R-234868 SLES-15-020020
+- name: stigrule_234868__etc_security_limits_conf
+  lineinfile:
+    path: /etc/security/limits.conf
+    regexp: '^\* hard maxlogins'
+    line: "{{ sles15STIG_stigrule_234868__etc_security_limits_conf_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234868_Manage
+# R-234870 SLES-15-020040
+- name: stigrule_234870_PermitRootLogin
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*PermitRootLogin\s+'
+    line: "{{ sles15STIG_stigrule_234870_PermitRootLogin_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_234870_Manage
+    - "'openssh' in packages"
+# R-234880 SLES-15-020110
+- name: stigrule_234880__etc_login_defs
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^CREATE_HOME'
+    line: "{{ sles15STIG_stigrule_234880__etc_login_defs_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234880_Manage
+# R-234881 SLES-15-020120
+- name: stigrule_234881_PrintLastLog
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '(?i)^\s*PrintLastLog\s+'
+    line: "{{ sles15STIG_stigrule_234881_PrintLastLog_Line }}"
+  notify: ssh_restart
+  when:
+    - sles15STIG_stigrule_234881_Manage
+    - "'openssh' in packages"
+# R-234888 SLES-15-020190
+- name: stigrule_234888__etc_login_defs
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^SHA_CRYPT_MIN_ROUNDS'
+    line: "{{ sles15STIG_stigrule_234888__etc_login_defs_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234888_Manage
+# R-234889 SLES-15-020200
+- name: stigrule_234889__etc_login_defs
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MIN_DAYS'
+    line: "{{ sles15STIG_stigrule_234889__etc_login_defs_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234889_Manage
+# R-234891 SLES-15-020220
+- name: stigrule_234891__etc_login_defs
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MAX_DAYS'
+    line: "{{ sles15STIG_stigrule_234891__etc_login_defs_Line }}"
+    create: yes
+  when:
+    - sles15STIG_stigrule_234891_Manage
+# R-234899 SLES-15-030000
+- name: stigrule_234899__etc_audit_rules_d_audit_rules__etc_passwd
+  lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    regexp: '^-w /etc/passwd -p wa -k account_mod$'
+    line: "{{ sles15STIG_stigrule_234899__etc_audit_rules_d_audit_rules__etc_passwd_Line }}"
+  notify: auditd_restart
+  when: sles15STIG_stigrule_234899_Manage

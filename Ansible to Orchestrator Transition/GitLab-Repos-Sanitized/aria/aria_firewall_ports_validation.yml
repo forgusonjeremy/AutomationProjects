@@ -1,0 +1,58 @@
+---
+- name: Validate Separate Port Configuration
+  hosts: all
+  become: yes
+  gather_facts: no
+  
+  tasks:
+    - name: Check port 22 rules
+      ansible.builtin.shell: |
+        iptables -L INPUT -n -v | grep "dpt:22" | grep ACCEPT
+      register: port_22_rules
+      changed_when: false
+    - name: Check port 22 rules
+      ansible.builtin.shell: |
+        iptables -L INPUT -n -v | grep "dpt:443" | grep ACCEPT
+      register: port_443_rules
+      changed_when: false
+
+    - name: Check port 1514 rules
+      ansible.builtin.shell: |
+        iptables -L INPUT -n -v | grep "dpt:1514" | grep ACCEPT
+      register: port_1514_rules
+      changed_when: false
+
+    - name: Check port 6514 rules
+      ansible.builtin.shell: |
+        iptables -L INPUT -n -v | grep "dpt:6514" | grep ACCEPT
+      register: port_6514_rules
+      changed_when: false
+
+    - name: Check port 9543 rules
+      ansible.builtin.shell: |
+        iptables -L INPUT -n -v | grep "dpt:9543" | grep ACCEPT
+      register: port_9543_rules
+      changed_when: false
+
+    - name: Display validation results
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Firewall Rules Validation"
+          - "=========================================="
+          - ""
+          - "Port 22 (HTTPS) Rules:"
+          - "{{ port_22_rules.stdout_lines }}"
+          - ""
+          - "Port 443 (HTTPS) Rules:"
+          - "{{ port_443_rules.stdout_lines }}"
+          - ""
+          - "Port 1514 (Syslog) Rules:"
+          - "{{ port_1514_rules.stdout_lines }}"
+          - ""
+          - "Port 6514 (Syslog TLS) Rules:"
+          - "{{ port_6514_rules.stdout_lines }}"
+          - ""
+          - "Port 9543 (Aria API) Rules:"
+          - "{{ port_9543_rules.stdout_lines }}"
+          - "=========================================="

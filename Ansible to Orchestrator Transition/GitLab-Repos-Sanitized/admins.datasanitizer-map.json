@@ -1,0 +1,164 @@
+{
+    "SchemaVersion":  1,
+    "Created":  "2026-08-13T09:56:10.6527893-04:00",
+    "Updated":  "2026-08-13T09:56:14.8389464-04:00",
+    "EntryCount":  21,
+    "Counters":  [
+                     {
+                         "Type":  "CommonName",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "DomainLabel",
+                         "Index":  3
+                     },
+                     {
+                         "Type":  "IPv4Subnet",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "Secret",
+                         "Index":  6
+                     },
+                     {
+                         "Type":  "SecretBlock",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "Tld",
+                         "Index":  1
+                     },
+                     {
+                         "Type":  "Username",
+                         "Index":  4
+                     }
+                 ],
+    "Entries":  [
+                    {
+                        "Type":  "CommonName",
+                        "Value":  "cvslocal",
+                        "Key":  "cvslocal",
+                        "Surrogate":  "cn1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "CONNECT",
+                        "Key":  "connect",
+                        "Surrogate":  "dom1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "CVSDANS02",
+                        "Key":  "cvsdans02",
+                        "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "pilot",
+                        "Key":  "pilot",
+                        "Surrogate":  "dom3"
+                    },
+                    {
+                        "Type":  "Email",
+                        "Value":  "ansiblelocal@CVSDANS02.pilot.dev",
+                        "Key":  "ansiblelocal@cvsdans02.pilot.dev",
+                        "Surrogate":  "ansiblelocal@dom2.dom3.example"
+                    },
+                    {
+                        "Type":  "EmailDomain",
+                        "Value":  "CVSDANS02.pilot.dev",
+                        "Key":  "cvsdans02.pilot.dev",
+                        "Surrogate":  "dom2.dom3.example"
+                    },
+                    {
+                        "Type":  "IPv4",
+                        "Value":  "10.100.6.40",
+                        "Key":  "10.100.6.40",
+                        "Surrogate":  "100.64.0.40"
+                    },
+                    {
+                        "Type":  "IPv4Subnet",
+                        "Value":  "10.100.6",
+                        "Key":  "10.100.6",
+                        "Surrogate":  "100.64.0"
+                    },
+                    {
+                        "Type":  "QualifiedUsername",
+                        "Value":  "CONNECT\\svc-CVSAnsWin",
+                        "Key":  "connect\\svc-cvsanswin",
+                        "Surrogate":  "DOM1\\user4"
+                    },
+                    {
+                        "Type":  "Secret",
+                        "Value":  "0CT1M00nn!!07",
+                        "Key":  "0CT1M00nn!!07",
+                        "Surrogate":  "REDACTED-SECRET-2"
+                    },
+                    {
+                        "Type":  "Secret",
+                        "Value":  "confirm_password",
+                        "Key":  "confirm_password",
+                        "Surrogate":  "REDACTED-SECRET-5"
+                    },
+                    {
+                        "Type":  "Secret",
+                        "Value":  "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo0LCJpYXQiOjE3NTg5OTE5MDEsImp0aSI6IjY4MWFlMDgyZDRmYWYwZDQ1YmFkYzExN2YyYWIzMjc2MWZjOTI2MDRlZGRlNDUyNDNlNDY5YjVlOTcwMjZmNzkiLCJzY29wZSI6InJlZ2lzdHJhdGlvbiNnbG9iYWwgcmVnaXN0cmF0aW9uI2hvc3QifQ.hd_q1yht3nI8Q9aIeYP8cDcYq95JA9vlfpDBkS0e5Vg",
+                        "Key":  "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo0LCJpYXQiOjE3NTg5OTE5MDEsImp0aSI6IjY4MWFlMDgyZDRmYWYwZDQ1YmFkYzExN2YyYWIzMjc2MWZjOTI2MDRlZGRlNDUyNDNlNDY5YjVlOTcwMjZmNzkiLCJzY29wZSI6InJlZ2lzdHJhdGlvbiNnbG9iYWwgcmVnaXN0cmF0aW9uI2hvc3QifQ.hd_q1yht3nI8Q9aIeYP8cDcYq95JA9vlfpDBkS0e5Vg",
+                        "Surrogate":  "REDACTED-SECRET-6"
+                    },
+                    {
+                        "Type":  "Secret",
+                        "Value":  "New",
+                        "Key":  "New",
+                        "Surrogate":  "REDACTED-SECRET-3"
+                    },
+                    {
+                        "Type":  "Secret",
+                        "Value":  "Password",
+                        "Key":  "Password",
+                        "Surrogate":  "REDACTED-SECRET-4"
+                    },
+                    {
+                        "Type":  "Secret",
+                        "Value":  "V1rtu@1c3!",
+                        "Key":  "V1rtu@1c3!",
+                        "Surrogate":  "REDACTED-SECRET-1"
+                    },
+                    {
+                        "Type":  "SecretBlock",
+                        "Value":  "\r\n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\r\n",
+                        "Key":  "\r\n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\r\n",
+                        "Surrogate":  "\r\nREDACTED-KEY-BLOCK-1\r\n"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "dev",
+                        "Key":  "dev",
+                        "Surrogate":  "example"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "admin",
+                        "Key":  "admin",
+                        "Surrogate":  "user1"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "cvslocal",
+                        "Key":  "cvslocal",
+                        "Surrogate":  "user2"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "svc-CVSAnsWin",
+                        "Key":  "svc-cvsanswin",
+                        "Surrogate":  "user4"
+                    },
+                    {
+                        "Type":  "Username",
+                        "Value":  "User",
+                        "Key":  "user",
+                        "Surrogate":  "user3"
+                    }
+                ]
+}

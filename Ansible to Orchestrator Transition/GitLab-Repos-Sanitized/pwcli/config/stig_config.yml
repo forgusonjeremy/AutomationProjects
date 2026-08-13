@@ -1,0 +1,48 @@
+# config/stig_config.yml
+# VMware vSphere 8.0 STIG Configuration Values
+---
+stig_config:
+  security:
+    account_lock_failures: 3
+    account_unlock_time: 900
+    password_complexity: "similar=deny retry=3 min=disabled,disabled,disabled,disabled,15"
+    password_history: 5
+    password_max_age: 90
+    host_client_timeout: 900
+    shell_interactive_timeout: 900
+    shell_timeout: 600
+    dcui_timeout: 600
+    api_timeout: 30
+    share_force_salting: 2
+    mem_eager_zero: 1
+    block_guest_bpdu: 1
+    bmc_network_enable: 0
+    enable_mob: false
+    suppress_shell_warning: 0
+    suppress_hyper_warning: 0
+    execute_vibs: "true"
+    lockdown_level: "normal"
+    
+  logging:
+    log_level: "info"
+    syslog_log_level: "info"
+    syslog_scratch: "[] /scratch/log"
+    audit_storage_capacity: 100
+    syslog_audit_enable: true
+    syslog_audit_remote: true
+    syslog_cert_check: true
+    syslog_cert_strict: true
+    
+  services:
+    ssh_enabled: false
+    shell_enabled: false
+    cim_enabled: false
+    slpd_enabled: false
+    
+  network:
+    tls_server_profile: "NIST_2024"
+    auto_discover_network: true
+    
+  compliance:
+    vib_accept_level: "PartnerSupported"
+    esxi_build: "24022510"

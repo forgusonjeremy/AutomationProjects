@@ -1,0 +1,33 @@
+hst:
+    hosts:
+        esocoowvara01.washdc.state.sbu:
+        esocoowvara02.washdc.state.sbu:
+    children:
+        hst_stig:
+        hst_win:       
+mdc:
+    hosts:
+        esoco26vara01.washdc.state.sbu:
+        esoco26vara02.washdc.state.sbu:
+    children:
+        mdc_stig:     
+        mdc_win:
+ew:
+    hosts:
+        esocoewvara01.washdc.state.sbu:
+        esocoewvara02.washdc.state.sbu:
+    children:
+        ew_stig:    
+        ew_win:       
+all:
+    children:
+        hst:
+        mdc:
+        ew:   
+    vars:
+        var_os_family: Windows
+        ansible_connection: winrm
+        ansible_port: 5986
+        ansible_winrm_transport: kerberos
+        ansible_winrm_kerberos_delegation: yes
+        ansible_winrm_server_cert_validation: ignore         

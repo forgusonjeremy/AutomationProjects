@@ -1,0 +1,38 @@
+---
+- name: Unlock cvslocal account on RHEL
+  hosts: all
+  become: yes
+  become_method: sudo
+ 
+  tasks:
+    - name: Ensure the cvslocal account is unlocked (pam_tally2)
+      command: pam_tally2 --user=cvslocal --reset
+      register: pam_tally2_result
+      failed_when: false
+      changed_when: pam_tally2_result.rc == 0
+      when: ansible_distribution_major_version | int <= 7
+ 
+    - name: Ensure the cvslocal account is unlocked (faillock - RHEL 8+)
+      command: faillock --user cvslocal --reset
+      register: faillock_result
+      failed_when: false
+      changed_when: faillock_result.rc == 0
+      when: ansible_distribution_major_version | int >= 8
+ 
+    - name: Unlock the cvslocal account if locked via passwd
+      command: passwd -u cvslocal
+      register: passwd_unlock_result
+      failed_when:
+        - passwd_unlock_result.rc != 0
+        - "'was unlocked' not in passwd_unlock_result.stderr"
+        - "'not locked' not in passwd_unlock_result.stderr"
+      changed_when: "'was unlocked' in passwd_unlock_result.stderr"
+ 
+    - name: Verify the cvslocal account status
+      command: passwd -S cvslocal
+      register: account_status
+      changed_when: false
+ 
+    - name: Display cvslocal account status
+      debug:
+        msg: "Account status: {{ account_status.stdout }}"

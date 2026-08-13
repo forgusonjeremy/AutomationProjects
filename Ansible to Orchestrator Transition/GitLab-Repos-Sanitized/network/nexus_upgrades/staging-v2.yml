@@ -1,0 +1,96 @@
+---
+- name: Playbook to stage/scp to N9kv bootflash (2.69GB image)
+  hosts: "{{ _groups }}"
+  gather_facts: False
+  
+  tasks:
+  - name: "Set exec-timeout to 120 minutes on VTY lines"
+    cisco.nxos.nxos_config:
+      parents: "line vty"
+      lines:
+        - "exec-timeout 120"  # 2 hours for large file transfer
+
+  - name: Enable SCP for N9kv
+    ansible.netcommon.cli_config:
+      config: "feature scp-server"
+      commit: True
+    
+  - name: Check if image already exist in bootflash
+    cisco.nxos.nxos_command:
+      commands: 'dir bootflash: | include {{ new_image }}'
+    register: check_image
+
+  - name: Check available bootflash space
+    cisco.nxos.nxos_command:
+      commands: 'dir bootflash:'
+    register: bootflash_space
+    when: check_image.stdout[0].find(new_image) == -1
+
+  - name: Display bootflash space
+    ansible.builtin.debug:
+      msg: "{{ bootflash_space.stdout_lines }}"
+    when: check_image.stdout[0].find(new_image) == -1
+   
+  - name: Copy from server to device (2.69GB - will take time!)
+    cisco.nxos.nxos_file_copy:
+      file_pull: true
+      file_pull_protocol: scp
+      file_pull_kstack: true
+      file_pull_timeout: 7200  # 2 HOURS
+      local_file: "{{ new_image }}"
+      remote_file: "{{ remote_file }}"
+      remote_scp_server: "{{ remote_scp_server }}"
+      remote_scp_server_user: "{{ cvs_username }}"
+      remote_scp_server_password: '{{ cvs_password }}'
+      vrf: "{{ cisco_vrf }}"
+    when: check_image.stdout[0].find(new_image) == -1
+    vars:
+      ansible_connect_timeout: 7200
+      ansible_command_timeout: 7200
+    async: 7200
+    poll: 60  # Check every 60 seconds
+    register: result
+
+  - name: Display copy result
+    ansible.builtin.debug:
+      var: result
+    when: check_image.stdout[0].find(new_image) == -1
+
+  - name: Wait for device to settle after large file copy
+    ansible.builtin.pause:
+      seconds: 30
+
+  - name: Reset connection
+    ansible.builtin.meta: reset_connection
+ 
+  - name: Verify file exists in bootflash
+    cisco.nxos.nxos_command:
+      commands: 'dir bootflash:{{ new_image }}'
+    register: file_existence
+    vars:
+      ansible_command_timeout: 300
+    failed_when: new_image not in file_existence.stdout[0]
+
+  - name: Verify SHA512 Hash of Image File (this may take several minutes)
+    cisco.nxos.nxos_command:
+      commands: 'show file bootflash:{{ new_image }} sha512sum'
+    register: sha_hash_verification_results
+    vars:
+      ansible_command_timeout: 1200  # 20 minutes for hashing 2.69GB
+  
+  - name: Display SHA512 hash comparison
+    ansible.builtin.debug:
+      msg: 
+        - "Expected SHA512: {{ sha_hash }}"
+        - "Actual SHA512:   {{ sha_hash_verification_results.stdout[0] }}"
+      
+  - name: Fail Task if SHA512 Hash Check Fails
+    ansible.builtin.fail:
+      msg: "SHA512 Hash Check Failed!"
+    when: sha_hash_verification_results.stdout[0] != sha_hash
+
+  - name: "Restore exec-timeout to 9 minutes on VTY lines"
+    cisco.nxos.nxos_config:
+      parents: "line vty"
+      lines:
+        - "exec-timeout 9"

@@ -1,0 +1,371 @@
+---
+- name: VMware Aria 8.18 Firewall Configuration (No Persistence)
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    # Survey inputs
+    restricted_ports_config: "{{ survey_restricted_ports | default('1514:tcp,1514:udp,6514:tcp,9543:tcp') }}"
+    restricted_ports_allowed_networks: "{{ survey_restricted_ports_networks | default('') }}"
+    restricted_ports_allowed_ips: "{{ survey_restricted_ports_ips | default('') }}"
+    cluster_nodes: "{{ survey_cluster_nodes | default('') }}"
+    backup_dir: "/root/iptables-backups"
+    remove_existing_blocks: "{{ survey_remove_existing_blocks | default(false) }}"
+    
+    # Convert to lists
+    restricted_ports_networks_list: "{{ restricted_ports_allowed_networks.split(',') | map('trim') | select() | list }}"
+    restricted_ports_ips_list: "{{ restricted_ports_allowed_ips.split(',') | map('trim') | select() | list }}"
+    cluster_nodes_list: "{{ cluster_nodes.split(',') | map('trim') | select() | list }}"
+
+  pre_tasks:
+    - name: Parse restricted ports configuration
+      ansible.builtin.set_fact:
+        restricted_ports: "{{ restricted_ports | default([]) + [port_dict] }}"
+      loop: "{{ restricted_ports_config.split(',') | map('trim') | select() | list }}"
+      loop_control:
+        loop_var: port_string
+      vars:
+        port_protocol: "{{ port_string.split(':') }}"
+        port_num: "{{ port_protocol[0] | trim }}"
+        protocol: "{{ port_protocol[1] | default('tcp') | trim }}"
+        port_name_map:
+          '1514': 'Syslog'
+          '6514': 'Syslog-TLS'
+          '9543': 'Aria-API'
+        port_dict:
+          port: "{{ port_num }}"
+          protocol: "{{ protocol }}"
+          name: "{{ port_name_map[port_num] | default('Port-' + port_num) }}-{{ protocol | upper }}"
+          log_prefix: "BLOCKED-{{ port_num }}-{{ protocol | upper }}"
+
+    - name: Display configuration
+      ansible.builtin.debug:
+        msg:
+          - "============================================"
+          - "VMware Aria Firewall Configuration"
+          - "============================================"
+          - "Restricted Ports: {{ restricted_ports | map(attribute='port') | unique | list | join(', ') }}"
+          - "Allowed Networks: {{ restricted_ports_networks_list if restricted_ports_networks_list else 'None' }}"
+          - "Allowed IPs: {{ restricted_ports_ips_list if restricted_ports_ips_list else 'None' }}"
+          - "Cluster Nodes: {{ cluster_nodes_list if cluster_nodes_list else 'None' }}"
+          - "Remove Existing: {{ remove_existing_blocks }}"
+          - ""
+          - "⚠️  NOTE: Rules will NOT persist after reboot"
+          - "    Re-run this playbook after reboots"
+          - "============================================"
+
+    - name: Validate configuration
+      ansible.builtin.assert:
+        that:
+          - restricted_ports | length > 0
+        fail_msg: "At least one restricted port must be specified"
+
+  tasks:
+    # ==========================================
+    # BACKUP
+    # ==========================================
+    - name: Create backup directory
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Backup current iptables rules
+      ansible.builtin.shell: |
+        iptables-save > {{ backup_dir }}/iptables-backup-{{ ansible_date_time.iso8601_basic_short }}.rules
+      changed_when: true
+
+    - name: Display current INPUT rules
+      ansible.builtin.command: iptables -L INPUT -n --line-numbers
+      register: before_rules
+      changed_when: false
+
+    - name: Show first 15 current rules
+      ansible.builtin.debug:
+       msg: "{{ (before_rules.stdout_lines | select('match', '^[0-9]') | list)[:15] }}"
+
+    - name: Count current rules
+      ansible.builtin.shell: iptables -L INPUT -n | wc -l
+      register: before_count
+      changed_when: false
+
+    # ==========================================
+    # REMOVE PROBLEMATIC RULES
+    # ==========================================
+    - name: Check for blanket ACCEPT rule
+      ansible.builtin.shell: |
+        iptables -L INPUT -n --line-numbers | \
+        grep "ACCEPT" | \
+        grep "0.0.0.0/0.*0.0.0.0/0" | \
+        grep -v "Cluster\|state\|dpt:\|icmp" | \
+        awk '{print $1}' | \
+        head -1
+      register: blanket_accept_line
+      changed_when: false
+      failed_when: false
+
+    - name: Display blanket ACCEPT rule if found
+      ansible.builtin.debug:
+        msg: "⚠️  Found problematic blanket ACCEPT rule at line {{ blanket_accept_line.stdout }}"
+      when: blanket_accept_line.stdout | length > 0
+
+    - name: Remove blanket ACCEPT rule
+      ansible.builtin.command: iptables -D INPUT {{ blanket_accept_line.stdout }}
+      when: blanket_accept_line.stdout | length > 0
+      register: blanket_removed
+
+    - name: Confirm blanket ACCEPT removal
+      ansible.builtin.debug:
+        msg: "✅ Removed blanket ACCEPT rule from line {{ blanket_accept_line.stdout }}"
+      when: blanket_accept_line.stdout | length > 0
+
+    - name: Check for catch-all REJECT rule
+      ansible.builtin.shell: |
+        iptables -L INPUT -n --line-numbers | \
+        grep "REJECT" | \
+        grep "icmp-proto-unreachable" | \
+        grep "0.0.0.0/0.*0.0.0.0/0" | \
+        awk '{print $1}' | \
+        head -1
+      register: catchall_reject_line
+      changed_when: false
+      failed_when: false
+
+    - name: Display catch-all REJECT rule if found
+      ansible.builtin.debug:
+        msg: "⚠️  Found catch-all REJECT rule at line {{ catchall_reject_line.stdout }}"
+      when: catchall_reject_line.stdout | length > 0
+
+    - name: Remove catch-all REJECT rule
+      ansible.builtin.command: iptables -D INPUT {{ catchall_reject_line.stdout }}
+      when: catchall_reject_line.stdout | length > 0
+      register: reject_removed
+
+    - name: Confirm catch-all REJECT removal
+      ansible.builtin.debug:
+        msg: "✅ Removed catch-all REJECT rule from line {{ catchall_reject_line.stdout }}"
+      when: catchall_reject_line.stdout | length > 0
+
+    # ==========================================
+    # REMOVE OLD ARIA RULES (if requested)
+    # ==========================================
+    - name: Check for existing Aria firewall rules
+      ansible.builtin.shell: |
+        iptables -L INPUT -n --line-numbers | grep -E "Aria-API|Syslog|VAMI|Cluster node|BLOCKED-|Allow Port-443-TCP|Allow Port-8553-TCP|Block Port-" | wc -l
+      register: existing_aria_rules
+      changed_when: false
+      failed_when: false
+
+    - name: Display existing Aria rules count
+      ansible.builtin.debug:
+        msg: "Found {{ existing_aria_rules.stdout }} existing Aria firewall rules"
+      when: existing_aria_rules.stdout | int > 0
+
+    - name: Remove existing Aria-related rules (if requested)
+      ansible.builtin.shell: |
+        for line in $(iptables -L INPUT -n --line-numbers | grep -E "Aria-API|Syslog|VAMI|Cluster node|BLOCKED Port-|Allow Port-443-TCP|Allow Port-8553-TCP|Block Port-" | awk '{print $1}' | sort -rn); do
+          iptables -D INPUT $line
+        done
+      when: 
+        - remove_existing_blocks | bool
+        - existing_aria_rules.stdout | int > 0
+      register: removal_result
+      changed_when: removal_result.rc == 0
+
+    - name: Confirm removal
+      ansible.builtin.debug:
+        msg: "✅ Removed {{ existing_aria_rules.stdout }} existing Aria firewall rules"
+      when: 
+        - remove_existing_blocks | bool
+        - existing_aria_rules.stdout | int > 0
+
+    # ==========================================
+    # ADD CLUSTER NODE RULES
+    # ==========================================
+    - name: Check if cluster node rule already exists
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep "{{ item }}" | grep -c "Cluster node"
+      loop: "{{ cluster_nodes_list }}"
+      register: cluster_rule_check
+      changed_when: false
+      failed_when: false
+      when: 
+        - cluster_nodes_list | length > 0
+        - item | length > 0
+
+    - name: Insert cluster node allow rules at top
+      ansible.builtin.iptables:
+        chain: INPUT
+        source: "{{ item.item }}"
+        jump: ACCEPT
+        action: insert
+        rule_num: 1
+        comment: "Cluster node {{ item.item }} - unrestricted"
+      loop: "{{ cluster_rule_check.results }}"
+      when: 
+        - cluster_nodes_list | length > 0
+        - item.item | length > 0
+        - item.stdout | int == 0
+
+    # ==========================================
+    # ADD RESTRICTED PORTS ALLOW RULES
+    # ==========================================
+    
+    # Allow from networks
+    - name: Check if network allow rule exists
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep "dpt:{{ item.0.port }}" | grep "{{ item.1 }}" | grep -c ACCEPT
+      loop: "{{ restricted_ports | product(restricted_ports_networks_list) | list }}"
+      register: network_allow_check
+      changed_when: false
+      failed_when: false
+      when: 
+        - restricted_ports_networks_list | length > 0
+        - item.1 | length > 0
+
+    - name: Allow restricted ports from allowed networks
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: "{{ item.item.0.protocol }}"
+        destination_port: "{{ item.item.0.port }}"
+        source: "{{ item.item.1 }}"
+        jump: ACCEPT
+        comment: "Allow {{ item.item.0.name }} from network {{ item.item.1 }}"
+      loop: "{{ network_allow_check.results }}"
+      when: 
+        - restricted_ports_networks_list | length > 0
+        - item.item.1 | length > 0
+        - item.stdout | int == 0
+
+    # Allow from IPs
+    - name: Check if IP allow rule exists
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep "dpt:{{ item.0.port }}" | grep "{{ item.1 }}" | grep -c ACCEPT
+      loop: "{{ restricted_ports | product(restricted_ports_ips_list) | list }}"
+      register: ip_allow_check
+      changed_when: false
+      failed_when: false
+      when: 
+        - restricted_ports_ips_list | length > 0
+        - item.1 | length > 0
+
+    - name: Allow restricted ports from allowed IPs
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: "{{ item.item.0.protocol }}"
+        destination_port: "{{ item.item.0.port }}"
+        source: "{{ item.item.1 }}"
+        jump: ACCEPT
+        comment: "Allow {{ item.item.0.name }} from IP {{ item.item.1 }}"
+      loop: "{{ ip_allow_check.results }}"
+      when: 
+        - restricted_ports_ips_list | length > 0
+        - item.item.1 | length > 0
+        - item.stdout | int == 0
+
+    # ==========================================
+    # ADD DROP RULES
+    # (Optional - redundant with default DROP policy,
+    #  but kept for packet counting and clarity)
+    # ==========================================
+    - name: Check if drop rule exists
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep "dpt:{{ item.port }}" | grep "{{ item.protocol }}" | grep -c DROP
+      loop: "{{ restricted_ports }}"
+      register: drop_check
+      changed_when: false
+      failed_when: false
+
+    - name: Block all other traffic on restricted ports
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: "{{ item.item.protocol }}"
+        destination_port: "{{ item.item.port }}"
+        jump: DROP
+        comment: "Block {{ item.item.name }} from unauthorized"
+      loop: "{{ drop_check.results }}"
+      when: item.stdout | int == 0
+
+
+    # ==========================================
+    # VERIFICATION
+    # ==========================================
+    - name: Display current rules after changes
+      ansible.builtin.command: iptables -L INPUT -n -v --line-numbers
+      register: after_rules_full
+      changed_when: false
+
+    - name: Show first 30 rules
+      ansible.builtin.debug:
+        msg: "{{ (after_rules_full.stdout_lines | select('match', '^[0-9]') | list)[:30] }}"
+
+    - name: Count rules after changes
+      ansible.builtin.shell: iptables -L INPUT -n | wc -l
+      register: after_count
+      changed_when: false
+
+    - name: Count Aria-specific rules
+      ansible.builtin.shell: |
+        iptables -L INPUT -n | grep -E "Aria-API|Syslog|VAMI|Cluster node" | wc -l
+      register: aria_rule_count
+      changed_when: false
+
+    - name: Check for problematic rules still present
+      ansible.builtin.shell: |
+        echo "Blanket ACCEPT rules:"
+        iptables -L INPUT -n | grep "ACCEPT.*0.0.0.0/0.*0.0.0.0/0" | grep -v "Cluster\|state\|dpt:\|icmp" || echo "None (Good!)"
+        echo ""
+        echo "Catch-all REJECT rules:"
+        iptables -L INPUT -n | grep "REJECT.*icmp-proto-unreachable" | grep "0.0.0.0/0.*0.0.0.0/0" || echo "None (Good!)"
+      register: problem_check
+      changed_when: false
+
+    - name: Display problem check
+      ansible.builtin.debug:
+        var: problem_check.stdout_lines
+
+    - name: Calculate rules changed
+      ansible.builtin.set_fact:
+        rules_changed: "{{ (after_count.stdout | int) - (before_count.stdout | int) }}"
+
+    - name: Final summary
+      ansible.builtin.debug:
+        msg:
+          - "============================================"
+          - "VMware Aria Firewall Configuration Complete"
+          - "============================================"
+          - ""
+          - "FIXES APPLIED:"
+          - "  {{ '✅ Removed blanket ACCEPT rule' if blanket_accept_line.stdout | length > 0 else '✅ No blanket ACCEPT found' }}"
+          - "  {{ '✅ Removed catch-all REJECT rule' if catchall_reject_line.stdout | length > 0 else '✅ No catch-all REJECT found' }}"
+          - "  {{ '✅ Removed ' + existing_aria_rules.stdout + ' old Aria rules' if (remove_existing_blocks | bool and existing_aria_rules.stdout | int > 0) else '✅ Kept existing rules' }}"
+          - ""
+          - "STATISTICS:"
+          - "  Rules before: {{ before_count.stdout }}"
+          - "  Rules after: {{ after_count.stdout }}"
+          - "  Rules changed: {{ rules_changed }}"
+          - "  Aria rules active: {{ aria_rule_count.stdout }}"
+          - ""
+          - "CONFIGURATION:"
+          - "  Cluster nodes: {{ cluster_nodes_list | length if cluster_nodes_list else 0 }}"
+          - "  Restricted ports: {{ restricted_ports | map(attribute='port') | unique | list | join(', ') }}"
+          - "  Allowed networks: {{ restricted_ports_networks_list | join(', ') if restricted_ports_networks_list else 'None' }}"
+          - "  Allowed IPs: {{ restricted_ports_ips_list | join(', ') if restricted_ports_ips_list else 'None' }}"
+          - ""
+          - "DEFAULT POLICY: DROP (secure)"
+          - "Firewall rules are now ACTIVE and FUNCTIONAL"
+          - ""
+          - "⚠️  IMPORTANT: Rules are NOT persistent!"
+          - "   Re-run this playbook after any reboot"
+          - ""
+          - "VERIFICATION:"
+          - "  iptables -L INPUT -n --line-numbers | head -30"
+          - "  iptables -L INPUT -n | grep -E 'Aria|Syslog|VAMI|Cluster'"
+          - ""
+          - "TESTING:"
+          - "  From unauthorized IP (should fail):"
+          - "    curl -k https://{{ ansible_host }}:9543 --connect-timeout 5"
+          - "  From cluster node (should work):"
+          - "    curl -k https://{{ ansible_host }}:9543"
+          - "============================================"

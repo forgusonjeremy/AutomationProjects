@@ -1,0 +1,35 @@
+- name: get export status
+  uri:
+    url: "{{ gitlab_endpoint }}/api/v4/projects/{{ item }}/export"
+    method: GET
+    status_code: 
+      - 200
+      - 201
+      - 202
+      - 409
+    validate_certs: false
+    body_format: json
+    headers:
+      Content-Type: application/json
+      Authorization: Bearer {{ gitlab_AccessToken.json.access_token }}
+  register: gitlab_export
+
+- name: download export to home location "~/ansibleTemp"
+  uri:
+    url: "{{ gitlab_export.json._links.api_url }}"
+    method: GET
+    status_code: 
+      - 200
+      - 201
+      - 202
+      - 409
+    validate_certs: false
+    body_format: json
+    headers:
+      Content-Type: application/json
+      Authorization: Bearer {{ gitlab_AccessToken.json.access_token }}
+    dest: "{{ var_destfolder }}"
+
+- name: Pause for seconds for download to complete
+  ansible.builtin.pause:
+    seconds: "{{ var_download_pause_time }}"

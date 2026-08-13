@@ -1,0 +1,41 @@
+---
+- name: VC++ runtime consumer report
+  hosts: all
+  gather_facts: false
+  become: true
+  become_method: runas
+
+  vars:
+    outputDirectory: 'C:\Temp'
+    targetComputers: 'CVSO26DYNAG01.connect.sbu, CVSO26DYNAG02.connect.sbu, CVSO26DYNSAG01.connect.sbu, CVSO26VARA01.connect.sbu, CVSO26VARA02.connect.sbu, CVSOEWDYNAG01.connect.sbu, CVSOEWDYNAG02.connect.sbu, CVSOEWDYNSAG01.connect.sbu, CVSOEWVARA01.connect.sbu, CVSOEWVARA02.connect.sbu, CVSOOWDB01.connect.sbu, CVSOOWDYNAG01.connect.sbu, CVSOOWDYNAG02.connect.sbu, CVSOOWDYNCGFSAG.connect.sbu, CVSOOWDYNNTAG01.connect.sbu, CVSOOWDYNNTAG02.connect.sbu, CVSOOWDYNSAG01.connect.sbu, CVSOOWDYNSAG02.connect.sbu, CVSOOWMGT004.connect.sbu, CVSOOWVARA01.connect.sbu, CVSOOWVARA02.connect.sbu, CVSVGEBMCZBX02.connect.sbu'
+
+  tasks:
+    - block:
+        - name: Create temp working directory
+          ansible.windows.win_tempfile:
+            state: directory
+          register: tempDir
+
+        - name: Stage script
+          ansible.windows.win_copy:
+            src: files/ps_scripts/get_vcredist_consumers.ps1
+            dest: '{{ tempDir.path }}\get_vcredist_consumers.ps1'
+
+        - name: Run VC++ runtime consumer report against targets
+          ansible.windows.win_command: >-
+            powershell.exe -ExecutionPolicy ByPass
+            -File "{{ tempDir.path }}\get_vcredist_consumers.ps1"
+            -ComputerName "{{ targetComputers }}"
+            -OutputDirectory "{{ outputDirectory }}"
+          register: reportRun
+
+        - name: Show script output
+          ansible.builtin.debug:
+            var: reportRun.stdout_lines
+
+      always:
+        - name: Cleanup temp directory
+          ansible.windows.win_file:
+            path: '{{ tempDir.path }}'
+            state: absent
+          when: tempDir is defined

@@ -1,0 +1,36 @@
+---
+- name: "Playbook - Import inventory from list called 'list_of_hosts'"
+  hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: "Task - Add list of hosts to the new group called 'new_groups'"
+      add_host:
+        name: "{{ item }}"
+        groups: new_groups
+        ansible_connection: winrm
+        ansible_port: 5986 
+        ansible_winrm_kerberos_delegation:  true
+        ansible_winrm_server_cert_validation: "ignore"
+        ansible_winrm_transport: "kerberos"
+        var_os_family: "Windows"
+      loop: "{{ list_of_hosts }}"
+
+- name: "Playbook - Install Windows compontent against the new invventory group 'new_groups'"
+  hosts: new_groups
+  gather_facts: no
+  # collections:
+  #   - microsoft.ad
+  #   - ansible.controller
+
+  tasks:
+    - name: Task - Installing ADDS Tools feature
+      ansible.windows.win_feature:
+        name:
+        - RSAT-AD-Tools
+        state: present
+      register: win_feature
+
+    - name: Tak - Reboot server if required after the Web-Server feature installation
+      ansible.windows.win_reboot:
+      when: win_feature.reboot_required

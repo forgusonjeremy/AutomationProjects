@@ -1,0 +1,25 @@
+---
+- name: port test from the inventory list
+  hosts: all
+  run_once: true
+
+  vars:
+    # var_list_vm:
+    #     - 'esocdowvxvcs.pilot.dev'
+    #     - 'cvsdans11.pilot.dev'
+    #     - 'cvsdans12.pilot.dev'
+    #     - 'cvsdans13.pilot.dev'
+    #     - 'cvsdans14.pilot.dev'
+    #     - cvsdgit11.pilot.dev
+    #     - cvsdgit12.pilot.dev
+
+  tasks:
+  - name: "check if port 22 is accessible"
+    ignore_errors: true
+    wait_for:
+      host: "{{ item }}"
+      port: 22
+      state: started
+      delay: 0
+      timeout: 1
+    loop: "{{var_list_vm}}"

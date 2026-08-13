@@ -1,0 +1,19 @@
+hst:
+    hosts:
+        esocdowvxmgr.pilot.dev:
+    children:
+        vxrmanagers:
+
+mdc:
+    children:
+        vxrmanagers:     
+
+ew:
+    children:
+        vxrmanagers:    
+    
+all:
+    children:
+        hst:
+        mdc:
+        ew:  

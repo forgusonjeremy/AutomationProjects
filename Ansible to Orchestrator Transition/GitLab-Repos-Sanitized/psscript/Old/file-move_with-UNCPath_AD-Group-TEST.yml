@@ -1,0 +1,149 @@
+---
+- name: "Retrieve Computer Objects"
+  hosts: all
+  gather_facts: false
+  run_once: true
+
+  tasks:
+    - name: Get computer members
+      ansible.windows.win_shell: |
+        Import-Module ActiveDirectory
+        
+        $secPassword = ConvertTo-SecureString "{{ WinRM_password }}" -AsPlainText -Force
+        $cred = New-Object System.Management.Automation.PSCredential("{{ WinRM_username }}", $secPassword)
+        
+        try {
+            $group = Get-ADGroup -Identity "{{ group_dn }}" -Properties Members -Credential $cred -ErrorAction Stop
+            
+            $computers = @()
+            foreach ($member in $group.Members) {
+                try {
+                    $comp = Get-ADComputer -Identity $member -Properties DNSHostName -Credential $cred -ErrorAction Stop
+                    $computers += [PSCustomObject]@{
+                        Name = $comp.Name
+                        DNSHostName = $comp.DNSHostName
+                    }
+                } catch {
+                }
+            }
+            
+            if ($computers.Count -gt 0) {
+                $computers | ConvertTo-Json -Compress
+            } else {
+                '[]'
+            }
+        } catch {
+            @{Error = $_.Exception.Message} | ConvertTo-Json
+        }
+      register: ad_query
+      failed_when: false
+
+    - name: Debug raw output
+      debug:
+        var: ad_query
+
+    - name: Check for errors in AD query
+      fail:
+        msg: "AD query failed: {{ (ad_query.stdout | from_json).Error }}"
+      when:
+        - ad_query.stdout is defined
+        - ad_query.stdout | trim | length > 0
+        - (ad_query.stdout | from_json).Error is defined
+
+    - name: Parse AD query results
+      set_fact:
+        ad_computers: "{{ ad_query.stdout | from_json }}"
+      when: 
+        - ad_query.stdout is defined
+        - ad_query.stdout | trim | length > 0
+        - ad_query.rc == 0
+
+    - name: Set empty list if no results
+      set_fact:
+        ad_computers: []
+      when: ad_computers is not defined
+      
+    - name: Handle single result (convert to list)
+      set_fact:
+        ad_computers: "{{ [ad_computers] }}"
+      when: 
+        - ad_computers is defined
+        - ad_computers is mapping
+
+    - name: Create server list from AD results
+      set_fact:
+        server_list: "{{ ad_computers | map(attribute='DNSHostName') | select() | list }}"
+      when: 
+        - ad_computers is defined
+        - ad_computers | length > 0
+
+    - name: Display server list
+      debug:
+        msg: "Servers to process: {{ server_list | default([]) | join(', ') }}"
+
+    - name: Add servers to dynamic inventory
+      add_host:
+        name: "{{ item }}"
+        groups:
+          - cvs_monitoring_servers
+        ansible_user: "{{ WinRM_username }}"
+        ansible_password: "{{ WinRM_password }}"
+        become_method: runas
+        ansible_become_user: "{{ WinRM_username }}"
+        ansible_become_pass: "{{ WinRM_password }}"
+        ansible_connection: winrm
+        ansible_winrm_transport: kerberos
+        ansible_winrm_kerberos_delegation: true
+        ansible_winrm_server_cert_validation: ignore
+        ansible_port: 5986
+      loop: "{{ server_list | default([]) }}"
+      no_log: true
+
+    - name: Execute Move-files function
+      ansible.windows.win_shell: |
+        Function Move-files {
+            [CmdletBinding()]
+            Param(
+                [Parameter(Mandatory=$true)]
+                [string] $Path,     
+                [Parameter(Mandatory=$true)]
+                [string] $TargetPath,
+                [Parameter(Mandatory=$false)]
+                [string] $FilterOn = '*',
+                [Parameter(Mandatory=$false)]
+                [string] $Days = '0'
+            )
+            Begin{
+                $fqdn = "{{item}}"
+                $hostname = $fqdn.Split('.')[0]
+                $dateTime = (Get-Date).AddDays([int]$Days)
+                $serverTargetPath = Join-Path -Path $TargetPath -ChildPath $hostname
+            }
+            Process{
+                Try {
+                    if ( !(Test-Path -PathType container $serverTargetPath) ){
+                        New-Item -ItemType Directory -Path $serverTargetPath | Out-Null
+                    }
+                    
+                    $movedFiles = Get-ChildItem -Path $Path -Recurse -File -Filter $FilterOn | 
+                        Where-Object { $_.LastWriteTime -lt $dateTime } | 
+                        ForEach-Object {
+                            Move-Item -Path $_.FullName -Destination "$serverTargetPath" -Force -PassThru
+                            $_.Name
+                        }
+                    
+                    $fileCount = ($movedFiles | Measure-Object).Count
+                    Write-Output "Moved $fileCount files FROM: $($Path)\$($FilterOn) TO: $serverTargetPath"
+                }
+                Catch{ 
+                    Write-Error $_.Exception.Message
+                    throw
+                }
+            }
+        }
+        Move-files -Path "\\{{item}}\{{ source_path }}" -TargetPath "{{ target_path }}" -FilterOn "{{ file_filter }}" -Days "{{ days_old }}"
+      loop: "{{ server_list | default([]) }}"
+      become: yes
+      become_user: "{{ WinRM_username }}"
+      vars:
+        ansible_become_password: "{{ WinRM_password }}"

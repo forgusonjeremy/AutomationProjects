@@ -1,0 +1,35 @@
+---
+collections:
+  # - name: ansible.utils
+  #   version: 5.1.2
+  #   source: https://cvsdans01.pilot.dev/pulp_ansible/galaxy/cvs/
+  #   type: galaxy
+
+  # - name: ansible.scm
+  #   version: 3.0.0
+  #   source: https://cvsdans01.pilot.dev/pulp_ansible/galaxy/cvs/
+  #   type: galaxy
+
+  # - name: ansible.netcommon
+  #   version: 7.1.0
+  #   source: https://cvsdans01.pilot.dev/pulp_ansible/galaxy/cvs/
+  #   type: galaxy
+
+  # - name: collections/ansible-utils-5.1.2.tar.gz
+  #   type: file
+
+  # - name: collections/ansible-scm-3.0.0.tar.gz
+  #   type: file
+
+  # - name: collections/ansible_netcommon_7.1.0.tar.gz
+  #   type: file
+
+  # - name: collections/ansible-posix-1.5.4.tar.gz
+  #   type: file
+
+  # - name: collections/azure-azcollection-2.0.0.tar.gz
+  #   type: file
+
+
+
+
