@@ -1,21 +1,21 @@
 hst:
     hosts:
-        cvsdwinrm01.pilot.dev:
-        esocdwinrm01.pilot.dev:
+        dom26.dom3.example:
+        dom23.dom3.example:
     children:
         stig:
 
 mdc:
     hosts:
-        cvsdwinrm02.pilot.dev:
-        esocdwinrm02.pilot.dev:
+        dom25.dom3.example:
+        dom24.dom3.example:
     children:
         stig:     
 
 ew:
     hosts:
-        cvsdwinrm03.pilot.dev:
-        esocdwinrm03.pilot.dev:
+        dom27.dom3.example:
+        dom20.dom3.example:
     children:
         stig:    
      

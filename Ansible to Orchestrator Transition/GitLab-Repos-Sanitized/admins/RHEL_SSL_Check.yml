@@ -173,7 +173,7 @@
         content: "{{ cert_info | default([]) | to_nice_json }}"
         dest: "{{ report_dir }}/{{ inventory_hostname }}_ssl_report.json"
         mode: "0644"
-      delegate_to: cvsoowans10.washdc.state.sbu
+      delegate_to: dom16.dom5.dom6.invalid
       become: true
  
     - name: Report saved

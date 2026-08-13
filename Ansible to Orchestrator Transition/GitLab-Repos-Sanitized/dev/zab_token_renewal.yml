@@ -3,7 +3,7 @@
   hosts: all
   gather_facts: false
   vars:
-    zabbix_url: "https://cvsdowzbs007.pilot.dev/api_jsonrpc.php"
+    zabbix_url: "https://dom6.dom7.ex4/api_jsonrpc.php"
     zabbix_admin_user: "ansiblelocal"
     zabbix_admin_password: ""  # REQUIRED: Set your password here or pass via -e
     target_username: "ansiblelocal"  # Username whose token you want to extend

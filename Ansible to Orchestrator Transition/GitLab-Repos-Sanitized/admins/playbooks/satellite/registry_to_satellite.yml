@@ -5,7 +5,7 @@
   gather_facts: yes
   vars:
     # Foreman/Satellite server details
-    foreman_server: "cvsdsat03.pilot.dev"
+    foreman_server: "dom31.dom3.example"
     foreman_port: "9090"
     foreman_protocol: "https"
     

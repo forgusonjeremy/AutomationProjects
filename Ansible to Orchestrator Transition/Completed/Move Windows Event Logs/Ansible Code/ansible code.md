@@ -568,7 +568,7 @@ days_old: '0'
 **file-move_with-LocalPath_AD-Group**
 ***extra vars***
 source_path: C:\Windows\System32\winevt\Logs
-target_path: \\esoco26cdt3-100.washdc.state.sbu\mdcarchivelog$\Windows
+target_path: \\dom46.dom5.dom3.invalid\mdcarchivelog$\Windows
 file_filter: Archive-*.evtx
 days_old: '-1'
 

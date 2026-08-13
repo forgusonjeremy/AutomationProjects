@@ -33,17 +33,17 @@ param(
 #  Active = $false retires a vCenter without deleting the line
 # =============================================================================
 $vCenterList = @(
-    [pscustomobject]@{ Name = 'ESOCO26VCS01'; FQDN = 'esoco26vcs01.washdc.state.sbu'; Area = 'CONUS';  Active = $true }
-    [pscustomobject]@{ Name = 'ESOCO26VCS02'; FQDN = 'esoco26vcs02.washdc.state.sbu'; Area = 'CONUS';  Active = $true }
-    [pscustomobject]@{ Name = 'ESOCOEWVCS';   FQDN = 'esocoewvcs.washdc.state.sbu';   Area = 'CONUS';  Active = $true }
-    [pscustomobject]@{ Name = 'ESOCOEWVCS01'; FQDN = 'esocoewvcs01.washdc.state.sbu'; Area = 'CONUS';  Active = $true }
-    [pscustomobject]@{ Name = 'ESOCOEWVCS02'; FQDN = 'esocoewvcs02.washdc.state.sbu'; Area = 'CONUS';  Active = $true }
-    [pscustomobject]@{ Name = 'AFVC60';       FQDN = 'afvc60.af.state.sbu';           Area = 'OCONUS'; Active = $true }
-    [pscustomobject]@{ Name = 'EAPVC60';      FQDN = 'eapvc60.eap.state.sbu';         Area = 'OCONUS'; Active = $true }
-    [pscustomobject]@{ Name = 'EURVC60';      FQDN = 'eurvc60.eur.state.sbu';         Area = 'OCONUS'; Active = $true }
-    [pscustomobject]@{ Name = 'GITMVC651ST';  FQDN = 'gitmvc651st.washdc.state.sbu';  Area = 'OCONUS'; Active = $true }
-    [pscustomobject]@{ Name = 'NEASAVC60';    FQDN = 'neasavc60.neasa.state.sbu';     Area = 'OCONUS'; Active = $true }
-    [pscustomobject]@{ Name = 'WHAVC60';      FQDN = 'whavc60.wha.state.sbu';         Area = 'OCONUS'; Active = $true }
+    [pscustomobject]@{ Name = 'ESOCO26VCS01'; FQDN = 'dom10.dom5.dom3.invalid'; Area = 'CONUS';  Active = $true }
+    [pscustomobject]@{ Name = 'ESOCO26VCS02'; FQDN = 'dom11.dom5.dom3.invalid'; Area = 'CONUS';  Active = $true }
+    [pscustomobject]@{ Name = 'ESOCOEWVCS';   FQDN = 'dom14.dom5.dom3.invalid';   Area = 'CONUS';  Active = $true }
+    [pscustomobject]@{ Name = 'ESOCOEWVCS01'; FQDN = 'dom9.dom5.dom3.invalid'; Area = 'CONUS';  Active = $true }
+    [pscustomobject]@{ Name = 'ESOCOEWVCS02'; FQDN = 'dom8.dom5.dom3.invalid'; Area = 'CONUS';  Active = $true }
+    [pscustomobject]@{ Name = 'AFVC60';       FQDN = 'dom44.dom45.dom3.invalid';           Area = 'OCONUS'; Active = $true }
+    [pscustomobject]@{ Name = 'EAPVC60';      FQDN = 'dom40.dom41.dom3.invalid';         Area = 'OCONUS'; Active = $true }
+    [pscustomobject]@{ Name = 'EURVC60';      FQDN = 'dom38.dom39.dom3.invalid';         Area = 'OCONUS'; Active = $true }
+    [pscustomobject]@{ Name = 'GITMVC651ST';  FQDN = 'dom12.dom5.dom3.invalid';  Area = 'OCONUS'; Active = $true }
+    [pscustomobject]@{ Name = 'NEASAVC60';    FQDN = 'dom24.dom25.dom3.invalid';     Area = 'OCONUS'; Active = $true }
+    [pscustomobject]@{ Name = 'WHAVC60';      FQDN = 'dom42.dom43.dom3.invalid';         Area = 'OCONUS'; Active = $true }
 )
 
 # =============================================================================
@@ -53,24 +53,24 @@ $caSigned = @(
     'U.S. Department of State AD High Assurance CA'
     'DOSMSSUBCA'
     'U.S. Department of State NPE03 Sub CA'
-    'esoco26vcs01.washdc.state.sbu'
-    'esoco26vcs02.washdc.state.sbu'
-    'esocoewvcs.washdc.state.sbu'
-    'esocoewvcs01.washdc.state.sbu'
-    'esocoewvcs02.washdc.state.sbu'
-    'afvc60.af.state.sbu'
-    'eapvc60.eap.state.sbu'
-    'eurvc60.eur.state.sbu'
-    'gitmvc651st.washdc.state.sbu'
-    'neasavc60.neasa.state.sbu'
-    'whavc60.wha.state.sbu'
+    'dom10.dom5.dom3.invalid'
+    'dom11.dom5.dom3.invalid'
+    'dom14.dom5.dom3.invalid'
+    'dom9.dom5.dom3.invalid'
+    'dom8.dom5.dom3.invalid'
+    'dom44.dom45.dom3.invalid'
+    'dom40.dom41.dom3.invalid'
+    'dom38.dom39.dom3.invalid'
+    'dom12.dom5.dom3.invalid'
+    'dom24.dom25.dom3.invalid'
+    'dom42.dom43.dom3.invalid'
 )
 
 # =============================================================================
 #  EDIT — paths, email distros, thresholds
 # =============================================================================
 if (-not $csvPath)    { $csvPath = 'D:\CVS_SSL' }
-if (-not $pbiPath)    { $pbiPath = '\\esocoeentap101.washdc.state.sbu\ceisshare$\ViPR\Datastores\SSL' }
+if (-not $pbiPath)    { $pbiPath = '\\dom7.dom5.dom3.invalid\ceisshare$\ViPR\Datastores\SSL' }
 if (-not $smtpServer) { $smtpServer = 'dom1.dom2.dom3.example' }
 $archivePath = Join-Path $csvPath 'Archive'
 $mailFrom    = "$env:user7@dom3.example"

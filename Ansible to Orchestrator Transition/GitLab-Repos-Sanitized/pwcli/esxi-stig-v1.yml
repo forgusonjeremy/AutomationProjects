@@ -8,12 +8,12 @@
 
   vars:
     # These will be provided via job template survey or extra_vars
-    vcenter_hostname: #"esocdowvxvcs.pilot.dev" # "{{ vcenter_server }}"
+    vcenter_hostname: #"dom10.dom9.ex4" # "{{ vcenter_server }}"
     vcenter_username: #"administrator@vsphere.local" # "{{ vcenter_user }}"
     vcenter_password: "{{ vcenter_pass | default('V1rtu@1c3!') }}"
     syslog_host: #"udp://100.64.0.54:514" #udp://100.64.0.54:514
     ntp_server_list: #"100.64.1.128" 
-    target_hostname:  #"{{ esxi_hostname | default('') }}"  #"esocdowvxrln8.pilot.dev"
+    target_hostname:  #"{{ esxi_hostname | default('') }}"  #"dom8.dom9.ex4"
     target_cluster: #"VxRail-Virtual-SAN-Cluster-2f4158d4-ab51-4b26-8d2f-239810aecf13" #"{{ esxi_cluster | default('') }}"
     
     # Environment specific variables

@@ -1,6 +1,6 @@
 hst:
     hosts:
-        esocdowvxmgr.pilot.dev:
+        dom21.dom3.example:
     children:
         vxrmanagers:
 

@@ -1,16 +1,20 @@
-{
+﻿{
     "SchemaVersion":  1,
     "Created":  "2026-08-13T10:01:29.8098125-04:00",
-    "Updated":  "2026-08-13T10:01:34.0272943-04:00",
-    "EntryCount":  15,
+    "Updated":  "2026-08-13T12:04:27.0880570-04:00",
+    "EntryCount":  27,
     "Counters":  [
                      {
                          "Type":  "DomainLabel",
-                         "Index":  1
+                         "Index":  7
                      },
                      {
                          "Type":  "Guid",
                          "Index":  4
+                     },
+                     {
+                         "Type":  "IPv4Subnet",
+                         "Index":  1
                      },
                      {
                          "Type":  "OrganizationalUnit",
@@ -49,6 +53,42 @@
                         "Surrogate":  "dom1"
                     },
                     {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsautomation",
+                        "Key":  "cvsautomation",
+                        "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsdowzbs007",
+                        "Key":  "cvsdowzbs007",
+                        "Surrogate":  "dom6"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "msconnectdc01",
+                        "Key":  "msconnectdc01",
+                        "Surrogate":  "dom5"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "pilot",
+                        "Key":  "pilot",
+                        "Surrogate":  "dom7"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "state",
+                        "Key":  "state",
+                        "Surrogate":  "dom4"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "washdc",
+                        "Key":  "washdc",
+                        "Surrogate":  "dom3"
+                    },
+                    {
                         "Type":  "Email",
                         "Value":  "svc-CVSAnsWin@CONNECT.SBU",
                         "Key":  "svc-cvsanswin@connect.sbu",
@@ -59,6 +99,24 @@
                         "Value":  "Connect.sbu",
                         "Key":  "connect.sbu",
                         "Surrogate":  "dom1.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsautomation.washdc.state.sbu",
+                        "Key":  "cvsautomation.washdc.state.sbu",
+                        "Surrogate":  "dom2.dom3.dom4.example"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsdowzbs007.pilot.dev",
+                        "Key":  "cvsdowzbs007.pilot.dev",
+                        "Surrogate":  "dom6.dom7.ex4"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "msconnectdc01.connect.sbu",
+                        "Key":  "msconnectdc01.connect.sbu",
+                        "Surrogate":  "dom5.dom1.example"
                     },
                     {
                         "Type":  "Guid",
@@ -85,6 +143,18 @@
                         "Surrogate":  "00000003-0000-4000-8000-000000000003"
                     },
                     {
+                        "Key":  "10.68.54.24",
+                        "Value":  "10.68.54.24",
+                        "Type":  "IPv4",
+                        "Surrogate":  "100.64.0.24"
+                    },
+                    {
+                        "Key":  "10.68.54",
+                        "Value":  "10.68.54",
+                        "Type":  "IPv4Subnet",
+                        "Surrogate":  "100.64.0"
+                    },
+                    {
                         "Type":  "OrganizationalUnit",
                         "Value":  "Service Accounts",
                         "Key":  "service accounts",
@@ -101,6 +171,12 @@
                         "Value":  "svc-CVSAnsWin@CONNECT",
                         "Key":  "svc-CVSAnsWin@CONNECT",
                         "Surrogate":  "REDACTED-SECRET-1"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "dev",
+                        "Key":  "dev",
+                        "Surrogate":  "ex4"
                     },
                     {
                         "Type":  "Tld",

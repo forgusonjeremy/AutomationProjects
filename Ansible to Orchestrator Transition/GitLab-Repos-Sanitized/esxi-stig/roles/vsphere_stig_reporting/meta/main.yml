@@ -1,0 +1,23 @@
+---
+# roles/vsphere_stig_reporting/meta/main.yml
+galaxy_info:
+  author: Infrastructure Team
+  description: Production VMware ESXi STIG remediation reporting
+  company: Your Company
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - vmware
+    - vsphere
+    - esxi
+    - reporting
+    - production
+    - stig
+    - compliance
+
+dependencies: []

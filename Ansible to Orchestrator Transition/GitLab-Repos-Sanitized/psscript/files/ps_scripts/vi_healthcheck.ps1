@@ -293,23 +293,23 @@ if (-not [string]::IsNullOrWhiteSpace($vCenterList)) {
     # Leaving IP blank preserves the original FQDN-only behavior for that vCenter.
     $vCenters = [ordered]@{
         'ESOC West' = [pscustomobject][ordered]@{
-            Fqdn = 'esocoewvcs.washdc.state.sbu'
+            Fqdn = 'dom14.dom5.dom3.invalid'
             IP   = '100.64.0.87'
         }
         'MDC vXRail' = [pscustomobject][ordered]@{
-            Fqdn = 'esoco26vcs01.washdc.state.sbu'
+            Fqdn = 'dom10.dom5.dom3.invalid'
             IP   = '100.64.1.70'
         }
         'EW VxRail' = [pscustomobject][ordered]@{
-            Fqdn = 'esocoewvcs01.washdc.state.sbu'
+            Fqdn = 'dom9.dom5.dom3.invalid'
             IP   = '100.64.2.100'
         }
         'EW VxRail Staging' = [pscustomobject][ordered]@{
-            Fqdn = 'esocoewvcs02.washdc.state.sbu'
+            Fqdn = 'dom8.dom5.dom3.invalid'
             IP   = '100.64.0.20'
         }
         'OW VxRail' = [pscustomobject][ordered]@{
-            Fqdn = 'esoco26vcs02.washdc.state.sbu'
+            Fqdn = 'dom11.dom5.dom3.invalid'
             IP   = '100.64.3.100'
         }
     }

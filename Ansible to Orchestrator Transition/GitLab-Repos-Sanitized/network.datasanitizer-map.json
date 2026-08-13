@@ -1,15 +1,43 @@
-{
+﻿{
     "SchemaVersion":  1,
     "Created":  "2026-08-13T10:02:26.9141974-04:00",
-    "Updated":  "2026-08-13T10:02:29.4156208-04:00",
-    "EntryCount":  1,
+    "Updated":  "2026-08-13T12:03:32.1918340-04:00",
+    "EntryCount":  5,
     "Counters":  [
+                     {
+                         "Type":  "DomainLabel",
+                         "Index":  2
+                     },
                      {
                          "Type":  "Username",
                          "Index":  1
                      }
                  ],
     "Entries":  [
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "cvsdans01",
+                        "Key":  "cvsdans01",
+                        "Surrogate":  "dom1"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "pilot",
+                        "Key":  "pilot",
+                        "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "cvsdans01.pilot.dev",
+                        "Key":  "cvsdans01.pilot.dev",
+                        "Surrogate":  "dom1.dom2.ex4"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "dev",
+                        "Key":  "dev",
+                        "Surrogate":  "ex4"
+                    },
                     {
                         "Type":  "Username",
                         "Value":  "admin",

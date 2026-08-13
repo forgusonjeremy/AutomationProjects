@@ -17,7 +17,7 @@
     # Default empty list - IP addresses must be provided via extra vars
     # Supported formats:
     # Individual IPs: "100.64.0.100"
-    # CIDR subnets: "100.64.0.0/24" (entire 192.168.1.x range)
+    # CIDR subnets: "100.64.0.0/24" (entire 100.64.0.x range)
     # For IP ranges, use CIDR notation or list individual IPs
     # Examples:
     # - Individual + subnet: -e "allowed_ssh_ips=['100.64.0.0/24','100.64.1.100']"
@@ -35,7 +35,7 @@
           - CIDR subnets: "100.64.0.0/24" (entire subnet)
           
           For IP ranges, use one of these approaches:
-          - CIDR notation: "100.64.2.0/28" (covers 100.64.2.1-10.3.128.14)
+          - CIDR notation: "100.64.2.0/28" (covers 100.64.2.1-100.64.2.14)
           - Individual IPs: "100.64.2.164","100.64.2.165","100.64.2.166"
           
           NOTE: SSH service will only be removed if at least one admin IP is included.

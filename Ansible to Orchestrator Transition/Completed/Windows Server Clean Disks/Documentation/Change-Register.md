@@ -216,7 +216,7 @@ PowerShell script* contract is reused unchanged.
 | Ansible var (`vars.txt`) | vRO workflow input | Script parameter |
 |---|---|---|
 | `var_ADGroupMember` (`CVS-DPT-AllServers`) | `groupDN` | `-ADGroupMember` |
-| `var_DomainName` (`connect.sbu`) | `domainName` | `-DomainName` |
+| `var_DomainName` (`dom4.invalid`) | `domainName` | `-DomainName` |
 | `var_FolderTarget` (`c:\Windows\ccmcache`) | `folderTarget` | `-FolderTarget` |
 | `var_FilterOn` (`*.*`) | `fileFilter` — **fixed workflow attribute `*.*`** (not an operator input) | `-FilterOn` |
 | `var_NumberOfDays` (`-1`) | `olderThanDays` (positive; `1`) | `-NumberOfDays` (build action sends `-olderThanDays`) |

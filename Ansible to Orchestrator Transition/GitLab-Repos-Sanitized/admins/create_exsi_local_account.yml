@@ -10,7 +10,7 @@
   tasks:     
   # - name: Add local user to ESXi
   #   community.vmware.vmware_local_user_manager:
-  #     hostname: esocdowvxrln6.pilot.dev
+  #     hostname: dom19.dom3.example
   #     username: administrator@vsphere.local
   #     password: REDACTED-SECRET-1
   #     local_user_name: ansiblelocal
@@ -23,11 +23,11 @@
 
   - name: Update the local user password in ESXi host
     community.vmware.vmware_host_user_manager:
-      hostname: esocdowvxvcs.pilot.dev
+      hostname: dom22.dom3.example
       username: "root"
       password: "REDACTED-SECRET-1"
       validate_certs: false
-      esxi_hostname: esocdowvxrln6.pilot.dev
+      esxi_hostname: dom19.dom3.example
       user_name: ansiblelocal
       user_description: "created by Ansible Automation"
       user_password: REDACTED-SECRET-2

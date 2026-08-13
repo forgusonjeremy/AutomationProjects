@@ -4,13 +4,13 @@
 
   vars:
     # var_list_vm:
-    #     - 'esocdowvxvcs.pilot.dev'
-    #     - 'cvsdans11.pilot.dev'
-    #     - 'cvsdans12.pilot.dev'
-    #     - 'cvsdans13.pilot.dev'
-    #     - 'cvsdans14.pilot.dev'
-    #     - cvsdgit11.pilot.dev
-    #     - cvsdgit12.pilot.dev
+    #     - 'dom22.dom3.example'
+    #     - 'dom28.dom3.example'
+    #     - 'dom33.dom3.example'
+    #     - 'dom29.dom3.example'
+    #     - 'dom37.dom3.example'
+    #     - dom35.dom3.example
+    #     - dom36.dom3.example
     # var_test_port:
     #     - 22
     #     - 443

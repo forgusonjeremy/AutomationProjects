@@ -11,11 +11,11 @@
     # var_ps_script_file: 'ESOC-Admin-Scripts.ps1' # script to be execute
     # var_parameter_action: 'Get-ServiceAccountExpiration' # parameter -Action
     # var_eMailReport: 'yes' # parameter email configuration
-    # var_SMTPServer: 'nccsmtprelay.irm.state.gov' # parameter email configuration
-    # var_MailToString: "NguyenTD4@state.gov,NguyenTD4@state.gov" # parameter email configuration 
-    # var_MailCcString: "NguyenTD4@state.gov,NguyenTD4@state.gov" # parameter email configuration
+    # var_SMTPServer: 'dom1.dom2.dom3.example' # parameter email configuration
+    # var_MailToString: "user4@dom3.example,user4@dom3.example" # parameter email configuration 
+    # var_MailCcString: "user4@dom3.example,user4@dom3.example" # parameter email configuration
     # var_MailSubjectstring: 'Ansible-Report: ESOC Service Account Expiration Report' # parameter email configuration
-    # var_OUPath: 'OU=Service Accounts,OU=ESOC,OU=M,OU=IRM,DC=washdc,DC=state,DC=sbu' # parameter OU path to the services location
+    # var_OUPath: 'OU=ou4,OU=ou5,OU=ou6,OU=ou7,DC=dom5,DC=dom3,DC=invalid' # parameter OU path to the services location
     # var_cleanup_temporary_folder: true # parameter clean your crap after done
     # var_ADGroupMember: 'ESOC-Monitoring-Servers' # parameter security group of list of servers
     # var_HeaderNotesSubstr: "ESOC-Monitoring-Servers" # parameter note in part of the email body

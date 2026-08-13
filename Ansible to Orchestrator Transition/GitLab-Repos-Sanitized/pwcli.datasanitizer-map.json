@@ -1,8 +1,8 @@
-{
+﻿{
     "SchemaVersion":  1,
     "Created":  "2026-08-13T10:07:34.3579110-04:00",
-    "Updated":  "2026-08-13T10:07:37.1553047-04:00",
-    "EntryCount":  21,
+    "Updated":  "2026-08-13T12:03:34.0434804-04:00",
+    "EntryCount":  27,
     "Counters":  [
                      {
                          "Type":  "CommonName",
@@ -10,7 +10,7 @@
                      },
                      {
                          "Type":  "DomainLabel",
-                         "Index":  7
+                         "Index":  10
                      },
                      {
                          "Type":  "IPv4Subnet",
@@ -37,6 +37,18 @@
                         "Value":  "company",
                         "Key":  "company",
                         "Surrogate":  "dom2"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esocdowvxrln8",
+                        "Key":  "esocdowvxrln8",
+                        "Surrogate":  "dom8"
+                    },
+                    {
+                        "Type":  "DomainLabel",
+                        "Value":  "esocdowvxvcs",
+                        "Key":  "esocdowvxvcs",
+                        "Surrogate":  "dom10"
                     },
                     {
                         "Type":  "DomainLabel",
@@ -70,9 +82,27 @@
                     },
                     {
                         "Type":  "DomainLabel",
+                        "Value":  "pilot",
+                        "Key":  "pilot",
+                        "Surrogate":  "dom9"
+                    },
+                    {
+                        "Type":  "DomainLabel",
                         "Value":  "syslog",
                         "Key":  "syslog",
                         "Surrogate":  "dom5"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esocdowvxrln8.pilot.dev",
+                        "Key":  "esocdowvxrln8.pilot.dev",
+                        "Surrogate":  "dom8.dom9.ex4"
+                    },
+                    {
+                        "Type":  "Fqdn",
+                        "Value":  "esocdowvxvcs.pilot.dev",
+                        "Key":  "esocdowvxvcs.pilot.dev",
+                        "Surrogate":  "dom10.dom9.ex4"
                     },
                     {
                         "Type":  "Fqdn",
@@ -151,6 +181,12 @@
                         "Value":  "com",
                         "Key":  "com",
                         "Surrogate":  "example"
+                    },
+                    {
+                        "Type":  "Tld",
+                        "Value":  "dev",
+                        "Key":  "dev",
+                        "Surrogate":  "ex4"
                     }
                 ]
 }

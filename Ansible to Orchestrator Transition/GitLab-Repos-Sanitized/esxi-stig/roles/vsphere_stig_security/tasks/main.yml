@@ -1,0 +1,290 @@
+---
+# roles/vsphere_stig_security/tasks/main.yml
+# - name: Load production STIG configuration
+#   ansible.builtin.include_vars:
+#     file: "config/production_stig_config.yml"
+#   tags: [config]
+
+- name: Apply production security STIG controls
+  block:
+    - name: "ESXI80000227: Password History"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Security.PasswordMaxDays: "{{ security.password_max_age }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000227
+      ignore_errors: true
+      tags: [account_policy]
+
+    - name: "ESXI80000043: Configure account security policies"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Security.PasswordHistory: "{{ security.password_history }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000043
+      ignore_errors: true
+      tags: [account_policy]
+
+    - name: "ESXI80000035: Password Complexity"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Security.PasswordQualityControl: "{{ security.password_complexity }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000035
+      ignore_errors: true
+      tags: [account_policy]
+
+    - name: "ESXI80000111: Account Unlock Time"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Security.AccountUnlockTime: "{{ security.account_unlock_time }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000111
+      ignore_errors: true
+      tags: [account_policy]
+
+    - name: "ESXI80000005: Account Lock Failures"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Security.AccountLockFailures: "{{ security.account_lock_failures }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000005
+      ignore_errors: true
+      tags: [account_policy]
+
+    - name: "ESXI80000226: API Timeout"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Config.HostAgent.vmacore.soap.sessionTimeout: "{{ security.api_timeout }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000226
+      ignore_errors: true
+      tags: [timeouts]
+
+    - name: "ESXI80000196: DCUI Timeout"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          UserVars.DcuiTimeOut: "{{ security.dcui_timeout }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000196
+      ignore_errors: true
+      tags: [timeouts]
+
+    - name: "ESXI80000195: Shell Timeout"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          UserVars.ESXiShellTimeOut: "{{ security.shell_timeout }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000195
+      ignore_errors: true
+      tags: [timeouts]
+
+    - name: "ESXI80000068: Shell Interactive Timeout"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          UserVars.ESXiShellInteractiveTimeOut: "{{ security.shell_interactive_timeout }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000068
+      ignore_errors: true
+      tags: [timeouts]
+
+    - name: "ESXI80000010: Host Client Timeout"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          UserVars.HostClientSessionTimeout: "{{ security.host_client_timeout }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000010
+      ignore_errors: true
+      tags: [timeouts]
+
+    - name: "ESXI80000241: The ESXi host must not use the default Active Directory ESX Admin group"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Config.HostAgent.plugins.hostsvc.esxAdminsGroup: "{{ esx_admin_group }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000241
+      ignore_errors: true
+      tags: [memory, network]
+
+    - name: "ESXI80000250: BMC Network"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Net.BMCNetworkEnable: "{{ security.bmc_network_enable }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000250
+      ignore_errors: true
+      tags: [memory, network]
+
+    - name: "ESXI80000215: Block Guest BPDU"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Net.BlockGuestBPDU: "{{ security.block_guest_bpdu }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000215
+      ignore_errors: true
+      tags: [memory, network]
+
+    - name: "ESXI80000213: Memory Salting"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Mem.ShareForceSalting: "{{ security.share_force_salting }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000213
+      ignore_errors: true
+      tags: [memory, network]
+
+    - name: "ESXI80000225: Memory Eager Zero"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Mem.MemEagerZero: "{{ security.mem_eager_zero }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000225
+      ignore_errors: true
+      tags: [memory, network]
+
+    - name: "ESXI80000047: Disable MOB"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Config.HostAgent.plugins.solo.enableMob: "{{ security.enable_mob }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000047
+      ignore_errors: true
+      tags: [features]
+
+    - name: "ESXI80000222: Suppress Shell Warning"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          UserVars.SuppressShellWarning: "{{ security.suppress_shell_warning }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000222
+      ignore_errors: true
+      tags: [features]
+
+    - name: "ESXI80000223: uppress Hyperthreading Warning"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          UserVars.SuppressHyperthreadWarning: "{{ security.suppress_hyper_warning }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000223
+      ignore_errors: true
+      tags: [features]
+
+    - name: "ESXI80000244: Execute VIBs"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          VMkernel.Boot.execInstalledOnly: "{{ security.execute_vibs }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000244
+      ignore_errors: true
+      tags: [features]
+
+    - name: "ESXI80000008: Enable lockdown mode"
+      community.vmware.vmware_host_lockdown:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        state: "{{ security.lockdown_level }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000008
+      ignore_errors: true
+      tags: [lockdown]
+
+  when:
+    - security is defined 

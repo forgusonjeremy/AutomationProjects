@@ -11,7 +11,7 @@
     var_ps_script_file:   'cvs_50_100.ps1'                   # dedicated datastore script
     var_parameter_action: 'get_datastores_75_100_used'       # fixed for this playbook
 
-    var_vCenterList:      'esoco26vcs01.washdc.state.sbu, esocoewvcs.washdc.state.sbu, esocoewvcs01.washdc.state.sbu, esocoewvcs02.washdc.state.sbu, esoco26vcs02.washdc.state.sbu'   # <-- your vCenters, comma-separated
+    var_vCenterList:      'dom10.dom5.dom3.invalid, dom14.dom5.dom3.invalid, dom9.dom5.dom3.invalid, dom8.dom5.dom3.invalid, dom11.dom5.dom3.invalid'   # <-- your vCenters, comma-separated
 
     var_eMailReport:      'yes'                                # 'yes' to actually send
     var_SMTPServer:       'dom1.dom2.dom3.example'        # <-- your relay

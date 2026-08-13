@@ -8,8 +8,8 @@ mdc:
 
 ew:
     hosts:
-        cvsoewans01.washdc.state.sbu:
-        cvsoewgit01.washdc.state.sbu:
+        dom18.dom5.dom6.invalid:
+        dom17.dom5.dom6.invalid:
     children:
         ew_stig:    
     

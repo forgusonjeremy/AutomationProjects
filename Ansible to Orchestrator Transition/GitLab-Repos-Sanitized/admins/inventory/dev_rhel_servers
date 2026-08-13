@@ -1,14 +1,14 @@
 hst:
     hosts:
-        cvsdans01.pilot.dev:
-        cvsdgit01.pilot.dev:
+        dom34.dom3.example:
+        dom32.dom3.example:
     children:
         stig:
 
 mdc:
     hosts:
-        cvsdans02.pilot.dev:
-        cvsdgit02.pilot.dev:
+        dom2.dom3.example:
+        dom30.dom3.example:
     children:
         stig:   
 

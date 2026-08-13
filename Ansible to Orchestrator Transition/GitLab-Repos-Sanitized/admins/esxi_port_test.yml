@@ -4,7 +4,7 @@
   collections:
   - community.vmware
   vars:
-    # vcenter_hostname: "esocdowvxvcs.pilot.dev"
+    # vcenter_hostname: "dom22.dom3.example"
     # var_datacenter_name: 'VxRail-Datacenter'
     # var_cluster_name:
     #     - 'VxRail-Virtual-SAN-Cluster-2f4158d4-ab51-4b26-8d2f-239810aecf13'

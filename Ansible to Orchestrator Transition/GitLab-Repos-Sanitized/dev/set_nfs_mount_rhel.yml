@@ -3,7 +3,7 @@
   hosts: all
   become: yes
   vars:
-    nfs_server: "10.68.54.24"  # Replace with your NFS server
+    nfs_server: "100.64.0.24"  # Replace with your NFS server
     nfs_export: "/vol/ewnfsarchive"                # Replace with your NFS export path
     nfs_mount_point: "/mnt/nfs-archive"
     nfs_mount_options: "rw,sync,hard,intr"

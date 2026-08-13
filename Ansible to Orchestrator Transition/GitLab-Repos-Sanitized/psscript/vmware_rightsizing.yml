@@ -14,7 +14,7 @@
     var_ps_folder:        'ps_scripts'                        # root folder under files/
     var_ps_script_file:   'cvs_vmware_rightsizing.ps1'        # dedicated rightsizing script
 
-    var_vCenterList:      'esoco26vcs01.washdc.state.sbu, esocoewvcs.washdc.state.sbu, esocoewvcs01.washdc.state.sbu, esocoewvcs02.washdc.state.sbu, esoco26vcs02.washdc.state.sbu'   # <-- your vCenters, comma-separated
+    var_vCenterList:      'dom10.dom5.dom3.invalid, dom14.dom5.dom3.invalid, dom9.dom5.dom3.invalid, dom8.dom5.dom3.invalid, dom11.dom5.dom3.invalid'   # <-- your vCenters, comma-separated
 
     # ---- sampling window ----
     var_LookbackDays:     '30'                                # perf history to pull

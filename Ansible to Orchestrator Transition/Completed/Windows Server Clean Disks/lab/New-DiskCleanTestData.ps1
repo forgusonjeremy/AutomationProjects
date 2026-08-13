@@ -120,7 +120,7 @@
 
 .EXAMPLE
     # Seed every direct member of the clean group (the set the workflow targets)
-    .\New-DiskCleanTestData.ps1 -ADGroup 'CVS-DPT-AllServers' -DomainName connect.sbu
+    .\New-DiskCleanTestData.ps1 -ADGroup 'CVS-DPT-AllServers' -DomainName dom4.invalid
 
 .EXAMPLE
     # Reproduce the user-profile template into a throwaway subfolder (safe)

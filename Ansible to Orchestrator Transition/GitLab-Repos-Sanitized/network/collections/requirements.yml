@@ -2,17 +2,17 @@
 collections:
   # - name: ansible.utils
   #   version: 5.1.2
-  #   source: https://cvsdans01.pilot.dev/pulp_ansible/galaxy/cvs/
+  #   source: https://dom1.dom2.ex4/pulp_ansible/galaxy/cvs/
   #   type: galaxy
 
   # - name: ansible.scm
   #   version: 3.0.0
-  #   source: https://cvsdans01.pilot.dev/pulp_ansible/galaxy/cvs/
+  #   source: https://dom1.dom2.ex4/pulp_ansible/galaxy/cvs/
   #   type: galaxy
 
   # - name: ansible.netcommon
   #   version: 7.1.0
-  #   source: https://cvsdans01.pilot.dev/pulp_ansible/galaxy/cvs/
+  #   source: https://dom1.dom2.ex4/pulp_ansible/galaxy/cvs/
   #   type: galaxy
 
   # - name: collections/ansible-utils-5.1.2.tar.gz

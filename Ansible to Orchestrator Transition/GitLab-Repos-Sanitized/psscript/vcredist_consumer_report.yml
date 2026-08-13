@@ -7,7 +7,7 @@
 
   vars:
     outputDirectory: 'C:\Temp'
-    targetComputers: 'CVSO26DYNAG01.connect.sbu, CVSO26DYNAG02.connect.sbu, CVSO26DYNSAG01.connect.sbu, CVSO26VARA01.connect.sbu, CVSO26VARA02.connect.sbu, CVSOEWDYNAG01.connect.sbu, CVSOEWDYNAG02.connect.sbu, CVSOEWDYNSAG01.connect.sbu, CVSOEWVARA01.connect.sbu, CVSOEWVARA02.connect.sbu, CVSOOWDB01.connect.sbu, CVSOOWDYNAG01.connect.sbu, CVSOOWDYNAG02.connect.sbu, CVSOOWDYNCGFSAG.connect.sbu, CVSOOWDYNNTAG01.connect.sbu, CVSOOWDYNNTAG02.connect.sbu, CVSOOWDYNSAG01.connect.sbu, CVSOOWDYNSAG02.connect.sbu, CVSOOWMGT004.connect.sbu, CVSOOWVARA01.connect.sbu, CVSOOWVARA02.connect.sbu, CVSVGEBMCZBX02.connect.sbu'
+    targetComputers: 'dom29.dom4.invalid, dom27.dom4.invalid, dom19.dom4.invalid, dom32.dom4.invalid, dom36.dom4.invalid, dom23.dom4.invalid, dom28.dom4.invalid, dom20.dom4.invalid, dom34.dom4.invalid, dom35.dom4.invalid, dom37.dom4.invalid, dom26.dom4.invalid, dom22.dom4.invalid, dom16.dom4.invalid, dom15.dom4.invalid, dom13.dom4.invalid, dom18.dom4.invalid, dom21.dom4.invalid, dom31.dom4.invalid, dom33.dom4.invalid, dom30.dom4.invalid, dom17.dom4.invalid'
 
   tasks:
     - block:

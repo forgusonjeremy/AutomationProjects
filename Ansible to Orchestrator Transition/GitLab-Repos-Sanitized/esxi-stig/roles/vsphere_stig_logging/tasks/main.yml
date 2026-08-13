@@ -1,0 +1,137 @@
+---
+# roles/vsphere_stig_logging/tasks/main.yml
+# - name: Load production STIG configuration
+#   ansible.builtin.include_vars:
+#     file: "config/production_stig_config.yml"
+#   tags: [config]
+  
+- name: Configure production logging STIG controls
+  block:
+    - name: Configure logging settings
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Config.HostAgent.log.level: "{{ logging.log_level }}"
+      loop: "{{ esxi_hosts }}"
+      ignore_errors: true
+      tags: [log_config]
+
+    - name: "ESXI80000015: Log Level"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.logLevel: "{{ logging.syslog_log_level }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000015
+      ignore_errors: true
+      tags: [log_config]
+
+    - name: "ESXI80000235: Syslog Log Level"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.logDir: "{{ logging.syslog_scratch }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000235
+      ignore_errors: true
+      tags: [log_config]
+
+    - name: Configure production syslog server
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.logHost: "{{ syslog_server }}"
+      loop: "{{ esxi_hosts }}"
+      when: 
+        - syslog_server | length > 0
+      ignore_errors: true
+      tags: [syslog]
+
+    - name: "ESXI80000113: Audit Storage Capacity"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.auditRecord.storageCapacity: "{{ logging.audit_storage_capacity }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000113
+      ignore_errors: true
+      tags: [audit]
+
+    - name: "ESXI80000232: syslog Audit Enable"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.auditRecord.storageEnable: "{{ logging.syslog_audit_enable }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000232
+      ignore_errors: true
+      tags: [audit]
+
+    - name: "ESXI80000233: Syslog Audit Remote"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.auditRecord.remoteEnable: "{{ logging.syslog_audit_remote }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000233
+      ignore_errors: true
+      tags: [audit]
+
+    - name: "ESXI80000224: Syslog Cert Check"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.certificate.checkSSLCerts: "{{ logging.syslog_cert_check }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000224
+      ignore_errors: true
+      tags: [ssl]
+
+    - name: "ESXI80000234: Syslog Cert Strict"
+      community.vmware.vmware_host_config_manager:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item }}"
+        options:
+          Syslog.global.certificate.strictX509Compliance: "{{ logging.syslog_cert_strict }}"
+      loop: "{{ esxi_hosts }}"
+      when: controls_enabled.ESXI80000234
+      ignore_errors: true
+      tags: [ssl]
+
+  when:
+    - logging is defined
