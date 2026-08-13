@@ -24,9 +24,20 @@ tooling, and the automation processes themselves.
 
 | Project | Status | Package | Touches shared script? | Per-project register |
 |---|---|---|---|---|
-| **Snapshot Cleanup** | Completed | `com.broadcom.pso.vc.snapshotmanagement` | **No** — vCenter-native; no PowerShell host dependency | *(none — no changes to existing customer automation)* |
-| **Move Windows Event Logs** | Completed | `com.broadcom.pso.cvs-dt.conus.eventlogarchivesmove` | **Yes** — S-1 … S-5 | `Move Windows Event Logs/_Shared/Documentation/Change-Register.md` |
-| **Server Reboots** | **In progress** | *(TBD)* | **Yes** — S-6 … S-13 | `InProgress/Server Reboots/Documentation/Change-Register.md` |
+| **Snapshot Cleanup** | Completed | `com.broadcom.pso.vm.snapshot.cleanup` | **No** — vCenter-native; no PowerShell host dependency | *(none — no changes to existing customer automation)* |
+| **Move Windows Event Logs** | Completed | `com.broadcom.pso.cvs-dt.conus.eventlogarchivesmove` | **Yes** — S-1 … S-5 / P-1 … P-8 | `Move Windows Event Logs/_Shared/Documentation/Change-Register.md` |
+| **Server Reboots** | Completed | `com.broadcom.pso.servers.windows.reboots` | **Yes** — S-6 … S-13 / P-9 … P-13 | `Server Reboots/Documentation/Change-Register.md` |
+| **Windows Server Clean Disks** | Completed | `com.broadcom.pso.servers.windows.serverDiskClean` | **Yes** — S-14 … S-15 / P-14 … P-19 | `Windows Server Clean Disks/Documentation/Change-Register.md` |
+| **Admin Accounts Report** | Completed | `com.broadcom.pso.identity.activedirectory.reporting` | **Yes** — S-16 … S-21 / P-20 … P-26 | `Admin Accounts Report/Documentation/Change-Register.md` |
+| **Service Account Expiration Reporting** | Completed | `com.broadcom.pso.identity.activedirectory.reporting` | **Yes** — S-22 … S-24 / P-27 … P-32 | `Service Account Expiration Reporting/Documentation/Change-Register.md` |
+| **Servers Reboot Report by CN** | Completed | `com.broadcom.pso.servers.windows.reboots.reporting` | **No** — the ByCN action already existed | `Servers Reboot Report by CN/Documentation/Change-Register.md` *(local `R-` numbering)* |
+| **Datastore Capacity Reporting** | **In progress** | `com.broadcom.pso.vc.storage.reporting` | **No** — vCenter-native; no PowerShell host dependency | `InProgress/Get Datastores Greater than 75 Percent Used/Documentation/Change-Register.md` |
+
+> **Two projects have now been delivered vCenter-native** — Snapshot Cleanup and
+> Datastore Capacity Reporting. Neither touches `cvs_functions.ps1`, neither needs a
+> PowerShell host, and neither creates re-test exposure for the Active Directory
+> packages. Where a process reads or acts on vCenter rather than on Windows guests,
+> this is the cheaper and lower-risk end state.
 
 ---
 
@@ -158,10 +169,33 @@ today exactly**.
 | **P-10** | 2026-07-17 | Server Reboots | Iteration & timing | **Unchanged** — script keeps AD resolution, iteration, delay and verification. Orchestrator passes inputs and classifies the transcript. Consistent with P-6 |
 | **P-11** | 2026-07-17 | Server Reboots | Targeting | Resolution now direct + computer-only + enabled (S-7); operator input named `groupDN` to steer toward the DN form |
 | **P-12** | 2026-07-17 | Server Reboots | Reporting | No report/mail → per-server HTML report emailed to a recipient **array** (S-11); outcome also surfaced via workflow end state |
-| **P-13** | 2026-07-17 | Server Reboots | Report header label | `HeaderNotesSubstr` dropped as an input — it is only a report-header label, so it is **derived from `groupDN`** in the build action. No script change | 
+| **P-13** | 2026-07-17 | Server Reboots | Report header label | `HeaderNotesSubstr` dropped as an input — it is only a report-header label, so it is **derived from `groupDN`** in the build action. No script change |
+| *P-14 … P-32* | 2026-07 – 2026-08 | Clean Disks, Admin Accounts, Service Account Expiry | *(various)* | **Not yet folded into this table** — see the consolidation backlog note below. Recorded in full in each project's own register |
+| **P-33** | 2026-08-10 | Datastore Reporting | Execution engine & targeting | `get_datastores_75_100_used.yml` (stage + run PowerCLI over WinRM) → **vCenter-plug-in-native** workflow. **No PowerShell host, no PowerCLI, no WinRM, no separate vCenter credential.** The hardcoded five-vCenter string is replaced by the vCenters registered in Orchestrator | Architecture |
+| **P-34** | 2026-08-10 | Datastore Reporting | Banding | Half-open, gapless bands `[floor, ceiling)`. Replaces `-gt` / `-lt x.99` comparisons that left four exact values and two ranges reported **nowhere** | **Defect (silent omission)** |
+| **P-35** | 2026-08-10 | Datastore Reporting | Resilience | Per-**vCenter** `try`/`catch`, **zero-capacity guard**, per-**datastore** `try`/`catch`. Previously either fault ended the whole run and emailed nothing | **Defect (total failure)** |
+| **P-36** | 2026-08-10 | Datastore Reporting | Report scope | The `uncommitted > freeSpace` **AND removed from collection**; carried as an `Overcommitted` **column** instead. A datastore at 99% used with low uncommitted growth was previously never reported | **Defect (silent omission)** |
+| **P-37** | 2026-08-10 | Datastore Reporting | De-duplication | `Sort-Object -Property Datastore -Unique` removed. Row identity is **vCenter + MoRef**, never the display name | **Defect (silent omission)** |
+| **P-38** | 2026-08-10 | Datastore Reporting | Incomplete scans | vCenters that could not be scanned are rendered **into the report body**, not only the run log. Same reasoning as S-16 | Enhancement (trust) |
+| **P-39** | 2026-08-10 | Datastore Reporting | Presentation | Stylesheet applied (this action had none); Datacenter / Datastore Cluster / Type / Overcommitted columns added; deterministic worst-first ordering | Enhancement |
+| **P-40** | 2026-08-10 | Datastore Reporting | Mail subject | Carries **all three** band counts, not the top band alone, and appends `INCOMPLETE (n vCenter(s) unreachable)` | **Defect (misleading)** |
+| **P-41** | 2026-08-10 | Datastore Reporting | Outcome & recovery | `COMPLETE` / `CLEAN_NO_FINDINGS` / `COMPLETE_WITH_GAPS` / `ERROR` instead of pass-fail. Delivery failure **fails the run**; the exception handler writes the built report into the transcript so a late failure does not discard the estate sweep | Enhancement (operability) |
+| **P-42** | 2026-08-10 | Datastore Reporting | Inputs & secrets | `vars.txt` → workflow inputs; recipients as **arrays** (consistent with P-12); blank Cc entries stripped; SMTP credentials as `SecureString`, unset by default. No configuration elements | Enhancement |
+| **P-43** | 2026-08-10 | Datastore Reporting | Report artefact | The unbounded **appending** `Debug\result.html` on the Windows host → `reportHtml` workflow output, produced on every run | Hygiene |
 
 **Programme net result so far:** 7 log playbooks → 2 workflows; 1 reboot playbook →
-1 workflow; snapshot cleanup delivered as a vCenter-native package.
+1 workflow; 1 reboot-report playbook set → 1 workflow; 1 disk-clean playbook →
+1 workflow; 2 account-report playbooks → 2 workflows; and **two vCenter-native
+packages** — snapshot cleanup and datastore capacity reporting — delivered with no
+PowerShell host in the path at all.
+
+> **Consolidation backlog.** Sections 3 and 5 carry S-1 … S-13 and P-1 … P-13 in
+> full. **S-14 … S-24 and P-14 … P-32 have not yet been folded in** from the Clean
+> Disks, Admin Accounts and Service Account Expiration registers, which remain the
+> authoritative record for those changes. The Datastore Reporting entries above are
+> complete because that project adds no `S-` changes at all. Folding in the
+> outstanding middle range is a documentation task in its own right and should be
+> scheduled before this register is presented as the programme-wide history.
 
 ---
 
@@ -175,6 +209,10 @@ today exactly**.
 | **WinRM operation timeout** | Server Reboots | The reboot run is one synchronous invocation lasting `(N × delay) + up to VerifyTimeoutSec`. The PS host's WinRM `MaxTimeoutms` / plug-in timeout must exceed the worst case. |
 | **Second hop (delegation)** | Move Event Logs, Server Reboots | PS host → AD and PS host → each target. Requires Kerberos constrained delegation. See *How to Build a PowerShell Host* §6. |
 | **Old `!(PendingReboot -eq 'False')` test retained** | `Get-ServerRebootReportStatus-ByCN`, `Get-ServerPendingRebootStatus` | Intentional. In those **report-only** actions the test only increments a counter for the mail subject and never triggers a reboot. Only the reboot path was corrected (S-8). |
+| **`get_datastores_75_100_used` defects stay live until the playbook is retired** | Datastore Reporting | **Open — accepted.** That deliverable is vCenter-native and deliberately does **not** fix the shared script, because the script is being taken out of the path entirely. For as long as both run in parallel the Ansible report retains all six defects in its register §1A. Keep the overlap short, and do not treat the Ansible report as the reference during comparison. |
+| **The datastore report will get materially longer at cutover** | Datastore Reporting | **Action required before go-live.** P-34, P-36 and P-37 each restore rows that were previously invisible. Recipients must be briefed, or a four-fold rise in row count reads as a sudden deterioration in the estate. |
+| **Two ambiguous configuration values in the datastore script** | Datastore Reporting | Customer decision. `$high = 90` carries a comment saying it should be 95; the process is named for 75% but the floor is 70%. Both preserved as-is and exposed as workflow inputs. |
+| **Register consolidation backlog** | Whole programme | S-14 … S-24 and P-14 … P-32 are recorded only in their per-project registers, not yet in §3/§5 here. See the note at the end of §5. |
 
 ---
 
@@ -183,4 +221,5 @@ today exactly**.
 | Date | Author | Summary |
 |---|---|---|
 | 2026-07-17 | Automation transition | Master register created. Consolidated the shared-script history (S-1…S-13), tooling changes (T-1…T-3) and process changes (P-1…P-12) across Snapshot Cleanup, Move Windows Event Logs and Server Reboots. Recorded the two-copy script policy and promotion workflow, the sanitized-archive exemption, the five pre-existing defects found in the customer's current automation (S-1, S-6, S-8, S-9, S-12), and the `ownership_w2k.ps1` security decision (S-13). |
+| 2026-08-10 | Automation transition | **Datastore Capacity Reporting folded in.** Added **P-33 … P-43**; the project adds **no `S-` changes** — it is the second vCenter-native delivery after Snapshot Cleanup and does not touch `cvs_functions.ps1`. Brought the §1 project index up to date, which had been stale since Server Reboots: added Clean Disks, Admin Accounts, Service Account Expiration and Reboot Report by CN with their packages and `S-`/`P-` ranges, and corrected the Snapshot Cleanup package name to `com.broadcom.pso.vm.snapshot.cleanup`. Recorded the **consolidation backlog** — S-14 … S-24 and P-14 … P-32 are still only in their per-project registers — and four new watch items. |
 | 2026-07-17 | Automation transition | **Corrected the version-control entry.** An earlier revision wrongly stated the tree had no git history — the check had been run against `E:\GitHub-LocalRepos`, which is a *container* of repos, not a repo. `AutomationProjects` is git-tracked and prior states are recoverable; the pre-S-6 baseline was retrieved from commit `56f7cf8` and verified byte-identical (58,155 bytes, SHA256 `01B7DCAD…FB37`). Risk restated as **commit granularity** (commits are periodic, not per-change) with a checkpoint recommendation for shared-script edits. |
