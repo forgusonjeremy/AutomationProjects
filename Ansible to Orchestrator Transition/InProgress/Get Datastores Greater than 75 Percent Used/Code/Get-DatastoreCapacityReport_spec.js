@@ -28,12 +28,26 @@
  * ───────────────────────────────────────────────────────────────────────────
  * MAPS FROM (Ansible)
  * ───────────────────────────────────────────────────────────────────────────
- *   - get_datastores_75_100_used.yml  x1 job template, which staged
- *                                     cvs_functions.ps1 onto a Windows host over
- *                                     WinRM and invoked it with
- *                                     -Action Get_Datastores_75_100_Used
+ *   TWO GENERATIONS OF THE SAME REPORT EXIST. Both stage a script onto a Windows
+ *   host over WinRM and invoke it. Which one is on the production schedule is
+ *   NOT confirmed — see Change-Register open item 9.
  *
- *   One playbook, one workflow. There is no fork and no second variant.
+ *   - Gen 1  get_datastores_75_100_used.yml
+ *              -> cvs_functions.ps1, case get_datastores_75_100_used
+ *   - Gen 2  get_datastores_75_100_used_(Works).yml            [NEWER]
+ *              -> cvs_50_100.ps1 — standalone, does not source cvs_functions.ps1,
+ *                 takes vCenter credentials from Ansible Vault via VC_USER /
+ *                 VC_PASS, and carries a purpose-built Outlook-safe HTML
+ *                 formatter. It already fixes the zero-capacity divide-by-zero
+ *                 and adds a TCP/443 preflight.
+ *
+ *   This workflow supersedes BOTH. One workflow either way — there is no fork.
+ *
+ *   RELATED, AND NOT IN SCOPE: datastore_fill_projection_report.yml
+ *   (cvs_datastore_fill_projection.ps1) adds historical growth projection and
+ *   appears to be the intended successor to this report. The recommendation is
+ *   that it be delivered by VCF Operations capacity analytics rather than
+ *   rebuilt in Orchestrator — see Documentation/06_Platform_Options_Advisory.md.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * WHAT THIS TRANSITION REMOVES ENTIRELY
@@ -80,11 +94,13 @@
  *      between 89.99% and 90.00%, matched no band in the old logic and was
  *      shown nowhere. Bands are now half-open and gapless (P-34).
  *   4. NEW COLUMNS — Datacenter, Datastore Cluster, Type, Overcommitted.
- *   5. A STYLED REPORT. The old action emitted bare ConvertTo-Html -Fragment
- *      output with no stylesheet (P-39).
- *   6. A REPORT ARRIVES EVEN WHEN A vCENTER IS DOWN, and says so on its face.
- *      The old script aborted the entire run on the first unreachable vCenter
- *      and sent nothing at all (P-35, P-38).
+ *   5. THE LOOK IS DELIBERATELY UNCHANGED. The newer cvs_50_100.ps1 already had
+ *      a well-built Outlook-safe formatter (Format-DsTableHtml); its inline-style
+ *      approach and accent colours are ADOPTED here, not replaced (P-39).
+ *   6. A REPORT ARRIVES EVEN WHEN A vCENTER REJECTS AUTHENTICATION, and says so
+ *      on its face. cvs_50_100.ps1 added a TCP/443 preflight that skips an
+ *      unreachable vCenter, but a vCenter that answers and then fails to
+ *      authenticate still aborts the whole run and emails nothing (P-35, P-38).
  *
  *   Brief the recipients before the first scheduled send. The datastore COUNT is
  *   expected to rise sharply; that is previously-invisible scope becoming

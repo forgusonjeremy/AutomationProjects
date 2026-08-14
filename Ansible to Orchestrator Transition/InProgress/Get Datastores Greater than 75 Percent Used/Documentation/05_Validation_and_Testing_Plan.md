@@ -55,7 +55,7 @@ how vRO binds attributes. Full fixture inventory is in [../lab/README.md](../lab
 | T-09 | Absent `uncommitted` renders `unknown`, never asserted `No` | **P-36** |
 | T-10 | Inaccessible datastores excluded by default, included on request | Input behaviour |
 | T-11 | Placement resolves; failure degrades to blank, not to a dead run | Design §3.3 |
-| T-12 | Rendering, stylesheet, HTML escaping | **P-38, P-39**, security |
+| T-12 | Rendering, **Outlook safety**, HTML escaping | **P-38, P-39**, security |
 | T-13 | Worst-first, run-to-run deterministic ordering | **P-39** |
 | T-14 | Subject carries all three counts and declares incompleteness | **P-40** |
 | T-15 | Blank Cc entries stripped, not rejected | **P-42** |
@@ -116,7 +116,8 @@ Run in order. Each step has a defined pass condition; do not proceed past a fail
 | **B-4** | Endpoint coverage | Read the report header | *vCenters scanned: n of n*, `n` = vCenters in scope. **A shortfall here is the most likely go-live defect** |
 | **B-5** | Placement resolution | Inspect Datacenter / Datastore Cluster columns | Populated for datastores in datacenters and storage pods. Blank columns with a `placement map` warning are acceptable but should be understood |
 | **B-6** | Figures are correct | Pick three datastores; compare against the vSphere Client | Capacity, free and % used match to rounding |
-| **B-7** | Mail delivery | `mailTo` = your address, `sendEmail = true` | Delivered; subject `<prefix> \| n critical / n warning / n advisory`; renders correctly **in the recipients' actual mail client**, not only a browser |
+| **B-7** | Mail delivery | `mailTo` = your address, `sendEmail = true` | Delivered; subject `<prefix> \| n critical / n warning / n advisory` |
+| **B-7a** | **Outlook rendering** | Open the delivered mail **in Outlook**, not a browser | Band headers show their accent colour, header rows are filled, zebra striping is visible. **A browser renders inline and stylesheet CSS identically and will not catch a regression here** — this test only means something in Outlook |
 | **B-8** | Cc handling | Add a real Cc, then an empty one | Both send; the empty Cc does not fail the run |
 | **B-9** | Narrowed run | Populate `vCenterConnections` with one vCenter | Report scopes to it; header reads *1 of 1* |
 | **B-10** | **Gap handling** | Break one vCenter endpoint's credentials, re-run | Report **still delivered**; red banner names that vCenter and the reason; subject carries `INCOMPLETE`; `outcome = COMPLETE_WITH_GAPS` |
@@ -179,12 +180,16 @@ Cutover on all seven. Then disable the Ansible job template.
 
 Reference table for anyone assessing a run.
 
+"Retiring behaviour" is stated for **Gen 2 (`cvs_50_100.ps1`)**, the newer script — see
+Change Register §1D. Where Gen 1 (`cvs_functions.ps1`) differs, it is noted.
+
 | Scenario | Expected behaviour | Retiring behaviour |
 |---|---|---|
-| One vCenter unreachable | Run continues; vCenter named in the report and the subject; `COMPLETE_WITH_GAPS` | **Entire run aborts. Nothing emailed.** |
-| All vCenters unreachable | Report delivered listing every failure; zero rows; `COMPLETE_WITH_GAPS` | Aborts on the first |
+| One vCenter unreachable on 443 | Run continues; vCenter named in the report and the subject; `COMPLETE_WITH_GAPS` | Skipped by the TCP preflight and **silently absent from the report**. *(Gen 1: entire run aborts, nothing emailed.)* |
+| One vCenter answers but **rejects authentication** | Run continues; vCenter and the auth error named in the report | **Entire run aborts. Nothing emailed.** The preflight tests reachability, not authentication |
+| All vCenters unreachable | Report delivered listing every failure; zero rows; `COMPLETE_WITH_GAPS` | Empty report emailed, with no indication that nothing was scanned |
 | No vCenter registered | Fails in ST-01 before contacting anything, with a message naming the fix | n/a |
-| Datastore reports capacity 0 | Skipped with a reason; listed in "could not be evaluated" | **Divide-by-zero. Run dies. Nothing emailed.** |
+| Datastore reports capacity 0 | Skipped with a reason; listed in "could not be evaluated" | Skipped silently by `Capacity -le 0`. *(Gen 1: divide-by-zero, run dies, nothing emailed.)* |
 | Datastore properties fault mid-sweep | Skipped with a reason; siblings unaffected | Run dies |
 | `uncommitted` not published | `unknown` in the Overcommitted column | Treated as 0, so the datastore was excluded from collection entirely |
 | Nothing above the floor | Report delivered saying so; `CLEAN_NO_FINDINGS` | Empty tables emailed |

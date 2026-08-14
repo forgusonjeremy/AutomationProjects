@@ -77,25 +77,36 @@ plug-in.
 | 3 | **The Ansible path keeps its defects until retired.** This deliverable does not fix `cvs_functions.ps1`. | Accepted deliberately: the script is being taken out of the path entirely. Keep the parallel-run overlap short and do not treat the Ansible output as the reference. |
 | 4 | **Delivery moves from the Windows host to the Orchestrator appliance.** The SMTP relay must accept submission from a new source. | Verified as a deployment step before the first scheduled run. |
 | 5 | **Two configuration values are ambiguous in the source.** The script sets the top threshold to 90 with a comment saying it should be 95; the process is named for 75% but the floor is 70%. | Both preserved as-is and exposed as workflow inputs. Flagged for customer decision — Change Register §1B. |
+| 6 | **Which script generation is deployed is unconfirmed.** `cvs_50_100.ps1` is newer than the `cvs_functions.ps1` case, but not confirmed as the version on the production schedule. | Does not change what the transition delivers, but it does change the parallel-run baseline. Confirm before comparison — Change Register open item 9. |
+| 7 | **A third, newer report exists** — `datastore_fill_projection_report.yml` — adding historical growth projection. It may be the intended successor to this report rather than a peer. | **Recommendation: do not transition it to Orchestrator.** VCF Operations does fill projection natively and better. See `06_Platform_Options_Advisory.md`. Decision required. |
 
 ---
 
 ## Defects found in the customer's existing automation
 
-Six, all silent, all affecting the report as it runs today independently of this
-transition. Four of them mean the report being received is not the report the
-recipients believe they are receiving.
+Two generations of the script exist. `cvs_50_100.ps1` is the newer standalone rewrite
+and **has already fixed some of what follows** — it is better engineering than its
+predecessor and this deliverable credits it as such. The table shows what remains live
+in the newer script.
 
 | Defect | Real-world effect today |
 |---|---|
 | Collection requires uncommitted space to exceed free space | **A datastore at 99% used is not reported unless it is also overcommitted** |
-| No `try`/`catch` around `Connect-VIServer` | **One unreachable vCenter out of five ends the run and emails nothing at all** |
-| No divide-by-zero guard on datastore capacity | **One decommissioned datastore anywhere in the estate ends the run the same way** |
 | `Sort-Object -Property Datastore -Unique` de-duplicates on **name** | **Identically named datastores on different vCenters are silently discarded** |
 | Band comparisons leave gaps | **A datastore at exactly 90.00%, 89.99%, 80.00% or 70.00% is shown nowhere** |
 | Mail subject counts the top band only | A subject reading **"0 Datastores @ 90%"** while fifty sit at 89% |
+| A TCP/443 preflight covers unreachable vCenters, but not authentication | **A vCenter whose service account has expired or locked still ends the run and emails nothing** |
+| No isolation around a single datastore's properties | One volume that faults mid-enumeration still ends the sweep |
+| `result.html` written with `-Append` | Grows without bound across scheduled runs |
+| `-InvalidCertificateAction Ignore` | vCenter certificate validation is **disabled** on the connection carrying the service-account credential |
 
-Full detail, including why each is silent, is in **Change-Register.md §1A**.
+**Already fixed in the newer script, and therefore not claimed as defects:** the
+divide-by-zero on zero-capacity datastores, and the unstyled report — the newer script
+has a well-built, Outlook-safe HTML formatter, which this deliverable **adopted rather
+than replaced**.
+
+Full detail and the generation-by-generation matrix are in **Change-Register.md §1A
+and §1D**.
 
 ---
 

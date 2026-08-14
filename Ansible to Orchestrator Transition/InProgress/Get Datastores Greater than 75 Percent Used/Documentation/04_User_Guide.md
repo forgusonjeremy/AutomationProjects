@@ -141,8 +141,13 @@ correction. Expect:
 4. **New columns** — Datacenter, Datastore Cluster, Type, Overcommitted.
 5. **A subject line with all three counts**, not just the top band, plus an
    `INCOMPLETE` marker when a vCenter was missed.
-6. **A report even when a vCenter is down.** The old script stopped on the first
-   unreachable vCenter and sent nothing at all.
+6. **A report even when a vCenter rejects authentication.** The old script skipped a
+   vCenter it could not reach on port 443, but a vCenter that answered and then failed
+   to authenticate — expired or locked service account — ended the run and sent
+   nothing at all.
+
+**What has not changed:** the look of the email. The banded layout and the accent
+colours are carried over deliberately, so the report stays familiar.
 
 **A higher count does not mean your estate got worse.** It means the report is now
 showing you what was always there.

@@ -20,8 +20,16 @@ transition — what changed, and **why**.
 > already-delivered Active Directory packages, and no sequencing dependency on the
 > `cvs_functions.ps1` promotion.
 >
-> **Current-state baseline:** `InProgress/Get Datastores Greater than 75 Percent Used/get_datastores_75_100_used.yml` + `vars.txt`
-> **Reference copy of the retiring logic:** `InProgress/psscript/files/cvs_functions.ps1`, case `get_datastores_75_100_used` (lines 3067–3142). Read-only for this project.
+> **Current-state baseline — TWO GENERATIONS EXIST. See §1D before reading §1A.**
+>
+> | Generation | Playbook | Script | Source |
+> |---|---|---|---|
+> | **Gen 1** (older) | `get_datastores_75_100_used.yml` | `cvs_functions.ps1`, case `get_datastores_75_100_used` (lines 3067–3142) | `InProgress/Get Datastores Greater than 75 Percent Used/` |
+> | **Gen 2** (newer) | `get_datastores_75_100_used_(Works).yml` | `cvs_50_100.ps1` — standalone, does not source `cvs_functions.ps1` | `GitLab-Repos-Sanitized/psscript/` |
+>
+> Gen 2 is confirmed newer. **Which generation is actually deployed and running on
+> the production schedule is NOT confirmed** — see open item 9. Both are read-only
+> for this project.
 
 ---
 
@@ -55,28 +63,61 @@ email that list on a schedule.
      **top band only**.
   5. Appends the body to `Debug\result.html` and emails it via `Send-MailMessage`.
 
-### 1A. Six pre-existing defects — all of them silent
+### 1A. Pre-existing defects — and which generation still carries them
 
 Every one of these produced a report that looked correct, or a run that produced
-nothing at all with no indication why. They are recorded in full because **four of
-them mean the report the customer has been receiving is not the report they believe
-they have been receiving.**
+nothing at all with no indication why.
+
+> **Read §1D first.** Gen 2 (`cvs_50_100.ps1`) has already fixed two of these and
+> improved a third. Credit where it is due — this register does **not** claim
+> defects the customer has already corrected. The matrix in §1D is the summary; the
+> detail below is written against Gen 1 and annotated where Gen 2 differs.
 
 | # | Defect | Effect today |
 |---|---|---|
 | 1 | **The overcommit AND.** Collection required `($percentUsed -gt $dsPercentUsed) -and ($ds.summary.uncommitted -gt $ds.summary.freespace)`. Both conditions had to hold. | **A datastore at 99% used is not reported unless it is also overcommitted.** A thick-provisioned or steadily-grown volume that is nearly full — the single most urgent case a capacity report exists to catch — has never appeared on it. The report heading says "Less Free Space than Uncommitted will be counted", so the behaviour is intentional; the consequence appears not to be. |
-| 2 | **No exception handling around `Connect-VIServer`.** The connect call carries `-ErrorAction Stop` and sits in the `foreach` loop with no `try`/`catch` anywhere in the case. | **One unreachable vCenter out of five ends the entire run and no report is emailed at all.** The failure is total and invisible to the recipients, who simply receive nothing — indistinguishable from a healthy estate or a missed schedule. |
-| 3 | **No divide-by-zero guard.** `(($ds.summary.capacity - $ds.summary.freespace) / $ds.summary.capacity)` runs against every datastore returned by `Get-View`, including inaccessible, unmounted or partially removed ones, which report `capacity = 0`. | A terminating "Attempted to divide by zero" error kills the run mid-inventory. Same outcome as defect 2: **no report at all**, from a single decommissioned volume anywhere in the estate. |
+| 2 | **No exception handling around `Connect-VIServer`.** The connect call carries `-ErrorAction Stop` and sits in the `foreach` loop with no `try`/`catch`. **Gen 2 partly fixes this** with a TCP/443 preflight (5s timeout, then `continue`). | Gen 1: **one unreachable vCenter out of five ends the entire run and no report is emailed at all** — indistinguishable to recipients from a healthy estate or a missed schedule. Gen 2: an *unreachable* vCenter is now skipped correctly, but a vCenter that **answers on 443 and then fails authentication** — expired service account, locked out, changed password, certificate rejection — still terminates the run with no report. The preflight tests reachability, not the thing that actually fails most often. |
+| 3 | ~~**No divide-by-zero guard.**~~ **FIXED IN GEN 2** by `if ($ds.Summary.Capacity -le 0) { continue }`. | Gen 1 only: a terminating "Attempted to divide by zero" kills the run mid-inventory from a single decommissioned volume. **No action needed if Gen 2 is deployed.** |
 | 4 | **`Sort-Object -Property Datastore -Unique`** de-duplicates on the datastore **name**, across the merged results of all five vCenters. | **A datastore whose name already appeared on another vCenter is silently discarded.** Datastore naming conventions are normally per-site, so collisions across a five-vCenter estate are the norm rather than the exception. The surviving row is whichever sorted first — the discarded one may be the fuller of the two. |
 | 5 | **Gaps between the bands.** `high: -gt 90`; `med: -gt 80 -and -lt 89.99`; `low: -gt 70 -and -lt 79.99`. The comparisons are strict and the limits are `-0.01` below the next floor. | A datastore at **exactly 90.00%**, **exactly 89.99%**, **exactly 80.00%** or **exactly 70.00%** matches **no band and is shown nowhere**, despite having been collected. Values between 89.99 and 90.00, and between 79.99 and 80.00, fall in the same holes. |
 | 6 | **The mail subject counts the top band only** — `"$alert_high_cnt Datastores @ $high%"`. | A subject reading **"0 Datastores @ 90%"** is sent while fifty datastores sit at 89%. The subject line is the only part of the report most recipients read on a phone. |
 
-Alongside those, the action carries the resilience and hygiene gaps this transition has
-been closing across the programme: the report body is **appended** to
-`Debug\result.html` on every run, so that file grows without bound; no stylesheet is
-applied to this action's output, unlike the `VMware_Disable_SSH` action in the same
-script, which builds one; and there is no `try`/`catch` isolating a single unreadable
-datastore from the rest of the sweep.
+Alongside those, both generations carry the resilience and hygiene gaps this
+transition has been closing across the programme: the report body is **appended** to
+`debug\result.html` on every run, so that file grows without bound (Gen 2 still uses
+`Out-File -Append`; note the newer `cvs_datastore_fill_projection.ps1` correctly does
+not); and there is no `try`/`catch` isolating a single unreadable datastore from the
+rest of the sweep, so a property that faults mid-enumeration still ends the run.
+
+### 1D. Generation matrix — what is already fixed
+
+`cvs_50_100.ps1` (Gen 2) is a rewrite, not a patch: it is standalone, does not source
+`cvs_functions.ps1`, takes vCenter credentials from Ansible Vault via `VC_USER` /
+`VC_PASS` environment variables, and carries a purpose-built HTML email formatter.
+**It is materially better engineering than Gen 1 and this register credits it as such.**
+
+| # | Defect | Gen 1 `cvs_functions.ps1` | Gen 2 `cvs_50_100.ps1` | Fixed by this transition |
+|---|---|---|---|---|
+| 1 | Overcommit AND in collection | Present | **Present** | Yes — P-36 |
+| 2 | Unreachable vCenter ends the run | Present | **Improved** — TCP/443 preflight; *auth failure still fatal* | Yes — P-35 |
+| 3 | Divide by zero on `capacity = 0` | Present | **Fixed** | n/a |
+| 4 | `Sort-Object -Unique` on datastore **name** | Present | **Present** | Yes — P-37 |
+| 5 | Band gaps at 90.00 / 89.99 / 80.00 / 70.00 | Present | **Present** | Yes — P-34 |
+| 6 | Subject counts top band only | Present | **Present** | Yes — P-40 |
+| 7 | `result.html` appended without bound | Present | **Present** | Yes — P-43 |
+| 8 | No stylesheet on the emailed report | Present | **Fixed** — Outlook-safe inline styling | n/a — **adopted from Gen 2**, see P-39 |
+| 9 | One unreadable datastore ends the sweep | Present | **Present** | Yes — P-35 |
+| 10 | vCenter credentials | PowerCLI ambient session | **Improved** — Ansible Vault via environment | Yes — P-33, credential removed entirely |
+| 11 | `-InvalidCertificateAction Ignore` | n/a | **Present** — vCenter certificate validation disabled | Yes — P-44 |
+
+**Gen 2's HTML formatter is better than the first revision of this deliverable was,
+and has been adopted rather than replaced.** `Format-DsTableHtml` uses inline styles
+plus legacy `bgcolor` attributes, with the comment *"Outlook (Word render engine)
+ignores most `<style>`-block CSS"*. That is correct and it matters: this workflow's
+first revision used a `<style>` block and would have rendered as unstyled text in the
+client most recipients use. The vRO renderer now mirrors Gen 2's approach, keeps its
+accent colours, and the test suite asserts that no `<style>` block or `class`
+attribute can be reintroduced.
 
 ### 1B. Two configuration observations for the customer
 
@@ -142,15 +183,16 @@ gate.
 |---|------|------|--------|------|
 | **P-33** | 2026-08-10 | Execution engine & targeting | `get_datastores_75_100_used.yml` (stage + run PowerCLI over WinRM) → a vCenter-plug-in-native Orchestrator workflow. The hardcoded five-vCenter string is replaced by the vCenters registered in Orchestrator; an explicit `vCenterConnections` input narrows a run when needed. **No PowerShell host, no PowerCLI, no WinRM, no separate vCenter credential.** | Architecture |
 | **P-34** | 2026-08-10 | Banding | Bands are **half-open and gapless** — `[floor, ceiling)` — so every value from the reporting floor to 100% lands in exactly one band, and a boundary value lands in the more severe one. Replaces the `-gt` / `-lt x.99` comparisons that left four exact values and two ranges unreported. | **Defect (silent omission)** |
-| **P-35** | 2026-08-10 | Resilience | Three levels of isolation where there was none: per-**vCenter** `try`/`catch` so one unreachable vCenter cannot end the run; a **zero-capacity guard** so a decommissioned datastore cannot raise a divide-by-zero; per-**datastore** `try`/`catch` so one unreadable volume cannot cost the other four hundred. | **Defect (total failure)** |
+| **P-35** | 2026-08-10 | Resilience | Three levels of isolation. Per-**vCenter** `try`/`catch` — this catches **authentication and certificate failures, not just unreachability**, which is the gap Gen 2's TCP/443 preflight leaves open. A **zero-capacity guard** (Gen 2 already has the equivalent). Per-**datastore** `try`/`catch` so one unreadable volume cannot cost the other four hundred — still absent in both generations. | **Defect (total failure)** |
 | **P-36** | 2026-08-10 | Report scope | The `uncommitted > freeSpace` **AND condition is removed from collection**. Every datastore at or above the floor is reported, and the original condition is carried as an **`Overcommitted` column**. Where vCenter publishes no uncommitted value the column reads `unknown` rather than asserting `No`. | **Defect (silent omission)** — *changes what the customer sees* |
 | **P-37** | 2026-08-10 | De-duplication | `Sort-Object -Property Datastore -Unique` removed. Row identity is **vCenter + MoRef**, never the display name, so identically named datastores on different vCenters both appear. A genuine duplicate identity within one vCenter is logged. | **Defect (silent omission)** — *changes what the customer sees* |
 | **P-38** | 2026-08-10 | Incomplete scans | A vCenter that could not be scanned is rendered **into the report body** as a banner and a table naming it and the reason, not only into the run log. The recipient of the email is far more likely to read the email than to open Orchestrator. *(Same reasoning as S-16 on the Admin Accounts report.)* | Enhancement (trust) |
-| **P-39** | 2026-08-10 | Presentation | A stylesheet is applied — this action emitted bare `ConvertTo-Html -Fragment` output with none. Four columns added: **Datacenter**, **Datastore Cluster**, **Type**, **Overcommitted**. Rows are ordered worst-first with deterministic tie-breaking, so consecutive reports can be compared by eye. | Enhancement |
+| **P-39** | 2026-08-10 | Presentation | **Gen 2's Outlook-safe email formatting is adopted, not replaced** — inline styles plus legacy `bgcolor` attributes and table-based layout, because Outlook's Word render engine ignores most `<style>`-block CSS. Gen 2's accent colours are kept so the report looks familiar. Four columns added: **Datacenter**, **Datastore Cluster**, **Type**, **Overcommitted**. Rows ordered worst-first with deterministic tie-breaking, so consecutive reports can be compared by eye. *(Corrected 2026-08-13: an earlier revision of this register wrongly recorded "no stylesheet" as a live defect — true of Gen 1, already fixed in Gen 2 — and the first revision of the vRO renderer used a `<style>` block, which would have regressed Outlook rendering against what the customer has today.)* | Enhancement / **regression averted** |
 | **P-40** | 2026-08-10 | Mail subject | Subject carries **all three band counts**, not the top band alone, and appends `INCOMPLETE (n vCenter(s) unreachable)` when the underlying scan had gaps. A recipient must not read a low count as good news when it is really a partial scan. | **Defect (misleading)** |
 | **P-41** | 2026-08-10 | Outcome & recovery | The run classifies as `COMPLETE`, `CLEAN_NO_FINDINGS`, `COMPLETE_WITH_GAPS` or `ERROR` rather than pass/fail. A **delivery failure fails the run** — a report nobody received is not a success — and the exception handler writes the already-built report into the transcript so a late failure does not discard the whole estate sweep. | Enhancement (operability) |
 | **P-42** | 2026-08-10 | Inputs & secrets | `vars.txt` → workflow inputs with defaults on the Inputs tab. Mail recipients are **arrays**, not comma-strings (consistent with P-12); blank Cc entries are stripped rather than rejected. SMTP credentials, when used, are a `SecureString` input; the current anonymous relay needs none. No configuration elements are required. | Enhancement |
-| **P-43** | 2026-08-10 | Report artefact | The unbounded, **appending** `Debug\result.html` on the Windows host is replaced by the `reportHtml` workflow output, produced on every run whether or not mail is enabled and whether or not anything crossed a threshold. | Hygiene |
+| **P-43** | 2026-08-10 | Report artefact | The unbounded, **appending** `debug\result.html` on the Windows host is replaced by the `reportHtml` workflow output, produced on every run whether or not mail is enabled and whether or not anything crossed a threshold. | Hygiene |
+| **P-44** | 2026-08-13 | Transport security | Gen 2 runs `Set-PowerCLIConfiguration -InvalidCertificateAction Ignore`, so **vCenter certificate validation is disabled** for the connection carrying the service-account credential. The Orchestrator vCenter plug-in validates against its trusted-certificate store instead, so the session is authenticated *and* verified. No configuration is required — this comes free with P-33. | **Security control** |
 
 ---
 
@@ -180,6 +222,9 @@ gate.
 | 6 | **SMTP relay reachability from Orchestrator.** Mail now leaves the Orchestrator appliance, not the Windows host. `mailrelay.corp.local:25` must accept submission from the appliance's address. | Verify at deployment |
 | 7 | **`uncommitted` is optional in the vSphere API** and is not published for every datastore type. Those rows render `unknown` in the Overcommitted column rather than a misleading `No`. Expect some on NFS. | Informational |
 | 8 | **Overlapping runs are harmless.** The workflow is read-only and holds no lock, so it needs no mutex — unlike Snapshot Cleanup. A slow run overrun by the next schedule costs duplicate emails, nothing more. | Informational |
+| 9 | **Which generation is deployed is unconfirmed** (§1D). `cvs_50_100.ps1` is confirmed newer than `cvs_functions.ps1`, but not confirmed as the version on the production schedule. This changes only *which* defects are live today, not what the transition delivers — the vRO workflow supersedes both. **Confirm before the parallel run**, because the comparison baseline differs: Gen 1 aborts on a zero-capacity datastore, Gen 2 does not. | **Customer confirmation required** |
+| 10 | **A third, newer report exists: `datastore_fill_projection_report.yml` / `cvs_datastore_fill_projection.ps1`.** It adds historical growth-rate projection (`Get-Stat` over 7 and 30 days), days-to-threshold, three risk tiers and a CSV export. It appears to be the intended successor to this report rather than a peer. **Not in scope for this deliverable, and it should probably not be transitioned to Orchestrator at all** — see `06_Platform_Options_Advisory.md`. | **Open — decision required** |
+| 11 | **`Select-Object -First 25`** silently truncates the "no measurable growth" tier in the projection script. The heading discloses it, but the total is not stated, so a reader cannot tell 25 from 25-of-400. Recorded for whoever owns that report next. | Informational |
 
 ---
 
@@ -214,4 +259,5 @@ difference is the point. Compare membership.
 
 | Date | Author | Summary |
 |---|---|---|
+| 2026-08-13 | Automation transition | **Re-baselined against `cvs_50_100.ps1` (Gen 2)**, found in `GitLab-Repos-Sanitized` and confirmed newer than the `cvs_functions.ps1` case this register was originally written against. Added §1D generation matrix. **Withdrew the divide-by-zero defect claim** (already fixed in Gen 2) and **withdrew the "no stylesheet" claim** (Gen 2 has a well-built Outlook-safe formatter). **Narrowed the unreachable-vCenter claim** to authentication and certificate failures, which Gen 2's TCP/443 preflight does not cover. Rewrote P-35 and P-39 accordingly, added **P-44** (vCenter certificate validation, disabled in Gen 2 by `-InvalidCertificateAction Ignore`), and added open items 9–11. The vRO renderer was rebuilt to adopt Gen 2's inline-style approach after review showed the first revision's `<style>` block would have regressed Outlook rendering. |
 | 2026-08-10 | Automation transition | Register created. Recorded the current state of `get_datastores_75_100_used.yml` and the `get_datastores_75_100_used` script case, six pre-existing silent defects (§1A), two configuration observations for customer decision (§1B), and process changes **P-33 … P-43**. Confirmed **no `S-` changes**: this deliverable is vCenter-native and does not touch `cvs_functions.ps1`. |

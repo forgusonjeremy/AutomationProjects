@@ -43,8 +43,12 @@ logic built on top of them.
 | `Sample-Report-NoFindings.html` | A clean estate — nothing at or above the floor. |
 | `Sample-Report-Thresholds-95.html` | `thresholdHighPct=95`, `bandWidthPct=5`. Shows rows re-banding. |
 
-The sample reports are regenerated on every run. Open them in a browser to
-review layout before the first scheduled send.
+The sample reports are regenerated on every run. Open them in a browser to review
+layout — but note that **a browser cannot validate Outlook rendering.** Browsers honour
+both inline styles and `<style>`-block CSS, so they render a correct report and a
+broken one identically. T-12 asserts the Outlook-safe construction statically (no
+`<style>` block, no `class` attributes, an inline style on every cell, `bgcolor` on
+every filled cell); lab test B-7a is the only check that exercises the real client.
 
 ---
 
@@ -61,14 +65,14 @@ Every fixture exists to exercise a specific defect or edge case.
 | `BOUNDARY-80-00` 80.00% | vc01 | Exactly on `$med`. Matched neither band (P-34). |
 | `BOUNDARY-70-00` 70.00% | vc01 | Exactly on the collection floor. `-gt 70` false → never collected (P-34). |
 | `QUIET-VMFS-050` 41.20% | vc01 | Below the floor. Must stay out. |
-| `DECOMMISSIONED-01` cap=0 | vc02 | **Divide by zero.** Killed the entire old run before anything was emailed (P-35). |
+| `DECOMMISSIONED-01` cap=0 | vc02 | Divide by zero in Gen 1 (`cvs_functions.ps1`) — killed the whole run. **Already fixed in Gen 2** (`cvs_50_100.ps1`); retained as a guard-rail fixture. |
 | `APD-VMFS-007` inaccessible | vc02 | Skipped by default, included via `includeInaccessible`. |
 | `NFS-ARCHIVE-01` 97.50% | vc02 | vCenter publishes no `uncommitted` value → must render `unknown`, not `No`. |
 | `FAULTY-VMFS-099` | vc02 | Property access faults mid-enumeration. Must be isolated, siblings still collected. |
 | `<script>alert…` 93.40% | vc02 | Datastore names are free text from vCenter. Must be escaped. |
 | `SITE-PROD-01` 94.00% | vcb01 | **Name collision across sites.** `Sort-Object -Unique` on the name silently dropped one of these (P-37). |
 | `SITE-PROD-01` 91.50% | vcb02 | The other half of the collision. |
-| *(none)* | vc.corp.local | Connection throws on login. Old script aborted the whole run; new run reports the gap (P-35, P-38). |
+| *(none)* | vc.corp.local | **Connection throws on login** — not on reachability. This is the case Gen 2's TCP/443 preflight does not cover: the vCenter answers, then rejects the credential. Both generations abort the whole run; the new one reports the gap (P-35, P-38). |
 
 ---
 
@@ -113,7 +117,7 @@ production figure is measured during the parallel run described in
 | T-09 | Absent `uncommitted` renders `unknown` | P-36 |
 | T-10 | Inaccessible datastores excluded by default, included on request | — |
 | T-11 | Datacenter / datastore cluster resolve; failure degrades to blank | — |
-| T-12 | Rendering, stylesheet, HTML escaping | P-38, P-39 |
+| T-12 | Rendering, **Outlook safety**, HTML escaping | P-38, P-39 |
 | T-13 | Worst-first, run-to-run deterministic ordering | — |
 | T-14 | Subject carries all three counts and declares incompleteness | P-40 |
 | T-15 | Blank Cc entries stripped, not rejected | — |

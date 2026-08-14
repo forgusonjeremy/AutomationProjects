@@ -177,7 +177,7 @@ check('NFS-ARCHIVE-01 is reported',              !!nfs);
 eq   ('uncommittedKnown is false',               nfs && nfs.uncommittedKnown, false);
 eq   ('uncommittedGB is null, not 0',            nfs && nfs.uncommittedGB, null);
 eq   ('overcommitted is not asserted true',      nfs && nfs.overcommitted, false);
-check('report renders it as "unknown"',          /unknown<\/span>/.test(ctx.reportHtml));
+check('report renders it as "unknown"',          />unknown<\/span>/.test(ctx.reportHtml));
 check('report renders an em dash for the value', /&mdash;/.test(ctx.reportHtml));
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -219,15 +219,39 @@ check('and the degradation is warned, not silent',
 // ═════════════════════════════════════════════════════════════════════════════
 section('T-12  Report rendering and escaping');
 // ═════════════════════════════════════════════════════════════════════════════
-check('report is a complete HTML document', /^<html>/.test(ctx.reportHtml) && /<\/html>$/.test(ctx.reportHtml));
-check('P-39 a stylesheet is present',       /<style>/.test(ctx.reportHtml));
+check('report is a complete HTML document',
+      /^<!DOCTYPE html>/.test(ctx.reportHtml) && /<\/html>$/.test(ctx.reportHtml));
 check('all three band headings render',
-      /Critical &mdash;/.test(ctx.reportHtml) &&
-      /Warning &mdash;/.test(ctx.reportHtml) &&
-      /Advisory &mdash;/.test(ctx.reportHtml));
+      /Critical &nbsp;&ndash;/.test(ctx.reportHtml) &&
+      /Warning &nbsp;&ndash;/.test(ctx.reportHtml) &&
+      /Advisory &nbsp;&ndash;/.test(ctx.reportHtml));
+
+// ── P-39 OUTLOOK SAFETY ──────────────────────────────────────────────────────
+// Outlook renders with the Word engine, which ignores most <style>-block CSS —
+// including cell backgrounds, which every band header depends on. A report that
+// relies on a stylesheet renders as unstyled text in the client most recipients
+// use. These assertions exist so nobody can "tidy" the inline styles back into
+// a stylesheet without the suite failing.
+check('P-39 NO <style> block is used at all', !/<style[\s>]/i.test(ctx.reportHtml));
+check('P-39 no class attributes are relied on', !/\sclass=/.test(ctx.reportHtml));
+// The (?=[\s>]) guard matters: a bare <th would also match <thead>.
+check('P-39 every table cell carries an inline style',
+      (ctx.reportHtml.match(/<td(?=[\s>])(?![^>]*style=)/g) || []).length === 0);
+check('P-39 every header cell carries an inline style',
+      (ctx.reportHtml.match(/<th(?=[\s>])(?![^>]*style=)/g) || []).length === 0);
+check('P-39 header cells also carry the legacy bgcolor attribute',
+      /<th [^>]*bgcolor="#b91c1c"/.test(ctx.reportHtml));
+check('P-39 zebra rows use bgcolor, not a stylesheet rule',
+      /<tr bgcolor="#f9fafb">/.test(ctx.reportHtml));
+check('P-39 layout tables are marked role=presentation',
+      /role="presentation"/.test(ctx.reportHtml));
+check('P-39 accent colours match the customer\'s existing report',
+      ctx.reportHtml.indexOf('#b91c1c') !== -1 &&   // critical
+      ctx.reportHtml.indexOf('#c2410c') !== -1 &&   // warning
+      ctx.reportHtml.indexOf('#a16207') !== -1);    // advisory
 check('P-38 the unreachable vCenter is named in the report body',
       /This report is incomplete/.test(ctx.reportHtml) && /vc\.corp\.local/.test(ctx.reportHtml));
-check('the skipped-datastore table is rendered', /could not be evaluated/.test(ctx.reportHtml));
+check('the skipped-datastore table is rendered', /ould not be evaluated/.test(ctx.reportHtml));
 
 check('a hostile datastore name is escaped',
       ctx.reportHtml.indexOf('<script>alert') === -1 &&
@@ -373,7 +397,7 @@ shim.runTask('EH_ExceptionHandler.js', ctxK, envK);
 eq   ('handler sets outcome to ERROR', ctxK.outcome, 'ERROR');
 check('handler writes the report into the transcript',
       envK.capture.log.some(l => l.indexOf('---BEGIN REPORT HTML---') !== -1) &&
-      envK.capture.log.some(l => l.indexOf('<html>') === 0));
+      envK.capture.log.some(l => l.indexOf('<!DOCTYPE html>') === 0));
 check('handler states no vCenter was modified',
       envK.capture.error.some(l => /read-only/.test(l)));
 
@@ -400,7 +424,7 @@ section('T-22  Every log line carries the [DATASTORE-REPORT] marker');
 // ═════════════════════════════════════════════════════════════════════════════
 const allLines = env.capture.log.concat(env.capture.warn, env.capture.error);
 const strays = allLines.filter(l => l.indexOf('[DATASTORE-REPORT]') !== 0 &&
-                                    l.indexOf('<html>') !== 0);
+                                    l.indexOf('<!DOCTYPE html>') !== 0);
 eq('no unmarked log lines', strays.length, 0, JSON.stringify(strays.slice(0, 3)));
 
 // ═════════════════════════════════════════════════════════════════════════════
