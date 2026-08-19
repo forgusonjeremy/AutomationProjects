@@ -150,9 +150,9 @@ been withdrawn.
 | 2 | Server Reboots | 1 | Pending |
 | 3 | Servers Reboot Report by CN | 1 | Pending |
 | 4 | Windows Server Clean Disks | 1 | Pending |
-| 5 | Admin Accounts Report | 2 | **Blocked** — see §7 |
-| 6 | Service Account Expiration Reporting | 2 | Pending (S-26) |
-| 7 | Service Account Password Rotation | 1 | Design + 5 actions written; S-25 outstanding |
+| 5 | Admin Accounts Report | 2 | **Unblocked** — consolidated onto v3; design + action written |
+| 6 | Service Account Expiration Reporting | 2 | Consolidated; design + action written; S-30 outstanding |
+| 7 | Service Account Password Rotation | 1 | Design + 5 actions written; S-25 outstanding. **Stays on psHost** — see §7.7 |
 
 Projects 1–4 share one pattern; #1 establishes it and the rest follow mechanically.
 
@@ -177,21 +177,63 @@ Register.** §7 shows the cost of not doing so.
 **`Multi-Domain-Remediation-Plan.md`** — full cross-project analysis, tier model,
 per-project impact, remediation steps, change register IDs P-51…P-55, S-26, S-27.
 
+**`Script-Distribution-Architecture.md`** — options analysis for how the script reaches the
+host. Superseded as a transport by guest operations; its S-28 finding stands.
+
+**`_Shared/`** (new, programme-wide). **Reference these — do not copy them.**
+
+| File | Purpose |
+|---|---|
+| `Code/stageScriptOnHost.js` | Resource Element → PS host over WinRM, **every run**, byte-count verified. Returns the version for the run record |
+| `Code/resolvePowerShellHostForAccount.js` | **Service account selector → psHost object.** The AAP credential decision, moved onto the workflow. Supersedes `resolvePowerShellHostForDomain` |
+| `Code/getRunAsAccountSelectors.js` | Populates the selector dropdown from the Configuration Elements, so nobody types an account name |
+| `Documentation/RunAsAccounts-Config_definition.md` | `PSO/Identity/RunAsAccounts` schema, host registration, wiring, validation |
+| `Documentation/Script-Staging-Design.md` | The current model: what changes, failure behaviour, host-build delta, **§6.3 Kerberos delegation**, S-28, CI sync |
+| `Documentation/Execution-Model-GuestOps.md` | **Deferred alternative.** Kept for the analysis and the conditions that would justify revisiting it |
+
+**Reporting consolidations** (each replaces **two** job templates with one workflow, with
+**no PowerShell changes** — both target scripts the customer already runs)
+
+| File | Purpose |
+|---|---|
+| `Admin Accounts Report/Code/buildAdminPkiReportInvocation.js` | v3 baseline; domain rows + `__DC__` templates; OUs, department filters, credential keys → one invocation |
+| `Admin Accounts Report/Documentation/06_Consolidation-Design-v3.md` | Decision, scope model, credential model, P-59/P-60, validation |
+| `Service Account Expiration Reporting/Code/parseServiceAccountScopes.js` | Scope rows → per-invocation entries, each carrying its own run-as account; all validation before the first host is touched |
+| `Service Account Expiration Reporting/Code/buildServiceAccountScopeInvocation.js` | One invocation per scope; `ou=`/`group=` selects the script's existing `-Action` |
+| `Service Account Expiration Reporting/Documentation/06_Consolidation-Design.md` | Decision, deferred **S-30** contract, P-61, validation |
+
 ---
 
 ## 7. Open questions
 
-1. **Admin Accounts Report: v2 or v3?** The delivered vRO workflow targets
-   `cvs_functions.ps1 -Action Get-AllAdmin-Accounts` (S-16…S-21), but the customer has
-   moved to `cvs_admin.ps1`, which additionally has per-domain credentials, department
-   filters, `-IncludeDisabled`, `-FailOnQueryError` and a PKI/smartcard focus. Re-baseline
-   onto v3, or is v3 being retired? **Blocks project #5.**
-2. **Domain inventory** — the full list in scope per workflow.
+1. ~~**Admin Accounts Report: v2 or v3?**~~ **Resolved 2026-08-17 — v3.** Consolidating the
+   two templates into one workflow decides it: v3 is the only baseline that can reach
+   `rootdomain.net`, the one domain carrying a per-domain credential. v2 retires; S-16…S-21
+   are withdrawn. See `Admin Accounts Report/Documentation/06_Consolidation-Design-v3.md`.
+2. **Domain inventory** — the full list in scope per workflow. Partly answered for
+   projects #5/#6 by the job-template variables; **P-60/P-61 (`.com` vs `.net`) must be
+   confirmed before either runs.**
 3. **Reset Password delegation** — confirm per domain, on the target OU, before S-25 goes
    to production.
-4. **Tier 2 credential staging** — stage `AD_CRED_*` on the PS host at build time
-   (recommended, nothing crosses from Orchestrator), or inject from Configuration Element
-   SecureStrings into a never-logged invocation string?
+4. ~~**Tier 2 credential staging**~~ **Resolved — option 1.** `AD_CRED_*` staged as
+   machine-level environment variables at host build; nothing crosses from Orchestrator.
+   Requires a WinRM restart to take effect (`_Shared/Documentation/Script-Staging-Design.md` §6).
+5. **Script distribution** — **resolved.** `stageScriptOnHost` copies the script from a
+   Resource Element to the PS host on every run, over the same WinRM session that invokes
+   it. Who owns the GitLab→Resource Element sync is still open, but **no longer blocking**:
+   dropping the S-29 marker removed the CI prerequisite, so the Resource Element can be
+   updated by hand until a pipeline exists.
+6. **Kerberos delegation (P-65)** — verify the plug-in host object makes the second hop
+   before building anything else. AAP already does this with
+   `ansible_winrm_kerberos_delegation: yes`, so the AD side is expected to be in place.
+7. **Execution model** — **resolved 2026-08-18: one model, all seven projects.** A hybrid was
+   considered (guest operations for the two `microsoft.ad.user` playbooks, psHost for the
+   rest) and rejected. Password Rotation stays on psHost: guest operations have no output
+   channel but a file, which would put the generated password on disk against a design
+   built to avoid exactly that; it is Tier 1, so the host object already carries the
+   identity; five actions exist; and its second hop is answerable with `-Credential` on
+   S-25, as `microsoft.ad.user` already does. `Execution-Model-GuestOps.md` is retained as
+   the contingency if delegation cannot be made to work.
 
 ---
 
@@ -204,7 +246,18 @@ per-project impact, remediation steps, change register IDs P-51…P-55, S-26, S-
 | P-52 | Tier 1 per-domain host resolution (4 projects) |
 | P-53 | Tier 2 multi-domain sweep (2 projects) |
 | P-54 | Cross-domain group members silently skipped — resolved via S-27 |
-| P-55 | Admin Accounts Report built against the superseded script |
+| P-55 | Admin Accounts Report built against the superseded script — **closed** by the v3 re-baseline |
+| P-56 | Execution model: script staged per run from a vRO Resource Element, superseding P-1/P-9/P-20 |
+| P-57 | Admin Accounts Report: two job templates → one workflow; v2 retires |
+| P-58 | Service Account Expiration: two job templates → one workflow; the duplicate 58 KB script retires |
+| P-59 | `-FailOnQueryError` defaults to `yes` on both reports — a multi-domain sweep that loses a domain must not report success |
+| P-60 | *Resolved* — the domain is `<sub>.company.net`; the `.com` spelling was a transcription artefact. The domain/DN agreement check is retained in the scope action, since under v3's `__DC__` generation a mismatch mis-targets silently |
+| P-61 | Service account templates: credential/domain spellings to confirm |
 | S-25 | `Set-ServiceAccountPassword` — new write action, not yet written |
-| S-26 | Port `Get-DomainCredential` + per-domain keys into `cvs_functions.ps1` |
+| S-26 | Port `Get-DomainCredential` + per-domain keys into `cvs_functions.ps1` — **absorbed by S-30** |
 | S-27 | Foreign group member: `Warn:` → `Error:` so the run ends "Completed with Errors" |
+| S-28 | Five `out-File -append` sites in `cvs_functions*.ps1` grow unboundedly against a persistent script directory; move `$DebugDir` off `$PSScriptRoot`. **Does not affect projects #5/#6** — `cvs_admin.ps1` is already clean and the service report inherits current behaviour |
+| ~~S-29~~ | Version marker — **dropped 2026-08-18.** `stageScriptOnHost` copies every run, so there is nothing to compare; removing it also removes the CI-stamping prerequisite from the critical path |
+| S-30 | `cvs_svcaccounts.ps1` — **deferred.** Needed only to turn the service report's two emails into one; contract written |
+| ~~P-62~~ ~~P-63~~ ~~P-64~~ | Guest-operations execution model — **withdrawn 2026-08-18.** Deferred for delivery speed and handover friction; P-52 stays on. Analysis kept in `_Shared/Documentation/Execution-Model-GuestOps.md` |
+| P-65 | Kerberos delegation on the plug-in host objects, matching AAP's `ansible_winrm_kerberos_delegation: yes`. **Verification, not new AD work — but the first thing to test** |

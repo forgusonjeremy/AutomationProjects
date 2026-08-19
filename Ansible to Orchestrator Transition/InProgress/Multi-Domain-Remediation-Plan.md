@@ -1,5 +1,22 @@
 # Multi-Domain Identity — Cross-Project Remediation Plan
 
+> **§5.1 (Tier 1 / P-52) is ON, as written.** A guest-operations execution model was
+> considered on 2026-08-17 and would have retired it; that was **deferred on 2026-08-18** in
+> favour of time to delivery and a lower-friction handover to the team who maintain the
+> Ansible estate. **P-62/P-63/P-64 are withdrawn.** See
+> `_Shared/Documentation/Execution-Model-GuestOps.md` for the deferred alternative and the
+> conditions that would justify revisiting it.
+>
+> **One addition to §5.1:** the second hop. Every `Get-ADUser -Server <domain>` these
+> scripts make is a network resource reached from a network logon, and AAP makes it work
+> with `ansible_winrm_transport: kerberos` + `ansible_winrm_kerberos_delegation: yes`
+> (`admins/inventory/on_winrm_servers`, `dev_winrm_servers`,
+> `admins/window-requirements.yml`). vRO's plug-in host objects must request the same
+> delegation. Good news: the AD-side configuration is already proven in this estate, so
+> Build Guide §6 is verification rather than a change request — but it must be **tested
+> first**, because a host object that connects without delegation fails on the first AD
+> query and looks like an AD fault. See `_Shared/Documentation/Script-Staging-Design.md` §6.3.
+
 **Status:** Active — customer answers folded in 2026-08-17
 **Affects:** 6 transitions
 **Supersedes:** `Move Windows Event Logs/_Shared/Documentation/Ansible-to-vRO-MappingTable.md:105`
@@ -129,9 +146,16 @@ credentials above.
 This is the re-baseline hazard: **GitLab-Repos-Sanitized is the newer baseline, and
 every transition must be re-checked against it before its Change Register is written.**
 
-**Decision needed:** does the vRO Admin Accounts Report re-baseline onto v3
-(`cvs_admin.ps1`), or does the customer intend to retire v3 and stay on v2? Everything
-else in §5.2 depends on the answer.
+**RESOLVED 2026-08-17 — re-baseline onto v3, and consolidate.** The customer requires a
+**single** workflow covering both templates, which decides it: v3 is the only baseline that
+can reach `rootdomain.net`, the one domain carrying a per-domain credential, and v2 has no
+credential mechanism at all. v2's scope for subdom1–7 is a subset of v3's and its
+recipients already receive the v3 report, so `admin_accounts_report-v2.yml` retires
+(**P-57**). S-16…S-21 are withdrawn — they specified for `cvs_functions.ps1` behaviour that
+`cvs_admin.ps1` already implements.
+
+Design: `Admin Accounts Report/Documentation/06_Consolidation-Design-v3.md`.
+Action: `buildAdminPkiReportInvocation` replaces `buildAdminAccountsReportInvocation`.
 
 ---
 
@@ -181,7 +205,17 @@ Options, in preference order:
    the invocation string never logged and never bound to a workflow output. Simpler,
    but it makes one action a permanent exception to the family's logging convention.
 
-Recommend (1). It also keeps Orchestrator free of credentials it does not need to hold.
+**RESOLVED 2026-08-17 — option (1)**, machine-level environment variables. It also keeps
+Orchestrator free of credentials it does not need to hold. Note the operational catch:
+a machine-level environment variable change is not visible to `wsmprovhost` until the
+**WinRM service is restarted**, because children inherit the environment block the service
+captured at start. Verify from vRO, not from an RDP session. See
+`_Shared/Documentation/Script-Staging-Design.md` §6.
+
+**Independent of this**, the *script* now reaches the host by a different route: staged per
+run from a vRO Resource Element (**P-56**, `Script-Distribution-Architecture.md`). The two
+decisions are orthogonal — environment variables persist on the host regardless of where
+the script file lives.
 
 ### 5.3 P-54 — cross-domain group members — **RESOLVED**
 
@@ -225,11 +259,14 @@ Register** — §4 shows what happens otherwise.
 
 ## 7. Open questions
 
-1. **Domain inventory** — the full list in scope per workflow.
-2. **Admin Accounts Report: v2 or v3?** (§4) Blocks project #5.
+1. **Domain inventory** — the full list in scope per workflow. Supplied for projects #5/#6;
+   **P-60/P-61 (`.com` vs `.net`) must be confirmed before either runs.**
+2. ~~**Admin Accounts Report: v2 or v3?**~~ **Resolved — v3, consolidated. See §4.**
 3. **Reset Password delegation** — confirm per domain, on the target OU, before S-25
    goes to production.
-4. **Tier 2 credential staging** — option (1) or (2) in §5.2.
+4. ~~**Tier 2 credential staging**~~ **Resolved — option (1). See §5.2.**
+5. **CI ownership** — who owns the GitLab pipeline job that stamps the S-29 version marker
+   and syncs Resource Elements into vRO on merge.
 
 ---
 
@@ -241,6 +278,19 @@ Register** — §4 shows what happens otherwise.
 | **P-52** | Tier 1 × 4 projects | Per-domain host object resolution; binding change only |
 | **P-53** | Tier 2 × 2 projects | Multi-domain sweep cannot carry one identity |
 | **P-54** | Cross-project | Cross-domain group members silently skipped — **resolved**, see S-27 |
-| **P-55** | Admin Accounts Report | Built against `cvs_functions.ps1`; customer has moved to `cvs_admin.ps1` (v3) |
-| **S-26** | `cvs_functions.ps1` | Port `Get-DomainCredential` + per-domain credential keys from `cvs_admin.ps1` |
-| **S-27** | `cvs_functions.ps1` | Foreign group member: `Warn:` → `Error:` so the run ends "Completed with Errors" |
+| **P-55** | Admin Accounts Report | Built against `cvs_functions.ps1`; customer has moved to `cvs_admin.ps1` (v3) — **closed** by the §4 re-baseline |
+| **P-56** | Cross-project | Execution model: script staged per run from a vRO Resource Element; supersedes P-1/P-9/P-20 |
+| **P-57** | Admin Accounts Report | Two job templates → one workflow; `admin_accounts_report-v2.yml` retires |
+| **P-58** | Service Account Expiration | Two job templates → one workflow; the duplicate 58 KB `_washdc` script retires |
+| **P-59** | Both Tier 2 reports | `-FailOnQueryError` defaults to `yes` — a multi-domain sweep that loses a domain must not report success |
+| **P-60** | Admin Accounts Report | *Resolved 2026-08-17 — the domain is `<sub>.company.net`.* The domain/DN agreement check is retained: v3 generates DNs from the domain name, so a mismatch mis-targets every domain without an explicit `ous:` and fails silently |
+| **P-61** | Service Account Expiration | Credential/domain spellings in the template data to confirm |
+| **S-26** | `cvs_functions.ps1` | Port `Get-DomainCredential` + per-domain credential keys from `cvs_admin.ps1` — **absorbed by S-30** |
+| **S-27** | `cvs_functions.ps1` | Foreign group member: `Warn:` → `Error:` so the run ends "Completed with Errors" — carried into S-30 |
+| **S-28** | `cvs_functions*.ps1` | Five `out-File -append` sites grow unboundedly against a persistent script directory; move `$DebugDir` off `$PSScriptRoot` |
+| ~~S-29~~ | All staged scripts | Version marker — **dropped 2026-08-18**; `stageScriptOnHost` copies every run, so there is nothing to compare |
+| **S-30** | New script | `cvs_svcaccounts.ps1` — `cvs_admin.ps1`'s scope-map + credential pattern applied to service accounts |
+| ~~P-62~~ | Cross-project | vCenter Guest Operations as the execution model — **withdrawn 2026-08-18**, deferred for delivery speed and handover friction |
+| ~~P-63~~ | Both Tier 2 reports | Scope map as a file — **withdrawn** with P-62; inline JSON is correct again over the PowerShell plug-in |
+| ~~P-64~~ | Both Tier 2 reports | `AD_CRED_*` via `envVariables` — **withdrawn** with P-62; back to §5.2 option 1, and only for the `rootdomain` key |
+| **P-65** | Cross-project | Kerberos delegation on the plug-in host objects, matching AAP's `ansible_winrm_kerberos_delegation: yes`. Verification, not new AD work — but the first thing to test |
