@@ -212,12 +212,27 @@ Base-64/PEM file opens as text beginning with `-----BEGIN CERTIFICATE-----`.
 | P-7 | 2026-06-28 | Variables / secrets | `vars` / `group_vars` / Ansible vault / `become` | Workflow inputs + a Configuration Element for defaults; credentials via the PS host plug-in service account | Standard Orchestrator patterns; no vault equivalent needed |
 | P-8 | 2026-07-09 | Move workflow input model | Move-ArchivedLogs-ByADGroup defaults bound to Configuration Element attributes | **Move-ArchivedLogs-ByADGroup uses plain input parameters with defaults set directly on each input** (no Configuration Element). The move-only attributes (`defaultDomainName`, `defaultFileShareTarget`, `defaultFileFilter`, `defaultFileAgeDays`) were removed from the element; `defaultScriptPath` + `defaultLogRetentionDays` remain for Remove-OldFiles-UNCShare | Customer preference: these values are static per environment and "do not need to be updated by anything", so explicit self-contained inputs are preferred over a shared Config Element for the move workflow |
 
+| P-9 | 2026-08-19 | Move script delivery model | `Move-ArchivedLogs-ByADGroup` invokes the pre-staged `cvs_functions.ps1` toolbox (`move-archived-logs-ByCN` action) on the PS host | **Purpose-built standalone script `Move-FilesByADGroup.ps1`**, held in Orchestrator as a **Resource Element** and copied to the PS host by `stageScriptOnHost`. One script, two actions (`Get-GroupComputers`, `Move-Files`) invoked against **two PowerShellHost objects** to preserve the two identities the playbooks used (`become: runas` — AD-query identity ≠ file-move identity in six of the seven templates); Orchestrator carries the computer list between them | Supersedes the `cvs_functions.ps1` dependency for the move path. The playbooks embedded their PowerShell inline as `win_shell` heredocs, so there was no existing script generation to preserve, and a purpose-built script allows the four behavioural corrections below to be made cleanly. Does **not** affect `Remove-OldFiles-UNCShare`, which still uses `cvs_functions.ps1` (`Delete-OldFiles-UNC-Share`) |
+
+### P-9 detail — behavioural corrections relative to the playbooks
+
+All four are deliberate and requested. Documented here because each changes observable output or scope.
+
+| # | Playbook behaviour | Corrected behaviour | Why |
+|---|---|---|---|
+| 1 | `Move-Item -PassThru` **and** `$_.Name` were piped into the same collection, so every "Moved N files" message reported exactly **twice** the real count | Explicit counters incremented only on confirmed success | File counts in run output were wrong by 2× |
+| 2 | `-OlderThanDays` computed `(Get-Date).AddDays(+$Days)` — pushing the cutoff into the **future**, so a larger positive value was *more* permissive and `30` meant "everything" | `(Get-Date).AddDays(-$OlderThanDays)`; a file exactly N days old is **kept**. Negative values are **rejected** (the old working convention was `fileAgeDays: -1`, which under the corrected sign would move every file in scope) | The parameter did the opposite of its name; carrying the old convention forward would silently move everything |
+| 3 | Gathered with `-Recurse` and dropped every file into one flat folder with `-Force` — two files sharing a name in different subdirectories silently overwrote each other | Destination mirrors the source tree beneath the per-server folder; an existing destination file is **not** overwritten unless `-OverwriteExisting` is `yes`. A collision is reported as an error and the source file is left in place | Silent data loss |
+| 4 | Neither generation was both domain-targeted **and** recursive: the TEST generation passed `-Server` but read direct members only (silently missing nested groups); the other recursed but ignored `DomainName` entirely | Group must be supplied as a **distinguishedName**; the domain is derived from its `DC=` components, so the two cannot disagree. No `-DomainName` parameter exists. An unresolvable member is an **error**, not a silent skip (S-27) | Removes both defects at once, including template #5's `DomainName` that was passed and never read |
+
+Exit codes: `0` success | `1` completed with errors | `2` unusable input.
+
 **Net result:** 7 playbooks → **2 workflows** (`Move-ArchivedLogs-ByADGroup`,
-`Remove-OldFiles-UNCShare`); 5 build actions → **3**. Both invoked actions
-(`move-archived-logs-ByCN`, `Delete-OldFiles-UNC-Share`) already exist in the
-deployed script; the changes to `cvs_functions.ps1` are limited to S-1 (report-only)
-and S-2…S-4 (parameterised file filter/age + resilient, logged per-server failure
-handling for the AD-group move).
+`Remove-OldFiles-UNCShare`); 5 build actions → **3**. `Delete-OldFiles-UNC-Share`
+already exists in the deployed `cvs_functions.ps1`; the changes to that script are
+limited to S-1 (report-only) and S-2…S-4. **As of P-9 the move path no longer calls
+`cvs_functions.ps1`** — S-2…S-4 remain recorded for history and still apply to
+`Get-ServerRebootReportStatus-ByCN`, which shares `Get-ListOfServers-ByCN`.
 
 ---
 
@@ -258,3 +273,4 @@ handling for the AD-group move).
 | 2026-07-09 | Automation transition | Authored the customer documentation set (Executive-Summary, Design-Document, Implementation-Guide, User-Guide) under `documentation/`. |
 | 2026-07-10 | Automation transition | Corrected the workflow folder path across all package docs to `Production >> Servers >> Windows >> Event Log Management` (lab/dev: under `Workflows >> Customer >> <Customer Name> >> Production >> …`). The actions' module namespace (`broadcom.pso.vc.vm.guestOps.files.windows.logs`) is unchanged. |
 | 2026-07-10 | Automation transition | Tooling/docs change T-3 — corrected the Kerberos setup guidance after live bring-up: fixed the `krb5.conf` `[realms]` block to the required multi-line/no-`;` form (single-line form threw `Vector cannot be cast to Hashtable`); corrected the `salt must be at least 128 bits` root cause to service-account name length (was wrongly attributed to krb5.conf); added the `UPPERCASE_REALM + sAMAccountName ≥ 16 chars` prerequisite (example account `vcf_svc` → `vcf_svc_ps`); added a Kerberos bring-up error sequence (incl. pre-auth error 24); required UPN username form; set `dns_lookup_kdc = false`. |
+| 2026-08-19 | Automation transition | Process change P-9 — the move path is delivered as a purpose-built standalone script (`Move-FilesByADGroup.ps1`, Resource Element staged via `stageScriptOnHost`) instead of the pre-staged `cvs_functions.ps1` toolbox, with a two-PowerShellHost split preserving the AD-query and file-move identities. Recorded the four behavioural corrections relative to the playbooks (2× file-count inflation; inverted `-OlderThanDays` sign with negative values now rejected; directory structure preserved with no silent overwrite; AD query now both domain-targeted and recursive with the domain derived from the group DN). Script relocated into `Move-ArchivedLogs-ByADGroup/Code/` from the standalone `File Move by AD Group/` working folder, which has been removed. `Remove-OldFiles-UNCShare` is unaffected and still uses `cvs_functions.ps1`. |

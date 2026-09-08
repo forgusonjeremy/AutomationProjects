@@ -5,9 +5,22 @@
 **Status:** Phase 1
 
 This project replaces the retiring Ansible automation for Windows event-log
-archives with VCF Orchestrator 9 workflows, reusing the proven `cvs_functions.ps1`
-toolbox. It is delivered as **two independent deliverables** that share a common set
-of components.
+archives with VCF Orchestrator 9 workflows. It is delivered as **two independent
+deliverables** that share a common set of components.
+
+> **Script delivery model (changed 2026-08-19 — see P-9).**
+> **Move-ArchivedLogs-ByADGroup** no longer calls the `cvs_functions.ps1` toolbox.
+> It uses a purpose-built standalone script, `Move-FilesByADGroup.ps1`, held in
+> Orchestrator as a **Resource Element** and copied to the PowerShell host by
+> `stageScriptOnHost`. The script exposes two actions — `Get-GroupComputers`
+> (AD-query identity) and `Move-Files` (file-move identity) — invoked against **two
+> PowerShellHost objects**, preserving the two separate accounts the playbooks used
+> via `become: runas`. It also carries four deliberate behavioural corrections
+> relative to the playbooks; **read P-9 in the Change Register before implementing.**
+>
+> **Remove-OldFiles-UNCShare is unaffected** and still uses `cvs_functions.ps1`
+> (`Delete-OldFiles-UNC-Share`), so the shared toolbox remains a prerequisite for
+> that deliverable.
 
 ---
 
@@ -30,7 +43,7 @@ the Config Element definition for Remove).
 Move Windows Event Logs/
 ├── README.md                         ← this index
 ├── Move-ArchivedLogs-ByADGroup/
-│   ├── Code/                          buildMoveByADGroupInvocation.js, *_spec.js
+│   ├── Code/                          Move-FilesByADGroup.ps1, buildMoveByADGroupInvocation.js, *_spec.js
 │   └── Documentation/                 01_Executive_Summary … 05_Validation_and_Testing_Plan
 ├── Remove-OldFiles-UNCShare/
 │   ├── Code/                          buildRemoveFilesInvocation.js, *_spec.js
