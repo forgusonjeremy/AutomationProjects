@@ -22,7 +22,7 @@
  * ---------------------------------------------------------------------------
  * WORKFLOW INPUTS -- bind these to the scriptable task's IN tab
  * ---------------------------------------------------------------------------
- *   adGroup            AD:UserGroup               The group of servers. Picked from a tree,
+ *   adGroup            AD:Group                   The group of servers. Picked from a tree,
  *                                                 so nothing is typed. Leave empty only for
  *                                                 scheduled runs, which use adGroupDn instead.
  *   adGroupDn          string                     The group's distinguishedName. For scheduled

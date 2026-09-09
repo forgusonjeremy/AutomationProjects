@@ -98,6 +98,12 @@ var wrapper = [
     "try {",
     "    $transcript = & $scriptFile" + argumentList + " *>&1 | Out-String -Width 4096",
     "}",
+    // A terminating error means the pipeline above never finished, so $transcript
+    // was never assigned. Keep the error text as the transcript instead -- without this
+    // the run comes back with nothing at all, which is when the log matters most.
+    "catch {",
+    "    $transcript = [string]$transcript + ($_ | Out-String)",
+    "}",
     "finally {",
     "    Remove-Item -LiteralPath $scriptFile -Force -ErrorAction SilentlyContinue",
     "}",
@@ -135,7 +141,11 @@ catch (e) {
 
 // Fallback: the value the script returned. This is what the *>&1 redirect above
 // produces, so it holds the same text.
-if (transcript === "") {
+//
+// Tested for blankness rather than for "" exactly: the plug-in can hand back a stray
+// line break as host output, and treating that as the transcript would skip this
+// fallback and lose the real one.
+if (transcript.replace(/^\s+|\s+$/g, "") === "") {
     var returned = invocation.getInvocationResult();
     if (returned !== null && returned !== undefined) {
         var root = returned.getRootObject();

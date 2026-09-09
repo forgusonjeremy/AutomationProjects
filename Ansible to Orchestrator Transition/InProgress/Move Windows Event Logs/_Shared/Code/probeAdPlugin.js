@@ -11,7 +11,7 @@
  *   they will work in this environment.
  *
  * INPUTS (in this order)
- *   adGroup  AD:UserGroup  any group to inspect -- may be empty, but pick one if you can
+ *   adGroup  AD:Group  any group to inspect -- may be empty, but pick one if you can
  *
  * RETURNS
  *   string -- the same report that is written to the log, so it can be copied out
@@ -65,9 +65,14 @@ else {
     for (var h = 0; h < adHosts.length; h++) {
         say("");
         say("  [" + (h + 1) + "] " + adHosts[h].name);
-        // findAdHostForDn matches a domain against these, so at least one of them
-        // must contain the domain name or its DC= path.
-        var fields = ["name", "hostName", "ldapHostName", "domainName", "rootDn", "ldapBase", "defaultRootDn"];
+        // The full AD:AdHost property set. findAdHostForDn matches on ldapBase and
+        // defaultDomain first, then falls back to host / url / alternativeHosts, so it is
+        // those five that decide whether a domain resolves -- the rest is context.
+        var fields = [
+            "name", "id", "host", "port", "url", "alternativeHosts", "loadBalancingMode",
+            "ldapBase", "useSSL", "defaultDomain", "bindType", "useSharedSession",
+            "sharedUserName", "followReferrals", "connectTimeoutMillis", "subDomainAutoConnect"
+        ];
         for (var f = 0; f < fields.length; f++) {
             say("        " + fields[f] + " : " + describe(adHosts[h], fields[f]));
         }

@@ -19,11 +19,11 @@
  *   have to care which happened.
  *
  * INPUTS (in this order)
- *   adGroup    AD:UserGroup  the group picked in the form -- may be empty
- *   adGroupDn  string        the group's distinguishedName -- may be empty
+ *   adGroup    AD:Group  the group picked in the form -- may be empty
+ *   adGroupDn  string    the group's distinguishedName -- may be empty
  *
  * RETURNS
- *   AD:UserGroup
+ *   AD:Group
  */
 
 // ---------------------------------------------------------------------------
@@ -62,14 +62,14 @@ var commonName = wantedDn.split(",")[0].replace(/^\s*CN=/i, "");
  */
 function searchGroups(host, name) {
     try {
-        return ActiveDirectory.search("UserGroup", name, 1000, host) || [];
+        return ActiveDirectory.search("Group", name, 1000, host) || [];
     }
     catch (e) {
         System.debug("Host-scoped AD search was not accepted, falling back: " + e);
     }
 
     try {
-        return ActiveDirectory.search("UserGroup", name) || [];
+        return ActiveDirectory.search("Group", name) || [];
     }
     catch (e2) {
         throw new Error(

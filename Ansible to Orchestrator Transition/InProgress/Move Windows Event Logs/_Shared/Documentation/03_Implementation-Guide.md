@@ -14,7 +14,7 @@ the rest of this guide will work.
 
 1. Create an action `probeAdPlugin` in module `com.broadcom.pso.windows.logs`
    (create the module as you go — Orchestrator makes it when you type the name).
-2. Input: `adGroup`, type `AD:UserGroup`.
+2. Input: `adGroup`, type `AD:Group`.
 3. Return type: `string`.
 4. Paste `_Shared/Code/probeAdPlugin.js`.
 5. Run it, and pick a real group that contains servers.
@@ -104,10 +104,10 @@ All five in module **`com.broadcom.pso.windows.logs`**.
 | Action | Inputs (in order) | Return type |
 |---|---|---|
 | `runPowerShellScript` | `psHost` : `PowerShell:PowerShellHost`<br>`scriptName` : `string`<br>`parameters` : `Properties` | `Properties` |
-| `resolveAdGroup` | `adGroup` : `AD:UserGroup`<br>`adGroupDn` : `string` | `AD:UserGroup` |
+| `resolveAdGroup` | `adGroup` : `AD:Group`<br>`adGroupDn` : `string` | `AD:Group` |
 | `findAdHostForDn` | `distinguishedName` : `string` | `AD:AdHost` |
 | `selectPowerShellHost` | `psHost` : `PowerShell:PowerShellHost` | `PowerShell:PowerShellHost` |
-| `getGroupComputers` | `adGroup` : `AD:UserGroup` | `Array/string` |
+| `getGroupComputers` | `adGroup` : `AD:Group` | `Array/string` |
 
 Paste each file's contents as the action script. `getGroupComputers.js` is in
 `Move-ArchivedLogs/Code/`; the rest are in `_Shared/Code/`.
@@ -122,7 +122,7 @@ Suggested folder: **Production → Servers → Windows → Event Log Management*
 
 | Name | Type | Default | Notes |
 |---|---|---|---|
-| `adGroup` | `AD:UserGroup` | — | Not mandatory. Renders as a tree the operator browses. |
+| `adGroup` | `AD:Group` | — | Not mandatory. Renders as a tree the operator browses. |
 | `adGroupDn` | `string` | — | Not mandatory. For scheduled runs only. |
 | `psHost` | `PowerShell:PowerShellHost` | — | Not mandatory. |
 | `sourcePath` | `string` | `C$\Windows\System32\winevt\Logs` | |

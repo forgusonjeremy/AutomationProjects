@@ -12,7 +12,7 @@
  *   already stored against the AD endpoint.
  *
  * INPUTS (in this order)
- *   adGroup  AD:UserGroup   the group to expand
+ *   adGroup  AD:Group  the group to expand
  *
  * RETURNS
  *   Array/string -- computer names such as ["srv01.connect.lab", "srv02.connect.lab"]
