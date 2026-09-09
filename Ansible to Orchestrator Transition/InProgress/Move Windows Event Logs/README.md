@@ -65,7 +65,10 @@ Move Windows Event Logs/
 │   └── Documentation/
 │       ├── 02_Design-Decisions.md       what was standardised, and why
 │       ├── 03_Implementation-Guide.md   how to build it in Orchestrator
-│       └── 04_Testing-Plan.md           how to prove it works
+│       ├── 04_Testing-Plan.md           how to prove it works
+│       ├── 05_Architecture.html         the architecture diagram (browser)
+│       ├── 05_Architecture.docx         the same, for sending to the customer
+│       └── 05_Architecture-Figure*.png  the two diagrams on their own
 │
 ├── Move-ArchivedLogs/
 │   ├── Code/
@@ -101,7 +104,12 @@ move workflow, and one scriptable task per workflow.
 2. **[03_Implementation-Guide.md](_Shared/Documentation/03_Implementation-Guide.md)** —
    building it. Starts with the `probeAdPlugin` check, which will save you time.
 3. **[04_Testing-Plan.md](_Shared/Documentation/04_Testing-Plan.md)** — proving it.
-4. The two **User Guides** — for whoever runs it day to day.
+4. **[05_Architecture.html](_Shared/Documentation/05_Architecture.html)** — the diagram. Open it
+   in a browser. Shows the whole path from the GitLab repository through Orchestrator to the
+   estate, and which link is still done by hand.
+   **[05_Architecture.docx](_Shared/Documentation/05_Architecture.docx)** is the same document in
+   Word, for sending to the customer; the two figures are also exported as PNGs for slides.
+5. The two **User Guides** — for whoever runs it day to day.
 
 ---
 
