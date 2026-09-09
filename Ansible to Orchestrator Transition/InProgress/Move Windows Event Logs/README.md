@@ -1,106 +1,114 @@
-# Windows Archive Log Management — Package Index
+# Move Windows Event Logs — Ansible to Orchestrator
 
-**Project:** Ansible → VCF Orchestrator transition — "Move Windows Event Logs"
-**Platform:** VCF Automation 9 / VCF Operations Orchestrator 9
-**Status:** Phase 1
-
-This project replaces the retiring Ansible automation for Windows event-log
-archives with VCF Orchestrator 9 workflows. It is delivered as **two independent
-deliverables** that share a common set of components.
-
-> **Script delivery model (changed 2026-08-19 — see P-9).**
-> **Move-ArchivedLogs-ByADGroup** no longer calls the `cvs_functions.ps1` toolbox.
-> It uses a purpose-built standalone script, `Move-FilesByADGroup.ps1`, held in
-> Orchestrator as a **Resource Element** and copied to the PowerShell host by
-> `stageScriptOnHost`. The script exposes two actions — `Get-GroupComputers`
-> (AD-query identity) and `Move-Files` (file-move identity) — invoked against **two
-> PowerShellHost objects**, preserving the two separate accounts the playbooks used
-> via `become: runas`. It also carries four deliberate behavioural corrections
-> relative to the playbooks; **read P-9 in the Change Register before implementing.**
->
-> **Remove-OldFiles-UNCShare is unaffected** and still uses `cvs_functions.ps1`
-> (`Delete-OldFiles-UNC-Share`), so the shared toolbox remains a prerequisite for
-> that deliverable.
+**Replaces:** five Ansible playbooks with two Orchestrator workflows
+**Platform:** VCF Operations Orchestrator 9
+**Status:** built, not yet deployed
 
 ---
 
-## Deliverables
+## What this does
 
-| Deliverable | Purpose | Folder |
-|---|---|---|
-| **Move-ArchivedLogs-ByADGroup** | Move `Archive-*.evtx` off every enabled member of an AD group to a central archive share (per-server subfolder) | `Move-ArchivedLogs-ByADGroup/` |
-| **Remove-OldFiles-UNCShare** | Delete files on the archive share older than a retention threshold (safe report-only default) | `Remove-OldFiles-UNCShare/` |
+Windows servers write their event logs out to `Archive-*.evtx` files and leave them on
+the C: drive. Two jobs keep that under control:
 
-Each deliverable is a self-contained set: `Code/` (its action + workflow spec) and
-`Documentation/` (`01_Executive_Summary` → `05_Validation_and_Testing_Plan`, plus
-the Config Element definition for Remove).
+| Workflow | Job |
+|---|---|
+| **Move Archived Logs** | Take those files off every server in an AD group and put them on a central share, in a folder named after the server |
+| **Remove Old Archived Logs** | Delete files from that share once they are past their retention period |
+
+Ansible did both. This package does both in Orchestrator instead.
 
 ---
 
-## Structure
+## The shape of it
+
+```
+                                      ┌──────────────────────────┐
+   Operator picks an AD group  ───►   │      Orchestrator        │
+   from a tree. Nothing typed.        │                          │
+                                      │  AD plug-in  ────────────┼──►  Domain controllers
+                                      │  (which servers?)        │     (one endpoint per domain)
+                                      │                          │
+                                      │  PowerShell plug-in  ────┼──►  PowerShell host
+                                      └──────────────────────────┘          │
+                                                                            │ UNC
+                                                                            ▼
+                                                            \\server\C$  ──►  \\share\<server>
+```
+
+Two rules decide where every piece of logic lives:
+
+- **Anything that ran on Windows** is in a PowerShell script, held in Orchestrator,
+  copied to the PowerShell host at run time, run, and deleted.
+- **Anything Ansible did itself** — mainly the Active Directory lookup — is now an
+  Orchestrator plug-in call.
+
+Nothing in this package accepts a username or a password. The AD plug-in uses the
+account stored against each domain endpoint; the PowerShell plug-in uses the account
+stored against the host. Neither one crosses the network from a workflow.
+
+---
+
+## Files
 
 ```
 Move Windows Event Logs/
-├── README.md                         ← this index
-├── Move-ArchivedLogs-ByADGroup/
-│   ├── Code/                          Move-FilesByADGroup.ps1, buildMoveByADGroupInvocation.js, *_spec.js
-│   └── Documentation/                 01_Executive_Summary … 05_Validation_and_Testing_Plan
-├── Remove-OldFiles-UNCShare/
-│   ├── Code/                          buildRemoveFilesInvocation.js, *_spec.js
-│   └── Documentation/                 01 … 05 + WindowsLogManagement-Config_definition
-└── _Shared/                          ← used by BOTH deliverables
-    ├── Code/                          parseScriptOutput.js, handlePSFailure_scriptableTask.js, cvs_functions.ps1
-    └── Documentation/                 Shared-Components.md, Change-Register.md, Ansible-to-vRO-MappingTable.md
-
-Automation Projects/_Shared References/  ← cross-project library
-└── PowerShell Host Build Guide/
-    ├── How-To-Build-a-PowerShell-Host.md   (with embedded Configure-vROPSHost.ps1)
-    └── Configure-vROPSHost.ps1
+├── README.md                        ← you are here
+│
+├── _Shared/                         used by both workflows
+│   ├── Code/
+│   │   ├── runPowerShellScript.js       copies a script to the host, runs it, reads the result
+│   │   ├── resolveAdGroup.js            accepts a picked group or a typed name
+│   │   ├── findAdHostForDn.js           works out the domain, and so the endpoint, from a name
+│   │   ├── selectPowerShellHost.js      only asks which host when there is a real choice
+│   │   └── probeAdPlugin.js             one-off check that this Orchestrator can do all of the above
+│   └── Documentation/
+│       ├── 02_Design-Decisions.md       what was standardised, and why
+│       ├── 03_Implementation-Guide.md   how to build it in Orchestrator
+│       └── 04_Testing-Plan.md           how to prove it works
+│
+├── Move-ArchivedLogs/
+│   ├── Code/
+│   │   ├── Move-ArchivedLogs.ps1            the Windows-side work
+│   │   ├── getGroupComputers.js             expands the AD group, nested groups included
+│   │   └── workflow_Move-ArchivedLogs.js    the workflow's scriptable task
+│   └── Documentation/
+│       └── 01_User-Guide.md
+│
+├── Remove-OldArchivedLogs/
+│   ├── Code/
+│   │   ├── Remove-OldArchivedLogs.ps1
+│   │   └── workflow_Remove-OldArchivedLogs.js
+│   └── Documentation/
+│       └── 01_User-Guide.md
+│
+└── Reference/                       source material, kept for the record
+    ├── ansible-source-playbooks.md
+    ├── New-ArchiveLogTestData.ps1
+    └── com.broadcom.pso.cvs-dt.conus.eventlogarchivesmove.package
 ```
 
----
-
-## Shared components (read before either deliverable)
-
-Documented once in `_Shared/Documentation/` and referenced by both sets:
-
-- **[Shared-Components.md](_Shared/Documentation/Shared-Components.md)** — `cvs_functions.ps1`,
-  the OOTB *Invoke a PowerShell script* workflow, the `parseScriptOutput` action
-  (incl. the ` *>&1 | Out-String -Width 4096` stream-capture contract and CLIXML
-  decode → `Properties{success, outputText, errorText}`), `handlePSFailure`, the
-  shared failure-handling contract, and the second-hop requirement.
-- **[Change-Register.md](_Shared/Documentation/Change-Register.md)** — every change to
-  `cvs_functions.ps1` (S-1…S-5), build tooling (T-1…T-3), and process (P-1…P-8).
-- **[Ansible-to-vRO-MappingTable.md](_Shared/Documentation/Ansible-to-vRO-MappingTable.md)** —
-  playbook → workflow conversion reference (7 playbooks → 2 workflows).
-
-**Cross-project reference:** the PowerShell host build/registration is a reusable
-library at `Automation Projects/_Shared References/PowerShell Host Build Guide/`.
-Any project needing a PS host references it. The Windows-side automation script
-`Configure-vROPSHost.ps1` is embedded in that guide (Appendix A) and shipped beside it.
+Ten code files in total: two PowerShell scripts, five shared actions, one action for the
+move workflow, and one scriptable task per workflow.
 
 ---
 
-## Deployment order
+## Where to start
 
-1. **Shared foundation (once):** build + register the PS host per the shared
-   **How to Build a PowerShell Host** guide; deploy the updated `cvs_functions.ps1`
-   (S-1…S-5) to the host; deploy the shared `parseScriptOutput` action and the
-   `handlePSFailure` scriptable task.
-2. **Per deliverable:** follow that deliverable's `03_Implementation_Guide.md` to
-   import its `build*Invocation` action, build its workflow, set inputs/forms, and
-   run its `05_Validation_and_Testing_Plan.md`.
-
-The two deliverables are independent — deploy either first, or only one.
+1. **[02_Design-Decisions.md](_Shared/Documentation/02_Design-Decisions.md)** — read this
+   first if you knew the playbooks. It explains what changed and why, including four
+   places where the old behaviour was wrong and has been corrected.
+2. **[03_Implementation-Guide.md](_Shared/Documentation/03_Implementation-Guide.md)** —
+   building it. Starts with the `probeAdPlugin` check, which will save you time.
+3. **[04_Testing-Plan.md](_Shared/Documentation/04_Testing-Plan.md)** — proving it.
+4. The two **User Guides** — for whoever runs it day to day.
 
 ---
 
-## Notes
+## Before anything else
 
-- **Move-ArchivedLogs-ByADGroup** uses plain input parameters with defaults set
-  directly on each input — **no Configuration Element**.
-- **Remove-OldFiles-UNCShare** uses the `WindowsLogManagement-Config` Configuration
-  Element for `defaultScriptPath` and `defaultLogRetentionDays` (see its Config
-  definition doc).
-- The previous **combined** `code/` and `documentation/` folders are **superseded**
-  by this split layout and can be archived/removed once the split is confirmed.
+Run the `probeAdPlugin` action once. It changes nothing and prints exactly what this
+Orchestrator's plug-ins offer, which is the fastest way to find out whether the AD
+endpoints and the PowerShell host are set up the way these workflows expect. Everything
+in [03_Implementation-Guide.md](_Shared/Documentation/03_Implementation-Guide.md) assumes
+you have done it.

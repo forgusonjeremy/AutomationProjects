@@ -1,0 +1,165 @@
+<#
+.SYNOPSIS
+    Deletes files older than a retention period from a file share.
+
+.DESCRIPTION
+    This is the Windows half of the "Remove Old Archived Logs" automation -- the
+    housekeeping partner to Move-ArchivedLogs.ps1. The move workflow fills the archive
+    share up; this one keeps it from filling up forever.
+
+    It lives in Orchestrator as a Resource Element. At run time Orchestrator writes this
+    file to the PowerShell host, runs it with the parameters below, then deletes it.
+
+    SAFETY
+    ReportOnly defaults to 'yes'. A run that is not explicitly told to delete will only
+    ever list what it would have deleted. This replaces an interactive "are you sure?"
+    prompt in the original script, which could not work unattended -- there is nobody
+    at a console to answer it, so it either hung the job or silently cancelled it.
+
+.PARAMETER Path
+    UNC path to clean up. Example: \\fileserver.vcf.lab\mdcarchivelog$\Windows
+
+.PARAMETER FileFilter
+    Which files to consider. Example: Archive-*.evtx. Default is every file.
+
+.PARAMETER OlderThanDays
+    Delete files last written MORE than this many days ago. Must be at least 1, so a
+    mistyped 0 cannot wipe the share. A file exactly this old is kept.
+
+.PARAMETER ReportOnly
+    'yes' (default) lists what would be deleted and deletes nothing. 'no' deletes.
+
+.NOTES
+    Requires PowerShell 5.1 or later.
+    Files only -- empty folders are left in place.
+#>
+
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+
+    [string]$FileFilter = '*',
+
+    [int]$OlderThanDays = 370,
+
+    [ValidateSet('yes', 'no')]
+    [string]$ReportOnly = 'yes'
+)
+
+$ErrorActionPreference = 'Stop'
+
+# ---------------------------------------------------------------------------
+# Logging -- identical contract to Move-ArchivedLogs.ps1 on purpose, so both
+# scripts are read by the same Orchestrator action and look the same in the log.
+# ---------------------------------------------------------------------------
+$script:ErrorMessages = New-Object System.Collections.ArrayList
+
+function Write-Log {
+    param(
+        [string]$Message,
+        [ValidateSet('INFO', 'WARN', 'ERROR')]
+        [string]$Level = 'INFO'
+    )
+    if ($Level -eq 'ERROR') { [void]$script:ErrorMessages.Add($Message) }
+    Write-Host ('{0}  {1,-5}  {2}' -f (Get-Date).ToString('HH:mm:ss'), $Level, $Message)
+}
+
+# The single line Orchestrator parses. See Move-ArchivedLogs.ps1 for why.
+function Write-Result {
+    param([hashtable]$Data)
+
+    $shortErrors = @($script:ErrorMessages | Select-Object -First 10 | ForEach-Object {
+        if ($_.Length -gt 120) { $_.Substring(0, 117) + '...' } else { $_ }
+    })
+
+    $Data['errorCount'] = $script:ErrorMessages.Count
+    $Data['errors']     = $shortErrors
+
+    Write-Host ('PSO_RESULT=' + ($Data | ConvertTo-Json -Compress -Depth 4))
+}
+
+# ---------------------------------------------------------------------------
+# Check the inputs before deleting anything
+# ---------------------------------------------------------------------------
+$reportOnlyMode = ($ReportOnly -eq 'yes')
+
+if ($OlderThanDays -lt 1) {
+    Write-Log "OlderThanDays must be at least 1, but was $OlderThanDays. Nothing was deleted." 'ERROR'
+    Write-Result @{ deleted = 0; matched = 0 }
+    return
+}
+
+if (-not (Test-Path -LiteralPath $Path)) {
+    Write-Log "Path is not reachable: $Path. Nothing was deleted." 'ERROR'
+    Write-Result @{ deleted = 0; matched = 0 }
+    return
+}
+
+$cutoff = (Get-Date).AddDays(-$OlderThanDays)
+
+Write-Log "Path            : $Path"
+Write-Log "Deleting files matching '$FileFilter' last written before $($cutoff.ToString('yyyy-MM-dd HH:mm:ss'))"
+Write-Log "Retention       : $OlderThanDays days"
+
+if ($reportOnlyMode) {
+    Write-Log "REPORT ONLY - listing what would be deleted. No files will be removed." 'WARN'
+}
+
+# ---------------------------------------------------------------------------
+# Find the files, then delete them one at a time
+#
+# Deleting individually (rather than piping the whole set into Remove-Item) means
+# one locked or permission-denied file is reported and skipped instead of stopping
+# the whole cleanup.
+# ---------------------------------------------------------------------------
+$candidates = @(
+    Get-ChildItem -LiteralPath $Path -Filter $FileFilter -File -Recurse |
+        Where-Object { $_.LastWriteTime -lt $cutoff }
+)
+
+Write-Log "Files matched   : $($candidates.Count)"
+
+$deleted   = 0
+$freedBytes = 0
+
+foreach ($file in $candidates) {
+
+    if ($reportOnlyMode) {
+        Write-Log "would delete $($file.FullName)  (last written $($file.LastWriteTime.ToString('yyyy-MM-dd')))"
+        $deleted++
+        $freedBytes += $file.Length
+        continue
+    }
+
+    try {
+        $size = $file.Length
+        Remove-Item -LiteralPath $file.FullName -Force
+        $deleted++
+        $freedBytes += $size
+    }
+    catch {
+        Write-Log "could not delete $($file.FullName) - $($_.Exception.Message)" 'ERROR'
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+$freedMb = [math]::Round($freedBytes / 1MB, 2)
+
+Write-Log "==============================================="
+if ($reportOnlyMode) {
+    Write-Log "Files that would be deleted : $deleted  ($freedMb MB)  (report only - nothing was deleted)"
+}
+else {
+    Write-Log "Files deleted   : $deleted  ($freedMb MB freed)"
+}
+Write-Log "Errors          : $($script:ErrorMessages.Count)"
+
+Write-Result @{
+    matched    = $candidates.Count
+    deleted    = $deleted
+    freedMB    = $freedMb
+    reportOnly = $reportOnlyMode
+}
