@@ -24,6 +24,13 @@
  *   reportOnly     boolean                    Default: true
  *
  * ---------------------------------------------------------------------------
+ * WORKFLOW ATTRIBUTES -- set once when the workflow is built, not by the operator
+ * ---------------------------------------------------------------------------
+ *   removeScript  ResourceElement  The Resource Element holding Remove-OldArchivedLogs.ps1.
+ *                                  Bound here so the run record shows which script ran;
+ *                                  the action does not go looking for it by name.
+ *
+ * ---------------------------------------------------------------------------
  * WORKFLOW OUTPUTS -- bind these to the OUT tab
  * ---------------------------------------------------------------------------
  *   success       boolean  true when the script reported no errors
@@ -55,7 +62,7 @@ else {
     System.warn("LIVE RUN: files older than " + olderThanDays + " days will be deleted from " + sharePath);
 }
 
-var run = actions.runPowerShellScript(host, "Remove-OldArchivedLogs.ps1", parameters);
+var run = actions.runPowerShellScript(host, removeScript, parameters);
 
 // ---------------------------------------------------------------------------
 // 3. Report

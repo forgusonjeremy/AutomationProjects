@@ -45,8 +45,10 @@ per-computer domain handling, which nothing else here exercises.
 | 2.3 | Check the nested group's server is in the list | It is there |
 | 2.4 | If you have a second domain, check that server's name | Ends in **its own** domain, not the group's |
 | 2.5 | Run it against an empty group | Returns nothing, and warns |
-| 2.6 | Run `resolveAdGroup` with an empty first input and the group's DN as text | Returns the same group as picking it |
+| 2.6 | Run `resolveAdGroup` with the group's DN and `adHost` bound from `findAdHostForDn` | Returns the same group as picking it from the tree |
+| 2.6a | Run `resolveAdGroup` with the DN but `adHost` left empty | Fails, and says to bind `adHost` to `findAdHostForDn` |
 | 2.7 | Run `findAdHostForDn` with a DN from each domain | Each returns that domain's endpoint |
+| 2.7a | Read the log line from 2.7 | Says `matched on ldapBase`. **`matched on name`, or a warning about the name, means `hostConfiguration.ldapBase` is empty** — set the endpoint's `Root` field |
 | 2.8 | Run `findAdHostForDn` with `CN=x,DC=nosuch,DC=domain` | Fails, and lists the endpoints that are registered |
 
 2.6 and 2.7 are what scheduled runs depend on. They are easy to skip because the form
@@ -103,7 +105,7 @@ never uses them, and then the first overnight run is the test.
 | # | Test | Pass |
 |---|---|---|
 | 6.1 | Turn off the PowerShell host, run | Fails outright with a plug-in error. Not "0 files moved" |
-| 6.2 | Rename the Resource Element, run | Fails with `no Resource Element named ...` |
+| 6.2 | Clear the script workflow attribute, run | Fails with `no script was supplied`, naming the binding to set |
 | 6.3 | Point `targetPath` at a share that does not exist | Every server errors, the workflow finishes and reports it |
 | 6.4 | Run with neither `adGroup` nor `adGroupDn` | Stops immediately with a message saying to supply one |
 | 6.5 | Run against an empty group | Stops, rather than reporting a successful run that did nothing |

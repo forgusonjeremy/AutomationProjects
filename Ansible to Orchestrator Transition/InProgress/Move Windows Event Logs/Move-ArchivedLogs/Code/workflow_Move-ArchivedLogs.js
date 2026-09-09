@@ -22,7 +22,7 @@
  * ---------------------------------------------------------------------------
  * WORKFLOW INPUTS -- bind these to the scriptable task's IN tab
  * ---------------------------------------------------------------------------
- *   adGroup            AD:Group                   The group of servers. Picked from a tree,
+ *   adGroup            AD:UserGroup               The group of servers. Picked from a tree,
  *                                                 so nothing is typed. Leave empty only for
  *                                                 scheduled runs, which use adGroupDn instead.
  *   adGroupDn          string                     The group's distinguishedName. For scheduled
@@ -35,6 +35,13 @@
  *   olderThanDays      number                     Default: 0  (0 means every age)
  *   reportOnly         boolean                    Default: true
  *   overwriteExisting  boolean                    Default: false
+ *
+ * ---------------------------------------------------------------------------
+ * WORKFLOW ATTRIBUTES -- set once when the workflow is built, not by the operator
+ * ---------------------------------------------------------------------------
+ *   moveScript  ResourceElement  The Resource Element holding Move-ArchivedLogs.ps1.
+ *                                Bound here so the run record shows which script ran;
+ *                                the action does not go looking for it by name.
  *
  * ---------------------------------------------------------------------------
  * WORKFLOW OUTPUTS -- bind these to the OUT tab
@@ -50,7 +57,19 @@ var actions = System.getModule("com.broadcom.pso.windows.logs");
 // ---------------------------------------------------------------------------
 // 1. Which group?
 // ---------------------------------------------------------------------------
-var group = actions.resolveAdGroup(adGroup, adGroupDn);
+// A group picked from the tree arrives already resolved and already attached to its
+// own endpoint, so it is used as it stands and nothing is looked up. Only a name given
+// as text has to be found, and finding it needs the endpoint worked out first --
+// adHost is that step's answer, passed on rather than looked up again inside.
+var group;
+
+if (adGroup !== null && adGroup !== undefined) {
+    group = adGroup;
+}
+else {
+    var adHost = actions.findAdHostForDn(adGroupDn);
+    group = actions.resolveAdGroup(adGroupDn, adHost);
+}
 
 // ---------------------------------------------------------------------------
 // 2. Which servers are in it?
@@ -92,7 +111,7 @@ if (reportOnly) {
     System.log("REPORT ONLY: this run will list what would move and change nothing.");
 }
 
-var run = actions.runPowerShellScript(host, "Move-ArchivedLogs.ps1", parameters);
+var run = actions.runPowerShellScript(host, moveScript, parameters);
 
 // ---------------------------------------------------------------------------
 // 5. Report

@@ -29,11 +29,29 @@
  */
 
 /**
- * Reads a property off a plug-in object without failing if it is absent or throws.
- * Returns it lower-case and trimmed, which is the form every comparison below wants.
+ * WHERE THE PROPERTIES ACTUALLY LIVE
+ *
+ * An AD:AdHost carries only three things of its own:
+ *
+ *     name               the configuration's name
+ *     Url                the connection URL actually in use
+ *     hostConfiguration  an AD_ServerConfiguration -- everything else
+ *
+ * The connection details are all on that nested object: ldapBase (labelled 'Root' on the
+ * Add an Active Directory server workflow), defaultDomain, host, port, alternativeHosts,
+ * useSSL and the rest. Reading them straight off the AdHost returns nothing, which looks
+ * exactly like an endpoint that was registered without them.
+ *
+ * So every read below goes to hostConfiguration first and falls back to the AdHost, which
+ * keeps this working if a plug-in version flattens the two.
  */
-function readProperty(object, propertyName) {
+
+/** Reads one property off one object, lower-cased and trimmed, never throwing. */
+function readFrom(object, propertyName) {
     try {
+        if (object === null || object === undefined) {
+            return "";
+        }
         var value = object[propertyName];
         if (value === null || value === undefined) {
             return "";
@@ -45,13 +63,40 @@ function readProperty(object, propertyName) {
     }
 }
 
+/** The nested AD_ServerConfiguration, or null when this version does not have one. */
+function configOf(endpoint) {
+    try {
+        var config = endpoint.hostConfiguration;
+        return (config === null || config === undefined) ? null : config;
+    }
+    catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Reads a property from the endpoint's configuration, falling back to the endpoint.
+ */
+function readProperty(endpoint, propertyName) {
+    var fromConfig = readFrom(configOf(endpoint), propertyName);
+    return (fromConfig !== "") ? fromConfig : readFrom(endpoint, propertyName);
+}
+
 /**
  * Same, for a property holding a list (alternativeHosts). Always returns an array.
  */
-function readList(object, propertyName) {
+function readList(endpoint, propertyName) {
     var out = [];
+    var source = configOf(endpoint);
+    var value = null;
+
     try {
-        var value = object[propertyName];
+        if (source !== null) {
+            value = source[propertyName];
+        }
+        if (value === null || value === undefined) {
+            value = endpoint[propertyName];
+        }
         if (value === null || value === undefined) {
             return out;
         }
@@ -107,6 +152,30 @@ function hostFromUrl(url) {
     return url.replace(/^[a-z]+:\/\//, "").split("/")[0].split(":")[0];
 }
 
+/**
+ * The endpoint's LDAP search base -- dc=vcf,dc=lab -- and which property it came from.
+ *
+ * This is hostConfiguration.ldapBase, shown as 'Root' on the Add an Active Directory
+ * server workflow, so a correctly registered endpoint always has it. 'base' is read as
+ * well for any version that names it that way.
+ *
+ * The property name is returned alongside the value so the log can say what actually
+ * matched rather than guessing at it.
+ */
+function readSearchBase(endpoint) {
+    var candidates = ["ldapBase", "base"];
+
+    for (var i = 0; i < candidates.length; i++) {
+        // "DC=vcf, DC=lab" and "DC=vcf,DC=lab" are the same base.
+        var value = readProperty(endpoint, candidates[i]).replace(/\s/g, "");
+        if (value !== "") {
+            return { value: value, property: candidates[i] };
+        }
+    }
+
+    return { value: "", property: "" };
+}
+
 // ---------------------------------------------------------------------------
 // 1. Read the domain off the end of the distinguishedName
 // ---------------------------------------------------------------------------
@@ -143,29 +212,49 @@ System.log("Looking for the Active Directory endpoint for domain: " + domainName
 // ---------------------------------------------------------------------------
 // 2. Find the registered endpoint for that domain
 // ---------------------------------------------------------------------------
-// Matching is done in three passes, and the order matters in a multi-domain estate.
+// Matching is done in five passes, and the order matters in a multi-domain estate.
+// Each is a weaker kind of evidence than the one before it, so the first to answer wins.
 //
 //   Pass 1 -- the properties that STATE the domain, compared exactly:
-//               ldapBase       DC=connect,DC=lab   the search base the endpoint is bound to
+//               base           DC=connect,DC=lab   the endpoint's LDAP search base. This
+//                                                  is the 'root' field on the Add an
+//                                                  Active Directory server workflow, so a
+//                                                  properly registered endpoint has it.
+//                                                  ('ldapBase' on versions that use that
+//                                                  name instead.)
 //               defaultDomain  connect.lab         the domain it authenticates against
 //             If either equals what was read off the distinguishedName, that is the
 //             endpoint, with no room for argument.
 //
-//   Pass 2 -- only if pass 1 found nothing, the properties that merely IMPLY it:
+//             Every comparison here is case-insensitive: readProperty lower-cases what it
+//             reads and the domain is lower-cased when it comes off the name, so DC=VCF
+//             and dc=vcf are the same thing. Spaces after the commas are ignored too.
+//
+//   Pass 2 -- the endpoint's name, when it IS the domain:
+//               name           connect.lab
+//             Whether an endpoint carries any of the properties above depends entirely on
+//             the plug-in version and on how it was registered. A registration made by
+//             the 'Add an Active Directory server' workflow can arrive with ldapBase,
+//             defaultDomain and host all empty and a bare IP in its url -- and then the
+//             name is the only thing on it that names a domain. It is operator-typed and
+//             so it is not proof, but an exact match against the whole domain is a great
+//             deal better than failing while an endpoint called 'connect.lab' sits in
+//             the list.
+//
+//   Pass 3 -- the properties that merely IMPLY the domain:
 //               host              dc01.connect.lab
 //               url               ldap://dc01.connect.lab:389
 //               alternativeHosts  dc02.connect.lab, ...
-//             A server inside the domain is good evidence of the endpoint for it, but
-//             it is weaker: a child domain's DC lives inside its parent's namespace
-//             too. Running it second means an exact ldapBase/defaultDomain match on
-//             any host always wins over a name-shaped guess at another.
+//             A server inside the domain is good evidence of the endpoint for it, but it
+//             is weaker: a child domain's DC lives inside its parent's namespace too.
+//             (A url holding an IP, as several do, matches nothing here and is skipped.)
 //
-//   Pass 3 -- last resort: a PARENT domain's endpoint with subDomainAutoConnect set,
-//             which the plug-in will follow down into this domain. Only reached when
-//             no endpoint names this domain and none of its own DCs are registered.
+//   Pass 4 -- a PARENT domain's endpoint with subDomainAutoConnect set, which the plug-in
+//             will follow down into this domain.
 //
-// The AD:AdHost 'name' is deliberately NOT matched on. It is a free-text label an
-// operator typed when registering the endpoint; it is used for reporting only.
+//   Pass 5 -- the endpoint's name merely CONTAINING the domain, for labels written like
+//             'AD - connect.lab' or 'connect.lab (production)'. Last because it is the
+//             loosest thing here: it is a substring test on free text.
 
 var adHosts = Server.findAllForType("AD:AdHost");
 
@@ -184,25 +273,41 @@ for (h = 0; h < adHosts.length; h++) {
     var adHost = adHosts[h];
     registeredNames.push(adHost.name);
 
-    // "DC=connect, DC=lab" and "DC=connect,DC=lab" are the same base.
-    var ldapBase = readProperty(adHost, "ldapBase").replace(/\s/g, "");
+    var searchBase = readSearchBase(adHost);
     // A defaultDomain is sometimes stored fully qualified, with a trailing dot.
     var defaultDomain = readProperty(adHost, "defaultDomain").replace(/\.$/, "");
 
-    if (ldapBase === domainPath || defaultDomain === domainName) {
+    if (searchBase.value === domainPath || defaultDomain === domainName) {
         System.log(
             "Using Active Directory endpoint: " + adHost.name +
-            " (matched on " + (ldapBase === domainPath ? "ldapBase" : "defaultDomain") + ")"
+            " (matched on " + (searchBase.value === domainPath ? searchBase.property : "defaultDomain") + ")"
         );
         return adHost;
     }
 }
 
-// -- Pass 2: host / url / alternativeHosts, by DC name ----------------------
+// -- Pass 2: the endpoint's name, when it IS the domain ---------------------
+for (h = 0; h < adHosts.length; h++) {
+    var named = adHosts[h];
+
+    if (readProperty(named, "name") === domainName) {
+        System.log("Using Active Directory endpoint: " + named.name + " (matched on name)");
+        return named;
+    }
+}
+
+// -- Pass 3: host / url / alternativeHosts, by DC name ----------------------
 for (h = 0; h < adHosts.length; h++) {
     var candidate = adHosts[h];
 
-    var serverNames = [readProperty(candidate, "host"), hostFromUrl(readProperty(candidate, "url"))];
+    // The AdHost's own connection URL is documented as 'Url' with a capital U, while the
+    // configuration underneath spells it 'url'. Take whichever this version answers to.
+    var connectionUrl = readProperty(candidate, "url");
+    if (connectionUrl === "") {
+        connectionUrl = readProperty(candidate, "Url");
+    }
+
+    var serverNames = [readProperty(candidate, "host"), hostFromUrl(connectionUrl)];
     var alternatives = readList(candidate, "alternativeHosts");
     for (var a = 0; a < alternatives.length; a++) {
         serverNames.push(hostFromUrl(alternatives[a]));
@@ -220,10 +325,10 @@ for (h = 0; h < adHosts.length; h++) {
     }
 }
 
-// -- Pass 3: a parent endpoint that is allowed to follow its children --------
+// -- Pass 4: a parent endpoint that is allowed to follow its children --------
 // subDomainAutoConnect is the plug-in's own switch for "this endpoint also serves the
 // domains beneath it". Where it is set, corp.lab's endpoint is a legitimate answer for
-// a DN in eu.corp.lab. It is tried last so that eu.corp.lab's OWN endpoint, if one is
+// a DN in eu.corp.lab. It runs this late so that eu.corp.lab's OWN endpoint, if one is
 // registered, is always preferred over reaching it through its parent.
 for (h = 0; h < adHosts.length; h++) {
     var parentHost = adHosts[h];
@@ -232,7 +337,7 @@ for (h = 0; h < adHosts.length; h++) {
         continue;
     }
 
-    var parentBase = readProperty(parentHost, "ldapBase").replace(/\s/g, "");
+    var parentBase = readSearchBase(parentHost).value;
     var parentDomain = readProperty(parentHost, "defaultDomain").replace(/\.$/, "");
 
     // Turn the base back into a domain so both properties compare the same way:
@@ -253,8 +358,34 @@ for (h = 0; h < adHosts.length; h++) {
     }
 }
 
+// -- Pass 5: the endpoint's name merely containing the domain ---------------
+// For labels written like 'AD - connect.lab'. Bounded so that 'connect.lab' is not found
+// inside 'notconnect.lab' or 'connect.lab.uk'.
+for (h = 0; h < adHosts.length; h++) {
+    var labelled = adHosts[h];
+    var label = readProperty(labelled, "name");
+    var at = label.indexOf(domainName);
+
+    if (at !== -1) {
+        var before = (at === 0) ? "" : label.charAt(at - 1);
+        var after = label.charAt(at + domainName.length);
+        var boundedBefore = (before === "" || /[^a-z0-9.-]/.test(before));
+        var boundedAfter = (after === "" || /[^a-z0-9.-]/.test(after));
+
+        if (boundedBefore && boundedAfter) {
+            System.warn(
+                "Using Active Directory endpoint: " + labelled.name + " -- matched only because its " +
+                "name mentions " + domainName + ". Nothing on it states the domain, so set its " +
+                "ldapBase (DC=...) or defaultDomain to make this certain rather than a guess."
+            );
+            return labelled;
+        }
+    }
+}
+
 throw new Error(
     "findAdHostForDn: none of the registered Active Directory hosts serve the domain '" + domainName +
     "'. Registered hosts are: " + registeredNames.join(", ") + ". Add an endpoint for that domain, " +
-    "or run the probeAdPlugin action to see how each registered host identifies itself."
+    "or run the probeAdPlugin action to see how each registered host identifies itself. An endpoint " +
+    "whose ldapBase and defaultDomain are both empty can only be matched by its name."
 );

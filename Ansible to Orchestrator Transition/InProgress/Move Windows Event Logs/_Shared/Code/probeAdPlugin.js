@@ -11,15 +11,19 @@
  *   they will work in this environment.
  *
  * INPUTS (in this order)
- *   adGroup  AD:Group  any group to inspect -- may be empty, but pick one if you can
+ *   adGroup  AD:UserGroup  any group to inspect -- may be empty, but pick one if you can
  *
  * RETURNS
  *   string -- the same report that is written to the log, so it can be copied out
  *
  * HOW TO READ THE RESULT
- *   Under "Group membership", at least one of computerMembers / groupMembers / members
- *   must say "present". If all three say "missing", this plug-in version reports
- *   membership some other way and getGroupComputers needs adjusting to match.
+ *   Under "Group membership", at least one of computers / computerMembers / groups /
+ *   groupMembers / members must say "present". If they all say "missing", this plug-in
+ *   version reports membership some other way and getGroupComputers needs adjusting.
+ *
+ *   Then check that whichever nested-group list is present points DOWNWARDS -- at the
+ *   groups inside this one, not the ones it belongs to. A list of parents would make
+ *   getGroupComputers walk up the tree and collect servers that are not in scope.
  */
 
 var report = [];
@@ -39,6 +43,16 @@ function describe(object, propertyName) {
             return "present (" + value.length + " item(s))";
         }
         return "present -> " + String(value);
+    }
+    catch (e) {
+        return "missing";
+    }
+}
+
+/** Whether a method exists to be called. resolveAdGroup picks its lookup from these. */
+function describeMethod(object, methodName) {
+    try {
+        return (typeof object[methodName] === "function") ? "present" : "missing";
     }
     catch (e) {
         return "missing";
@@ -65,19 +79,54 @@ else {
     for (var h = 0; h < adHosts.length; h++) {
         say("");
         say("  [" + (h + 1) + "] " + adHosts[h].name);
-        // The full AD:AdHost property set. findAdHostForDn matches on ldapBase and
-        // defaultDomain first, then falls back to host / url / alternativeHosts, so it is
-        // those five that decide whether a domain resolves -- the rest is context.
+        // An AD:AdHost carries only name, Url and hostConfiguration. Everything that
+        // describes the connection lives on that nested AD_ServerConfiguration, so both
+        // levels are printed -- reading ldapBase straight off the AdHost returns nothing
+        // and looks exactly like an endpoint registered without it.
+        say("        name : " + describe(adHosts[h], "name"));
+        say("        Url  : " + describe(adHosts[h], "Url") + "   (lower-case 'url': " +
+            describe(adHosts[h], "url") + ")");
+
+        var config = null;
+        try { config = adHosts[h].hostConfiguration; } catch (ce) { config = null; }
+
+        if (config === null || config === undefined) {
+            say("        hostConfiguration : MISSING -- this version does not nest the");
+            say("            connection settings, so they are read off the endpoint itself.");
+            config = adHosts[h];
+        }
+        else {
+            say("        hostConfiguration : present");
+        }
+
+        // findAdHostForDn matches on ldapBase (the 'Root' field on the Add an Active
+        // Directory server workflow) and defaultDomain first, then falls back to
+        // host / url / alternativeHosts, and finally the endpoint's name.
         var fields = [
-            "name", "id", "host", "port", "url", "alternativeHosts", "loadBalancingMode",
-            "ldapBase", "useSSL", "defaultDomain", "bindType", "useSharedSession",
-            "sharedUserName", "followReferrals", "connectTimeoutMillis", "subDomainAutoConnect"
+            "id", "name", "ldapBase", "defaultDomain", "host", "port", "alternativeHosts",
+            "loadBalancingMode", "useSSL", "bindType", "useSharedSession", "sharedUserName",
+            "followReferrals"
         ];
         for (var f = 0; f < fields.length; f++) {
-            say("        " + fields[f] + " : " + describe(adHosts[h], fields[f]));
+            say("            " + fields[f] + " : " + describe(config, fields[f]));
         }
+
+        // resolveAdGroup asks the endpoint itself for the group, preferring an exact
+        // match on the distinguishedName. It tries these in order and uses the first
+        // one that is present, so this says which form this plug-in will actually use.
+        say("        -- lookup methods on the endpoint --");
+        say("        searchExactMatch() : " + describeMethod(adHosts[h], "searchExactMatch"));
+        say("        search()           : " + describeMethod(adHosts[h], "search"));
     }
 }
+
+// The same lookups on the plug-in's own scripting class, used with the endpoint passed
+// as an argument. At least one of these four forms must be present for a scheduled or
+// API run to resolve a group from its name.
+say("");
+say("--- Active Directory lookup calls ---");
+say("  ActiveDirectory.searchExactMatch() : " + describeMethod(ActiveDirectory, "searchExactMatch"));
+say("  ActiveDirectory.search()           : " + describeMethod(ActiveDirectory, "search"));
 
 // ---------------------------------------------------------------------------
 // 2. PowerShell hosts -- one is needed to run the scripts
@@ -137,17 +186,27 @@ else {
     say("Group : " + adGroup.name);
     say("  distinguishedName : " + describe(adGroup, "distinguishedName"));
     say("");
-    say("  getGroupComputers needs at least one of these to be present:");
+    say("  getGroupComputers needs at least one of these to be present.");
+    say("  It reads them in this order, and the mixed 'members' list only as a last resort:");
+    say("      computers       : " + describe(adGroup, "computers"));
     say("      computerMembers : " + describe(adGroup, "computerMembers"));
+    say("      groups          : " + describe(adGroup, "groups"));
     say("      groupMembers    : " + describe(adGroup, "groupMembers"));
     say("      members         : " + describe(adGroup, "members"));
     say("      (userMembers    : " + describe(adGroup, "userMembers") + " -- not used, shown for comparison)");
+    say("      (users          : " + describe(adGroup, "users") + " -- not used, shown for comparison)");
+    say("");
+    say("  CHECK THE NESTED-GROUP LIST POINTS DOWNWARDS. Whichever of 'groups' or");
+    say("  'groupMembers' is present must hold the groups INSIDE this one, not the ones");
+    say("  this group belongs to. If it is the latter, getGroupComputers would walk up the");
+    say("  tree and collect machines that are not in scope. The names below say which:");
+    say("      memberOf        : " + describe(adGroup, "memberOf") + " -- upward, must NOT be used");
 
     // Look at one computer to confirm the two properties used to build its full name,
     // and the disabled flag used to skip decommissioned machines.
     var sample = null;
     try {
-        var list = adGroup.computerMembers || adGroup.members || [];
+        var list = adGroup.computers || adGroup.computerMembers || adGroup.members || [];
         if (list.length > 0) {
             sample = list[0];
         }

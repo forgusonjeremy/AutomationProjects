@@ -11,9 +11,14 @@
  *   only place that knows anything about the PowerShell plug-in, so if the plug-in ever
  *   behaves differently, this is the only file that changes.
  *
+ *   The Resource Element itself is handed in, not looked up by name in here, so the
+ *   workflow shows which script a run used rather than that being decided out of sight.
+ *
  * INPUTS (in this order -- vRO passes action inputs positionally)
  *   psHost      PowerShell:PowerShellHost   the host that will run the script
- *   scriptName  string                      Resource Element name, e.g. "Move-ArchivedLogs.ps1"
+ *   script      ResourceElement             the element holding the .ps1. Its name is used
+ *                                           as the file name on the host, e.g.
+ *                                           "Move-ArchivedLogs.ps1"
  *   parameters  Properties                  script parameters, e.g. { SourcePath : "C$\\Windows" }
  *
  * RETURNS
@@ -30,22 +35,40 @@
  */
 
 // ---------------------------------------------------------------------------
-// 1. Find the script in Orchestrator and read it
+// 1. Get the script content
 // ---------------------------------------------------------------------------
-function findScript(name) {
-    var all = Server.findAllForType("ResourceElement");
-    for (var i = 0; i < all.length; i++) {
-        if (all[i].name === name) {
-            return all[i];
-        }
-    }
+if (script === null || script === undefined) {
     throw new Error(
-        "runPowerShellScript: no Resource Element named '" + name + "'. Import the .ps1 file " +
-        "into Orchestrator as a Resource Element with exactly that name."
+        "runPowerShellScript: no script was supplied. Bind the script input to the Resource " +
+        "Element that holds the .ps1, for example Move-ArchivedLogs.ps1."
     );
 }
 
-var scriptText = findScript(scriptName).getContentAsMimeAttachment().content;
+// The Resource Element's own name becomes the file name on the host, so the file sitting
+// in the working folder during a run is recognisably the one held in Orchestrator.
+var scriptName = String(script.name);
+
+// That name is used to build a path on the host. A separator in it would put the file
+// somewhere other than the working folder, so it is refused rather than quietly cleaned up.
+if (/[\\\/:]/.test(scriptName)) {
+    throw new Error(
+        "runPowerShellScript: the Resource Element is named '" + scriptName + "'. That name " +
+        "becomes the file name on the host, so it cannot contain \\ / or :. Rename the element."
+    );
+}
+
+var attachment = script.getContentAsMimeAttachment();
+
+if (attachment === null || attachment === undefined ||
+    attachment.content === null || attachment.content === undefined ||
+    String(attachment.content) === "") {
+    throw new Error(
+        "runPowerShellScript: the Resource Element '" + scriptName + "' holds no content. " +
+        "Re-import the .ps1 file into it."
+    );
+}
+
+var scriptText = String(attachment.content);
 
 // The script is handed to PowerShell inside a single-quoted here-string, which treats
 // every character literally. The only thing that can break it is a line consisting of
