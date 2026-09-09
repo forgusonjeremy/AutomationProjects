@@ -59,6 +59,67 @@ function describeMethod(object, methodName) {
     }
 }
 
+/**
+ * Lists what a plug-in object ACTUALLY carries, rather than guessing at property names.
+ *
+ * These objects are Java underneath and do not answer 'for (key in object)', so a probe
+ * that lists a set of likely names can only ever report on the names it thought of --
+ * and reports "missing" for a property that is really there under another name. Asking
+ * the class itself removes the guesswork: every no-argument getter is a property, and
+ * Rhino exposes getFoo() as .foo, so each one can be read straight back.
+ *
+ * Returns an array of lines, or null when the object will not be reflected on.
+ */
+function describeByReflection(object, indent) {
+    var cls = null;
+    try { cls = object.getClass(); }
+    catch (e) { return null; }
+
+    if (cls === null || cls === undefined) { return null; }
+
+    var lines = [];
+    try { lines.push(indent + "class : " + cls.getName()); }
+    catch (e2) { return null; }
+
+    var methods = null;
+    try { methods = cls.getMethods(); }
+    catch (e3) { methods = null; }
+
+    if (methods === null || methods === undefined) {
+        lines.push(indent + "(the class would not list its methods)");
+        return lines;
+    }
+
+    var seen = {};
+    for (var i = 0; i < methods.length; i++) {
+        var name, argCount;
+        try {
+            name = String(methods[i].getName());
+            argCount = methods[i].getParameterTypes().length;
+        }
+        catch (e4) { continue; }
+
+        // A property is a getter that takes nothing. getClass() is Java's own.
+        if (argCount !== 0 || name === "getClass") { continue; }
+
+        var prop;
+        if (name.indexOf("get") === 0 && name.length > 3)      { prop = name.substring(3); }
+        else if (name.indexOf("is") === 0 && name.length > 2)  { prop = name.substring(2); }
+        else { continue; }
+
+        prop = prop.charAt(0).toLowerCase() + prop.substring(1);
+        if (seen[prop] === true) { continue; }
+        seen[prop] = true;
+
+        lines.push(indent + prop + " : " + describe(object, prop) + "   [" + name + "()]");
+    }
+
+    if (lines.length === 1) {
+        lines.push(indent + "(no readable properties found)");
+    }
+    return lines;
+}
+
 say("=================================================================");
 say(" Orchestrator plug-in probe");
 say("=================================================================");
@@ -142,7 +203,77 @@ if (psHosts === null || psHosts.length === 0) {
 else {
     say(psHosts.length + " host(s) registered:");
     for (var p = 0; p < psHosts.length; p++) {
+        say("");
         say("  [" + (p + 1) + "] " + psHosts[p].name);
+
+        // How this host authenticates decides whether the script can reach anything
+        // BEYOND the host itself. A session opened without a forwardable credential can
+        // run on the host perfectly well and still be refused by \\<server>\C$, which
+        // looks like a permissions fault and is not one.
+        //
+        //   transport / authentication : Kerberos can delegate, CredSSP always does,
+        //                                Basic and plain NTLM cannot
+        //   sharedSession + user       : a shared session logs on with a stored account,
+        //                                which is a different kind of logon again
+        //
+        // Names differ between plug-in versions, so several are tried and the ones this
+        // version answers to are the ones that matter.
+        say("        name : " + describe(psHosts[p], "name"));
+        say("        id   : " + describe(psHosts[p], "id"));
+        say("        type : " + describe(psHosts[p], "type"));
+
+        // Like AD:AdHost, this object is a thin wrapper: its 'host' property is not a
+        // hostname but a nested com.vmware.o11n.plugin.powershell.model.Host holding the
+        // real connection settings. Printing it directly gives only its Java toString,
+        // which is what makes the settings look absent when they are not.
+        var psConfig = null;
+        try { psConfig = psHosts[p].host; } catch (he) { psConfig = null; }
+
+        if (psConfig === null || psConfig === undefined || typeof psConfig === "string") {
+            say("        host : " + describe(psHosts[p], "host") + "   (not a nested object)");
+            psConfig = psHosts[p];
+        }
+        else {
+            say("        host : nested object -- its settings follow");
+        }
+
+        // The authentication is the thing worth knowing. A session opened without a
+        // forwardable credential runs on the host perfectly well and is still refused by
+        // \\<server>\C$, which reads as a permissions fault and is not one:
+        //   Kerberos with delegation, or CredSSP -> the credential reaches the next hop
+        //   Basic, or plain NTLM/Negotiate       -> it stops at the host
+        //
+        // The names are not guessed at -- the class is asked what it has.
+        var reflected = describeByReflection(psConfig, "            ");
+
+        if (reflected !== null) {
+            for (var r = 0; r < reflected.length; r++) {
+                say(reflected[r]);
+            }
+        }
+        else {
+            // Orchestrator sandboxes the scripting engine, so getClass() is refused and
+            // this object cannot be asked what it holds. Guessing at names is what the
+            // reflection above was written to avoid, and a list of "missing" from a guess
+            // says nothing about the host -- only about the guess. So it is not printed.
+            say("            This plug-in will not let a script read these settings:");
+            say("            getClass() is blocked and the property names are not exposed.");
+            say("");
+            say("            READ THE AUTHENTICATION ANOTHER WAY. It decides whether the");
+            say("            script can reach \\\\<server>\\C$ at all, so it is worth knowing:");
+            say("");
+            say("              - In the Orchestrator UI, run 'Update a PowerShell host'");
+            say("                against this host. The form shows its current settings.");
+            say("              - Or ask the session itself. Run this on the host through");
+            say("                'Invoke a PowerShell script':");
+            say("                    whoami");
+            say("                    klist");
+            say("                    Test-Path \\\\<a-target-server>\\C$");
+            say("");
+            say("            Basic or NTLM cannot carry a credential to a second machine.");
+            say("            CredSSP always does. Kerberos does only where constrained");
+            say("            delegation is configured for this host.");
+        }
     }
     if (psHosts.length === 1) {
         say("  Exactly one, so the workflows will select it automatically.");

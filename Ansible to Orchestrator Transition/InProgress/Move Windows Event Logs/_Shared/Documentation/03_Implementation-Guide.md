@@ -122,22 +122,76 @@ The account configured on that host does the file work, so it needs:
 
 Orchestrator connects to the PowerShell host, and the host then reaches out to the servers
 and the share. That second hop is a separate authentication, and by default Windows will
-not forward the credential to it. Symptom: everything works when you run the script
-directly on the host, and every path is "not reachable" when Orchestrator runs it.
+not forward the credential to it.
 
-Fix it with **Kerberos constrained delegation** — delegate the PowerShell host's computer
-account to the `CIFS` service on each target server and on the file server. CredSSP is the
-fallback if delegation is not possible.
+**Set the PowerShell host to Kerberos.** Basic and NTLM cannot carry a credential to a
+second machine at all, so with either of those this workflow cannot work whatever else is
+configured. Kerberos can — provided the connection actually delegates, which is a separate
+condition and the one worth checking rather than assuming. `klist` below says which.
 
-Ansible did not have this problem because it connected to each server directly. It is the
-one genuinely new piece of infrastructure in this design, so prove it before you build
-anything. From a session on the PowerShell host opened *by Orchestrator* — not an RDP
-session — this must succeed:
+The symptom when the credential does not reach the second hop is specific and easy to
+misread:
+
+```
+monsrv01.vcf.lab : Access is denied - while listing files in \\monsrv01.vcf.lab\C$\...
+```
+
+`Test-Path` on the same path succeeds, so it does not look like a connectivity problem,
+and the account really does have the rights — logging on to the host at the console and
+browsing there works. **That console test proves nothing**, and is the trap this section
+exists for: a console logon holds primary credentials and can authenticate onward; a WinRM
+session cannot. Same account, same rights, different logon type.
+
+### Confirming it
+
+From a session on the PowerShell host opened *by Orchestrator* — not RDP, not the console:
 
 ```powershell
+whoami                                 # which identity the script actually runs as
+klist                                  # read the Ticket Flags -- see below
 Test-Path \\<a-target-server>\C$\Windows\System32\winevt\Logs
-Test-Path \\<fileserver>\<share>
+Get-ChildItem \\<a-target-server>\C$\Windows\System32\winevt\Logs -File | Select-Object -First 3
 ```
+
+**The `klist` flags are the answer.** Look for a `krbtgt/<DOMAIN>` ticket and read them:
+
+| Flags | Meaning |
+|---|---|
+| `forwardable forwarded` | The credential **was delegated** to this host. The second hop will work — this is what a healthy host looks like |
+| `forwardable` alone | The ticket *could* be delegated, but was not. The connection is not requesting delegation |
+| No `krbtgt` ticket, only `HOST/<pshost>` | No delegation at all. The session can act only on this host |
+
+A healthy result reads like this, and needs nothing further doing:
+
+```
+Client: administrator @ VCF.LAB
+Server: krbtgt/VCF.LAB @ VCF.LAB
+Ticket Flags 0x60210000 -> forwardable forwarded pre_authent name_canonicalize
+```
+
+Both the `Test-Path` and the `Get-ChildItem` must succeed before the workflow can work.
+`Test-Path` passing on its own means little — a path check needs no credential, while
+listing the directory does, which is why they are tested separately.
+
+### Fixing it
+
+Any one of these:
+
+| Option | What to do | Trade-off |
+|---|---|---|
+| **Resource-based constrained delegation** | On each target and the file server:<br>`Set-ADComputer <target> -PrincipalsAllowedToDelegateToAccount (Get-ADComputer <pshost>)` | Least invasive, set per resource, instantly reversible. Needs rights on the target objects only |
+| **Constrained delegation** | On the PS host's computer account: *Trust this computer for delegation to specified services only* → `CIFS` on each target and the file server | Central, but edits the PS host object and usually needs Domain Admin |
+| **CredSSP** | Enable on the WinRM connection and the host | Works regardless of delegation, but sends the credential to the target. Fallback, not first choice |
+
+After changing delegation, purge the cached tickets (`klist purge`, or restart the host)
+or the old non-forwardable ticket will keep being used and nothing will appear to change.
+
+> **Why Ansible never hit this.** The playbooks did not rely on delegation at all — they
+> used `become_method: runas` with an explicit password, which performs a fresh logon on
+> the host holding real credentials, and that logon can authenticate onward by itself. So
+> a script that worked under Ansible can fail here **unchanged**, in an environment where
+> nothing else has changed. `cvs_functions.ps1` does the identical `\\<server>\C$` access
+> and contains no credential handling of its own; the password came from the playbook.
 
 ---
 

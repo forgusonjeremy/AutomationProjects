@@ -98,16 +98,45 @@ var host = actions.selectPowerShellHost(psHost);
 // ---------------------------------------------------------------------------
 // The script takes 'yes' and 'no' rather than true and false, so that its own log
 // lines read plainly and so it can be run by hand at a console the same way.
+
+/**
+ * Turns the tick-box into the 'yes' or 'no' the script expects.
+ *
+ * reportOnly and overwriteExisting are booleans, so  value ? "yes" : "no"  would do the
+ * job today. It is written out longhand because these two have been declared as strings
+ * at times, and that one-liner fails silently when they are: every non-empty string is
+ * truthy in JavaScript, so "no" comes out as "yes" -- turning OverwriteExisting on for a
+ * run whose operator had turned it off, and pinning ReportOnly on so nothing ever moves.
+ * Nothing in the log would say so. These two decide whether files are overwritten and
+ * whether anything moves at all, so the value is read rather than tested for truth.
+ */
+function yesNo(value) {
+    if (value === true)  { return "yes"; }
+    if (value === false) { return "no"; }
+
+    var text = String(value).replace(/^\s+|\s+$/g, "").toLowerCase();
+    return (text === "yes" || text === "true" || text === "1") ? "yes" : "no";
+}
+
+var reportOnlyFlag = yesNo(reportOnly);
+
 var parameters = new Properties();
 parameters.put("ComputerNames",     computers.join(","));
 parameters.put("SourcePath",        sourcePath);
 parameters.put("TargetPath",        targetPath);
 parameters.put("FileFilter",        fileFilter);
 parameters.put("OlderThanDays",     String(olderThanDays));
-parameters.put("ReportOnly",        reportOnly ? "yes" : "no");
-parameters.put("OverwriteExisting", overwriteExisting ? "yes" : "no");
+parameters.put("ReportOnly",        reportOnlyFlag);
+parameters.put("OverwriteExisting", yesNo(overwriteExisting));
 
-if (reportOnly) {
+// Say what was decided, so the run log shows it rather than the raw input. A run that
+// moved nothing because ReportOnly was on is otherwise indistinguishable from one that
+// found nothing to move.
+System.log(
+    "ReportOnly=" + reportOnlyFlag + ", OverwriteExisting=" + yesNo(overwriteExisting)
+);
+
+if (reportOnlyFlag === "yes") {
     System.log("REPORT ONLY: this run will list what would move and change nothing.");
 }
 

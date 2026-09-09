@@ -27,12 +27,18 @@ per-computer domain handling, which nothing else here exercises.
 |---|---|---|
 | 1.1 | Run `probeAdPlugin` with a real group | Endpoints listed, PowerShell host listed, both scripts found, at least one membership property present |
 | 1.2 | From an Orchestrator-opened session on the PowerShell host: `Test-Path \\<server>\C$` | `True` — this is the double hop |
+| 1.2a | Same session: `Get-ChildItem \\<server>\C$\Windows\System32\winevt\Logs -File` | Lists files. **`Test-Path` can pass while this fails** — listing needs the credential, a path check does not |
+| 1.2b | Same session: `klist` | A `krbtgt` ticket whose flags include **`forwarded`** — that word means the credential was actually delegated. `forwardable` on its own, or only a `HOST/<pshost>` ticket, means it was not, and 1.2a will fail |
 | 1.3 | Same session: `Test-Path \\<fileserver>\<share>` | `True` |
 
-> 1.2 and 1.3 must be run in a session **Orchestrator opened**, not an RDP session. An RDP
-> session has a credential that a delegated one may not, so it will pass while the real
+> 1.2–1.3 must be run in a session **Orchestrator opened** — not RDP, and not the console.
+> Both hold primary credentials and can authenticate onward, so both pass while the real
 > thing fails. Test it with a one-line scriptable task calling `runPowerShellScript`, or
 > the plug-in's own *Invoke a PowerShell script* workflow.
+>
+> Setting the PowerShell host to **Kerberos is not sufficient by itself** — see *The double
+> hop* in the Implementation Guide. 1.2a is the test that actually catches this; 1.2 alone
+> passes on a host that cannot do the work.
 
 ---
 

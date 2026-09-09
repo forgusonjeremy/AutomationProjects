@@ -49,13 +49,33 @@ var host = actions.selectPowerShellHost(psHost);
 // ---------------------------------------------------------------------------
 // 2. Run the script
 // ---------------------------------------------------------------------------
+/**
+ * Turns the tick-box into the 'yes' or 'no' the script expects.
+ *
+ * reportOnly is a boolean, so  reportOnly ? "yes" : "no"  would do the job today. It is
+ * written out longhand because this input has been declared a string at times, and that
+ * one-liner fails silently when it is: every non-empty string is truthy in JavaScript, so
+ * "no" comes out as "yes". Here that error is fail-safe -- it reports instead of deleting
+ * -- but it would mean nothing could ever be deleted, and the identical mistake on the
+ * move workflow silently overwrites archived logs.
+ */
+function yesNo(value) {
+    if (value === true)  { return "yes"; }
+    if (value === false) { return "no"; }
+
+    var text = String(value).replace(/^\s+|\s+$/g, "").toLowerCase();
+    return (text === "yes" || text === "true" || text === "1") ? "yes" : "no";
+}
+
+var reportOnlyFlag = yesNo(reportOnly);
+
 var parameters = new Properties();
 parameters.put("Path",          sharePath);
 parameters.put("FileFilter",    fileFilter);
 parameters.put("OlderThanDays", String(olderThanDays));
-parameters.put("ReportOnly",    reportOnly ? "yes" : "no");
+parameters.put("ReportOnly",    reportOnlyFlag);
 
-if (reportOnly) {
+if (reportOnlyFlag === "yes") {
     System.log("REPORT ONLY: this run will list what would be deleted and delete nothing.");
 }
 else {
@@ -77,7 +97,7 @@ spaceFreedMB = reported.get("freedMB");
 if (success) {
     System.log(
         "Finished. " + filesDeleted + " file(s), " + spaceFreedMB + " MB" +
-        (reportOnly ? " would have been deleted." : " deleted.")
+        (reportOnlyFlag === "yes" ? " would have been deleted." : " deleted.")
     );
 }
 else {

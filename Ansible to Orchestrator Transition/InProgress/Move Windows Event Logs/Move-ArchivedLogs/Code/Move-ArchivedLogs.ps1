@@ -179,10 +179,18 @@ foreach ($server in $servers) {
 
     Write-Log "--- $server ---"
 
+    # What the catch below reports alongside the error. Windows says 'Access is denied'
+    # and nothing else, which leaves a reader unable to tell the source share from the
+    # destination -- and that is the first thing anyone needs to know. Updated as the work
+    # moves on, so whatever fails names the path it failed on.
+    $stage = "reaching $sourceRoot"
+
     try {
         if (-not (Test-Path -LiteralPath $sourceRoot)) {
             throw "Source path is not reachable: $sourceRoot"
         }
+
+        $stage = "listing files in $sourceRoot"
 
         $candidates = @(
             Get-ChildItem -LiteralPath $sourceRoot -Filter $FileFilter -File -Recurse |
@@ -196,9 +204,12 @@ foreach ($server in $servers) {
         }
 
         if (-not $reportOnlyMode -and -not (Test-Path -LiteralPath $serverDest)) {
+            $stage = "creating $serverDest"
             New-Item -ItemType Directory -Path $serverDest -Force | Out-Null
             Write-Log "$server : created destination folder $serverDest"
         }
+
+        $stage = "moving files to $serverDest"
 
         $movedHere   = 0
         $skippedHere = 0
@@ -249,8 +260,9 @@ foreach ($server in $servers) {
         $serversOk++
     }
     catch {
-        # Whole-server failure: offline, no admin share, or permissions.
-        Write-Log "$server : $($_.Exception.Message)" 'ERROR'
+        # Whole-server failure: offline, no admin share, or permissions. $stage names the
+        # path being worked on, so 'Access is denied' says which share denied it.
+        Write-Log "$server : $($_.Exception.Message) - while $stage" 'ERROR'
     }
 }
 

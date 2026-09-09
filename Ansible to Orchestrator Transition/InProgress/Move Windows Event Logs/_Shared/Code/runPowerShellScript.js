@@ -70,6 +70,19 @@ if (attachment === null || attachment === undefined ||
 
 var scriptText = String(attachment.content);
 
+// A .ps1 saved with a byte-order mark arrives with U+FEFF as its first character. It has
+// to come off before the text is embedded below, because from here on it is treated as
+// script rather than as an encoding marker: it ends up inside the here-string, and
+// Set-Content then writes a real BOM of its own in front of it. PowerShell reads the real
+// one, and what is left is an invisible character welded to the first token -- which is
+// why the failure reads
+//
+//     ?<# : The term '?<#' is not recognized as the name of a cmdlet ...
+//
+// naming a token that does not appear anywhere in the file. Nothing downstream can
+// recover from it, so it is removed here rather than guarded against later.
+scriptText = scriptText.replace(/^\uFEFF+/, "");
+
 // The script is handed to PowerShell inside a single-quoted here-string, which treats
 // every character literally. The only thing that can break it is a line consisting of
 // just  '@  -- that would end the here-string early. No normal script contains one,
@@ -138,15 +151,35 @@ var wrapper = [
 // ---------------------------------------------------------------------------
 System.log("Running " + scriptName + " on " + psHost.name);
 
+// USE THE HOST'S OWN CALL, NOT openSession()
+//
+// These are not equivalent. A host configured for Shared Session keeps one session that
+// the plug-in has already authenticated -- and, where the connection delegates, that is
+// the session the credential was forwarded into. psHost.invokeScript() runs in it.
+// psHost.openSession() deliberately opens a SEPARATE session, which need not carry the
+// same credential.
+//
+// The difference is invisible on the host itself and only shows up one hop further out:
+// the script runs, whoami reports the right account, and every \\<server>\C$ path comes
+// back 'Access is denied' -- while the identical commands run through the plug-in's own
+// 'Invoke a PowerShell script' workflow succeed, because that uses the host-level call.
+//
+// openSession() is kept as a fallback for plug-in versions that do not expose
+// invokeScript() on the host.
 var invocation;
-var session = psHost.openSession();
-try {
-    invocation = session.invokeScript(wrapper);
+
+if (typeof psHost.invokeScript === "function") {
+    invocation = psHost.invokeScript(wrapper);
 }
-finally {
-    // Always close the session, even if the script failed, so sessions do not
-    // accumulate on the host.
-    psHost.closeSession(session.getSessionId());
+else {
+    var session = psHost.openSession();
+    try {
+        invocation = session.invokeScript(wrapper);
+    }
+    finally {
+        // Always close it, even if the script failed, so sessions do not accumulate.
+        psHost.closeSession(session.getSessionId());
+    }
 }
 
 // ---------------------------------------------------------------------------
