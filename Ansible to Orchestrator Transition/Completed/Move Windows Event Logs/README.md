@@ -89,11 +89,17 @@ Move-Archived-Logs/
 │   ├── 02_Design-Decisions.md           what was standardised, and why
 │   ├── 03_Implementation-Guide.md       how to build it in Orchestrator
 │   ├── 04_Testing-Plan.md               how to prove it works
+│   ├── 01–04 *.docx                     the same four, in Word, for sending out
+│   │                                    (generated -- edit the .md, then Tools/markdown-docx)
 │   ├── 05_Architecture.docx             **the architecture document (Word) — the deliverable**
 │   ├── 05_Architecture.html             the two diagrams, in a browser
 │   ├── 05_Architecture-Figure*.png      the two diagrams on their own
 │   ├── 06_Shared-Components.md          what is shared, with what, and how to avoid duplicating it
 │   └── 07_As-Deployed.md                what was actually built, and what is outstanding on it
+│
+├── Tools/                           build tooling for the Word copies
+│   ├── architecture-docx/               builds 05_Architecture.docx (needs Node)
+│   └── markdown-docx/                   builds 01-04 .docx from the Markdown (PowerShell)
 │
 └── Reference/                       source material, kept for the record
     ├── ansible-source-playbooks.md
