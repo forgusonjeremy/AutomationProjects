@@ -10,7 +10,7 @@ transition — what changed, and **why**.
 > Changes S-1 … S-5 were made by the **Move Windows Event Logs** project and are
 > recorded in that project's register
 > (`Completed/Move Windows Event Logs/_Shared/Documentation/Change-Register.md`).
-> This deliverable adds **S-6 … S-13** and process changes **P-9 … P-13**.
+> This deliverable adds **S-6 … S-13** and process changes **P-9 … P-17**.
 >
 > **Script under change (working copy):** `InProgress/psscript/files/cvs_functions.ps1`
 > **Promoted to (on completion):** `Completed/_Shared References/psscript/files/cvs_functions.ps1`
@@ -105,10 +105,46 @@ a false success by sampling too early.
 | P-12 | 2026-07-17 | Reporting | No report, no mail (`var_eMailReport: 'no'`) | HTML per-server report emailed to a recipient **array** (S-11); run outcome also surfaced through the workflow end state | Closes the two Phase-2 items the Move project deferred ("per-server status reporting", "email reporting on workflow completion") |
 | P-13 | 2026-07-17 | Report header label | `var_HeaderNotesSubstr` supplied as its own variable | **Dropped as an input.** The script's `-HeaderNotesSubstr` is only a display label ("the security group called X") in the report header, so `buildServerRebootInvocation` now **derives** it from `groupDN` (leftmost CN of a DN, or the identifier as-is). No script change — the parameter is still passed, just computed | Removes a redundant input and makes it impossible for the header to name a different group than the one actually targeted |
 
-**Net result:** 1 playbook → **1 workflow** (`Invoke-ServerReboot`); 1 new build
-action; `parseScriptOutput` / `handlePSFailure` reused from the Event Log package.
-The invoked script action (`Invoke-ServerReboot`) already existed; changes are
-limited to S-6…S-13.
+### 3a. Alignment with the Move Windows Event Logs delivery pattern (P-14 … P-17)
+
+> **These four supersede P-9, P-10 and P-13.** The first cut of this package kept
+> the Ansible shape — a pre-staged `cvs_functions.ps1` invoked by a hand-built
+> command line. It has been re-based onto the pattern already delivered and proven
+> by **Move Windows Event Logs**, so that the two packages are built, installed and
+> supported the same way rather than each having its own idea of how a script
+> reaches a Windows host.
+>
+> **The targeting rule is unchanged.** S-7 stands in full: direct members only,
+> computer objects only, enabled only. It moved from `Get-ListOfServers-Direct` in
+> the shared PowerShell to `getGroupComputersDirect` in Orchestrator. Nothing about
+> *which servers get rebooted* changed — only *who works the list out*.
+
+| # | Date | Area | Previous (P-9 … P-13) | New | Reason |
+|---|------|------|------------------------|-----|--------|
+| P-14 | 2026-09-14 | Script storage | `cvs_functions.ps1` **pre-staged** on the PS host; workflow took a `scriptPath` input and invoked `-Action Invoke-ServerReboot` | Purpose-built **`Invoke-ServerReboot.ps1`** held in Orchestrator as a **Resource Element**, copied to the host at run time, run, and deleted | Matches the Move package. No staged copy can drift out of date with the version Orchestrator holds, and the run record shows exactly which script ran. The 3,356-line shared toolbox is no longer a runtime dependency of this workflow, so a change made for another action cannot alter a reboot run |
+| P-15 | 2026-09-14 | Execution | OOTB *Invoke a PowerShell script* driven by a hand-built invocation string from `buildServerRebootInvocation` | Shared **`runPowerShellScript`** action; parameters passed as a `Properties` bag | One component knows about the PowerShell plug-in, so plug-in behaviour changes in one file. Removes hand-rolled PowerShell quoting — the old action escaped single quotes itself, which is a defect waiting to happen in a DN or a mail subject. Also inherits the `invokeScript()`-over-`openSession()` fix, which is what makes second-hop access to each target work |
+| P-16 | 2026-09-14 | AD resolution | **Unchanged from Ansible (P-10)** — the script resolved the group itself via `Get-ADGroupMember` | New **`getGroupComputersDirect`** action; Orchestrator resolves the group and passes `-ComputerNames`. The script no longer talks to AD at all | Reverses the P-10 decision to keep resolution in the script. The target list is now in the run record *before* anything is rebooted, rather than only visible in the transcript afterwards; the `ActiveDirectory` module is no longer required on the PS host; and S-12's `Invoke-Module` defect stops being on this workflow's critical path. Deliberately **non-recursive**, unlike the Move package's `getGroupComputers` — see the note below |
+| P-17 | 2026-09-14 | Result contract | `parseScriptOutput` scanned the transcript for `Error:` text | The script writes one **`PSO_RESULT={json}`** line; `runPowerShellScript` parses it | A reworded log line could previously change the workflow's end state. Counts are now reported by the script rather than inferred, which is what lets the workflow distinguish *skipped*, *reboot rejected* and *did not return* — three outcomes with three different owners that the transcript scan collapsed into one |
+
+**`getGroupComputersDirect` is NOT `getGroupComputers`.** The Move package's action
+is recursive by design; this one is deliberately not, and the two must not be
+merged. Moving a log file off a machine that should not have been in scope wastes
+a little time — rebooting one takes a production service down. A sub-group nested
+in the reboot group is reported in a warning naming it, so the omission is visible
+on the run that made it rather than discovered months later.
+
+**Net result:** 1 playbook → **1 workflow** (`Invoke Server Reboot`). Five actions
+shared with the Move package (`runPowerShellScript`, `selectPowerShellHost`,
+`resolveAdGroup`, `findAdHostForDn`, `probeAdPlugin` — create each **once**), one
+new action of its own (`getGroupComputersDirect`), two scriptable tasks, and one
+Resource Element. `buildServerRebootInvocation` is **retired** — it existed only to
+build the pre-staged command line. `parseScriptOutput` / `handlePSFailure` are no
+longer used by this workflow.
+
+**Script changes S-6 … S-13 are all carried forward** into
+`Invoke-ServerReboot.ps1`, with S-7 relocated to Orchestrator as described above.
+`cvs_functions.ps1` keeps them too: its other actions still need them, and it
+remains the working copy for every automation that has not yet been transitioned.
 
 ---
 
@@ -116,19 +152,22 @@ limited to S-6…S-13.
 
 | Today (Ansible) | New (Orchestrator) |
 |---|---|
-| `servers_reboot.yml` + `vars.txt` | `Invoke-ServerReboot` workflow |
-| `var_ADGroupMember` | `groupDN` input → `-ADGroupMember` |
-| `var_DomainName` | `domainName` input → `-DomainName` |
-| `var_RebootIt` (`simpleMode`) | `rebootMode` input → `-RebootIt` (default `no` = report only) |
+| `servers_reboot.yml` + `vars.txt` | `Invoke Server Reboot` workflow |
+| `var_ADGroupMember` | `adGroup` (picked from a tree) or `adGroupDn` (scheduled/API runs) → resolved by the AD plug-in → `-ComputerNames` |
+| `var_DomainName` | *(dropped as an input — the domain is read from the group's own DN, so the two can never disagree; see P-16)* |
+| `var_RebootIt` (`simpleMode`) | `rebootMode` input → `-RebootMode` (default `no` = report only) |
 | `var_RebootIt_DelayBetweenServer` | `delayBetweenServersSec` input |
 | *(new)* | `verifyTimeoutSec` / `verifyPollSec` inputs (S-10) |
+| *(new)* | `runPreRebootScript` / `preRebootScriptPath` inputs (S-13, default OFF) |
 | `var_eMailReport` | `emailReport` input (boolean) |
 | `var_SMTPServer` | `smtpServer` input |
 | `var_MailToString` / `var_MailCcString` | `mailTo` / `mailCc` inputs (**arrays**, joined to CSV) |
 | `var_MailSubjectstring` | `mailSubject` input |
-| `var_HeaderNotesSubstr` | *(no input — derived from `groupDN` in the build action; see P-13)* |
+| `var_HeaderNotesSubstr` | *(no input — taken from the resolved group object; see P-13, P-16)* |
 | `var_OUPath` | *(dropped — not used by this action)* |
-| `var_ps_folder` / `var_ps_script_file` / `var_parameter_action` / `var_cleanup_temporary_folder` | *(dropped — script is pre-staged, not copied per run)* |
+| `var_ps_folder` / `var_ps_script_file` / `var_parameter_action` | *(dropped — the script is a Resource Element, selected by binding, not by path)* |
+| `var_cleanup_temporary_folder` | *(dropped — `runPowerShellScript` always deletes the script after the run)* |
+| *(was `scriptPath` in the first cut)* | *(dropped — nothing is pre-staged; see P-14)* |
 
 ---
 
@@ -143,7 +182,10 @@ limited to S-6…S-13.
 | **`Get-RebootStatus` stale `$ComputerlastBootUptime`** | In its catch block the emitted object can carry the *previous* server's boot time. Harmless here (status-unknown servers are never rebooted or verified), but worth a future tidy. |
 | **WinRM operation timeout** | One synchronous invocation now runs for `(N × delay) + up to VerifyTimeoutSec`. The PS host's WinRM `MaxTimeoutms` / plug-in timeout must exceed the worst case. Validate before first production run. |
 | **Second hop (delegation)** | PS host → AD and PS host → each target over RPC/WMI/SMB. Same Kerberos constrained-delegation requirement as the Move package. See *How to Build a PowerShell Host* §6. |
-| **Event Log package re-test** | S-12 changes `Invoke-Module`, which `move-archived-logs-ByCN` also calls. The already-delivered package benefits from the fix but should be re-tested before the updated script is deployed. |
+| **Event Log package re-test** | S-12 changes `Invoke-Module`, which `move-archived-logs-ByCN` also calls. The already-delivered package benefits from the fix but should be re-tested before the updated script is deployed. **Reduced in scope by P-16:** this workflow no longer calls `Invoke-Module` at all, so the risk is now confined to the Event Log package itself. |
+| **Remaining documentation still describes the pre-staged design** | **OPEN.** `01_Executive_Summary`, `02_Design_Document`, `03_Implementation_Guide` and `04_User_Guide` (and their `.docx` builds) were written against P-9/P-10/P-13 and still refer to a `scriptPath` input, `buildServerRebootInvocation` and `parseScriptOutput`. The code and this register are current; those four are not. They need rewriting against the schema in `Code/Invoke-ServerReboot_spec.js` before the package is handed over. |
+| **Shared actions — do not create twice** | **ACTION ON BUILD.** `runPowerShellScript`, `selectPowerShellHost`, `resolveAdGroup`, `findAdHostForDn` and `probeAdPlugin` are shared with the Move / Remove Archived Logs packages and are delivered inside this one so it can stand alone. If either of those is already installed, these actions exist — create each **once** and let all three workflows call it. A second copy under a different name drifts silently from the first. |
+| **`Invoke-ServerReboot.ps1` not yet run against real servers** | **OPEN.** The script has been verified end to end for parsing, input validation, report generation, the `PSO_RESULT` contract and the S-8 skip path (using unreachable hosts). The paths that need real infrastructure — a genuine pending-reboot detection, `shutdown.exe` acceptance, and `LastBootUpTime` verification — have not been exercised. Run report-only against a real group first, then a single-server live run, before any group-wide run. |
 
 ---
 
@@ -157,3 +199,4 @@ limited to S-6…S-13.
 | 2026-07-17 | Automation transition | **Two-copy policy adopted.** Working edits are made in `InProgress/psscript/files/`; `Completed/_Shared References/psscript/files/` receives the promoted copy when a project completes and is what migrates to the customer environment. The `Ansible Playbooks and Files - Sanitized/psscript/files/` originals are retained as an as-received source archive (exempt). Server Reboots' working copy is the In-Progress one. |
 | 2026-07-17 | Automation transition | Added script change S-13 after reviewing the supplied `ownership_w2k.ps1`: the pre-reboot step is now **opt-in, default OFF**. The script `takeown`s and loosens ACLs on `usbstor.inf` and `termsrv.dll`; since S-6 shows the step has never executed, fixing S-6 alone would have silently introduced a security-posture change on the `Security-Reboot-Servers` group. Default behaviour therefore remains identical to today. Security review recommended before enabling. |
 | 2026-07-20 | Automation transition | Added process change P-13: the report-header label (`-HeaderNotesSubstr`) is no longer an input — `buildServerRebootInvocation` derives it from `groupDN` (a vRO-layer change; no script change). Corrected the header note "P-9 … P-12" → "P-9 … P-13". This register is reproduced as Appendix A of the Design Document (the standalone file remains authoritative). |
+| 2026-09-14 | Automation transition | **Re-based onto the Move Windows Event Logs delivery pattern.** Added process changes P-14 … P-17, which **supersede P-9, P-10 and P-13**: the workflow now runs a purpose-built `Invoke-ServerReboot.ps1` held in Orchestrator as a Resource Element (copied to the host per run, then deleted) via the shared `runPowerShellScript` action, resolves the AD group with the new `getGroupComputersDirect` action instead of in the script, and reads its outcome from a single `PSO_RESULT` line instead of scanning the transcript. **Targeting is unchanged** — S-7's direct / computer-only / enabled-only rule moved from `Get-ListOfServers-Direct` to `getGroupComputersDirect`, and nested sub-groups are still never expanded (now reported in a warning naming each one). S-6 … S-13 are all carried forward into the new script. `buildServerRebootInvocation` retired; `parseScriptOutput` / `handlePSFailure` no longer used here. `domainName` dropped as an input — the domain is read from the group's own DN. Corrected the header note "P-9 … P-13" → "P-9 … P-17". Logged three new open items: the four remaining documents still describe the superseded design, the five shared actions must be created only once, and the new script has not yet been run against real servers. |
