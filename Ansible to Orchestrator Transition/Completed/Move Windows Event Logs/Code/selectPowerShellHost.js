@@ -16,7 +16,7 @@
 
 /**
  * Action:  selectPowerShellHost
- * Module:  com.broadcom.pso.windows.logs
+ * Module:  com.broadcom.pso.powershell
  *
  * WHAT IT DOES
  *   Decides which PowerShell host runs the script, and only asks when it genuinely

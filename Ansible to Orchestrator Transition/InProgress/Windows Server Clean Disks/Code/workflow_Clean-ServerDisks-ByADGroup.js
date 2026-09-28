@@ -82,7 +82,7 @@
  *      │                └─[Exception]──────────────► [End: Failed - AD Resolution]
  *      ▼
  *   ┌───────────────────────────────────┐
- *   │ 3. Get Computers in AD Group      │  Action  getGroupComputersDirect
+ *   │ 3. Get Computers in AD Group      │  Action  getADGroupComputersDirect
  *   └───────────────────────────────────┘
  *      │                └─[Exception]──────────────► [End: Failed - AD Resolution]
  *      ▼
