@@ -59,7 +59,7 @@ PowerShell plug-in over WinRM, script copied from a Resource Element each run
 input runAsAccount            <- dropdown, from getRunAsAccountSelectors
 
 [ resolvePowerShellHostForAccount ]  runAsAccount -> psHost            (shared, P-52)
-[ stageScriptOnHost ]                psHost, 'PSO/Scripts/cvs_admin.ps1', scriptPath
+[ stageScriptOnHost ]                psHost, adminScript (RE attr: PSO/Scripts/cvs_admin.ps1), scriptPath
         |                            -> scriptVersion   (workflow OUTPUT)
 [ buildAdminPkiReportInvocation ]    -> invocationString
 [ Invoke a PowerShell script ]       (OOTB, against psHost)
@@ -214,7 +214,7 @@ The action warns loudly when an operator turns it off.
 
 | v2 / v3 job template | Orchestrator |
 |---|---|
-| `var_ps_folder` + `var_ps_script_file` | folded into `scriptPath`; the file itself is copied from a Resource Element by `stageScriptOnHost` every run (P-56) |
+| `var_ps_folder` + `var_ps_script_file` | folded into `scriptPath`; the file itself is staged from a Resource Element by `stageScriptOnHost` — copied when absent or different, SHA-256 verified (P-56, amended by P-67) |
 | `var_DomainOUs` (v2, `to_json` + `win_copy` + `-DomainOUsFile`) | `domains` rows → inline `-DomainOUs` JSON (the script accepts both; inline keeps the scope in the run history) |
 | `var_domains` / `var_ou_templates` (v3) | `domains` rows + `ouTemplates` |
 | `item.ous` | `ou=` modifier |
@@ -226,8 +226,8 @@ The action warns loudly when an operator turns it off.
 | `var_eMailReport` / `var_SMTPServer` / `var_MailToString` / `var_MailCcString` / `var_MailSubjectstring` / `var_ReportTitle` | inputs of the same name |
 | `var_winrm_port: 5985` (v3) / `port: 5986` (v2) | `PowerShell:PowerShellHost` object configuration |
 | `ansible_winrm_kerberos_delegation: yes` (inventory) | Kerberos delegation on the plug-in host object — **§6.3 of `Script-Staging-Design.md`; test first** |
-| `win_tempfile` / `win_file: absent` | *(dropped — the script goes to a stable path and is overwritten each run)* |
-| `win_copy` (script) / `win_stat` | `stageScriptOnHost` — copies one script rather than all ~25, and **verifies** the byte count, which `win_stat` never did |
+| `win_tempfile` / `win_file: absent` | *(dropped — the script goes to a stable path, re-verified by hash each run and overwritten only if it differs — P-67)* |
+| `win_copy` (script) / `win_stat` | `stageScriptOnHost` — copies one script rather than all ~25, and **verifies** its SHA-256 and byte count, which `win_stat` never did |
 | `ls -Recurse …\debug` (v2) | dropped — a bare directory listing that was never read |
 | `assert` block (v3) | input validation in `buildAdminPkiReportInvocation`, before the host is touched |
 
@@ -258,7 +258,7 @@ The action warns loudly when an operator turns it off.
 | **V-6** | `AD_CRED_ROOTDOMAIN_*` unset | `rootdomain.net` produces an error row; with `failOnQueryError=true` the run ends failed **after** the mail is sent |
 | **V-7** | Generated JSON parses | `ConvertFrom-Json` on the host yields 8 keys, each with `ous` / `departments` / `credential` |
 | **V-7b** | **Second hop** | `Get-ADUser -Server rootdomain.net -Filter * -ResultSetSize 1` succeeds through the bound psHost. **Run this before building anything else** — §6.3 |
-| **V-7c** | Staging | `stageScriptOnHost` copies and verifies the byte count; a truncated copy fails the run rather than being invoked |
+| **V-7c** | Staging | `stageScriptOnHost` copies when absent/different and verifies SHA-256 + length; a truncated or edited copy fails or is replaced rather than being invoked |
 | **V-8** | Subject line | `Ansible-Report: Admin PKI Card Status ( N Non-Compliance - M Compliance )` |
 | **V-9** | Against the retiring templates | Same account population per domain, allowing for v3's de-duplication and department filter |
 

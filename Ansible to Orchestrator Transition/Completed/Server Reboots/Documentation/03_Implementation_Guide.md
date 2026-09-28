@@ -61,9 +61,10 @@ resolved by the Orchestrator AD plug-in.
 3. On the import dialog:
    - Review the content list against the table at the top of this guide.
    - **Certificate:** trust the signing certificate if prompted.
-   - **Shared actions:** if the Move Archived Logs or Remove Old Archived Logs
-     packages are already installed, `findAdHostForDn`, `resolveAdGroup`,
-     `runPowerShellScript` and `probeAdPlugin` **already exist**. Do not create a
+   - **Shared actions:** `runPowerShellScript` is shared by every PowerShell-based
+     Orchestrator workflow, so it **already exists** if any of them is installed.
+     If the Move Archived Logs or Remove Old Archived Logs packages are installed,
+     `findAdHostForDn`, `resolveAdGroup` and `probeAdPlugin` **already exist** too. Do not create a
      second copy under another name — let all workflows call the one copy. Only
      overwrite an existing action if this package carries the newer version.
 4. Click **Import**, then confirm the workflow and actions appear in the library.

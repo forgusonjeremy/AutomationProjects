@@ -122,7 +122,7 @@ PowerShell plug-in over WinRM, script copied from a Resource Element each run
 
 for each scope:
     [ resolvePowerShellHostForAccount ]       scope.account -> psHost       (shared, P-52)
-    [ stageScriptOnHost ]                     psHost, 'PSO/Scripts/cvs_function_formatted_email.ps1'
+    [ stageScriptOnHost ]                     psHost, script (RE attr: PSO/Scripts/cvs_function_formatted_email.ps1)
             |                                 -> scriptVersion   (workflow OUTPUT, first pass)
     [ buildServiceAccountScopeInvocation ]    -> invocationString
     [ Invoke a PowerShell script ]            (OOTB, against psHost)
@@ -148,7 +148,7 @@ domains. Binding one `PowerShellHost` object per domain identity and resolving i
 (P-52) reproduces that exactly, which is why no credential injection is needed here at all.
 
 `stageScriptOnHost` runs per scope but is cheap and harmless: all host objects for the pool
-share one filesystem, so passes after the first overwrite an identical file.
+share one filesystem, so passes after the first find an exact match and copy nothing (P-67).
 
 **Second hop:** every `Get-ADUser -Server` and `Get-ADGroupMember -Server` needs Kerberos
 delegation on the WinRM session. AAP already runs with
@@ -274,4 +274,4 @@ single email.
 | **V-5** | Host resolution | Each scope binds the host object for **its** domain; a missing mapping fails the run, not the scope |
 | **V-6** | Subject lines | Two mails, distinguishable by the appended `(<domain>)` |
 | **V-7** | Against the retiring templates | Same account population per scope, on the same day |
-| **V-8** | Staging | `stageScriptOnHost` verifies the byte count; a truncated copy fails before invocation |
+| **V-8** | Staging | `stageScriptOnHost` verifies SHA-256 + length; a truncated copy fails before invocation |

@@ -9,11 +9,21 @@ transition — what changed, and **why**.
 > **Continues the shared `S-` numbering.** `cvs_functions.ps1` is a shared toolbox.
 > Changes **S-1 … S-5** were made by the **Move Windows Event Logs** project and
 > **S-6 … S-13** by the **Server Reboots** project (each recorded in its own
-> register). This deliverable adds **S-14 … S-15** and process changes **P-14 … P-17**.
+> register). This deliverable adds **S-14 … S-15**, **S-31 … S-33**, and process changes
+> **P-14 … P-19** and **P-66 … P-69**.
 >
-> **Script under change (working copy):** `InProgress/psscript/files/cvs_functions.ps1`
-> **Promoted to (on completion):** `Completed/_Shared References/psscript/files/cvs_functions.ps1`
-> **Current-state baseline:** `InProgress/Windows Server Clean Disks/servers_diskclean.yml` + `vars.txt`
+> **REDESIGNED 2026-09-28 — read section 2B first.** The workflow no longer calls
+> `cvs_functions.ps1 -Action clean-ServerDisk`. It runs a new, standalone,
+> fully-commented script **`Invoke-ServerDiskClean.ps1`**, held in an Orchestrator
+> Resource Element and staged onto the PowerShell host only when the host copy is
+> missing or differs (SHA-256). AD resolution and email moved into Orchestrator
+> plug-ins. S-14/S-15 remain in `cvs_functions.ps1` (harmless, and still the
+> behaviour the new script's selection rules were ported from) but are no longer on
+> this workflow's path.
+>
+> **Script under change (working copy):** `InProgress/Windows Server Clean Disks/Code/Invoke-ServerDiskClean.ps1`
+> **Shared actions under change:** `InProgress/_Shared/Code/stageScriptOnHost.js`, `invokeStagedScript.js`, `sendHtmlEmail.js`
+> **Current-state baseline:** `GitLab-Repos-Sanitized/psscript/servers_diskclean.yml` (confirmed identical to the local copy, 2026-09-28) + `vars.txt`
 >
 > Only **two** working copies of the shared PowerShell exist: the In-Progress copy
 > (edited while a project is in flight) and the Completed copy (what is migrated to
@@ -182,6 +192,49 @@ artifact per preserved category (`vmware-vmsvc-SYSTEM.log`, `_KEEP_newer_than_th
 [future-dated], `_readonly_aged.txt`, `_hidden_aged.txt`) so each rule above can be
 observed surviving a run.
 
+**Carried unchanged into `Invoke-ServerDiskClean.ps1` (S-31).** Every row above holds for
+the redesigned workflow; the mechanism now lives in `Invoke-TargetClean` instead of
+`Remove-files`. Verified 2026-09-28 against a seeded folder (29 checks, Windows
+PowerShell 5.1).
+
+> **Caveat to rows 1 and 2 (inherited, now stated explicitly).** With
+> `FolderIncluded=yes`, a **folder** whose own `LastWriteTime` is older than the cutoff is
+> removed with `-Recurse`, taking **everything** inside it — including files newer than the
+> cutoff, hidden files, and a nested `vmware-vmsvc-SYSTEM.log`. A folder's timestamp changes
+> only when entries directly in it are added, removed or renamed, not when a deeper file is
+> modified. This is how the original script behaved and it is what the two user-profile
+> templates (`c:\users`, 0 days, force) rely on to remove whole profiles, so it is
+> **deliberately unchanged**. Harmless for the SCCM cache (written once). Must appear in
+> `02_Design_Document` / `04_User_Guide` beside the preserved list.
+
+---
+
+## 2B. The 2026-09-28 redesign — standalone script, plug-ins, hash-checked staging
+
+**Why.** The customer's direction for this workflow (2026-09-28):
+
+1. Use Orchestrator plug-ins for **AD queries**, **vCenter work** and **email**.
+2. Keep the **fully documented** PowerShell script in an Orchestrator **Resource Element**.
+3. Before running, **check whether the script is already on the PowerShell host**: copy it the
+   first time, run the existing copy on later runs, but only if it is an **exact match** for
+   what would be copied — otherwise **overwrite** it.
+4. It must work the same for **physical and virtual** servers: the PowerShell host does the
+   cleanup for every target. (So this workflow does no vCenter work at all.)
+
+`cvs_functions.ps1 -Action clean-ServerDisk` could not meet (1): it resolves the AD group
+itself with `Get-ADGroupMember`. The action was therefore lifted into its own script, following
+the `Invoke-ServerReboot.ps1` precedent.
+
+| # | Date | Component | Change | Reason | Deployment impact |
+|---|------|-----------|--------|--------|-------------------|
+| S-31 | 2026-09-28 | **`Invoke-ServerDiskClean.ps1`** (new, standalone) | Replaces `cvs_functions.ps1 -Action clean-ServerDisk` for this workflow. Takes the server list as `-ComputerNames` (no AD lookup, no ActiveDirectory module). Positive `-OlderThanDays` (was negative `-NumberOfDays`, previously converted in vRO — P-18). `-ReportOnly yes/no` (`ValidateSet`, default `yes`) replaces `-WhatIf`. Folder targets `|`-separated (was a YAML-list string through `Convert-YAMLList`). Selection and deletion rules of `Remove-files` (S-15) **ported unchanged** — see §2A. No email (vRO sends it — P-69). Pure ASCII, fully commented. | Customer direction (§2B items 1–2). A standalone script has one job, is testable on its own, and is small enough to stage per run. | Import into Resource Element `PSO/Scripts/Invoke-ServerDiskClean.ps1`. Nothing to pre-stage on the host (P-67). `cvs_functions.ps1` is **not** modified. |
+| S-32 | 2026-09-28 | `Invoke-ServerDiskClean.ps1` — result | Writes one **`PSO_RESULT=` JSON line**: totals plus a **per-server list** (`name, status, matched, removed, failed, bytes, freeBefore, freeAfter, detail`). **Space freed is measured** (sizes taken before each delete; children of a removed folder not double-counted) and **drive free space is recorded before and after** through the admin share (`Scripting.FileSystemObject` — SMB only, no WMI). | The per-server report and freed-space figure were both deferred items (§5). Structured output lets vRO build the email and outputs without scraping log text (`parseScriptOutput` is no longer used). | None beyond S-31. |
+| S-33 | 2026-09-28 | `Invoke-ServerDiskClean.ps1` — resilience & guard rails | (a) An unreadable sub-folder no longer abandons the whole target: the target root must open, deeper enumeration errors are logged as `ERROR` and everything else is still cleaned (was: `-ErrorAction Stop` on the whole recursive enumeration). (b) A folder target **absent** on a server is a per-server warning; absent on **every** reachable server is an `ERROR` (almost always a typo). (c) Drive roots and core OS folders (`\Windows`, `\Windows\System32`, `\Program Files`, `\ProgramData`, …) are **refused** before anything is touched; `c:\users` is deliberately allowed. (d) Unreachable servers (admin share will not open) are reported with the reason. (e) Individually named items capped per target (`-MaxItemsListed`, default 25) — counts always cover everything. | "One failure must not stop the rest" applied one level deeper; a missing SCCM cache on a non-SCCM server is not an error; the whole transcript is copied into the vRO run log, so tens of thousands of `WouldDelete` lines are not acceptable. | None beyond S-31. |
+
+**What did NOT change, deliberately:** the selection and deletion rules (§2A), direct-only
+targeting (P-15, now enforced by `getGroupComputersDirect`), the `whatIf` safety gate and its
+default (P-16), the fixed `*.*` filter (P-19), the positive age input (P-18).
+
 ---
 
 ## 3. Changes to the automation process (Ansible → Orchestrator)
@@ -194,37 +247,46 @@ observed surviving a run.
 | P-17 | 2026-07-22 | Variables / secrets | `vars` / `group_vars` / `become` | Workflow inputs with defaults set directly on each input (no Configuration Element); credentials via the PS host plug-in service account | Standard Orchestrator patterns; these values are static per environment, so self-contained inputs are preferred over a shared Config Element (same decision as Move-ArchivedLogs-ByADGroup, P-8) |
 | P-18 | 2026-07-23 | Age-threshold input | `var_NumberOfDays` is a **negative** value (`-1`, `-4`) fed straight to the script's `(Get-Date).AddDays(N)` | Operator-facing workflow input is a **positive** `olderThanDays` — "delete items older than N days" (`4` = 4 days old or older, `1` = older than a day, `0` = everything up to now). The **build action converts** it to the script's negative convention (`-NumberOfDays = -olderThanDays`); negatives are rejected on the form. **No `cvs_functions.ps1` change** — the script still receives the negative value | The negative form is a footgun on a user form (a bigger negative is *less* aggressive, and there is "no such thing as -4 days old"). A positive "older than N days" reads naturally and matches the sibling `Remove-OldFiles-UNCShare` `olderThanDays` input. Kept entirely in the vRO layer so the shared script and its other callers are unaffected |
 | P-19 | 2026-07-23 | File filter | `var_FilterOn` (`*.*`) supplied as a variable | `fileFilter` is a **fixed workflow attribute `*.*`**, NOT an operator input | `-FilterOn` in `Remove-files` is applied to **directory names too**, not just files. `*.*` matches every file **and** folder, so `FolderIncluded='yes'` actually deletes folders; a restrictive filter such as `*.txt` matches no folders (they aren't named `*.txt`), so folders would silently NOT be deleted. Pinning the filter to `*.*` and keeping it off the form removes that footgun. All eight production templates already use `*.*`. **No `cvs_functions.ps1` or build-action change** — the action passes the attribute value through unchanged |
+| P-66 | 2026-09-28 | AD targeting engine (**supersedes the mechanism of P-15**; the rule is unchanged) | `Get-ADGroupMember` inside the script, over WinRM, as the PS host's account; domain from `var_DomainName` | **Orchestrator AD plug-in**: `findAdHostForDn` (endpoint from the DN's `DC=` parts) → `resolveAdGroup` → `getGroupComputersDirect` (direct, enabled computers only; nested groups warned, not expanded). The script receives only the resulting list. The `domainName` input is gone — the DN implies it | Customer direction (§2B item 1). No PowerShell and no second hop to resolve the group; the endpoint cannot disagree with the group; reuses the three actions already delivered with Server Reboots |
+| P-67 | 2026-09-28 | Script delivery (**supersedes P-14's "pre-staged" and amends programme-wide P-56**) | `win_copy` of the whole `ps_scripts` folder to a temp dir every run; deleted afterwards | Script held **fully commented** in Resource Element `PSO/Scripts/Invoke-ServerDiskClean.ps1`. Shared **`stageScriptOnHost`** probes `C:\PSO\Scripts\Invoke-ServerDiskClean.ps1` on the PS host: **absent → copy**; **SHA-256 and length match → run the existing copy**; **any difference → overwrite**, then re-hash on disk and fail the run if it does not match. Returns `<name> v<RE version> sha256=<12 hex> (first copy|updated|unchanged)`, bound to a workflow output | Customer direction (§2B item 3). A content hash needs no version marker and no CI job (the reason P-56 originally chose copy-every-run); an in-place edit on the host is detected even when the length is unchanged; the script body crosses WinRM only when it changed, so it can stay fully commented. `stageScriptOnHost` is shared: its inputs changed from `(psHost, resourcePath, targetPath)` to `(psHost, script: ResourceElement, targetPath)` — see `_Shared/Documentation/Script-Staging-Design.md` |
+| P-68 | 2026-09-28 | Script execution | `win_command powershell.exe -File <temp>\cvs_functions.ps1 -Action clean-ServerDisk …` | New shared action **`invokeStagedScript`** runs the staged file by path through the host's own session (`psHost.invokeScript()`), merges all streams, and parses the `PSO_RESULT` line; a missing line throws (**Failed - PS Execution**). Replaces the OOTB *Invoke a PowerShell script* + `parseScriptOutput` + `handlePSFailure` chain for this workflow | The staged file is already verified, so it is invoked, not re-sent. Structured result instead of scanning for `Error:` lines. Its `stagedScript` input must be bound from `stageScriptOnHost`, so the run element cannot be wired without the staging element in front of it |
+| P-69 | 2026-09-28 | Reporting / email (**closes the §5 deferred item**) | None — `clean-ServerDisk` never emailed | Per-server **HTML report** built in vRO from the structured result (problems first; matched / deleted / failed / freed / free before / free after / detail; the preserved-items list in the footer) and sent by new shared action **`sendHtmlEmail`** through the **Orchestrator Mail plug-in** (`EmailMessage`); SMTP host/port/from default to the plug-in's *Configure mail* settings. A send failure does **not** fail the workflow — it sets `executionSuccess=false` and says so | Customer direction (§2B item 1). Mail leaves from Orchestrator, not the PS host, so the script needs no relay access or SMTP parameters. Recipients are validated **before** anything is deleted |
 
-**Net result:** 1 playbook → **1** workflow (`Clean-ServerDisks-ByADGroup`); the
-invoked action (`clean-ServerDisk`) already exists in the deployed script; the
-changes to `cvs_functions.ps1` are limited to **S-14** (case hardening: AD guard,
-Direct resolver, whatIf gate, per-server isolation, zero-result guard) and **S-15**
-(`Remove-files`: `-ErrorAction Stop`, fixed catch message, report-only, per-item
-delete). The shared `parseScriptOutput` / `handlePSFailure` / OOTB *Invoke a
-PowerShell script* contract is reused unchanged.
+**Net result (as redesigned 2026-09-28):** 1 playbook → **1** workflow
+(`Clean-ServerDisks-ByADGroup`, 11 elements: 3 AD plug-in actions, host selection,
+parameter task, **stage**, **run**, parse/report task, email decision, **email**, closing
+summary). **1** new script (`Invoke-ServerDiskClean.ps1`, S-31 … S-33); **3** new/changed
+shared actions (`stageScriptOnHost`, `invokeStagedScript`, `sendHtmlEmail`); **no** change
+to `cvs_functions.ps1`. Build sheet: `Code/workflow_Clean-ServerDisks-ByADGroup.js`.
+The July design (`buildCleanDisksInvocation` + spec) is kept in `Code/Superseded/`.
 
 ---
 
 ## 4. Current vs new — quick mapping
 
-| Today (Ansible playbook) | New (Orchestrator workflow) |
+| Today (Ansible playbook task) | New (Orchestrator workflow element) |
 |---|---|
-| `servers_diskclean.yml` (`-Action clean-ServerDisk`) | `Clean-ServerDisks-ByADGroup` |
+| `win_tempfile` / `win_copy files/ps_scripts` / `win_stat` | **6. Stage Script on Host** (`stageScriptOnHost`) — copy only if absent or different; SHA-256 verified |
+| (inside the script) `Get-ADGroupMember` | **1–3.** `findAdHostForDn` → `resolveAdGroup` → `getGroupComputersDirect` (AD plug-in) |
+| `win_command … -Action clean-ServerDisk` | **7. Run Disk Clean** (`invokeStagedScript`) → `Invoke-ServerDiskClean.ps1` |
+| (none) | **8–10.** Parse, HTML report, `sendHtmlEmail` (Mail plug-in) |
+| `always: win_file state=absent` | *(dropped — the script stays at a fixed path and is re-verified every run)* |
 
-**Variable mapping:**
+**Variable mapping (as redesigned 2026-09-28):**
 
-| Ansible var (`vars.txt`) | vRO workflow input | Script parameter |
+| Ansible var (`vars.txt`) | vRO workflow input / attribute | Script parameter |
 |---|---|---|
-| `var_ADGroupMember` (`CVS-DPT-AllServers`) | `groupDN` | `-ADGroupMember` |
-| `var_DomainName` (`dom4.invalid`) | `domainName` | `-DomainName` |
-| `var_FolderTarget` (`c:\Windows\ccmcache`) | `folderTarget` | `-FolderTarget` |
-| `var_FilterOn` (`*.*`) | `fileFilter` — **fixed workflow attribute `*.*`** (not an operator input) | `-FilterOn` |
-| `var_NumberOfDays` (`-1`) | `olderThanDays` (positive; `1`) | `-NumberOfDays` (build action sends `-olderThanDays`) |
-| `var_FolderIncluded` (`yes`) | `folderIncluded` (boolean) | `-FolderIncluded` |
-| `var_ForceEnable` (`no`) | `forceEnable` (boolean) | `-ForceEnable` |
-| (none — new) | `whatIf` (yes/no, default yes) | `-WhatIf` |
-| `var_ps_folder` / `var_ps_script_file` | folded into `scriptPath` | `& "<scriptPath>"` |
-| `var_parameter_action` (`clean-ServerDisk`) | fixed in the build action | `-Action 'clean-ServerDisk'` |
+| `var_ADGroupMember` (`CVS-DPT-AllServers`) | input `adGroupDn` (the group's **DN**) | *(none — resolved by the AD plug-in; the list arrives as `-ComputerNames`)* |
+| `var_DomainName` (`dom4.invalid`) | *(dropped — implied by the DN's `DC=` parts)* | *(none)* |
+| `var_FolderTarget` (`c:\Windows\ccmcache`) | input `folderTarget` (Array/string, one path per row) | `-FolderTarget` (`|`-joined) |
+| `var_FilterOn` (`*.*`) | attribute `fileFilter` = `*.*` (not an operator input — P-19) | `-FilterOn` |
+| `var_NumberOfDays` (`-1`) | input `olderThanDays` (positive; `1`) | `-OlderThanDays` (positive) |
+| `var_FolderIncluded` (`yes`) | input `folderIncluded` (boolean) | `-FolderIncluded yes/no` |
+| `var_ForceEnable` (`no`) | input `forceEnable` (boolean) | `-ForceEnable yes/no` |
+| (none — new) | input `whatIf` (yes/no, default **yes**) | `-ReportOnly yes/no` |
+| `var_ps_folder` / `var_ps_script_file` | attribute `diskCleanScript` (Resource Element) + `scriptTargetPath` | *(the staged file itself)* |
+| `var_parameter_action` (`clean-ServerDisk`) | *(dropped — the script does one thing)* | *(none)* |
+| (none — new) | inputs `emailReport`, `mailTo`, `mailCc`, `mailSubject`, `smtpHost`, `smtpPort`, `fromAddress` | *(none — vRO sends the mail)* |
 
 ---
 
@@ -232,10 +294,12 @@ PowerShell script* contract is reused unchanged.
 
 | Item | Status / note |
 |---|---|
-| Customer documentation set (01_Executive_Summary … 05_Validation_and_Testing_Plan) | **Complete (2026-07-23).** The section 2A "Items intentionally preserved" list is reproduced in `02_Design_Document` §5 and `04_User_Guide` §3 (including the `vmware-vmsvc-SYSTEM.log` name exclusion and the read-only-vs-hidden distinction). |
-| `.package` export (`com.broadcom.pso…diskcleanup`) | Built from the action + workflow once the workflow is assembled in vRO |
-| Per-server structured reporting / email on completion | Deferred — script outputs aggregate stdout; `clean-ServerDisk` does not currently email a report |
-| Freed-space (bytes deleted) summary in the transcript | Candidate enhancement — `Remove-files` currently reports item counts, not sizes |
+| Customer documentation set (01_Executive_Summary … 05_Validation_and_Testing_Plan) | **OUT OF DATE since the 2026-09-28 redesign.** Written for the `cvs_functions.ps1` / `buildCleanDisksInvocation` design. Must be revised for §2B (AD plug-in, Resource Element + hash-checked staging, standalone script, Mail plug-in, new inputs) and must add the §2A folder caveat. `.docx` copies to be regenerated afterwards. |
+| `.package` export (`com.broadcom.pso.servers.windows.serverDiskClean`) | **The existing `.package` (2026-09-08) is the OLD design** (`buildCleanDisksInvocation` + `parseScriptOutput` + OOTB invoke). Rebuild in vRO from the build sheet; include the Resource Element and the three new shared actions. |
+| Lab validation of the vRO-side pieces | Script logic and staging logic verified locally (PowerShell 5.1: 29 script checks; 8 staging scenarios incl. same-length in-place edit and read-only overwrite). Still to prove in the lab: plug-in result accessor (ST-8), Kerberos second hop to `\\server\c$`, Mail plug-in defaults, WinRM timeout on a large cache. |
+| Per-server structured reporting / email on completion | **Done — S-32 / P-69.** |
+| Freed-space (bytes deleted) summary | **Done — S-32** (measured bytes, plus drive free space before/after). |
+| Folder removed whole with newer contents (§2A caveat) | Inherited and kept, because the profile templates depend on it. Revisit only if the customer wants the cache templates to protect newer nested files — that would need a separate mode, not a change to the profile behaviour. |
 
 ---
 
@@ -248,3 +312,4 @@ PowerShell script* contract is reused unchanged.
 | 2026-07-23 | Automation transition | Process change **P-19**: pinned `fileFilter` to a **fixed workflow attribute `*.*`** (removed it from the operator form). `-FilterOn` applies to directory names too, so a restrictive filter (e.g. `*.txt`) silently prevents folder deletion under `FolderIncluded='yes'`; `*.*` matches all files and folders. No code change. Updated the workflow spec and variable-mapping table. |
 | 2026-07-23 | Automation transition | Process change **P-18**: replaced the negative `fileAgeDays` workflow input with a positive, intuitive **`olderThanDays`** ("delete items older than N days"); the `buildCleanDisksInvocation` action converts it to the script's negative `-NumberOfDays` (`-olderThanDays`) and rejects negatives. Default `1` (== the former `-1`). No `cvs_functions.ps1` change. Updated the build action, workflow spec, and variable-mapping table. |
 | 2026-07-23 | Automation transition | Added **section 2A "Items the clean intentionally preserves"** — the full, customer-facing list of what is *not* deleted (the `vmware-vmsvc-SYSTEM.log` case-sensitive name exclusion, newer-than-cutoff items, loose hidden/system files, the target root folder, read-only files under `ForceEnable=no`, folders under `FolderIncluded=no`, and report-only `whatIf=yes`). Flagged it as a required section for the pending `02_Design_Document` / `04_User_Guide`. No code change. Prompted by the `vmware-vmsvc-SYSTEM.log` exclusion not being obvious from the workflow inputs. |
+| 2026-09-28 | Automation transition | **Redesign per customer direction (§2B).** New standalone, fully-commented **`Invoke-ServerDiskClean.ps1`** (**S-31** script; **S-32** structured per-server result, measured space freed, drive free space before/after; **S-33** sub-folder resilience, absent-target handling, OS-folder refusal, capped listings). Process changes **P-66** (AD plug-in targeting), **P-67** (Resource Element + SHA-256 copy-if-different staging — amends shared `stageScriptOnHost` and programme-wide P-56), **P-68** (run the staged file by path via new shared `invokeStagedScript`), **P-69** (HTML report via new shared `sendHtmlEmail` / Mail plug-in). No vCenter work, by direction: physical and virtual targets are handled identically. Added the §2A folder-removed-whole caveat. New build sheet `Code/workflow_Clean-ServerDisks-ByADGroup.js`; July design moved to `Code/Superseded/`. Confirmed the customer's current playbook is identical to the baseline. Documentation set and `.package` flagged out of date (§5). |

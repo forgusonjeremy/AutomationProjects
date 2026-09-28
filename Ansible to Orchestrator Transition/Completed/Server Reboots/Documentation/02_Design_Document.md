@@ -73,14 +73,15 @@ the PS host.
 | `findAdHostForDn` | Action (shared) | `com.broadcom.pso.vcf.activedirectory` | Picks the registered AD endpoint from the DN's `DC=` parts |
 | `resolveAdGroup` | Action (shared) | `com.broadcom.pso.vcf.activedirectory` | Looks the group up **on that endpoint**, matching on the full DN |
 | `getADComputersGroupNonRecursive` | Action | `com.broadcom.pso.vcf.activedirectory` | Direct, enabled computer members only; warns about nested groups. Source: `Code/getGroupComputersDirect.js` |
-| `runPowerShellScript` | Action (shared) | `com.broadcom.pso.vcfa.vm.guestScripting` | Copies the Resource Element to the host, runs it with the parameters, deletes it, parses `PSO_RESULT` |
+| `runPowerShellScript` | Action (shared by all PowerShell-based workflows) | `com.broadcom.pso.vcfa.vm.guestScripting` | Copies the Resource Element to the host, runs it with the parameters, deletes it, parses `PSO_RESULT`. Source: `_Shared References/psscript/files/runPowerShellScript.js` |
 | `Invoke-ServerReboot.ps1` | Resource Element | Orchestrator | The reboot script. Content is the comment-stripped build `Invoke-ServerReboot.deploy.ps1`; element **name** must be `Invoke-ServerReboot.ps1` |
 | `probeAdPlugin` | Action (shared, diagnostic) | — | Read-only report of AD endpoints, membership properties, PS hosts. Not called by the workflow |
 | `Test-PSHostWinRM.ps1` | Diagnostic script | `Code/` | Run on the PS host when the plug-in cannot open a shell (`document out [EMPTY]`) |
 | PS host | Windows Server + PowerShell plug-in | — | Executes the script; reaches the targets |
 
-"Shared" actions are also used by the Move Archived Logs / Remove Old Archived Logs
-packages. Create each **once** per Orchestrator.
+"Shared" actions are also used by other packages: the AD actions by the Move Archived
+Logs / Remove Old Archived Logs packages, and `runPowerShellScript` by every
+PowerShell-based Orchestrator workflow. Create each **once** per Orchestrator.
 
 The PS host is fixed by the workflow's `psHost` attribute; there is no host selection
 at run time.

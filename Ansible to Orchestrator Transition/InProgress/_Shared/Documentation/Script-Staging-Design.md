@@ -1,9 +1,40 @@
 # Script Staging — Design & Implementation
 
+> **AMENDED 2026-09-28 — P-67 supersedes amendment 1 below.** At the customer's direction
+> (Windows Server Clean Disks), `stageScriptOnHost` now **copies only when it has to**:
+>
+> | Host state | Action |
+> |---|---|
+> | Target absent | Copy (first run) |
+> | SHA-256 **and** byte length match the Resource Element | Nothing copied — the existing copy runs |
+> | Anything differs | Warn with both hashes, overwrite, re-hash on disk, fail the run on mismatch |
+>
+> The comparison is a **content hash computed at run time** (SHA-256 in the action over the
+> exact bytes it would write; `Get-FileHash` on the host), so it keeps everything amendment 1
+> bought — **no version marker, no CI stamping job** — while sending the script body over
+> WinRM only when it changed. That is what makes it affordable to keep scripts **fully
+> commented** in the Resource Element.
+>
+> **Signature changed:** `(psHost, resourcePath, targetPath)` → **`(psHost, script, targetPath)`**
+> where `script` is the **ResourceElement** itself, bound from a workflow attribute set at build
+> time (so the run record shows which element was staged; no path lookup inside the action).
+> Returns `<name> v<version> sha256=<12 hex> (first copy|updated|unchanged)`.
+>
+> **Companion action:** `invokeStagedScript (psHost, scriptPath, parameters, stagedScript)` runs
+> the staged file by path and parses its `PSO_RESULT` line. Its `stagedScript` input is bound
+> from `stageScriptOnHost`'s output, so it cannot be wired without staging in front of it.
+> Workflows that build an invocation string for the OOTB *Invoke a PowerShell script* may keep
+> doing so — staging is independent of how the script is then invoked.
+>
+> Also changed: the install step writes a **uniquely named** `.staging` sibling (two concurrent
+> runs cannot collide), and the file is written through the host's own session
+> (`psHost.invokeScript()`, the same one the run uses) so it is written by the identity that
+> executes it. Verified locally against Windows PowerShell 5.1 — see §8, ST-1 … ST-6.
+>
 > **CURRENT — reinstated 2026-08-18.** `Execution-Model-GuestOps.md` is deferred; this is
 > the model being built. Three amendments from the version first written:
 >
-> 1. **`stageScriptOnHost` copies on every run.** No version marker, no comparison. **S-29
+> 1. ~~**`stageScriptOnHost` copies on every run.**~~ *(Superseded 2026-09-28 by P-67 above.)* No version marker, no comparison. **S-29
 >    and its CI-stamping prerequisite are dropped** — one less thing to build, and one less
 >    open question ("who owns the CI job") on the critical path. Ansible copies every run; so
 >    do we. "Which generation ran" is the Resource Element version, logged by the action.
@@ -57,7 +88,7 @@ staging logic drifts per project.
 Two elements go in front of the existing invoke step, in every workflow:
 
 ```
-[ stageScriptOnHost ]      psHost, resourcePath, targetPath, force
+[ stageScriptOnHost ]      psHost, script (ResourceElement attr), targetPath
         |                  -> scriptVersion (workflow attribute)
         v
 [ build<X>Invocation ]     scriptPath = targetPath
@@ -217,16 +248,20 @@ hazard that the marker would now assert a generation that is not what is deploye
 
 ## 8. Validation
 
+*(Rows updated 2026-09-28 for P-67. ST-1, ST-2, ST-4 and ST-6 were run locally against
+Windows PowerShell 5.1 with the vRO objects stubbed — all passed, including a
+**same-length** in-place edit and overwriting a **read-only** host copy. Repeat in the lab.)*
+
 | # | Check | Expected |
 |---|---|---|
-| **ST-1** | Run twice, unchanged | First run stages; second logs `already at <marker> - nothing pushed` |
-| **ST-2** | Bump the Resource Element, re-run | Stages, verifies, returns the new marker |
-| **ST-3** | Delete the target on the host, re-run | Probe returns `ABSENT`; stages cleanly; directory created if missing |
-| **ST-4** | Edit the deployed copy in place, re-run | Warns on length mismatch, re-stages |
-| **ST-5** | Strip the marker from the Resource Element | Fails with the S-29 message; nothing pushed |
-| **ST-6** | 60 KB script (`cvs_svcaccounts.ps1`) | Two chunks, both acknowledged; verified length matches |
+| **ST-1** | Run twice, unchanged | First run returns `(first copy)`; second returns `(unchanged)` and logs "exact match … nothing copied" |
+| **ST-2** | Update the Resource Element, re-run | Warns with both hashes, returns `(updated)` with the new hash |
+| **ST-3** | Delete the target on the host, re-run | Probe returns `ABSENT`; returns `(first copy)`; directory created if missing |
+| **ST-4** | Edit the deployed copy in place (even keeping its length), re-run | Warns with both hashes, re-stages, returns `(updated)` |
+| **ST-5** | ~~Strip the marker~~ *(no marker since P-67)* — empty the Resource Element instead | Fails before contacting the host; target untouched |
+| **ST-6** | 60 KB script (`cvs_svcaccounts.ps1`) | Two chunks, both acknowledged; verified SHA-256 and length match |
 | **ST-7** | Point `targetPath` at a directory with no write access | Fails at install; target unchanged |
-| **ST-8** | Confirm the plug-in result accessor | `psInvoke()` returns non-empty for a `Write-Output` probe — see the note in the action header |
+| **ST-8** | Confirm the plug-in result accessor | `psInvoke()` returns the `PSO_PROBE=` line (it reads `getHostOutput()`, then `getInvocationResult().getRootObject()`) — see the note in the action header |
 
 **ST-8 first.** The PowerShell plug-in's result accessors vary by version;
 `stageScriptOnHost` tries `getHostOutput()`, then `getInvocationResult()`, then
