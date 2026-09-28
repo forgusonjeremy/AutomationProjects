@@ -11,6 +11,7 @@ transition — what changed, and **why**.
 > recorded in that project's register
 > (`Completed/Move Windows Event Logs/_Shared/Documentation/Change-Register.md`).
 > This deliverable adds **S-6 … S-15** and process changes **P-9 … P-18**.
+> The deployed workflow definition is `Code/rebootServersWorkflow.yml`.
 >
 > **Script under change (working copy):** `InProgress/psscript/files/cvs_functions.ps1`
 > **Promoted to (on completion):** `Completed/_Shared References/psscript/files/cvs_functions.ps1`
@@ -200,11 +201,12 @@ a little time — rebooting one takes a production service down. A sub-group nes
 in the reboot group is reported in a warning naming it, so the omission is visible
 on the run that made it rather than discovered months later.
 
-**Net result:** 1 playbook → **1 workflow** (`Invoke Server Reboot`). Five actions
-shared with the Move package (`runPowerShellScript`, `selectPowerShellHost`,
-`resolveAdGroup`, `findAdHostForDn`, `probeAdPlugin` — create each **once**), one
-new action of its own (`getGroupComputersDirect`), two scriptable tasks, and one
-Resource Element. `buildServerRebootInvocation` is **retired** — it existed only to
+**Net result:** 1 playbook → **1 workflow** (`Reboot Servers in AD Group`). Four
+actions shared with the Move package (`runPowerShellScript`, `resolveAdGroup`,
+`findAdHostForDn`, and the diagnostic `probeAdPlugin` — create each **once**), one
+action of its own (`getADComputersGroupNonRecursive`, source
+`Code/getGroupComputersDirect.js`), two scriptable tasks, and one Resource Element.
+The PowerShell host is a fixed workflow attribute. `buildServerRebootInvocation` is **retired** — it existed only to
 build the pre-staged command line. `parseScriptOutput` / `handlePSFailure` are no
 longer used by this workflow.
 
@@ -219,13 +221,13 @@ remains the working copy for every automation that has not yet been transitioned
 
 | Today (Ansible) | New (Orchestrator) |
 |---|---|
-| `servers_reboot.yml` + `vars.txt` | `Invoke Server Reboot` workflow |
-| `var_ADGroupMember` | `adGroup` (picked from a tree) or `adGroupDn` (scheduled/API runs) → resolved by the AD plug-in → `-ComputerNames` |
+| `servers_reboot.yml` + `vars.txt` | `Reboot Servers in AD Group` workflow |
+| `var_ADGroupMember` | `adGroupDn` input → resolved by the AD plug-in → `-ComputerNames` |
 | `var_DomainName` | *(dropped as an input — the domain is read from the group's own DN, so the two can never disagree; see P-16)* |
-| `var_RebootIt` (`simpleMode`) | `rebootMode` input → `-RebootMode` (default `no` = report only) |
-| `var_RebootIt_DelayBetweenServer` | `delayBetweenServersSec` input |
-| *(new)* | `verifyTimeoutSec` / `verifyPollSec` inputs (S-10) |
-| *(new)* | `runPreRebootScript` / `preRebootScriptPath` inputs (S-13, default OFF) |
+| `var_RebootIt` (`simpleMode`) | `rebootMode` input (dropdown **Reboot** = `reboot` / **Report Only** = `report-only`) → `-RebootMode`; only `reboot` reboots |
+| `var_RebootIt_DelayBetweenServer` | `delayBetweenServersSec` workflow attribute (10) |
+| *(new)* | `verifyTimeoutSec` (600) / `verifyPollSec` (30) workflow attributes (S-10) |
+| *(new)* | `runPreRebootScript` input (S-13, default OFF; step embedded per S-14) |
 | `var_eMailReport` | `emailReport` input (boolean) |
 | `var_SMTPServer` | `smtpServer` input |
 | `var_MailToString` / `var_MailCcString` | `mailTo` / `mailCc` inputs (**arrays**, joined to CSV) |
@@ -247,13 +249,13 @@ remains the working copy for every automation that has not yet been transitioned
 | **`Invoke-Module` defect** | **RESOLVED — see S-12** (applied 2026-07-17). |
 | **Old `!(PendingReboot -eq 'False')` test elsewhere** | Still present in `Get-ServerRebootReportStatus-ByCN` and `Get-ServerPendingRebootStatus`. **Intentionally left as-is:** in those report-only actions the test merely increments a counter for the mail subject ("X of Y might require reboot") and never triggers a reboot. Changing it would alter those actions' reported figures. Only the reboot path (S-8) was corrected. |
 | **`Get-RebootStatus` stale `$ComputerlastBootUptime`** | In its catch block the emitted object can carry the *previous* server's boot time. Harmless here (status-unknown servers are never rebooted or verified), but worth a future tidy. |
-| **WinRM operation timeout** | One synchronous invocation now runs for `(N × delay) + up to VerifyTimeoutSec`. The PS host's WinRM `MaxTimeoutms` / plug-in timeout must exceed the worst case. Validate before first production run. |
+| **WinRM operation timeout** | One synchronous invocation now runs for ~40s start-up + `((N-1) × delay) + up to VerifyTimeoutSec`. The PS host's WinRM `MaxTimeoutms` / plug-in timeout must exceed the worst case. Validate before first production run. |
 | **Second hop (delegation)** | PS host → AD and PS host → each target over RPC/WMI/SMB. Same Kerberos constrained-delegation requirement as the Move package. See *How to Build a PowerShell Host* §6. |
 | **Event Log package re-test** | S-12 changes `Invoke-Module`, which `move-archived-logs-ByCN` also calls. The already-delivered package benefits from the fix but should be re-tested before the updated script is deployed. **Reduced in scope by P-16:** this workflow no longer calls `Invoke-Module` at all, so the risk is now confined to the Event Log package itself. |
 | **PS host certificate must be SHA-256 (VCF Automation 9.1.1)** | **RESOLVED 2026-09-22 — root cause of a full outage.** After the 9.1 → 9.1.1 upgrade, *every* PowerShell workflow in both this package and the Move Windows Event Logs package failed with `document out [EMPTY]` on the WS-Man Shell Create. Cause: `Configure-vROPSHost.ps1` pinned the legacy `Microsoft RSA SChannel Cryptographic Provider` CSP and did not pass `-HashAlgorithm`, producing a **SHA-1 signed** certificate. 9.1.1 runs the Orchestrator JVM with BouncyCastle in FIPS approved-only mode (`FIPS_MODE: strict`) and refuses SHA-1, so the TLS handshake failed — while the SSL Trust Manager still reported the certificate as *trusted*, because trust and algorithm policy are separate checks. Nothing in the vRO error named TLS or the certificate. Fixed in the shared script (`-HashAlgorithm SHA256` + CNG KSP, with a post-generation check that refuses to continue if the result is still weak) and documented in *How to Build a PowerShell Host* §3. **Re-verify on any host built before 2026-09-22:** `curl -vk https://<host>:5986/wsman 2>&1 \| grep 'signed using'`. |
-| **Remaining documentation still describes the pre-staged design** | **OPEN.** `01_Executive_Summary`, `02_Design_Document`, `03_Implementation_Guide` and `04_User_Guide` (and their `.docx` builds) were written against P-9/P-10/P-13 and still refer to a `scriptPath` input, `buildServerRebootInvocation` and `parseScriptOutput`. The code and this register are current; those four are not. They need rewriting against the canvas in `Code/workflow_Invoke-ServerReboot.js` before the package is handed over. |
-| **Shared actions — do not create twice** | **ACTION ON BUILD.** `runPowerShellScript`, `selectPowerShellHost`, `resolveAdGroup`, `findAdHostForDn` and `probeAdPlugin` are shared with the Move / Remove Archived Logs packages and are delivered inside this one so it can stand alone. If either of those is already installed, these actions exist — create each **once** and let all three workflows call it. A second copy under a different name drifts silently from the first. |
-| **`Invoke-ServerReboot.ps1` not yet run against real servers** | **OPEN.** The script has been verified end to end for parsing, input validation, report generation, the `PSO_RESULT` contract and the S-8 skip path (using unreachable hosts). The paths that need real infrastructure — a genuine pending-reboot detection, `shutdown.exe` acceptance, and `LastBootUpTime` verification — have not been exercised. Run report-only against a real group first, then a single-server live run, before any group-wide run. |
+| **Remaining documentation still describes the pre-staged design** | **RESOLVED 2026-09-28** for the Markdown sources: `01_Executive_Summary`, `02_Design_Document`, `03_Implementation_Guide` and `04_User_Guide` were rewritten against the deployed workflow (`Code/rebootServersWorkflow.yml`). **OPEN:** the `.docx` builds of all five documents have not been regenerated and still describe the earlier design. |
+| **Shared actions — do not create twice** | **ACTION ON BUILD.** `runPowerShellScript`, `resolveAdGroup`, `findAdHostForDn` and `probeAdPlugin` are shared with the Move / Remove Archived Logs packages and are delivered inside this one so it can stand alone. If either of those is already installed, these actions exist — create each **once** and let all three workflows call it. A second copy under a different name drifts silently from the first. |
+| **`Invoke-ServerReboot.ps1` not yet run against real servers** | **RESOLVED 2026-09-23** — first successful end-to-end live reboot, including `shutdown.exe` acceptance and `LastBootUpTime` verification; the defects it exposed are S-15a/b. *Original note:* The script has been verified end to end for parsing, input validation, report generation, the `PSO_RESULT` contract and the S-8 skip path (using unreachable hosts). The paths that need real infrastructure — a genuine pending-reboot detection, `shutdown.exe` acceptance, and `LastBootUpTime` verification — have not been exercised. Run report-only against a real group first, then a single-server live run, before any group-wide run. |
 
 ---
 
@@ -272,3 +274,4 @@ remains the working copy for every automation that has not yet been transitioned
 | 2026-09-14 | Automation transition | Added script change **S-14**: the pre-reboot step (`ownership_w2k.ps1`) moved INSIDE `Invoke-ServerReboot.ps1` as the `$PreRebootStep` script block, and `-PreRebootScriptPath` was removed. Nothing is pre-staged under P-14, so a path parameter would have rebuilt the exact shape of defect S-6 — a path resolving to nothing, a silent non-terminating failure, and the server rebooted as though the step had run. Each `takeown`/`icacls` call now has its exit code checked, which the original never did (native executables raise no PowerShell exception — the S-9 defect class); verified by running the block unelevated, where all five commands failed and all five were reported. Default behaviour unchanged: the step still does not run unless `-RunPreRebootScript 'yes'`, and a failure still logs an ERROR and reboots anyway. |
 | 2026-09-22 | Automation transition | **Shared-component defect fixed: PS host certificate was SHA-1.** Following the VCF Automation 9.1 → 9.1.1 upgrade, every PowerShell workflow in **both** this package and the already-delivered Move Windows Event Logs package failed identically with `document out [EMPTY]` on the WS-Man Shell Create. Root cause: `Configure-vROPSHost.ps1` pinned the legacy SChannel CSP and omitted `-HashAlgorithm`, yielding a SHA-1 signed listener certificate. 9.1.1 runs the Orchestrator JVM under BouncyCastle FIPS approved-only mode and refuses SHA-1, failing the TLS handshake — with no error naming TLS or the certificate, and with the SSL Trust Manager simultaneously reporting the certificate as trusted. `Configure-vROPSHost.ps1` now uses `-HashAlgorithm SHA256` (configurable to SHA384/SHA512) with the CNG KSP, adds a Server Authentication EKU and explicit subject, **verifies the generated certificate is not weakly signed and aborts if it is**, refuses a SHA-1 cert in `ExistingCA` mode, warns when SANs omit the FQDN, and reports what the listener is actually bound to. Per operator decision it generates a **new certificate on every run** — so each run must be followed by re-importing the cert and re-running *Update a PowerShell host*; superseded certificates are reported, not deleted. Also fixed a `Set-StrictMode` defect in the new code (`.Count` on an unrolled empty array). Guide §3 updated. `Test-PSHostWinRM.ps1` (new diagnostic, `InProgress/Server Reboots/Code/`) flags a weak listener certificate. |
 | 2026-09-14 | Automation transition | **Workflow schema simplified — no behaviour change.** The Decision element and the two end-state scriptable tasks (`End - Success` / `End - Errors`) were removed. `Parse Results` now does all the reporting, including the run's closing line, and connects straight to a single `End`. The canvas is seven elements plus three failure end states hung off exception bindings. Per-server problems no longer land on a separate "Completed with Errors" end state — the run completes and the `executionSuccess` output (false when the script reported any error) is what a caller branches on. Rationale: the whole account of a run stays in one place and one order, rather than split across two branches where half is only reached on one of them. `rebootMode` added to `Parse Results`' IN tab for the closing line. |
+| 2026-09-28 | Automation transition | **Documentation aligned to the deployed workflow — no behaviour change.** `01`–`04` rewritten against `Code/rebootServersWorkflow.yml`, which is now the authoritative workflow definition: workflow `Reboot Servers in AD Group` (`ca28572d-…`); six elements (`findAdHostForDn` → `resolveAdGroup` → `getADComputersGroupNonRecursive` → *Create Script Parameters* → `runPowerShellScript` → *Parse Results*); PS host, Resource Element and the three timings (10s / 600s / 30s) held as workflow attributes; `rebootMode` values `reboot` / `report-only`. Section 4 mapping and the open items updated to match; the "not yet run against real servers" and documentation items closed. `.docx` builds still to regenerate. |
