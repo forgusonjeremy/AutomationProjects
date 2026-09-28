@@ -33,7 +33,7 @@
     Comma-separated server names (FQDNs), supplied by Orchestrator from the AD group.
 
 .PARAMETER RebootMode
-    THE SAFETY GATE. 'simpleMode' actually reboots. ANY other value (default 'no')
+    THE SAFETY GATE. 'reboot' actually reboots. ANY other value (default 'report-only')
     produces a report-only run: pending servers are detected and reported but NOT
     rebooted. The odd spelling is inherited from the Ansible variable var_RebootIt
     and is kept so the two can be read against each other.
@@ -51,12 +51,10 @@
     How often the verification pass re-checks the servers that have not yet returned.
 
 .PARAMETER RunPreRebootScript
-    'yes' runs -PreRebootScriptPath on each server immediately before rebooting it.
-    Defaults to 'no'. See the NOTES section -- do not turn this on without reading it.
-
-.PARAMETER PreRebootScriptPath
-    Path on the PowerShell host to the script to run when -RunPreRebootScript is
-    'yes'. Historically ownership_w2k.ps1. Required only when that switch is on.
+    'yes' runs the embedded pre-reboot step on each server immediately before
+    rebooting it. Defaults to 'no'. The step is the former ownership_w2k.ps1, carried
+    into this file as a script block -- there is no separate file and no path to
+    supply. See the NOTES section; do not turn this on without reading it.
 
 .PARAMETER EmailReport
     'yes' emails the HTML report. 'no' (default) builds it and writes it to the log
@@ -99,13 +97,22 @@
       5. (S-11) A per-server HTML report is produced and optionally emailed. The
          old Invoke-ServerReboot action produced no report and sent no mail.
 
-    THE PRE-REBOOT SCRIPT IS OFF BY DEFAULT, AND SHOULD STAY THAT WAY  (S-13)
-    ownership_w2k.ps1 takes ownership of and loosens the ACLs on usbstor.inf (the
-    USB mass-storage driver INF -- a common hardening DENY target) and termsrv.dll
-    (Terminal Services). Because of defect S-6 the step has NEVER actually executed,
-    so enabling it is a security-posture CHANGE, not a restoration of working
-    behaviour. Leave -RunPreRebootScript at 'no' until security has reviewed it.
-    The 'w2k' naming suggests it may simply be obsolete.
+    THE PRE-REBOOT STEP IS OFF BY DEFAULT, AND SHOULD STAY THAT WAY  (S-13, S-14)
+    It takes ownership of and loosens the ACLs on usbstor.inf (the USB mass-storage
+    driver INF -- a common hardening DENY target) and termsrv.dll (Terminal
+    Services). Because of defect S-6 it has NEVER actually executed, so enabling it
+    is a security-posture CHANGE, not a restoration of working behaviour. Leave
+    -RunPreRebootScript at 'no' until security has reviewed it. The 'w2k' (Windows
+    2000) naming suggests it may simply be obsolete.
+
+    S-14 moved it INTO this file, as the $PreRebootStep script block below. It used
+    to be a separate ownership_w2k.ps1 staged beside cvs_functions.ps1 on the
+    PowerShell host, reached by a path built at run time -- which is precisely what
+    defect S-6 broke, silently, for years. Nothing is pre-staged under the current
+    design, so a path parameter would have reintroduced exactly that failure: a
+    missing file, a non-terminating error, and a server rebooted as though the step
+    had run. Embedding it means the step either runs or reports why, and it is
+    version-controlled with the script that calls it.
 
     WHY VERIFICATION IS ONE PASS AFTER ALL REBOOTS, NOT PER SERVER
     Reboot-then-block-until-back would take up to N x VerifyTimeoutSec. With 20
@@ -121,7 +128,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ComputerNames,
 
-    [string]$RebootMode = 'no',
+    [string]$RebootMode = 'report-only',
 
     [int]$DelayBetweenServersSec = 10,
 
@@ -131,8 +138,6 @@ param(
 
     [ValidateSet('yes', 'no')]
     [string]$RunPreRebootScript = 'no',
-
-    [string]$PreRebootScriptPath = '',
 
     [ValidateSet('yes', 'no')]
     [string]$EmailReport = 'no',
@@ -303,6 +308,75 @@ function Get-RebootStatus {
 }
 
 # ---------------------------------------------------------------------------
+# The optional pre-reboot step  (S-13 opt-in, S-14 embedded)
+#
+# This is the former ownership_w2k.ps1, carried into this file verbatim in effect.
+# It runs ON EACH TARGET SERVER, via Invoke-Command, immediately before that server
+# is rebooted -- and ONLY when -RunPreRebootScript is 'yes'.
+#
+# READ BEFORE ENABLING. It weakens two hardening controls:
+#   usbstor.inf   the USB mass-storage driver INF. Denying access to it is a common
+#                 way to stop USB storage being installed. This grants Users:RX and
+#                 Administrators:F back.
+#   termsrv.dll   Terminal Services. Loosening its ACL is a known prerequisite for
+#                 patching it to allow concurrent RDP sessions.
+# Because of defect S-6 this has never actually run in production. Turning it on is
+# a NEW security posture, not a restoration of an old one.
+#
+# WHY IT IS A SCRIPT BLOCK AND NOT A FILE
+# Nothing is pre-staged under the current design. A -PreRebootScriptPath pointing at
+# a file on the host would have rebuilt the exact shape of defect S-6: a path that
+# resolves to nothing, a non-terminating failure, and the server rebooted as though
+# the step had succeeded. Held here, it either runs or says why.
+#
+# EXIT CODES ARE CHECKED, UNLIKE THE ORIGINAL
+# takeown and icacls are NATIVE executables: on failure they set an exit code and
+# write to stderr, but raise no PowerShell exception. The original's try/catch
+# therefore never fired for them and every failure was invisible. Same defect class
+# as S-9. Each command's exit code is tested and the failures are returned to the
+# caller as text.
+#
+# The commands themselves are unchanged from ownership_w2k.ps1, including the
+# icacls /grant argument spellings -- this is a port, not a rewrite. If any of them
+# is wrong, it has always been wrong, and it will now say so instead of failing
+# silently.
+# ---------------------------------------------------------------------------
+$PreRebootStep = {
+
+    # Runs one native command and RETURNS a description of the failure, or $null.
+    # It returns rather than appending to an outer variable: this block executes in a
+    # remote session, and a helper reaching back into its caller's scope is exactly
+    # the kind of thing that works when tested locally and quietly does nothing
+    # there.
+    function Invoke-Native {
+        param([string]$Label, [scriptblock]$Command)
+
+        $output = & $Command 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            return "$Label exited $LASTEXITCODE : $($output -join ' ')"
+        }
+        return $null
+    }
+
+    $problems = @()
+
+    # Make the files owned by Administrators.
+    $problems += Invoke-Native 'takeown usbstor.inf' { takeown.exe /A /F c:\windows\inf\usbstor.inf }
+    $problems += Invoke-Native 'takeown termsrv.dll' { takeown.exe /A /F c:\windows\system32\termsrv.dll }
+
+    # Adjust from DENY to ALLOW.
+    $problems += Invoke-Native 'icacls usbstor.inf grant Users:RX'         { icacls.exe c:\windows\inf\usbstor.inf /grant 'Users:RX' }
+    $problems += Invoke-Native 'icacls usbstor.inf grant Administrators:F' { icacls.exe c:\windows\inf\usbstor.inf /grant 'Administrators:F' }
+
+    # Grant full permissions.
+    $problems += Invoke-Native 'icacls termsrv.dll grant administrator:F'  { icacls.exe c:\windows\system32\termsrv.dll /grant ':r' 'administrator:F' }
+
+    # A successful command contributes $null, which lands in the array as an empty
+    # element -- strip those so the caller gets failures only.
+    return @($problems | Where-Object { $_ })
+}
+
+# ---------------------------------------------------------------------------
 # Issue one reboot
 #
 # shutdown.exe is a NATIVE executable. When it fails -- access denied, RPC
@@ -383,10 +457,23 @@ function Wait-ServersBackOnline {
             if ($null -ne $newBoot -and ($null -eq $t.PreRebootLastBoot -or $newBoot -gt $t.PreRebootLastBoot)) {
                 $t.BackOnline  = $true
                 $t.NewLastBoot = $newBoot
-                $t.DurationSec = [int]((Get-Date) - $t.RebootIssuedAt).TotalSeconds
+
+                # Measured to the server's OWN boot time, not to the moment this
+                # pass happened to look at it.
+                #
+                # Verification is a single batch pass that starts only after every
+                # reboot has been issued, so a server rebooted early has been up
+                # for the whole of the remaining delay before anything checks it.
+                # Timing to (Get-Date) therefore reported the wait, not the
+                # reboot: a server that came back in 14 seconds was logged as
+                # "back online after 1200s" purely because it was first in the
+                # queue. LastBootUpTime is what the machine itself says, so it is
+                # the same number however late the poll arrives.
+                $t.DurationSec = [Math]::Max(0, [int]($newBoot - $t.RebootIssuedAt).TotalSeconds)
+
                 $t.Status      = 'Rebooted'
                 $t.Detail      = "Back online; LastBootUpTime advanced to $newBoot"
-                Write-Log "$($t.ComputerName) : back online after $($t.DurationSec)s"
+                Write-Log "$($t.ComputerName) : back online, returned $($t.DurationSec)s after its reboot was issued"
             }
             elseif ((Get-Date) -ge $deadline) {
                 $t.BackOnline  = $false
@@ -531,7 +618,7 @@ if ($servers.Count -eq 0) {
     return
 }
 
-$willReboot = ($RebootMode -eq 'simpleMode')
+$willReboot = ($RebootMode -eq 'reboot')
 
 if ($DelayBetweenServersSec -lt 0) {
     Write-Log "DelayBetweenServersSec must be 0 or greater, but was $DelayBetweenServersSec. Nothing was done." 'ERROR'
@@ -545,25 +632,22 @@ if ($VerifyPollSec -lt 1 -or $VerifyTimeoutSec -lt 1 -or $VerifyPollSec -gt $Ver
     return
 }
 
-if ($RunPreRebootScript -eq 'yes' -and
-    ([string]::IsNullOrWhiteSpace($PreRebootScriptPath) -or -not (Test-Path -LiteralPath $PreRebootScriptPath))) {
-    # Defect S-6 was exactly this: the path was built from a variable that was always
-    # empty, Invoke-Command could not find the file, the failure was non-terminating,
-    # and the server was rebooted anyway -- so the step appeared to work for years
-    # while never once running. It is checked up front now rather than per server.
-    Write-Log "RunPreRebootScript is 'yes' but no script exists at '$PreRebootScriptPath'. Nothing was done." 'ERROR'
-    Write-Result @{ serversRequested = $servers.Count; pendingReboot = 0; rebooted = 0; notReturned = 0; rebootFailed = 0; skipped = 0; reportOnly = (-not $willReboot) }
-    return
-}
-
 if ($HeaderNote -eq '') { $HeaderNote = '(group not named)' }
+
+# S-14: there is no longer a path to validate here. The pre-reboot step is the
+# $PreRebootStep script block in this file, so it cannot be missing -- which is the
+# whole point of embedding it. Defect S-6 was a path that silently resolved to
+# nothing; that failure mode no longer exists.
+if ($RunPreRebootScript -eq 'yes' -and $willReboot) {
+    Write-Log "Pre-reboot step is ENABLED. It will run on every server that is rebooted, and it loosens ACLs on usbstor.inf and termsrv.dll. This has never run in production before (defect S-6)." 'WARN'
+}
 
 Write-Log "==============================================="
 Write-Log "Servers to check  : $($servers.Count)"
 Write-Log "Reboot mode       : $RebootMode$(if (-not $willReboot) { "  (REPORT ONLY - nothing will be rebooted)" })"
 Write-Log "Delay between     : ${DelayBetweenServersSec}s"
 Write-Log "Verify timeout    : ${VerifyTimeoutSec}s, polling every ${VerifyPollSec}s"
-Write-Log "Pre-reboot script : $RunPreRebootScript$(if ($RunPreRebootScript -eq 'yes') { " - $PreRebootScriptPath" })"
+Write-Log "Pre-reboot step   : $RunPreRebootScript$(if ($RunPreRebootScript -eq 'yes') { '  (embedded; loosens ACLs on usbstor.inf and termsrv.dll)' })"
 Write-Log "==============================================="
 
 # ---------------------------------------------------------------------------
@@ -642,18 +726,35 @@ Write-Log "Servers requiring a reboot: $($rebootTargets.Count) of $($servers.Cou
 if ($willReboot -and $rebootTargets.Count -gt 0) {
 
     # -- Phase 1: issue every reboot, with the delay between each ------------
-    foreach ($t in $rebootTargets) {
+    # Indexed rather than foreach so the delay can be skipped after the LAST
+    # server -- see the note at the Start-Sleep below.
+    for ($i = 0; $i -lt $rebootTargets.Count; $i++) {
+        $t = $rebootTargets[$i]
 
-        # S-13: opt-in, default off. See the NOTES block at the top of this file.
-        # When enabled, a failure here is non-fatal by design -- it matches the
-        # historic intent: log an error and still reboot the server.
+        # S-13: opt-in, default off. S-14: the step is the $PreRebootStep script
+        # block in this file, sent to the server rather than read from a path.
+        #
+        # A failure here is non-fatal BY DECISION, matching the historic intent:
+        # log an error and still reboot the server. Two kinds of failure are
+        # possible and both are reported, because they have different causes:
+        #   - the remote session itself fails      -> caught below
+        #   - a takeown/icacls command fails       -> returned in $problems
+        # The second kind never surfaced at all before, because native executables
+        # raise no exception (the same defect class as S-9).
         if ($RunPreRebootScript -eq 'yes') {
             try {
-                Write-Log "$($t.ComputerName) : running pre-reboot script $PreRebootScriptPath"
-                Invoke-Command -ComputerName $t.ComputerName -FilePath $PreRebootScriptPath -ErrorAction Stop
+                Write-Log "$($t.ComputerName) : running the embedded pre-reboot step"
+                $problems = Invoke-Command -ComputerName $t.ComputerName -ScriptBlock $PreRebootStep -ErrorAction Stop
+
+                foreach ($problem in @($problems)) {
+                    Write-Log "$($t.ComputerName) : pre-reboot step - $problem. Rebooting anyway." 'ERROR'
+                }
+                if (@($problems).Count -eq 0) {
+                    Write-Log "$($t.ComputerName) : pre-reboot step completed"
+                }
             }
             catch {
-                Write-Log "$($t.ComputerName) : pre-reboot script failed - $($_.Exception.Message). Rebooting anyway." 'ERROR'
+                Write-Log "$($t.ComputerName) : pre-reboot step could not run - $($_.Exception.Message). Rebooting anyway." 'ERROR'
             }
         }
 
@@ -669,17 +770,23 @@ if ($willReboot -and $rebootTargets.Count -gt 0) {
             $t.Detail       = 'shutdown command was rejected; see the ERROR line in the transcript.'
         }
 
-        Start-Sleep -Seconds $DelayBetweenServersSec
+        # The delay is BETWEEN servers, so there is nothing to wait for after the
+        # last one. Sleeping there just adds DelayBetweenServersSec of dead time to
+        # every run before verification even starts -- with a 600s delay and two
+        # servers that was ten wasted minutes out of a twenty-one minute run.
+        if ($i -lt ($rebootTargets.Count - 1)) {
+            Start-Sleep -Seconds $DelayBetweenServersSec
+        }
     }
 
     # -- Phase 2: one verification pass over everything actually rebooted ----
     Wait-ServersBackOnline -Targets $report -TimeoutSec $VerifyTimeoutSec -PollSec $VerifyPollSec
 }
 elseif ($rebootTargets.Count -gt 0) {
-    Write-Log "RebootMode is '$RebootMode', not 'simpleMode' - report-only run. $($rebootTargets.Count) server(s) require a reboot but none were rebooted."
+    Write-Log "RebootMode is '$RebootMode', not 'reboot' - report-only run. $($rebootTargets.Count) server(s) require a reboot but none were rebooted."
     foreach ($t in $rebootTargets) {
         $t.Status = 'Skipped-ReportOnly'
-        $t.Detail = "Pending reboot detected but RebootMode was '$RebootMode', not 'simpleMode'."
+        $t.Detail = "Pending reboot detected but RebootMode was '$RebootMode', not 'reboot'."
     }
 }
 else {

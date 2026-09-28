@@ -148,11 +148,17 @@ Generate a self-signed cert and export it as **Base-64 (PEM)**:
 ```powershell
 $cert = New-SelfSignedCertificate `
     -CertStoreLocation cert:\localmachine\my `
+    -Subject "CN=pshost.vcf.lab" `
     -DnsName ("pshost.vcf.lab", "pshost") `
     -NotAfter (Get-Date).AddYears(5) `
-    -Provider "Microsoft RSA SChannel Cryptographic Provider" `
-    -KeyLength 2048
-$cert.Thumbprint     # note for Step 4
+    -Provider "Microsoft Software Key Storage Provider" `
+    -KeyAlgorithm RSA `
+    -KeyLength 2048 `
+    -HashAlgorithm SHA256 `
+    -KeyUsage DigitalSignature, KeyEncipherment `
+    -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.1')   # EKU: Server Authentication
+$cert.Thumbprint                          # note for Step 4
+$cert.SignatureAlgorithm.FriendlyName     # MUST be sha256RSA or stronger — see below
 
 # vRO's "Import a trusted certificate from a file" requires Base-64 (PEM).
 # Export-Certificate -Type CERT writes DER (binary), which vRO REJECTS. Write PEM:
@@ -167,6 +173,39 @@ $cert.Thumbprint     # note for Step 4
 
 > `-NotAfter` sets a 5-year expiry; if omitted the cert expires in 1 year. An
 > expired certificate breaks **every** workflow using this host — track the expiry.
+
+> **The certificate MUST be SHA-256 signed. `-HashAlgorithm SHA256` and the CNG
+> KSP are both required — neither alone is enough.**
+>
+> VCF Automation 9.1.1 runs its Orchestrator JVM with BouncyCastle in FIPS
+> approved-only mode (`FIPS_MODE: strict`, `-Dorg.bouncycastle.fips.approved_only=true`)
+> and **refuses a SHA-1 signed certificate**. The TLS handshake fails and *every*
+> PowerShell workflow dies on the WS-Man Shell Create with:
+>
+> ```
+> send message on https://pshost.vcf.lab:5986/wsman error ,
+> document in <...>, document out [EMPTY]
+> ```
+>
+> That error names neither TLS nor the certificate, which is what makes it
+> expensive. Two things make it worse:
+>
+> - **Importing the certificate does not fix it.** The SSL Trust Manager will log
+>   `Certificate is already trusted` while the handshake still refuses it — trust
+>   and algorithm policy are separate gates. If you also see
+>   `certificate_unknown(46)` in that same log, that is the rejection, and it is
+>   the one line worth acting on.
+> - **The old command in this guide produced SHA-1.** Pinning
+>   `"Microsoft RSA SChannel Cryptographic Provider"` (a legacy CSP) while letting
+>   `-HashAlgorithm` default yields `sha1RSA`. Pre-9.1.1 JVMs accepted it, so hosts
+>   built that way worked until the upgrade and then failed with no config change.
+>
+> Verify what the listener is actually serving, from the Orchestrator pod:
+>
+> ```bash
+> curl -vk https://pshost.vcf.lab:5986/wsman 2>&1 | grep 'signed using'
+> # want: sha256WithRSAEncryption   /   NOT: sha1WithRSAEncryption
+> ```
 
 #### Step 4 — WinRM HTTPS listener (port 5986)
 

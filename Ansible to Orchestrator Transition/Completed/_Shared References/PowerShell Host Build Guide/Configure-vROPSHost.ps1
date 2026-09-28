@@ -37,16 +37,51 @@
 
 .PARAMETER CertificateMode
     How to obtain the HTTPS certificate.
-    SelfSigned  : Generate a new self-signed certificate (default).
-                  The exported .cer file must be imported into vRO trust store.
+    SelfSigned  : Re-use a usable self-signed certificate for the Fqdn, or generate
+                  one if none exists (default).  A newly generated certificate must
+                  be imported into the vRO trust store.
     ExistingCA  : Locate an existing certificate in LocalMachine\My that matches
                   the Fqdn.  Use when a CA-issued certificate is already installed.
+                  Refused if it is SHA-1 signed -- see -HashAlgorithm.
     Example: SelfSigned
 
 .PARAMETER CertValidityYears
     Validity period in years for the self-signed certificate.
     Only used when CertificateMode = SelfSigned.
     Default: 5
+
+.PARAMETER HashAlgorithm
+    Signature algorithm for a generated self-signed certificate.
+    SHA256 (default), SHA384 or SHA512.  SHA-1 is not offered on purpose.
+
+    VCF Automation 9.1.1 runs its JVM with BouncyCastle in FIPS approved-only mode
+    (FIPS_MODE=strict) and REFUSES a SHA-1 signed certificate.  The TLS handshake
+    fails and every PowerShell workflow dies on the WS-Man Shell Create with
+    "document out [EMPTY]" -- an error naming neither TLS nor the certificate.
+    Importing the certificate does not help: the SSL Trust Manager will report it
+    as trusted while the handshake still refuses it, because trust and algorithm
+    policy are separate checks.
+
+    Earlier versions of this script pinned the legacy SChannel CSP and let the hash
+    default, which produced SHA-1.  That was tolerated by the pre-9.1.1 JVM.
+
+.NOTES ON RE-RUNNING
+    In SelfSigned mode this script generates a NEW certificate every time it runs.
+    Nothing is re-used, so the certificate always carries the requested
+    -HashAlgorithm and can never be a leftover SHA-1 one from an earlier build.
+
+    The consequence: the thumbprint changes on every run, and Orchestrator does not
+    trust the new certificate until it is re-imported.  So EVERY run must be
+    followed by:
+
+      1. Import the exported .cer into the vRO SSL Trust Manager
+      2. Re-run "Update a PowerShell host"
+
+    Skip that and every PowerShell workflow fails with "document out [EMPTY]" on the
+    WS-Man Shell Create -- an error naming neither TLS nor the certificate.
+
+    Old certificates are reported but not deleted; the script prints the command to
+    clear them once the host is confirmed working.
 
 .PARAMETER CertExportPath
     Directory where the exported certificate (.cer) file will be written.
@@ -112,6 +147,20 @@ param (
     [ValidateRange(1, 20)]
     [int]$CertValidityYears = 5,
 
+    # Signature algorithm for a generated self-signed certificate.
+    #
+    # SHA-1 IS NOT AN OPTION, DELIBERATELY. VCF Automation 9.1.1 runs its JVM with
+    # BouncyCastle in FIPS approved-only mode (FIPS_MODE=strict), which rejects a
+    # SHA-1 signed certificate outright. The TLS handshake fails and every
+    # PowerShell workflow dies with "document out [EMPTY]" on the WS-Man Shell
+    # Create -- a failure that names neither TLS nor the certificate. Importing the
+    # cert into the Orchestrator trust store does NOT help: trust and algorithm
+    # policy are separate checks, so the trust store reports it as trusted while
+    # the handshake still refuses it.
+    [Parameter(Mandatory = $false)]
+    [ValidateSet('SHA256', 'SHA384', 'SHA512')]
+    [string]$HashAlgorithm = 'SHA256',
+
     [Parameter(Mandatory = $false)]
     [string]$CertExportPath = 'C:\PSO\Certs\',
 
@@ -161,6 +210,48 @@ $Warnings = [System.Collections.Generic.List[string]]::new()
 function Add-Result {
     param([string]$Step, [string]$Status, [string]$Detail = '')
     $Results.Add([PSCustomObject]@{ Step = $Step; Status = $Status; Detail = $Detail })
+}
+
+# ── Certificate suitability ───────────────────────────────────────────────────
+#
+# Orchestrator will not complete a TLS handshake against a certificate signed with
+# a weak algorithm. Under FIPS_MODE=strict (VCF Automation 9.1.1) that check is
+# absolute, and it is invisible from the vRO side: the run fails on the WS-Man
+# Shell Create with "document out [EMPTY]", naming neither TLS nor the cert. The
+# SSL Trust Manager will even report the certificate as trusted while the
+# handshake continues to refuse it, because trust and algorithm policy are
+# separate gates.
+#
+# So the signature algorithm is checked HERE, where it can be fixed, rather than
+# discovered days later from an error that does not mention it.
+
+# Signature OIDs that will be refused. FriendlyName is not used: it can be empty
+# or localised depending on the OS, and a null there would silently pass a SHA-1
+# certificate through.
+$script:WeakSignatureOids = @{
+    '1.2.840.113549.1.1.2'  = 'md2RSA'
+    '1.2.840.113549.1.1.3'  = 'md4RSA'
+    '1.2.840.113549.1.1.4'  = 'md5RSA'
+    '1.2.840.113549.1.1.5'  = 'sha1RSA'
+    '1.2.840.10040.4.3'     = 'sha1DSA'
+    '1.2.840.10045.4.1'     = 'sha1ECDSA'
+    '1.3.14.3.2.29'         = 'sha1RSA (legacy OID)'
+}
+
+function Get-CertSignatureName {
+    param($Certificate)
+    if ($script:WeakSignatureOids.ContainsKey($Certificate.SignatureAlgorithm.Value)) {
+        return $script:WeakSignatureOids[$Certificate.SignatureAlgorithm.Value]
+    }
+    if ($Certificate.SignatureAlgorithm.FriendlyName) {
+        return $Certificate.SignatureAlgorithm.FriendlyName
+    }
+    return $Certificate.SignatureAlgorithm.Value
+}
+
+function Test-CertSignatureWeak {
+    param($Certificate)
+    return $script:WeakSignatureOids.ContainsKey($Certificate.SignatureAlgorithm.Value)
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -273,26 +364,79 @@ $certSubject    = $null
 
 if ($CertificateMode -eq 'SelfSigned') {
 
-    try {
-        Write-Info "Generating self-signed certificate for $Fqdn (validity: $CertValidityYears year(s))..."
+    # ── Always generate a fresh certificate ───────────────────────────────────
+    #
+    # A NEW CERTIFICATE EVERY RUN IS DELIBERATE. Nothing is re-used, so the
+    # certificate always carries the -HashAlgorithm asked for and can never be a
+    # leftover SHA-1 one from an earlier build.
+    #
+    # The cost is that the thumbprint changes on every run, and Orchestrator does
+    # not trust the new one until it is re-imported. So EVERY run of this script
+    # is followed by: re-import into the SSL Trust Manager, then re-run "Update a
+    # PowerShell host". Skip that and every PowerShell workflow fails with
+    # "document out [EMPTY]" on the WS-Man Shell Create -- an error that names
+    # neither TLS nor the certificate.
+    $priorCerts = @(
+        Get-ChildItem 'cert:\LocalMachine\My' |
+            Where-Object { $_.Subject -eq "CN=$Fqdn" -and $_.Issuer -eq "CN=$Fqdn" }
+    )
 
+    try {
+        Write-Info "Generating self-signed certificate for $Fqdn ($HashAlgorithm, $CertValidityYears year(s))..."
+
+        # -HashAlgorithm and the CNG KSP are BOTH required.
+        #
+        # The previous version passed neither: it pinned the legacy
+        # 'Microsoft RSA SChannel Cryptographic Provider' CSP and let the hash
+        # default, which yields a SHA-1 signature. That was tolerated by the
+        # pre-9.1.1 JVM and is refused by the FIPS one.
+        # 'Microsoft Software Key Storage Provider' is the CNG equivalent and
+        # honours -HashAlgorithm properly.
         $cert = New-SelfSignedCertificate `
             -CertStoreLocation 'cert:\LocalMachine\My' `
+            -Subject "CN=$Fqdn" `
             -DnsName ($Fqdn, $shortName) `
             -NotAfter (Get-Date).AddYears($CertValidityYears) `
-            -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
-            -KeyLength 2048
+            -Provider 'Microsoft Software Key Storage Provider' `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -HashAlgorithm $HashAlgorithm `
+            -KeyExportPolicy NonExportable `
+            -KeyUsage DigitalSignature, KeyEncipherment `
+            -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.1')   # EKU: Server Authentication
 
-        $certThumbprint = $cert.Thumbprint
-        $certSubject    = $cert.Subject
+        # Never take the flags on trust -- confirm what was actually produced.
+        # This is the check that would have caught the original defect on the run
+        # that introduced it, rather than days later from an unrelated-looking
+        # WinRM error.
+        if (Test-CertSignatureWeak -Certificate $cert) {
+            throw ("The generated certificate is signed with $(Get-CertSignatureName -Certificate $cert) " +
+                   "despite -HashAlgorithm $HashAlgorithm. Orchestrator will refuse it under FIPS. " +
+                   "Check the provider is available: certutil -csplist")
+        }
 
         Write-OK "Self-signed certificate generated."
-        Write-Info "  Thumbprint : $certThumbprint"
-        Write-Info "  Subject    : $certSubject"
+        Write-Info "  Thumbprint : $($cert.Thumbprint)"
+        Write-Info "  Subject    : $($cert.Subject)"
+        Write-Info "  Signature  : $(Get-CertSignatureName -Certificate $cert)"
         Write-Info "  Expires    : $($cert.NotAfter.ToString('yyyy-MM-dd'))"
-        Write-Warn "This certificate is self-signed. It MUST be imported into the VCF"
-        Write-Warn "Orchestrator trust store before adding this PS host. See next steps."
-        Add-Result "Certificate" "Self-signed generated" "Thumbprint: $certThumbprint | Expires: $($cert.NotAfter.ToString('yyyy-MM-dd'))"
+        Write-Warn "This certificate is NEW, so its thumbprint differs from any previous run."
+        Write-Warn "Orchestrator does NOT trust it yet. Re-import it and re-run"
+        Write-Warn "'Update a PowerShell host' before using this host. See next steps."
+        Add-Result "Certificate" "Self-signed generated" "Thumbprint: $($cert.Thumbprint) | $(Get-CertSignatureName -Certificate $cert) | Expires: $($cert.NotAfter.ToString('yyyy-MM-dd'))"
+
+        # Point out what this run superseded. Not deleted automatically -- one of
+        # them may still be bound to something else on this host, and removing a
+        # certificate is not a thing a build script should do behind your back.
+        if ($priorCerts.Count -gt 0) {
+            Write-Info ""
+            Write-Info "$($priorCerts.Count) earlier self-signed certificate(s) for $Fqdn are now superseded:"
+            foreach ($old in $priorCerts) {
+                Write-Info "  $($old.Thumbprint)  $(Get-CertSignatureName -Certificate $old)  expires $($old.NotAfter.ToString('yyyy-MM-dd'))"
+            }
+            Write-Info "They accumulate with each run. Remove them once this host is confirmed working:"
+            Write-Info "  Get-ChildItem Cert:\LocalMachine\My | Where-Object { `$_.Subject -eq 'CN=$Fqdn' -and `$_.Thumbprint -ne '$($cert.Thumbprint)' } | Remove-Item"
+        }
 
     } catch {
         Write-Fail "Failed to generate self-signed certificate: $($_.Exception.Message)"
@@ -301,19 +445,24 @@ if ($CertificateMode -eq 'SelfSigned') {
         exit 1
     }
 
+    $certThumbprint = $cert.Thumbprint
+    $certSubject    = $cert.Subject
+
 } elseif ($CertificateMode -eq 'ExistingCA') {
 
     Write-Info "Searching LocalMachine\My for a certificate matching FQDN: $Fqdn ..."
 
-    $certs = Get-ChildItem 'cert:\LocalMachine\My' |
+    # @() so a single match is still an array -- $certs.Count is read below, and a
+    # bare object there behaves differently under StrictMode.
+    $certs = @(Get-ChildItem 'cert:\LocalMachine\My' |
         Where-Object {
             ($_.Subject -like "*$Fqdn*" -or $_.DnsNameList.Unicode -contains $Fqdn) -and
             $_.NotAfter -gt (Get-Date) -and
             $_.HasPrivateKey
         } |
-        Sort-Object NotAfter -Descending
+        Sort-Object NotAfter -Descending)
 
-    if (-not $certs) {
+    if ($certs.Count -eq 0) {
         Write-Fail "No valid certificate found in LocalMachine\My matching '$Fqdn'."
         Write-Fail "Install the CA-issued certificate first, then re-run with -CertificateMode ExistingCA."
         Add-Result "Certificate" "FAILED" "No matching cert found for $Fqdn"
@@ -327,6 +476,7 @@ if ($CertificateMode -eq 'SelfSigned') {
     Write-OK "Found existing certificate."
     Write-Info "  Thumbprint : $certThumbprint"
     Write-Info "  Subject    : $certSubject"
+    Write-Info "  Signature  : $(Get-CertSignatureName -Certificate $cert)"
     Write-Info "  Expires    : $($cert.NotAfter.ToString('yyyy-MM-dd'))"
     Write-Info "  Issuer     : $($cert.Issuer)"
 
@@ -335,7 +485,30 @@ if ($CertificateMode -eq 'SelfSigned') {
         Write-Warn "If this is incorrect, remove unwanted certificates and re-run."
     }
 
-    Add-Result "Certificate" "Existing CA cert selected" "Thumbprint: $certThumbprint | Expires: $($cert.NotAfter.ToString('yyyy-MM-dd'))"
+    # A CA-issued certificate is not automatically safe here. An internal CA that
+    # still signs with SHA-1 produces a certificate Orchestrator refuses under
+    # FIPS, and the failure names neither TLS nor the certificate. Stop now, where
+    # the reason is obvious, rather than after the listener is bound.
+    if (Test-CertSignatureWeak -Certificate $cert) {
+        Write-Fail "This certificate is signed with $(Get-CertSignatureName -Certificate $cert)."
+        Write-Fail "VCF Automation 9.1.1 runs its JVM in FIPS approved-only mode and will REFUSE it."
+        Write-Fail "Every PowerShell workflow would fail with 'document out [EMPTY]' on the"
+        Write-Fail "WS-Man Shell Create -- an error that mentions neither TLS nor this certificate."
+        Write-Fail "Re-issue it with SHA-256 or later, or use -CertificateMode SelfSigned."
+        Add-Result "Certificate" "FAILED" "Weak signature: $(Get-CertSignatureName -Certificate $cert)"
+        exit 1
+    }
+
+    # SANs, not CN -- modern TLS clients ignore CN for name matching entirely.
+    $sans = @()
+    try { $sans = @($cert.DnsNameList | ForEach-Object { $_.Unicode }) } catch { }
+    if ($sans -notcontains $Fqdn) {
+        Write-Warn "This certificate does not list $Fqdn among its SANs ($($sans -join ', '))."
+        Write-Warn "Orchestrator connects by FQDN and matches on SANs, so the handshake may be refused."
+        $Warnings.Add("Certificate SANs do not include $Fqdn.")
+    }
+
+    Add-Result "Certificate" "Existing CA cert selected" "Thumbprint: $certThumbprint | $(Get-CertSignatureName -Certificate $cert) | Expires: $($cert.NotAfter.ToString('yyyy-MM-dd'))"
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -600,6 +773,55 @@ if ($certInStore) {
     Write-OK "Certificate is in LocalMachine\My store. Thumbprint: $certThumbprint"
 } else {
     Write-Warn "Certificate not found in store."
+}
+
+# What the listener is ACTUALLY bound to.
+#
+# Checked separately from the certificate we selected above, because those are
+# two different things: the listener can still be bound to a previous thumbprint
+# if the rebind in Step 4 failed, and the symptom of that is identical to every
+# other TLS failure here -- "document out [EMPTY]", naming nothing useful.
+try {
+    # Collected into an array first rather than reading .Value off the pipeline
+    # directly: when no HTTPS listener exists the pipeline yields nothing, and
+    # under StrictMode reading a property off that $null throws instead of simply
+    # being empty.
+    $thumbProps = @(Get-ChildItem WSMan:\localhost\Listener -ErrorAction Stop |
+        Where-Object { $_.Keys -contains 'Transport=HTTPS' } |
+        ForEach-Object { Get-ChildItem "WSMan:\localhost\Listener\$($_.Name)" } |
+        Where-Object { $_.Name -eq 'CertificateThumbprint' })
+
+    $boundThumb = ''
+    if ($thumbProps.Count -gt 0) {
+        $boundThumb = [string]$thumbProps[0].Value -replace '\s', ''
+    }
+
+    if (-not $boundThumb) {
+        Write-Warn "The HTTPS listener reports no certificate thumbprint."
+    }
+    elseif ($boundThumb -ne $certThumbprint) {
+        Write-Fail "The HTTPS listener is bound to $boundThumb, NOT the certificate above."
+        Write-Fail "Orchestrator will be served a certificate this script did not prepare."
+        $Warnings.Add("Listener bound to $boundThumb but this run selected $certThumbprint.")
+    }
+    else {
+        $boundCert = Get-ChildItem "cert:\LocalMachine\My\$boundThumb" -ErrorAction SilentlyContinue
+        if ($boundCert) {
+            $sig = Get-CertSignatureName -Certificate $boundCert
+            if (Test-CertSignatureWeak -Certificate $boundCert) {
+                Write-Fail "The listener is serving a $sig signed certificate."
+                Write-Fail "VCF Automation 9.1.1 (FIPS strict) will REFUSE it and every PowerShell"
+                Write-Fail "workflow will fail with 'document out [EMPTY]'. Re-run this script"
+                Write-Fail "with -HashAlgorithm SHA256 and check the listener rebind succeeded."
+                $Warnings.Add("Listener certificate is $sig -- Orchestrator will refuse it under FIPS.")
+            }
+            else {
+                Write-OK "Listener is serving a $sig signed certificate (FIPS-acceptable)."
+            }
+        }
+    }
+} catch {
+    Write-Warn "Could not read the listener's certificate binding: $($_.Exception.Message)"
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
