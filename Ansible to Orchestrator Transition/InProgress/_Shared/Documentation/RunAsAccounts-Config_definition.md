@@ -83,7 +83,7 @@ Three things are load-bearing:
 |---|---|
 | Input `runAsAccount` (string) | Value list ← `getRunAsAccountSelectors(accountCategoryPath)` |
 | `resolvePowerShellHostForAccount` | `(accountCategoryPath, runAsAccount)` → `psHost` |
-| `stageScriptOnHost` | `(psHost, script, scriptPath)` — `script` is the ResourceElement attribute (P-67) |
+| `stageScriptOnHost` | `(psHost, script, targetPath)` — `targetPath` is the directory; returns the verified full path — `script` is the ResourceElement attribute (P-67) |
 | *Invoke a PowerShell script* | host ← `psHost` |
 
 `accountCategoryPath` is a workflow attribute defaulting to `PSO/Identity/RunAsAccounts`, not

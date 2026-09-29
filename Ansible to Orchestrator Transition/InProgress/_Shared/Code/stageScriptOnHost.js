@@ -3,7 +3,7 @@
  * Module:  com.broadcom.pso.powershell   (SHARED - reference, do not copy)
  *
  * vRO input-parameter order (positional call from the workflow):
- *   (psHost, scriptDirectory, script)
+ *   (psHost, script, targetPath)
  *
  * Purpose:
  *   Makes sure the PowerShell host holds an EXACT copy of a script kept in an Orchestrator
@@ -11,9 +11,9 @@
  *   script's full path for invokeStagedScript to run. The analogue of the playbooks'
  *   `win_copy: src=files/ps_scripts` - except that it copies only when it has to.
  *
- *   The full path is  scriptDirectory + '\' + <Resource Element name>:
+ *   The full path is  targetPath + '\' + <Resource Element name>:
  *
- *     scriptDirectory  C:\PSO\Scripts
+ *     targetPath       C:\PSO\Scripts
  *     script           Resource Element named  Invoke-ServerDiskClean.ps1
  *     full path        C:\PSO\Scripts\Invoke-ServerDiskClean.ps1      <- checked, placed, returned
  *
@@ -72,15 +72,16 @@
  *                                                  estate (P-52) every host object points at
  *                                                  the same pool and shares one filesystem, so
  *                                                  staging via any of them serves all of them.
- *   scriptDirectory  (string)                    - the directory on the host the script lives in
- *                                                  and runs from, e.g. 'C:\PSO\Scripts'. Absolute
- *                                                  local path; a trailing '\' is optional. Created
- *                                                  on first copy if it does not exist.
  *   script           (ResourceElement)           - the element holding the .ps1. Its NAME is the
  *                                                  file name on the host, so it must be a plain
  *                                                  file name ending in .ps1. Bind it to a workflow
  *                                                  ATTRIBUTE set at build time, so the run record
  *                                                  shows which script was staged.
+ *   targetPath       (string)                    - the DIRECTORY on the host the script lives in
+ *                                                  and runs from, e.g. 'C:\PSO\Scripts' -- not the
+ *                                                  file path; the file name comes from the element.
+ *                                                  Absolute local path; a trailing '\' is optional.
+ *                                                  Created on first copy if it does not exist.
  *
  * Returns: string - the script's full path on the host, e.g.
  *            'C:\PSO\Scripts\Invoke-ServerDiskClean.ps1'
@@ -89,7 +90,7 @@
  *          Resource Element, so a path that came from here is a path that is safe to run.
  *
  * Fails the run (throws) when:
- *   - scriptDirectory is not an absolute local path, or the element's name is not a plain
+ *   - targetPath is not an absolute local directory path, or the element's name is not a plain
  *     .ps1 file name
  *   - the Resource Element is missing or empty (staging it would replace a working script
  *     with nothing)
@@ -116,29 +117,29 @@ if (script === null || script === undefined) {
 
 var scriptName = String(script.name).replace(/^\s+|\s+$/g, "");
 
-if (!scriptDirectory || String(scriptDirectory).replace(/^\s+|\s+$/g, "") === "") {
-    throw new Error("stageScriptOnHost: scriptDirectory is required, e.g. 'C:\\PSO\\Scripts'.");
+if (!targetPath || String(targetPath).replace(/^\s+|\s+$/g, "") === "") {
+    throw new Error("stageScriptOnHost: targetPath is required -- the directory the script goes in, e.g. 'C:\\PSO\\Scripts'.");
 }
 
 // Forward slashes are accepted and normalised; trailing separators are dropped so the join
 // below always produces exactly one '\' between directory and file name.
-var dirPath = String(scriptDirectory).replace(/^\s+|\s+$/g, "").replace(/\//g, "\\").replace(/\\+$/, "");
+var dirPath = String(targetPath).replace(/^\s+|\s+$/g, "").replace(/\//g, "\\").replace(/\\+$/, "");
 
 // A relative directory resolves against whatever directory the WinRM session started in, so
 // the script would land somewhere the invocation does not look for it. A UNC directory would
 // make "the copy on the host" a copy somewhere else, reached by a second hop.
 if (!/^[a-zA-Z]:(\\|$)/.test(dirPath)) {
     throw new Error(
-        "stageScriptOnHost: scriptDirectory must be an absolute local path on the host, e.g. " +
-        "'C:\\PSO\\Scripts' - got '" + scriptDirectory + "'."
+        "stageScriptOnHost: targetPath must be an absolute local directory path on the host, e.g. " +
+        "'C:\\PSO\\Scripts' - got '" + targetPath + "'."
     );
 }
 if (/(^|\\)\.\.(\\|$)/.test(dirPath) || /[*?"<>|]/.test(dirPath.substring(2))) {
-    throw new Error("stageScriptOnHost: scriptDirectory '" + scriptDirectory + "' contains '..' or a character not valid in a path.");
+    throw new Error("stageScriptOnHost: targetPath '" + targetPath + "' contains '..' or a character not valid in a path.");
 }
 
 // The element's name becomes the file name. A separator in it would put the file somewhere
-// other than scriptDirectory, and anything but .ps1 cannot be invoked as a script -- so both
+// other than targetPath, and anything but .ps1 cannot be invoked as a script -- so both
 // are refused rather than quietly repaired.
 if (scriptName === "" || /[\\\/:*?"<>|]/.test(scriptName)) {
     throw new Error(

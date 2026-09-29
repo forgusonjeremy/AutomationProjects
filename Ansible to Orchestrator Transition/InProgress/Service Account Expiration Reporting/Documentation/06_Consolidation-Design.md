@@ -122,7 +122,7 @@ PowerShell plug-in over WinRM, script copied from a Resource Element each run
 
 for each scope:
     [ resolvePowerShellHostForAccount ]       scope.account -> psHost       (shared, P-52)
-    [ stageScriptOnHost ]                     psHost, script (RE attr: PSO/Scripts/cvs_function_formatted_email.ps1)
+    [ stageScriptOnHost ]                     psHost, script (RE attr: PSO/Scripts/cvs_function_formatted_email.ps1), targetPath (directory) -> scriptPath
             |                                 -> scriptVersion   (workflow OUTPUT, first pass)
     [ buildServiceAccountScopeInvocation ]    -> invocationString
     [ Invoke a PowerShell script ]            (OOTB, against psHost)

@@ -59,7 +59,7 @@ PowerShell plug-in over WinRM, script copied from a Resource Element each run
 input runAsAccount            <- dropdown, from getRunAsAccountSelectors
 
 [ resolvePowerShellHostForAccount ]  runAsAccount -> psHost            (shared, P-52)
-[ stageScriptOnHost ]                psHost, adminScript (RE attr: PSO/Scripts/cvs_admin.ps1), scriptPath
+[ stageScriptOnHost ]                psHost, adminScript (RE attr: PSO/Scripts/cvs_admin.ps1), targetPath (directory) -> scriptPath
         |                            -> scriptVersion   (workflow OUTPUT)
 [ buildAdminPkiReportInvocation ]    -> invocationString
 [ Invoke a PowerShell script ]       (OOTB, against psHost)

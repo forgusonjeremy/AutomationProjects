@@ -15,14 +15,20 @@
 > WinRM only when it changed. That is what makes it affordable to keep scripts **fully
 > commented** in the Resource Element.
 >
-> **Signature changed:** `(psHost, resourcePath, targetPath)` → **`(psHost, script, targetPath)`**
-> where `script` is the **ResourceElement** itself, bound from a workflow attribute set at build
-> time (so the run record shows which element was staged; no path lookup inside the action).
-> Returns `<name> v<version> sha256=<12 hex> (first copy|updated|unchanged)`.
+> **Signature (2026-09-29):** **`stageScriptOnHost (psHost, script, targetPath)`**, where `targetPath` is the **directory**. `script`
+> is the **ResourceElement** itself, bound from a workflow attribute set at build time, so the
+> run record shows which element was staged and nothing is looked up by path inside the action.
+> The action builds the full path as `targetPath + '\' + <element name>` (the element name
+> must be a plain `.ps1` file name), performs the check-and-copy on that path, and **returns the
+> full path**, e.g. `C:\PSO\Scripts\Invoke-ServerDiskClean.ps1`. Which generation ran is logged:
+> `staged: <path> | <name> v<version> | sha256=<12 hex> | first copy|updated|unchanged`.
+> *(Superseded forms: `(psHost, resourcePath, targetPath)`, then `(psHost, script, targetPath)`
+> returning a label.)*
 >
-> **Companion action:** `invokeStagedScript (psHost, scriptPath, parameters, stagedScript)` runs
-> the staged file by path and parses its `PSO_RESULT` line. Its `stagedScript` input is bound
-> from `stageScriptOnHost`'s output, so it cannot be wired without staging in front of it.
+> **Companion action:** **`invokeStagedScript (psHost, scriptPath, parameters)`** runs the staged
+> file and parses its `PSO_RESULT` line. `scriptPath` is bound to the path `stageScriptOnHost`
+> **returned**, so the file run is the file just verified, and the run element cannot be
+> wired up without staging in front of it.
 > Workflows that build an invocation string for the OOTB *Invoke a PowerShell script* may keep
 > doing so — staging is independent of how the script is then invoked.
 >
@@ -88,10 +94,10 @@ staging logic drifts per project.
 Two elements go in front of the existing invoke step, in every workflow:
 
 ```
-[ stageScriptOnHost ]      psHost, script (ResourceElement attr), targetPath
-        |                  -> scriptVersion (workflow attribute)
+[ stageScriptOnHost ]      psHost, script (ResourceElement attr), targetPath (directory)
+        |                  -> scriptPath (workflow attribute: the verified full path)
         v
-[ build<X>Invocation ]     scriptPath = targetPath
+[ build<X>Invocation ]     scriptPath
         |                  -> invocationString
         v
 [ Invoke a PowerShell script ]   (OOTB, unchanged)

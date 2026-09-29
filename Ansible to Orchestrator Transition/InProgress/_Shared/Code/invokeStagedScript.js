@@ -1,9 +1,9 @@
 /**
  * Action: invokeStagedScript
- * Module:  com.broadcom.pso.vcf.powershell.staging   (SHARED - reference, do not copy)
+ * Module:  com.broadcom.pso.powershell   (SHARED - reference, do not copy)
  *
  * vRO input-parameter order (positional call from the workflow):
- *   (psHost, scriptPath, parameters, stagedScript)
+ *   (psHost, scriptPath, parameters)
  *
  * WHAT IT DOES
  *   Runs a script that stageScriptOnHost has ALREADY put on the PowerShell host, with the
@@ -19,15 +19,13 @@
  * INPUTS (in this order -- vRO passes action inputs positionally)
  *   psHost        PowerShell:PowerShellHost  the host to run on -- the SAME object that was
  *                                            bound to stageScriptOnHost
- *   scriptPath    string                     absolute path of the staged script, the SAME
- *                                            value bound to stageScriptOnHost's targetPath
+ *   scriptPath    string                     the full path RETURNED by stageScriptOnHost. Bind it
+ *                                            to the attribute that action's output is written
+ *                                            to -- never type it or build it separately. That
+ *                                            binding is what guarantees the file run is the
+ *                                            file just verified, and it means this element
+ *                                            cannot be wired up without staging in front of it.
  *   parameters    Properties                 script parameters; each key becomes -Key 'value'
- *   stagedScript  string                     the label stageScriptOnHost returned. Bind it from
- *                                            that action's output. It is not used to run
- *                                            anything; it exists so this element cannot be
- *                                            wired up without the staging element in front of
- *                                            it, and so the run log names the script generation
- *                                            next to its output.
  *
  * RETURNS
  *   Properties with:
@@ -63,12 +61,9 @@ if (psHost === null || psHost === undefined) {
     throw new Error("invokeStagedScript: psHost is required. Bind it to the same host object used by stageScriptOnHost.");
 }
 if (!scriptPath || String(scriptPath).replace(/^\s+|\s+$/g, "") === "") {
-    throw new Error("invokeStagedScript: scriptPath is required. Bind it to the same value as stageScriptOnHost's targetPath.");
-}
-if (!stagedScript || String(stagedScript).replace(/^\s+|\s+$/g, "") === "") {
     throw new Error(
-        "invokeStagedScript: stagedScript is empty. Bind it to the output of the stageScriptOnHost element -- " +
-        "a staged script must be staged (and verified) in the same run before it is invoked."
+        "invokeStagedScript: scriptPath is empty. Bind it to the attribute written by the stageScriptOnHost " +
+        "element -- a script must be staged (and verified) in the same run before it is invoked."
     );
 }
 
@@ -125,7 +120,7 @@ var wrapper = [
 // ---------------------------------------------------------------------------
 // 4. Run it on the host
 // ---------------------------------------------------------------------------
-System.log("Running " + path + " on " + psHost.name + " -- " + stagedScript);
+System.log("Running " + path + " on " + psHost.name);
 
 var invocation;
 if (typeof psHost.invokeScript === "function") {

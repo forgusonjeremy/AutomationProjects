@@ -227,26 +227,28 @@
  *    Action:    stageScriptOnHost
  *    IN    psHost              PowerShell:PowerShellHost  ← attr   resolvedHost
  *          script              ResourceElement            ← attr   diskCleanScript
- *          targetPath          string                     ← attr   scriptTargetPath
- *    OUT   actionResult        string                     → attr   stagedScript
+ *          targetPath          string                     ← attr   scriptDirectory   (the DIRECTORY)
+ *    OUT   actionResult        string                     → attr   scriptPath
  *    Exception → [End: Failed - Script Staging]
  *
- *    Returns e.g.  'Invoke-ServerDiskClean.ps1 v1.0.2 sha256=3F9A0C11D2B7 (unchanged)'
- *    -- the last word is first copy | updated | unchanged. 'updated' on a run where nobody
- *    changed the Resource Element means the copy on the host had been edited; the action
- *    has already logged both hashes as a warning.
+ *    Builds the full path  targetPath + '\' + <Resource Element name>
+ *    (C:\PSO\Scripts\Invoke-ServerDiskClean.ps1), copies the script there if it is missing
+ *    or differs, verifies it, and returns that path. The log line
+ *        staged: <path> | <name> v<version> | sha256=<12 hex> | first copy|updated|unchanged
+ *    records which generation this run executes. 'updated' on a run where nobody changed
+ *    the Resource Element means the copy on the host had been edited; the action has
+ *    already logged both hashes as a warning.
  *
  * ── 7. Run Disk Clean ──────────────────────────────────────────────────────────
  *    Action:    invokeStagedScript
  *    IN    psHost              PowerShell:PowerShellHost  ← attr   resolvedHost
- *          scriptPath          string                     ← attr   scriptTargetPath
+ *          scriptPath          string                     ← attr   scriptPath
  *          parameters          Properties                 ← attr   scriptParameters
- *          stagedScript        string                     ← attr   stagedScript
  *    OUT   actionResult        Properties                 → attr   scriptRunResult
  *    Exception → [End: Failed - PS Execution]
  *
- *    psHost and scriptPath MUST be the same two attributes element 6 used -- that is what
- *    guarantees the file run is the file just verified.
+ *    psHost must be the same attribute element 6 used, and scriptPath must be the path
+ *    element 6 RETURNED -- that is what guarantees the file run is the file just verified.
  *
  *    scriptRunResult holds: success (boolean), transcript (string), and result
  *    (Properties) with the script's PSO_RESULT fields -- see the .ps1's .OUTPUTS. The
@@ -257,7 +259,7 @@
  *    IN    scriptRunResult     Properties                 ← attr   scriptRunResult
  *          adGroup             AD:UserGroup               ← attr   adGroup
  *          resolvedHost        PowerShell:PowerShellHost  ← attr   resolvedHost
- *          stagedScript        string                     ← attr   stagedScript
+ *          scriptPath          string                     ← attr   scriptPath
  *          folderIncluded      boolean                    ← input  folderIncluded
  *          forceEnable         boolean                    ← input  forceEnable
  *          mailSubject         string                     ← input  mailSubject
@@ -298,7 +300,7 @@
  *          emailSent           boolean             ← attr   emailSent
  *          adGroup             AD:UserGroup        ← attr   adGroup
  *          whatIf              string              ← input  whatIf
- *          stagedScript        string              ← attr   stagedScript
+ *          scriptPath          string              ← attr   scriptPath
  *    OUT   executionSuccess    boolean             → output executionSuccess
  *
  *    executionSuccess is on BOTH tabs: it arrives from element 8 and leaves false if the
@@ -356,7 +358,7 @@
  *   Name              Type                       Set by           Value
  *   ───────────────── ────────────────────────── ──────────────── ─────────────────────────────────────────
  *   diskCleanScript   ResourceElement            YOU, at build    PSO/Scripts/Invoke-ServerDiskClean.ps1
- *   scriptTargetPath  string                     YOU, at build    C:\PSO\Scripts\Invoke-ServerDiskClean.ps1
+ *   scriptDirectory   string                     YOU, at build    C:\PSO\Scripts
  *   fileFilter        string                     YOU, at build    *.*          (P-19 -- do not change)
  *   maxItemsListed    number                     YOU, at build    25
  *   psHostCandidates  Array/PowerShell:          YOU, at build    the PowerShell host objects this
@@ -366,7 +368,7 @@
  *   computerNames     Array/string               element 3
  *   resolvedHost      PowerShell:PowerShellHost  element 4
  *   scriptParameters  Properties                 element 5
- *   stagedScript      string                     element 6
+ *   scriptPath        string                     element 6
  *   scriptRunResult   Properties                 element 7
  *   reportSubject     string                     element 8
  *   reportHtml        string                     element 8
@@ -375,7 +377,7 @@
  *   diskCleanScript is an ATTRIBUTE bound to the element, not a name looked up at run
  *   time, so the run record shows which Resource Element was staged.
  *
- *   scriptTargetPath: the directory is created on first staging. The account the
+ *   scriptDirectory: created on first staging. The account the
  *   PowerShell host object connects as needs Modify on it (to stage) and Read & Execute
  *   (to run). Nobody else needs write access -- and should not have it: anything written
  *   there is overwritten on the next run anyway.
@@ -391,7 +393,8 @@
  *   itemsDeleted      number   items removed (0 in a report-only run)
  *   bytesFreed        number   bytes removed; in a report-only run, the estimate of what
  *                              would be removed
- *   stagedScript      string   bind attr stagedScript here too: which script generation ran
+ *   scriptPath        string   bind attr scriptPath here too: the staged script that ran
+ *                              (its version and hash are in element 6's log line)
  *   transcript        string   the script's full log
  *
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -615,7 +618,7 @@ System.log(
  * IN   scriptRunResult   Properties                 attr    from element 7
  *      adGroup           AD:UserGroup               attr    from element 2
  *      resolvedHost      PowerShell:PowerShellHost  attr    from element 4
- *      stagedScript      string                     attr    from element 6
+ *      scriptPath        string                     attr    from element 6
  *      folderIncluded    boolean                    input
  *      forceEnable       boolean                    input
  *      mailSubject       string                     input
@@ -760,7 +763,7 @@ reportHtml =
     "<tr><td style=\"" + td + "font-weight:600;\">Folders</td><td style=\"" + td + "\">" + esc(targets.join("  |  ")) + "</td></tr>" +
     "<tr><td style=\"" + td + "font-weight:600;\">Older than</td><td style=\"" + td + "\">" + esc(reported.get("olderThanDays")) + " day(s) -- last written before " + esc(reported.get("cutoff")) + "</td></tr>" +
     "<tr><td style=\"" + td + "font-weight:600;\">Options</td><td style=\"" + td + "\">folders included: " + (folderIncluded === true ? "yes" : "no") + ", read-only items (force): " + (forceEnable === true ? "yes" : "no") + "</td></tr>" +
-    "<tr><td style=\"" + td + "font-weight:600;\">Script</td><td style=\"" + td + "\">" + esc(stagedScript) + " on " + esc(resolvedHost.name) + "</td></tr>" +
+    "<tr><td style=\"" + td + "font-weight:600;\">Script</td><td style=\"" + td + "\">" + esc(scriptPath) + " on " + esc(resolvedHost.name) + "</td></tr>" +
     "</table>" +
     "<table style=\"border-collapse:collapse;border:1px solid #B4B4B4;" + font + "width:100%;\">" +
     "<tr>" +
@@ -798,7 +801,7 @@ function trim(value) {
  *      emailSent         boolean       attr   (from element 10; false if it did not run)
  *      adGroup           AD:UserGroup  attr
  *      whatIf            string        input
- *      stagedScript      string        attr
+ *      scriptPath        string        attr
  * OUT  executionSuccess  boolean       output
  *
  * Both branches of the email decision end here, so the run record always finishes with
@@ -820,7 +823,7 @@ executionSuccess = success;
 var closing =
     "Clean Server Disks | group=" + adGroup.name +
     " | whatIf=" + whatIf +
-    " | script=" + stagedScript +
+    " | script=" + scriptPath +
     " | " + executionOutput +
     (emailReport === true ? (emailSent === true ? " | report emailed" : " | report NOT emailed") : " | email off");
 
