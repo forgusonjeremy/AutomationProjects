@@ -1,0 +1,944 @@
+inputForms:
+  - schema:
+      adGroupDn:
+        id: adGroupDn
+        type:
+          dataType: string
+        label: adGroupDn
+        constraints:
+          required: false
+      rebootMode:
+        id: rebootMode
+        type:
+          dataType: string
+        label: Reboot or Report Only
+        constraints:
+          required: false
+        valueList:
+          - value: reboot
+            label: Reboot
+          - value: report-only
+            label: Report Only
+      runPreRebootScript:
+        id: runPreRebootScript
+        type:
+          dataType: boolean
+        label: Run Allow USB and Make TermSrv.dll Editable Script?
+        constraints:
+          required: false
+        default: false
+      emailReport:
+        id: emailReport
+        type:
+          dataType: boolean
+        label: emailReport
+        constraints:
+          required: false
+      mailTo:
+        id: mailTo
+        type:
+          dataType: string
+          isMultiple: true
+        label: mailTo
+        constraints:
+          required: false
+      mailCc:
+        id: mailCc
+        type:
+          dataType: string
+          isMultiple: true
+        label: mailCc
+        constraints:
+          required: false
+      mailSubject:
+        id: mailSubject
+        type:
+          dataType: string
+        label: mailSubject
+        constraints:
+          required: false
+      smtpServer:
+        id: smtpServer
+        type:
+          dataType: string
+        label: smtpServer
+        constraints:
+          required: false
+    layout:
+      pages:
+        - id: page_e307h6bp
+          sections:
+            - id: section_r3gqmjzd
+              fields:
+                - id: adGroupDn
+                  display: textField
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_0rgbdvpj
+              fields:
+                - id: rebootMode
+                  display: dropDown
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_54e8c58a
+              fields:
+                - id: runPreRebootScript
+                  display: checkbox
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_0ij68pmw
+              fields:
+                - id: emailReport
+                  display: checkbox
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_o8p23lcs
+              fields:
+                - id: mailTo
+                  display: array
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_hekshklr
+              fields:
+                - id: mailCc
+                  display: array
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_i3wqmrmr
+              fields:
+                - id: mailSubject
+                  display: textField
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_clo9ts6q
+              fields:
+                - id: smtpServer
+                  display: textField
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+          title: General
+          state: {}
+    options:
+      externalValidations: []
+    itemId: ''
+workflowSchema:
+  display-name: Reboot Servers in AD Group
+  position:
+    'y': 10
+    x: 50
+  input:
+    param:
+      - description: ''
+        name: adGroupDn
+        type: string
+      - name: rebootMode
+        type: string
+      - name: emailReport
+        type: boolean
+      - name: mailTo
+        type: Array/string
+      - name: mailCc
+        type: Array/string
+      - name: mailSubject
+        type: string
+      - name: runPreRebootScript
+        type: boolean
+      - name: smtpServer
+        type: string
+  output:
+    param:
+      - name: executionSuccess
+        type: boolean
+      - name: executionOutput
+        type: string
+      - name: serversChecked
+        type: number
+      - name: serversRebooted
+        type: number
+      - name: transcript
+        type: string
+      - name: serversPending
+        type: number
+  attrib:
+    - description: ''
+      type: AD:AdHost
+      name: adHost
+    - type: AD:UserGroup
+      name: adGroup
+    - type: Array/string
+      name: computerNames
+    - value:
+        properties:
+          property: []
+      type: Properties
+      name: scriptParameters
+    - value:
+        sdk-object:
+          type: PowerShell:PowerShellHost
+          href: >-
+            https://cvsd26vcfauto01.connect.lab:443/vco/api/catalog/PowerShell/PowerShellHost/0c675c7a-137b-40c3-af36-6f36223dfa59/
+          id: 0c675c7a-137b-40c3-af36-6f36223dfa59
+      type: PowerShell:PowerShellHost
+      name: psHost
+    - value:
+        sdk-object:
+          type: ResourceElement
+          href: >-
+            https://cvsd26vcfauto01.connect.lab:443/vco/api/catalog/System/ResourceElement/1d91559a-f672-4a42-8ce3-297a9e59206b/
+          id: 1d91559a-f672-4a42-8ce3-297a9e59206b
+      type: ResourceElement
+      name: script
+    - value:
+        properties:
+          property: []
+      type: Properties
+      name: scriptRunResult
+    - value:
+        number:
+          value: 10
+      type: number
+      name: delayBetweenServersSec
+    - value:
+        number:
+          value: 600
+      type: number
+      name: verifyTimeoutSec
+    - value:
+        number:
+          value: 30
+      type: number
+      name: verifyPollSec
+  workflow-item:
+    - in-binding: {}
+      out-binding: {}
+      position:
+        'y': 10
+        x: 890
+      name: item0
+      type: end
+      end-mode: '0'
+      comparator: 0
+    - display-name: resolveAdGroup
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.vcf.activedirectory").resolveAdGroup(adGroupDn,adHost);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: adGroupDn
+            type: string
+            export-name: adGroupDn
+          - description: ''
+            name: adHost
+            type: AD:AdHost
+            export-name: adHost
+      out-binding:
+        bind:
+          - name: actionResult
+            type: AD:UserGroup
+            export-name: adGroup
+      description: Add a note to the workflow schema.
+      position:
+        'y': 20
+        x: 270
+      name: item1
+      out-name: item3
+      type: task
+      script-module: com.broadcom.pso.vcf.activedirectory/resolveAdGroup
+      comparator: 0
+    - display-name: findAdHostForDn
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.vcf.activedirectory").findAdHostForDn(distinguishedName);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: distinguishedName
+            type: string
+            export-name: adGroupDn
+      out-binding:
+        bind:
+          - name: actionResult
+            type: AD:AdHost
+            export-name: adHost
+      description: Add a note to the workflow schema.
+      position:
+        'y': 20
+        x: 140
+      name: item2
+      out-name: item1
+      type: task
+      script-module: com.broadcom.pso.vcf.activedirectory/findAdHostForDn
+      comparator: 0
+    - display-name: Get Computers in AD Group - Non-Recursive Search
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.vcf.activedirectory").getADComputersGroupNonRecursive(adGroup);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: adGroup
+            type: AD:UserGroup
+            export-name: adGroup
+      out-binding:
+        bind:
+          - name: actionResult
+            type: Array/string
+            export-name: computerNames
+      description: Add a note to the workflow schema.
+      position:
+        'y': 20
+        x: 400
+      name: item3
+      out-name: item4
+      type: task
+      script-module: com.broadcom.pso.vcf.activedirectory/getADComputersGroupNonRecursive
+      comparator: 0
+    - display-name: Create Script Parameters
+      script:
+        value: >-
+          /*
+          ═════════════════════════════════════════════════════════════════════════════
+           *
+           * IN   computerNames           Array/string    attr    from element 3
+           *      adGroup                   AD:UserGroup    attr    from element 2
+           *      rebootMode              string          input
+           *      delayBetweenServersSec  number          input
+           *      verifyTimeoutSec        number          input
+           *      verifyPollSec           number          input
+           *      runPreRebootScript      boolean         input
+           *      emailReport             boolean         input
+           *      smtpServer              string          input
+           *      mailTo                  Array/string    input
+           *      mailCc                  Array/string    input
+           *      mailSubject             string          input
+           * OUT  scriptParameters        Properties      attr    → element 6 'parameters'
+           *
+           * Does no work of its own. Turns the request form and the resolved server list into
+           * the Properties bag Invoke-ServerReboot.ps1 expects, and says in the log what it
+           * decided. Everything arrives as a binding, so the schema shows where each value came
+           * from -- nothing is fetched with System.getModule().
+           * ═════════════════════════════════════════════════════════════════════════════ */
+
+          // -- 1. Refuse to run a script against nothing
+          -------------------------------
+
+          // A run that rebooted nothing because the group was empty must not
+          look the same as a
+
+          // run that rebooted nothing because no server had a reboot pending.
+
+          if (computerNames === null || computerNames === undefined ||
+          computerNames.length === 0) {
+              throw new Error(
+                  "Create Script Parameters: no servers were resolved. The AD group has no enabled " +
+                  "computer accounts as DIRECT members -- note that nested groups are deliberately not " +
+                  "expanded for reboots (change S-7). Check the 'Get Computers in AD Group' element's " +
+                  "log: if it reported nested groups, that is where the servers are."
+              );
+          }
+
+
+          var groupName = String(adGroup.name);
+
+
+          System.log("Servers to check (" + computerNames.length + "): " +
+          computerNames.join(", "));
+
+
+          // -- 2. The safety gate
+          ------------------------------------------------------
+
+          // rebootMode maps to the script's -RebootMode. 'reboot' actually
+          reboots; ANY other
+
+          // value is a report-only run. The spelling is inherited from the
+          Ansible variable
+
+          // var_RebootIt and kept so the two can be read against each other.
+
+          //
+
+          // The failure mode worth guarding is a TYPO: 'reboot' or 'simple'
+          silently means
+
+          // "do nothing", and the run looks entirely successful while no server
+          is rebooted.
+
+          var mode = String(rebootMode === null || rebootMode === undefined ? ""
+          : rebootMode).replace(/^\s+|\s+$/g, "");
+
+
+          if (mode === "") {
+              throw new Error(
+                  "Create Script Parameters: rebootMode is empty. Use 'reboot' to reboot, or 'no' " +
+                  "for a report-only run."
+              );
+          }
+
+
+          if (mode === "reboot") {
+              System.warn(
+                  "rebootMode='reboot' -- this run WILL REBOOT every direct, enabled member of '" +
+                  groupName + "' that reports a pending reboot. " + computerNames.length + " server(s) " +
+                  "will be checked."
+              );
+          }
+
+          else {
+              if (mode !== "no") {
+                  System.warn(
+                      "rebootMode='" + mode + "' is neither 'reboot' nor 'no'. The script treats any " +
+                      "non-'reboot' value as report-only, so NO servers will be rebooted. If a reboot " +
+                      "was intended, the value must be exactly 'reboot' -- it is case-sensitive."
+                  );
+              }
+              System.log("rebootMode='" + mode + "' -- report-only run; pending servers will be reported but not rebooted.");
+          }
+
+
+          // -- 3. Check the numbers before the script has to
+          ---------------------------
+
+          // These are cast with [int] inside the script, where a bad value
+          becomes 0 rather than
+
+          // an error -- a verifyPollSec of 0 would spin the verification loop
+          with no wait at all.
+
+          // Refuse them here, where the message can name the input the operator
+          has to fix.
+
+          function requireWholeNumber(value, name, minimum) {
+              if (value === null || value === undefined || String(value).replace(/^\s+|\s+$/g, "") === "") {
+                  throw new Error("Create Script Parameters: " + name + " is required.");
+              }
+
+              var n = parseInt(value, 10);
+
+              if (isNaN(n) || String(n) !== String(value).replace(/^\s+|\s+$/g, "")) {
+                  throw new Error(
+                      "Create Script Parameters: " + name + " must be a whole number. Received: " + value
+                  );
+              }
+              if (n < minimum) {
+                  throw new Error(
+                      "Create Script Parameters: " + name + " must be " + minimum + " or greater. Received: " + n
+                  );
+              }
+              return n;
+          }
+
+
+          var delaySec  = requireWholeNumber(delayBetweenServersSec,
+          "delayBetweenServersSec", 0);
+
+          var verifySec = requireWholeNumber(verifyTimeoutSec,
+          "verifyTimeoutSec", 1);
+
+          var pollSec   = requireWholeNumber(verifyPollSec, "verifyPollSec", 1);
+
+
+          if (pollSec > verifySec) {
+              throw new Error(
+                  "Create Script Parameters: verifyPollSec (" + pollSec + ") must not exceed verifyTimeoutSec (" +
+                  verifySec + ") -- a server would never be polled before its deadline passed."
+              );
+          }
+
+
+          // The whole run is ONE synchronous PowerShell invocation. If it
+          outlasts the WinRM/PSRP
+
+          // operation timeout on the host, the session is cut and the
+          transcript is lost
+
+          // mid-reboot -- with servers already rebooting and no record of
+          which.
+
+          var worstCaseSec = (computerNames.length * delaySec) + verifySec;
+
+          System.log(
+              "Worst-case run time: " + Math.ceil(worstCaseSec / 60) + " minute(s) (" + computerNames.length +
+              " server(s) x " + delaySec + "s delay, plus up to " + verifySec + "s of verification)."
+          );
+
+          if (worstCaseSec > 1800) {
+              System.warn(
+                  "This run could take up to " + Math.ceil(worstCaseSec / 60) + " minutes in a single " +
+                  "PowerShell invocation. Confirm the PS host's WinRM MaxTimeoutms and the PowerShell " +
+                  "plug-in timeout both exceed that, or the session will be cut off mid-run -- after " +
+                  "reboots have been issued but before anything is reported."
+              );
+          }
+
+
+          // -- 4. Turn the tick-boxes into the 'yes' and 'no' the script
+          expects -------
+
+          /**
+           * These are booleans, so  value ? "yes" : "no"  would do the job today. It is written
+           * out longhand because inputs like these have been declared as strings at times, and
+           * that one-liner fails silently when they are: every non-empty string is truthy in
+           * JavaScript, so "no" comes out as "yes". Here that would turn ON the pre-reboot script
+           * for a run whose operator had turned it off -- a security-posture change nobody asked
+           * for. The value is read, not tested for truth.
+           */
+          function yesNo(value) {
+              if (value === true)  { return "yes"; }
+              if (value === false) { return "no"; }
+
+              var text = String(value).replace(/^\s+|\s+$/g, "").toLowerCase();
+              return (text === "yes" || text === "true" || text === "1") ? "yes" : "no";
+          }
+
+
+          var preScriptFlag = yesNo(runPreRebootScript);
+
+          var emailFlag     = yesNo(emailReport);
+
+
+          // S-13: the pre-reboot step is opt-in and defaults OFF. S-14: it
+          lives INSIDE
+
+          // Invoke-ServerReboot.ps1 as a script block, so there is no path to
+          supply and no
+
+          // file that can go missing -- which is what defect S-6 was.
+
+          //
+
+          // It takes ownership of and loosens the ACLs on usbstor.inf (USB
+          mass-storage driver
+
+          // INF) and termsrv.dll (Terminal Services). Because of S-6 it never
+          actually ran, so
+
+          // enabling it is a security-posture CHANGE rather than a restoration
+          of working
+
+          // behaviour. Make it loud when it is on.
+
+          if (preScriptFlag === "yes") {
+              System.warn(
+                  "runPreRebootScript is ON -- the embedded pre-reboot step WILL run on every server " +
+                  "that is rebooted. It takes ownership of and loosens ACLs on usbstor.inf (USB mass " +
+                  "storage) and termsrv.dll (Terminal Services). This step has never run in production " +
+                  "(defect S-6), so enabling it changes security posture. Confirm it is security-approved."
+              );
+          }
+
+
+          // -- 5. Email is opt-in; when it is on, there has to be somewhere to
+          send it --
+
+          var toList = (mailTo && mailTo.length) ? mailTo.join(",") : "";
+
+          var ccList = (mailCc && mailCc.length) ? mailCc.join(",") : "";
+
+
+          if (emailFlag === "yes") {
+              if (smtpServer === null || smtpServer === undefined ||
+                  String(smtpServer).replace(/^\s+|\s+$/g, "") === "") {
+                  throw new Error(
+                      "Create Script Parameters: smtpServer is required when emailReport is ticked."
+                  );
+              }
+              if (toList === "") {
+                  throw new Error(
+                      "Create Script Parameters: mailTo must hold at least one recipient when emailReport " +
+                      "is ticked."
+                  );
+              }
+          }
+
+
+          // -- 6. Build the bag
+          --------------------------------------------------------
+
+          // The keys are the script's parameter names. runPowerShellScript
+          turns each one into
+
+          // -Name 'value' on the command line, so they have to match the
+          param() block in
+
+          // Invoke-ServerReboot.ps1 exactly.
+
+          scriptParameters = new Properties();
+
+          scriptParameters.put("ComputerNames",         
+          computerNames.join(","));
+
+          scriptParameters.put("RebootMode",             mode);
+
+          scriptParameters.put("DelayBetweenServersSec", String(delaySec));
+
+          scriptParameters.put("VerifyTimeoutSec",       String(verifySec));
+
+          scriptParameters.put("VerifyPollSec",          String(pollSec));
+
+          scriptParameters.put("RunPreRebootScript",     preScriptFlag);
+
+          scriptParameters.put("EmailReport",            emailFlag);
+
+          scriptParameters.put("SMTPServer",             smtpServer ?
+          String(smtpServer).replace(/^\s+|\s+$/g, "") : "");
+
+          scriptParameters.put("MailToString",           toList);
+
+          scriptParameters.put("MailCcString",           ccList);
+
+          scriptParameters.put("MailSubject",            mailSubject ?
+          String(mailSubject).replace(/^\s+|\s+$/g, "") : "");
+
+
+          // -HeaderNote is the group name printed in the report header. It is a
+          display label
+
+          // only, so it is taken from the group that was actually RESOLVED
+          rather than asked for
+
+          // separately -- which makes it impossible for the header to name a
+          different group than
+
+          // the one whose servers were rebooted. (Change P-13.)
+
+          scriptParameters.put("HeaderNote", groupName);
+
+
+          System.log(
+              "rebootMode=" + mode + ", servers=" + computerNames.length +
+              ", delay=" + delaySec + "s, verifyTimeout=" + verifySec + "s, verifyPoll=" + pollSec + "s" +
+              ", preRebootScript=" + preScriptFlag + ", emailReport=" + emailFlag +
+              (emailFlag === "yes" ? ", mailTo=" + toList : "")
+          );
+        encoded: false
+      in-binding:
+        bind:
+          - name: computerNames
+            type: Array/string
+            export-name: computerNames
+          - name: adGroup
+            type: AD:UserGroup
+            export-name: adGroup
+          - name: rebootMode
+            type: string
+            export-name: rebootMode
+          - name: delayBetweenServersSec
+            type: number
+            export-name: delayBetweenServersSec
+          - name: verifyTimeoutSec
+            type: number
+            export-name: verifyTimeoutSec
+          - name: verifyPollSec
+            type: number
+            export-name: verifyPollSec
+          - name: runPreRebootScript
+            type: boolean
+            export-name: runPreRebootScript
+          - name: emailReport
+            type: boolean
+            export-name: emailReport
+          - name: smtpServer
+            type: string
+            export-name: smtpServer
+          - name: mailTo
+            type: Array/string
+            export-name: mailTo
+          - name: mailCc
+            type: Array/string
+            export-name: mailCc
+          - name: mailSubject
+            type: string
+            export-name: mailSubject
+      out-binding:
+        bind:
+          - name: scriptParameters
+            type: Properties
+            export-name: scriptParameters
+      description: Simple task with custom script capability.
+      position:
+        'y': 20
+        x: 510
+      name: item4
+      out-name: item6
+      type: task
+      comparator: 0
+    - display-name: Parse Results
+      script:
+        value: >-
+          /* IN   scriptRunResult   Properties      attr     from element 6
+           *      adGroup             AD:UserGroup    attr     from element 2
+           *      rebootMode        string          input
+           * OUT  executionSuccess  boolean         output
+           *      executionOutput   string          output
+           *      serversChecked    number          output
+           *      serversRebooted   number          output
+           *      serversPending    number          output
+           *      transcript        string          output
+           *      -- BIND ALL SIX TO THE WORKFLOW OUTPUTS
+           *
+           * Element 6 hands back one Properties object holding everything the script reported.
+           * This takes it apart into the workflow's own outputs, so a caller -- a parent
+           * workflow, a schedule, or the API -- can read the numbers without knowing anything
+           * about PSO_RESULT or about how the script logs.
+           *
+           * THIS TASK DOES ALL THE REPORTING. There is no decision element after it and no
+           * pass/fail branch: it reports both outcomes and the workflow then ends. That keeps
+           * the whole account of a run in one place and in one order, which is what someone
+           * reading the log afterwards actually needs -- rather than split across two branches
+           * where half of it is only ever reached on one of them.
+           * ═════════════════════════════════════════════════════════════════════════════ */
+
+          // runPowerShellScript throws rather than returning nothing, so an
+          empty result here
+
+          // means element 6 was skipped or its output was never bound. Say
+          which, because the
+
+          // alternative is six null outputs and no clue where they came from.
+
+          if (scriptRunResult === null || scriptRunResult === undefined) {
+              throw new Error(
+                  "Parse Results: scriptRunResult is empty. Bind this task's scriptRunResult input to " +
+                  "the output of the 'Run PowerShell Script' element."
+              );
+          }
+
+
+          var reported = scriptRunResult.get("result");
+
+
+          executionSuccess = scriptRunResult.get("success");
+
+          transcript       = scriptRunResult.get("transcript");
+
+
+          serversChecked  = reported.get("serversRequested");
+
+          serversPending  = reported.get("pendingReboot");
+
+          serversRebooted = reported.get("rebooted");
+
+
+          var notReturned  = reported.get("notReturned");
+
+          var rebootFailed = reported.get("rebootFailed");
+
+          var skipped      = reported.get("skipped");
+
+          var errorCount   = reported.get("errorCount");
+
+
+          // reportOnly comes back from the SCRIPT rather than from the request
+          form, so this
+
+          // reports what actually ran. If the two ever disagree, the script's
+          answer is the true
+
+          // one -- and the disagreement is itself the thing worth knowing.
+
+          var wasReportOnly = (reported.get("reportOnly") === true);
+
+
+          if (wasReportOnly) {
+              executionOutput =
+                  serversPending + " of " + serversChecked + " server(s) require a reboot. " +
+                  "REPORT ONLY -- nothing was rebooted.";
+          }
+
+          else {
+              executionOutput =
+                  serversRebooted + " of " + serversPending + " pending server(s) rebooted and verified, " +
+                  "across " + serversChecked + " server(s) checked.";
+          }
+
+
+          if (executionSuccess) {
+              System.log("Finished. " + executionOutput);
+
+              if (wasReportOnly && serversPending > 0) {
+                  // Worth saying plainly. A clean report-only run proves the servers could be
+                  // interrogated -- not that any of them can actually be rebooted. The reboot
+                  // path (shutdown rights, RPC) is never exercised until a live run.
+                  System.log(
+                      "This was a report-only run. No reboot was issued, so it does not confirm the " +
+                      "servers can be rebooted -- only that their pending state could be read. " +
+                      "Re-run with rebootMode set to 'simpleMode' to reboot these " + serversPending +
+                      " server(s)."
+                  );
+              }
+          }
+
+          else {
+              // Some servers worked and some did not. That is not a failed workflow -- the work
+              // that could be done was done, and the report was still produced -- but it must be
+              // visible rather than buried in a transcript nobody opens.
+              System.warn(
+                  "Finished with " + errorCount + " error(s) against group '" + adGroup.name + "'. " +
+                  executionOutput
+              );
+
+              // Each count names a DIFFERENT kind of problem with a different owner, so they are
+              // reported separately rather than as one total. Collapsing them is what makes a
+              // reboot run hard to read: "3 errors" could be three unreachable servers (a
+              // firewall or WMI problem) or three servers that never came back (a real outage),
+              // and those two call for opposite responses.
+              if (skipped > 0 && serversPending < serversChecked) {
+                  System.warn(
+                      "  " + skipped + " server(s) were skipped. A server whose pending-reboot state " +
+                      "could not be read is NEVER rebooted (change S-8) -- check remote WMI/RPC access " +
+                      "to those servers from the PowerShell host."
+                  );
+              }
+              if (rebootFailed > 0) {
+                  System.warn(
+                      "  " + rebootFailed + " server(s) rejected the shutdown command. These are still " +
+                      "running and still require a reboot. Check the PowerShell host's shutdown rights " +
+                      "on them."
+                  );
+              }
+              if (notReturned > 0) {
+                  System.warn(
+                      "  " + notReturned + " server(s) did NOT come back within the verification timeout. " +
+                      "THESE NEED ATTENTION NOW -- a reboot was issued and the machine has not answered " +
+                      "since. Check them before re-running anything."
+                  );
+              }
+
+              var errors = reported.get("errors");
+              if (errors !== null && errors !== undefined) {
+                  System.warn("The errors were:");
+                  for (var i = 0; i < errors.length; i++) {
+                      System.warn("  " + errors[i]);
+                  }
+              }
+
+              System.warn("The full transcript, and the emailed report, hold the per-server detail.");
+          }
+
+
+          var closing =
+              "Invoke Server Reboot | group=" + adGroup.name +
+              " | rebootMode=" + rebootMode +
+              " | " + executionOutput;
+
+          if (executionSuccess) {
+              System.log(closing);
+          }
+
+          else {
+              System.warn(closing + " | Completed WITH ERRORS -- see the warnings above and the emailed report.");
+          }
+        encoded: false
+      in-binding:
+        bind:
+          - name: scriptRunResult
+            type: Properties
+            export-name: scriptRunResult
+          - name: adGroup
+            type: AD:UserGroup
+            export-name: adGroup
+          - name: rebootMode
+            type: string
+            export-name: rebootMode
+      out-binding:
+        bind:
+          - name: executionSuccess
+            type: boolean
+            export-name: executionSuccess
+          - name: executionOutput
+            type: string
+            export-name: executionOutput
+          - name: serversChecked
+            type: number
+            export-name: serversChecked
+          - name: serversRebooted
+            type: number
+            export-name: serversRebooted
+          - name: serversPending
+            type: number
+            export-name: serversPending
+          - name: transcript
+            type: string
+            export-name: transcript
+      description: Simple task with custom script capability.
+      position:
+        'y': 20
+        x: 760
+      name: item5
+      out-name: item0
+      type: task
+      comparator: 0
+    - display-name: runPowerShellScript
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.vcfa.vm.guestScripting").runPowerShellScript(psHost,script,parameters);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: psHost
+            type: PowerShell:PowerShellHost
+            export-name: psHost
+          - description: ''
+            name: script
+            type: ResourceElement
+            export-name: script
+          - description: ''
+            name: parameters
+            type: Properties
+            export-name: scriptParameters
+      out-binding:
+        bind:
+          - name: actionResult
+            type: Properties
+            export-name: scriptRunResult
+      description: Add a note to the workflow schema.
+      position:
+        'y': 20
+        x: 625
+      name: item6
+      out-name: item5
+      type: task
+      script-module: com.broadcom.pso.vcfa.vm.guestScripting/runPowerShellScript
+      comparator: 0
+  root-name: item2
+  object-name: workflow:name=generic
+  id: ca28572d-4aec-487b-97ea-ce19d2d871c2
+  version: 0.0.0
+  api-version: 6.0.0
+  restartMode: 1
+  resumeFromFailedMode: 0
+  editor-version: '2.0'

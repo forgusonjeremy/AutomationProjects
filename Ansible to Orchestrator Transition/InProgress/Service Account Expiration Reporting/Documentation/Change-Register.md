@@ -14,8 +14,8 @@ Orchestrator transition — what changed, and **why**.
 > its own register). This deliverable adds **S-22 … S-24** and process changes
 > **P-27 … P-32**.
 >
-> **Script under change (working copy):** `InProgress/psscript/files/cvs_functions.ps1`
-> **Promoted to (on completion):** `Completed/_Shared References/psscript/files/cvs_functions.ps1`
+> **Script under change (working copy):** `InProgress/_Shared/PowerShell/cvs_functions.ps1`
+> **Promoted to (on completion):** `Completed/_Shared/PowerShell/cvs_functions.ps1`
 > **Current-state baseline:** `InProgress/Service Account Expiration Reporting/service_accounts_report.yml` + `vars.txt`
 >
 > Only **two** working copies of the shared PowerShell exist: the In-Progress copy

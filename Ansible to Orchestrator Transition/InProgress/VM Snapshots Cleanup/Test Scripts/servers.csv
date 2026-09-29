@@ -1,0 +1,2 @@
+Server,Username,RemotePath,Port
+<server ip>,sshuser,/tmp/,22

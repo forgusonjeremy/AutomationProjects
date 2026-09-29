@@ -28,7 +28,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $ScriptPath = "e:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\psscript\files\cvs_functions.ps1",
+    [string] $ScriptPath = "e:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\_Shared\PowerShell\cvs_functions.ps1",
     [switch] $KeepArtifacts
 )
 
@@ -37,7 +37,7 @@ Set-Location $PSScriptRoot
 
 if (-not (Test-Path -LiteralPath $ScriptPath)) {
     Write-Host "FATAL: script under test not found: $ScriptPath" -ForegroundColor Red
-    Write-Host "       Pass -ScriptPath if it has been promoted to Completed\_Shared References\." -ForegroundColor Yellow
+    Write-Host "       Pass -ScriptPath if it has been promoted to Completed\_Shared\." -ForegroundColor Yellow
     exit 1
 }
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {

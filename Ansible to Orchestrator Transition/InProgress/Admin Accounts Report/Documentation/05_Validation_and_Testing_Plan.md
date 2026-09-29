@@ -52,7 +52,7 @@
 Run before any lab work. Fails here mean the content is wrong regardless of environment.
 
 ```powershell
-cd '<repo>\InProgress\psscript\Admin Accounts Report\lab'
+cd '<repo>\InProgress\Admin Accounts Report\lab'
 .\Run-AllTests.ps1
 ```
 
@@ -173,7 +173,7 @@ directory simultaneously with no interference. Compare on **output**.
 |---|---|
 | **J1** | `.\New-AdminAccountTestData.ps1 -Domain <lab domain> -Remove` |
 | **J2** | Confirm only marker-tagged objects were removed and no OU was dropped while holding foreign objects |
-| **J3** | Promote `cvs_functions.ps1` to `Completed/_Shared References/psscript/files/` and update the lab suite's script path |
+| **J3** | Promote `cvs_functions.ps1` to `Completed/_Shared/PowerShell/` and update the lab suite's script path |
 
 ---
 

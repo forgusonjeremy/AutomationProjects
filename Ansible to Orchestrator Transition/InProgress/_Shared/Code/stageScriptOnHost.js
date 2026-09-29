@@ -1,6 +1,6 @@
 /**
  * Action: stageScriptOnHost
- * Module:  com.broadcom.pso.vcf.powershell.staging   (SHARED - reference, do not copy)
+ * Module:  com.broadcom.pso.powershell   (SHARED - reference, do not copy)
  *
  * vRO input-parameter order (positional call from the workflow):
  *   (psHost, script, targetPath)

@@ -5,7 +5,7 @@ to the vRO **Get Server Reboot Report** workflow. `R-#` = change; `P-#` = proces
 decision.
 
 ## Source (Ansible) being transitioned
-Two report playbooks in `InProgress/psscript/Servers Reboot Report by CN/`, both
+Two report playbooks in `InProgress/Servers Reboot Report by CN/`, both
 **read-only** (no reboot):
 
 | Playbook | vars | Script action | Group input | Resolver |

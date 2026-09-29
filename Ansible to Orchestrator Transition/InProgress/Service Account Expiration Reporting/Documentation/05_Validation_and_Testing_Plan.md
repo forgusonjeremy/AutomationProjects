@@ -204,7 +204,7 @@ cutover.
 | J2 | Confirm only tagged objects were removed, and the OUs are gone |
 | J3 | Remove lab entries from `domainOUs` in the production workflow |
 | J4 | Delete lab report files from the PS host Debug folder |
-| J5 | Promote `cvs_functions.ps1` to `Completed/_Shared References/` and update the lab suite's default path |
+| J5 | Promote `cvs_functions.ps1` to `Completed/_Shared/` and update the lab suite's default path |
 
 ---
 

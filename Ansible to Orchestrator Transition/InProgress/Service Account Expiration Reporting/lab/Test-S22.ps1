@@ -30,14 +30,14 @@
 .PARAMETER ScriptPath
     Path to the cvs_functions.ps1 under test. Defaults to the InProgress working copy.
     UPDATE THIS DEFAULT when the script is promoted to
-    Completed\_Shared References\psscript\files\.
+    Completed\_Shared\PowerShell\.
 
 .EXAMPLE
     .\Test-S22.ps1
 #>
 [CmdletBinding()]
 param(
-    [string] $ScriptPath = "e:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\psscript\files\cvs_functions.ps1"
+    [string] $ScriptPath = "e:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\_Shared\PowerShell\cvs_functions.ps1"
 )
 
 $ErrorActionPreference = 'Continue'

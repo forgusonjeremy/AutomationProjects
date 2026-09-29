@@ -198,7 +198,7 @@ After the first save, copy the workflow ID into the header of
 Run the offline suite before deploying — no infrastructure required:
 
 ```powershell
-cd '<repo>\InProgress\psscript\Admin Accounts Report\lab'
+cd '<repo>\InProgress\Admin Accounts Report\lab'
 .\Run-AllTests.ps1        # 191 checks
 ```
 
@@ -233,7 +233,7 @@ requires no coordination with that team.
 1. Record the workflow ID in the spec file.
 2. Export the package (`com.broadcom.pso.vcf.identity.ad.accounts.adminReport`).
 3. Promote `cvs_functions.ps1` from `InProgress/` to
-   `Completed/_Shared References/psscript/files/`.
+   `Completed/_Shared/PowerShell/`.
 4. Update the lab suite's script path to the promoted location.
 5. Create the schedule.
 6. **Brief recipients** — the report format has changed, the subject line may carry

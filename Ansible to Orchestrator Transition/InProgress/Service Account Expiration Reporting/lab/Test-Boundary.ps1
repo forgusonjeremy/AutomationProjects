@@ -25,7 +25,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $ScriptPath = "e:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\psscript\files\cvs_functions.ps1"
+    [string] $ScriptPath = "e:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\_Shared\PowerShell\cvs_functions.ps1"
 )
 
 $scratch = $PSScriptRoot

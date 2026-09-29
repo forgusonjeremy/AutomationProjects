@@ -97,8 +97,8 @@ copies, so they cannot drift from the shipping code — if a function is renamed
 removed, the tests fail loudly instead of silently testing a stale copy.
 
 `Test-S16.ps1` and `Test-Boundary.ps1` both reference the working copy at
-`InProgress/psscript/files/cvs_functions.ps1`. Update that path when the script is
-promoted to `Completed/_Shared References/psscript/files/`.
+`InProgress/_Shared/PowerShell/cvs_functions.ps1`. Update that path when the script is
+promoted to `Completed/_Shared/PowerShell/`.
 
 ## Scope
 

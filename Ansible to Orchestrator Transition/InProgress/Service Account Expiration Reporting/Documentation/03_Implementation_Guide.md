@@ -269,7 +269,7 @@ no coordination with that team.
 1. Record the workflow ID in the spec file.
 2. Export the package (`com.broadcom.pso.vcf.identity.ad.accounts.serviceAccountExpiry`).
 3. Promote `cvs_functions.ps1` from `InProgress/` to
-   `Completed/_Shared References/psscript/files/`.
+   `Completed/_Shared/PowerShell/`.
 4. Update the lab suite's script path to the promoted location.
 5. Create the schedule, and **check the window is at least as long as the schedule
    interval**.

@@ -21,7 +21,7 @@ Complete these before importing:
       the group with `Get-ADGroupMember` / `Get-ADComputer`).
 - [ ] **`cvs_functions.ps1` staged** on the PS host at the path you will pass as
       `scriptPath` (default `C:\PSO\Scripts\cvs_functions.ps1`). Use the current version
-      containing changes **S-14 and S-15** (from `InProgress/psscript/files/cvs_functions.ps1`).
+      containing changes **S-14 and S-15** (from `InProgress/_Shared/PowerShell/cvs_functions.ps1`).
 - [ ] **PS host service account permissions:** **local admin on each target server**
       (this is what grants `\\server\C$` access *and* delete rights under
       `c:\Windows\ccmcache`), plus read access to the AD group.

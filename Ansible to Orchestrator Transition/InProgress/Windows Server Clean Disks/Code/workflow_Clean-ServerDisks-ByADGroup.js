@@ -50,10 +50,12 @@
  *   Create each ONCE per Orchestrator and let every workflow call it. A second copy
  *   under a different name drifts silently from the first.
  *
- *     findAdHostForDn          Server Reboots package      (AD plug-in)
- *     resolveAdGroup           Server Reboots package      (AD plug-in)
- *     getGroupComputersDirect  Server Reboots package      (AD plug-in; NON-recursive)
- *     selectPowerShellHost     Server Reboots package
+ *     findAdHostForDn          InProgress/_Shared/Code/    (AD plug-in)
+ *     resolveAdGroup           InProgress/_Shared/Code/    (AD plug-in)
+ *     getGroupComputersDirect  InProgress/_Shared/Code/    (AD plug-in; NON-recursive)
+ *     selectPowerShellHost     InProgress/_Shared/Code/    (UPDATED
+ *                              2026-09-29: picks the least busy of an ARRAY of hosts;
+ *                              input is now psHosts, not psHost -- replace any older copy)
  *
  *   New shared actions, source in InProgress/_Shared/Code/:
  *
@@ -183,13 +185,23 @@
  *
  * ── 4. Select PowerShell Host ──────────────────────────────────────────────────
  *    Action:    selectPowerShellHost
- *    IN    psHost              PowerShell:PowerShellHost  ← input  psHost  (may be null)
- *    OUT   actionResult        PowerShell:PowerShellHost  → attr   resolvedHost
+ *    IN    psHosts             Array/PowerShell:PowerShellHost  ← attr   psHostCandidates
+ *    OUT   actionResult        PowerShell:PowerShellHost        → attr   resolvedHost
  *    Exception → [End: Failed - PS Execution]
  *
- *    One registered host is used without asking; several and no choice stops the run.
- *    (A multi-domain estate using per-account host objects (P-52) swaps this element for
- *    resolvePowerShellHostForAccount; nothing downstream changes.)
+ *    AUTOMATIC -- there is no host picker on the form. Each host in psHostCandidates is
+ *    probed once and the one with the lowest resource utilization wins:
+ *
+ *        score = cpu% + 0.5 x memory-in-use% + 20 x other ACTIVE remote PS sessions
+ *
+ *    Hosts that do not answer are warned about and skipped; the run stops only if none
+ *    answers. A list of one is used without probing. The log lists every candidate, its
+ *    figures, its score, and the choice.
+ *
+ *    WHICH HOSTS ARE CANDIDATES IS DECIDED AT BUILD TIME, in psHostCandidates. The action
+ *    does not check what domain a host is in: list only hosts whose account can reach
+ *    this workflow's targets (local admin over \\server\c$ -- see BEFORE THE FIRST
+ *    PRODUCTION RUN).
  *
  * ── 5. Create Script Parameters ────────────────────────────────────────────────
  *    Scriptable task        ← code at the bottom of this file
@@ -301,7 +313,6 @@
  *   Name            Type                       Default                                     Mand.
  *   ─────────────── ────────────────────────── ─────────────────────────────────────────── ─────
  *   adGroupDn       string                     (none)                                      Yes
- *   psHost          PowerShell:PowerShellHost  (none)                                      No
  *   folderTarget    Array/string               [ c:\Windows\ccmcache ]                     Yes
  *   olderThanDays   number                     1                                           Yes
  *   folderIncluded  boolean                    true                                        Yes
@@ -348,6 +359,8 @@
  *   scriptTargetPath  string                     YOU, at build    C:\PSO\Scripts\Invoke-ServerDiskClean.ps1
  *   fileFilter        string                     YOU, at build    *.*          (P-19 -- do not change)
  *   maxItemsListed    number                     YOU, at build    25
+ *   psHostCandidates  Array/PowerShell:          YOU, at build    the PowerShell host objects this
+ *                     PowerShellHost                              workflow may run on (one or more)
  *   adHost            AD:AdHost                  element 1
  *   adGroup           AD:UserGroup               element 2
  *   computerNames     Array/string               element 3
@@ -392,7 +405,9 @@
  *   Plug-in will not report group membership               3    Failed - AD Resolution
  *   Nested group in the group                              3    warned, not expanded → continues
  *   Disabled computer account                              3    skipped + logged → continues
- *   No PowerShell host / several and none chosen           4    Failed - PS Execution
+ *   psHostCandidates empty                                 4    Failed - PS Execution
+ *   No candidate host answers its probe                    4    Failed - PS Execution
+ *   A candidate host does not answer its probe             4    warned, skipped → continues
  *   Zero direct enabled computer members                   5    Failed - Bad Inputs
  *   whatIf not 'yes'/'no'; bad age; bad/refused folder     5    Failed - Bad Inputs
  *   Email on with no recipient                             5    Failed - Bad Inputs

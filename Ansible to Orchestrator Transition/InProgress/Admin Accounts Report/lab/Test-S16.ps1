@@ -2,7 +2,7 @@
 # Extracts Resolve-DomainOUsMap and GenerateReportPKI-v2 from the script by AST and
 # exercises them with fake data, so no AD / SMTP is required.
 
-$src = "E:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\psscript\files\cvs_functions.ps1"
+$src = "E:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\_Shared\PowerShell\cvs_functions.ps1"
 
 $errors = $null; $tokens = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($src, [ref]$tokens, [ref]$errors)

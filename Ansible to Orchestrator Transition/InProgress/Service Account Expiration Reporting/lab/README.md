@@ -128,9 +128,9 @@ existed; asserting against raw text would fail on the documentation, and the tem
 
 `Test-S22.ps1`, `Test-Boundary.ps1`, `New-SampleReport.ps1` and `Run-AllTests.ps1` all
 default to the working copy at
-`InProgress/psscript/files/cvs_functions.ps1`, and all accept `-ScriptPath`. Update the
+`InProgress/_Shared/PowerShell/cvs_functions.ps1`, and all accept `-ScriptPath`. Update the
 defaults when the script is promoted to
-`Completed/_Shared References/psscript/files/`.
+`Completed/_Shared/PowerShell/`.
 
 The JavaScript harnesses resolve the action and spec **relative to this folder**, so
 they keep working when the project moves from `InProgress` to `Completed`.

@@ -4,7 +4,7 @@
 # This is what validates the JS-JSON -> PowerShell-single-quote -> ConvertFrom-Json chain.
 
 $scratch = $PSScriptRoot
-$real    = "E:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\psscript\files\cvs_functions.ps1"
+$real    = "E:\GitHub-LocalRepos\AutomationProjects\Ansible to Orchestrator Transition\InProgress\_Shared\PowerShell\cvs_functions.ps1"
 
 # --- stub script: same relevant params as cvs_functions.ps1, prints the parsed map --
 $stub = Join-Path $scratch 'stub_cvs.ps1'
