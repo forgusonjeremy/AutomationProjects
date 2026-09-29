@@ -3,12 +3,22 @@
  * Module:  com.broadcom.pso.powershell   (SHARED - reference, do not copy)
  *
  * vRO input-parameter order (positional call from the workflow):
- *   (psHost, script, targetPath)
+ *   (psHost, scriptDirectory, script)
  *
  * Purpose:
  *   Makes sure the PowerShell host holds an EXACT copy of a script kept in an Orchestrator
- *   Resource Element, at a fixed path, before the workflow runs it. The analogue of the
- *   playbooks' `win_copy: src=files/ps_scripts` - except that it copies only when it has to.
+ *   Resource Element, in a given directory, before the workflow runs it -- and returns the
+ *   script's full path for invokeStagedScript to run. The analogue of the playbooks'
+ *   `win_copy: src=files/ps_scripts` - except that it copies only when it has to.
+ *
+ *   The full path is  scriptDirectory + '\' + <Resource Element name>:
+ *
+ *     scriptDirectory  C:\PSO\Scripts
+ *     script           Resource Element named  Invoke-ServerDiskClean.ps1
+ *     full path        C:\PSO\Scripts\Invoke-ServerDiskClean.ps1      <- checked, placed, returned
+ *
+ *   So the file on the host always carries the name of the element it came from, and the
+ *   path is built in exactly one place.
  *
  *     First run on a host      the file is absent          -> copy it
  *     Every later run          the file matches exactly    -> run the copy already there
@@ -32,8 +42,9 @@
  *       whole script through WinRM - which is what makes it affordable to keep the scripts
  *       FULLY COMMENTED in the Resource Element rather than stripping them to save payload.
  *
- *   "Which generation ran" is answered by the value this action returns: the Resource
- *   Element's version plus the first 12 hex digits of the SHA-256 that was verified on disk.
+ *   "Which generation ran" is answered in the log: every run writes the Resource Element's
+ *   version, the SHA-256 verified on disk, and whether the file was a first copy, updated,
+ *   or unchanged.
  *
  * ── Transport ─────────────────────────────────────────────────────────────────
  *   The PowerShell plug-in has no file-transfer call, so the content goes as base64 inside
@@ -56,23 +67,30 @@
  *   cannot exist. openSession() is the fallback for plug-in versions without invokeScript()
  *   on the host, as in runPowerShellScript.
  *
- * Inputs:
- *   psHost      (PowerShell:PowerShellHost) - the host to stage on. For a multi-domain estate
- *                                             (P-52) every host object points at the same pool
- *                                             and shares one filesystem, so staging via any of
- *                                             them serves all of them.
- *   script      (ResourceElement)           - the element holding the .ps1. Bind it to a
- *                                             workflow ATTRIBUTE set at build time, so the run
- *                                             record shows which script was staged.
- *   targetPath  (string)                    - absolute path on the host, e.g.
- *                                             'C:\PSO\Scripts\Invoke-ServerDiskClean.ps1'
+ * Inputs (in this order):
+ *   psHost           (PowerShell:PowerShellHost) - the host to stage on. For a multi-domain
+ *                                                  estate (P-52) every host object points at
+ *                                                  the same pool and shares one filesystem, so
+ *                                                  staging via any of them serves all of them.
+ *   scriptDirectory  (string)                    - the directory on the host the script lives in
+ *                                                  and runs from, e.g. 'C:\PSO\Scripts'. Absolute
+ *                                                  local path; a trailing '\' is optional. Created
+ *                                                  on first copy if it does not exist.
+ *   script           (ResourceElement)           - the element holding the .ps1. Its NAME is the
+ *                                                  file name on the host, so it must be a plain
+ *                                                  file name ending in .ps1. Bind it to a workflow
+ *                                                  ATTRIBUTE set at build time, so the run record
+ *                                                  shows which script was staged.
  *
- * Returns: string - a run-record label, e.g.
- *            'Invoke-ServerDiskClean.ps1 v1.0.2 sha256=3F9A0C11D2B7 (unchanged)'
- *          The last word is one of: first copy | updated | unchanged.
- *          Bind it to a workflow OUTPUT - it answers "which script did that run use?"
+ * Returns: string - the script's full path on the host, e.g.
+ *            'C:\PSO\Scripts\Invoke-ServerDiskClean.ps1'
+ *          Bind it to a workflow attribute and from there to invokeStagedScript's scriptPath.
+ *          It is returned only once the file at that path has been verified to match the
+ *          Resource Element, so a path that came from here is a path that is safe to run.
  *
  * Fails the run (throws) when:
+ *   - scriptDirectory is not an absolute local path, or the element's name is not a plain
+ *     .ps1 file name
  *   - the Resource Element is missing or empty (staging it would replace a working script
  *     with nothing)
  *   - the host probe does not answer (deployed state unknown - overwriting blind is worse
@@ -95,35 +113,48 @@ if (script === null || script === undefined) {
         "Resource Element with the .ps1."
     );
 }
-if (!targetPath || String(targetPath).replace(/^\s+|\s+$/g, "") === "") {
-    throw new Error("stageScriptOnHost: targetPath is required, e.g. 'C:\\PSO\\Scripts\\" + script.name + "'.");
+
+var scriptName = String(script.name).replace(/^\s+|\s+$/g, "");
+
+if (!scriptDirectory || String(scriptDirectory).replace(/^\s+|\s+$/g, "") === "") {
+    throw new Error("stageScriptOnHost: scriptDirectory is required, e.g. 'C:\\PSO\\Scripts'.");
 }
 
-var tgtPath    = String(targetPath).replace(/^\s+|\s+$/g, "");
-var scriptName = String(script.name);
+// Forward slashes are accepted and normalised; trailing separators are dropped so the join
+// below always produces exactly one '\' between directory and file name.
+var dirPath = String(scriptDirectory).replace(/^\s+|\s+$/g, "").replace(/\//g, "\\").replace(/\\+$/, "");
 
-// A relative target resolves against whatever directory the WinRM session started in, so
-// the script would land somewhere the invocation does not look for it. A UNC target would
+// A relative directory resolves against whatever directory the WinRM session started in, so
+// the script would land somewhere the invocation does not look for it. A UNC directory would
 // make "the copy on the host" a copy somewhere else, reached by a second hop.
-if (!/^[a-zA-Z]:\\[^\\]/.test(tgtPath)) {
+if (!/^[a-zA-Z]:(\\|$)/.test(dirPath)) {
     throw new Error(
-        "stageScriptOnHost: targetPath must be an absolute local path on the host (e.g. " +
-        "'C:\\PSO\\Scripts\\" + scriptName + "') - got '" + tgtPath + "'."
+        "stageScriptOnHost: scriptDirectory must be an absolute local path on the host, e.g. " +
+        "'C:\\PSO\\Scripts' - got '" + scriptDirectory + "'."
     );
 }
-if (/\.\.(\\|$)/.test(tgtPath) || /[*?"<>|]/.test(tgtPath.substring(2))) {
-    throw new Error("stageScriptOnHost: targetPath '" + tgtPath + "' contains '..' or a character not valid in a path.");
+if (/(^|\\)\.\.(\\|$)/.test(dirPath) || /[*?"<>|]/.test(dirPath.substring(2))) {
+    throw new Error("stageScriptOnHost: scriptDirectory '" + scriptDirectory + "' contains '..' or a character not valid in a path.");
 }
 
-// The file name on the host does not have to match the element's name, but if it does not
-// someone looking at the host cannot tell which element it came from. Say so, do not fail.
-var leaf = tgtPath.substring(tgtPath.lastIndexOf("\\") + 1);
-if (leaf.toLowerCase() !== scriptName.toLowerCase()) {
-    System.warn(
-        "stageScriptOnHost | targetPath file name '" + leaf + "' differs from the Resource Element name '" +
-        scriptName + "'. It works, but the file on the host no longer names its source."
+// The element's name becomes the file name. A separator in it would put the file somewhere
+// other than scriptDirectory, and anything but .ps1 cannot be invoked as a script -- so both
+// are refused rather than quietly repaired.
+if (scriptName === "" || /[\\\/:*?"<>|]/.test(scriptName)) {
+    throw new Error(
+        "stageScriptOnHost: the Resource Element is named '" + scriptName + "'. That name becomes the " +
+        "file name on the host, so it must be a plain file name with no \\ / : * ? \" < > |. Rename the element."
     );
 }
+if (!/\.ps1$/i.test(scriptName)) {
+    throw new Error(
+        "stageScriptOnHost: the Resource Element is named '" + scriptName + "'. It becomes the script's file " +
+        "name on the host and must end in .ps1, or PowerShell will not run it. Rename the element."
+    );
+}
+
+// The one place the full path is built.
+var tgtPath = dirPath + "\\" + scriptName;
 
 // ── Load the script from the Resource Element ─────────────────────────────────
 
@@ -261,8 +292,12 @@ var bytes   = utf8Bytes(content);
 var wantLen = bytes.length;
 var wantSha = sha256Hex(bytes);
 
-function label(outcome) {
-    return scriptName + " " + version + " sha256=" + wantSha.substring(0, 12) + " (" + outcome + ")";
+// One line per run that says which generation of the script this run will execute.
+function logStaged(outcome) {
+    System.log(
+        "stageScriptOnHost | staged: " + tgtPath + " | " + scriptName + " " + version +
+        " | sha256=" + wantSha.substring(0, 12) + " | " + outcome
+    );
 }
 
 // ── Talk to the host ──────────────────────────────────────────────────────────
@@ -357,7 +392,8 @@ else {
             "stageScriptOnHost | '" + tgtPath + "' on " + psHost.name + " is an exact match for " + scriptName +
             " " + version + " (SHA-256 " + wantSha + ", " + wantLen + " bytes) - nothing copied, the existing copy will run."
         );
-        return label("unchanged");
+        logStaged("unchanged");
+        return tgtPath;
     }
 
     outcome = "updated";
@@ -444,4 +480,5 @@ System.log(
     "stageScriptOnHost | " + outcome + ": " + scriptName + " " + version + " written to '" + tgtPath + "' on " +
     psHost.name + " and verified (SHA-256 " + wantSha + ", " + wantLen + " bytes)."
 );
-return label(outcome);
+logStaged(outcome);
+return tgtPath;
