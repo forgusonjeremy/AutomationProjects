@@ -30,7 +30,7 @@ then run `.\Promote-Project.ps1 -SharedOnly`.
 InProgress/
   _Shared/
     Code/            ONE copy of every shared vRO action (runPowerShellScript, stageScriptOnHost,
-                     invokeStagedScript, selectPowerShellHost, sendHtmlEmail, findAdHostForDn,
+                     invokeStagedScript, selectPowerShellHost, findAdHostForDn,
                      resolveAdGroup, getGroupComputersDirect, probeAdPlugin, ...)
     PowerShell/      shared PowerShell: cvs_functions.ps1, ownership_w2k.ps1
     Documentation/   shared designs + PowerShell Host Build Guide

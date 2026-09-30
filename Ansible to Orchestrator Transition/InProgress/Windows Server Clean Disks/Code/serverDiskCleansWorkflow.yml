@@ -1,0 +1,1424 @@
+inputForms:
+  - layout:
+      pages:
+        - id: page_k0g2rn4t
+          sections:
+            - id: section_mnx0dvdx
+              fields:
+                - id: distinguishedName
+                  display: textField
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_l4sjfgof
+              fields:
+                - id: folderTarget
+                  display: array
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_kx7svay5
+              fields:
+                - id: fileFilter
+                  display: textField
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_vanbj0ac
+              fields:
+                - id: reportOnly
+                  display: dropDown
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_31a225d5
+              fields:
+                - id: emailReport
+                  display: checkbox
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_o9d6u2f8
+              fields:
+                - id: folderIncluded
+                  display: checkbox
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_bfbc8abe
+              fields:
+                - id: forceEnable
+                  display: checkbox
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_oc6y8khl
+              fields:
+                - id: olderThanDays
+                  display: decimalField
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_9dwp0j2k
+              fields:
+                - id: mailTo
+                  display: array
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_8zhcl228
+              fields:
+                - id: mailSubject
+                  display: textField
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+            - id: section_8kfqxzxa
+              fields:
+                - id: targetPath
+                  display: textField
+                  signpostPosition: right-middle
+                  state:
+                    visible: true
+                    read-only: false
+          title: General
+          state: {}
+    schema:
+      distinguishedName:
+        id: distinguishedName
+        type:
+          dataType: string
+        label: AD Group Distinguished Name
+        constraints:
+          required: false
+      folderTarget:
+        id: folderTarget
+        type:
+          dataType: string
+          isMultiple: true
+        label: Folder where files to be deleted are located
+        constraints:
+          required: false
+      fileFilter:
+        id: fileFilter
+        type:
+          dataType: string
+        label: >-
+          Delete files with the following string in the name (wildcard search
+          supported)
+        constraints:
+          required: false
+      reportOnly:
+        id: reportOnly
+        type:
+          dataType: string
+        label: Report Only or Report and Delete?
+        valueList:
+          - value: 'yes'
+            label: Report Only
+          - value: 'no'
+            label: Report and Delete
+        constraints: {}
+      emailReport:
+        id: emailReport
+        type:
+          dataType: boolean
+        label: Email Report?
+        constraints:
+          required: false
+      folderIncluded:
+        id: folderIncluded
+        type:
+          dataType: boolean
+        label: Delete folder containing the matched files as well?
+        constraints:
+          required: false
+      forceEnable:
+        id: forceEnable
+        type:
+          dataType: boolean
+        label: Delete Read-Only items?
+        constraints:
+          required: false
+      olderThanDays:
+        id: olderThanDays
+        type:
+          dataType: decimal
+        label: Delete Files/Folders Older Than x Days
+        constraints:
+          required: false
+      mailTo:
+        id: mailTo
+        type:
+          dataType: string
+          isMultiple: true
+        label: Email addresses to whom report is to be sent
+        constraints:
+          required: false
+      mailSubject:
+        id: mailSubject
+        type:
+          dataType: string
+        label: Email Subject
+        constraints:
+          required: false
+      targetPath:
+        id: targetPath
+        type:
+          dataType: string
+        label: Script execution directory (UNC path)
+        constraints:
+          required: false
+    options:
+      externalValidations: []
+    itemId: ''
+workflowSchema:
+  display-name: Windows Server Disk Cleans
+  position:
+    'y': 10
+    x: 50
+  input:
+    param:
+      - description: ''
+        name: distinguishedName
+        type: string
+      - name: folderTarget
+        type: Array/string
+      - name: fileFilter
+        type: string
+      - name: reportOnly
+        type: string
+      - name: folderIncluded
+        type: boolean
+      - name: olderThanDays
+        type: number
+      - name: mailTo
+        type: Array/string
+      - name: mailSubject
+        type: string
+      - name: forceEnable
+        type: boolean
+      - description: >-
+          Full path to the script file on the PowerShell host (directory and
+          file name)
+        name: targetPath
+        type: string
+      - name: emailReport
+        type: boolean
+  output:
+    param:
+      - name: executionSuccess
+        type: boolean
+      - name: executionOuput
+        type: string
+      - name: ServersProcessed
+        type: number
+      - name: itemsDeleted
+        type: number
+      - name: bytesFreed
+        type: number
+      - name: transcript
+        type: string
+  attrib:
+    - type: AD:AdHost
+      name: adHost
+    - type: AD:UserGroup
+      name: adGroup
+    - type: Array/string
+      name: computerNames
+    - description: ''
+      value:
+        array:
+          elements:
+            - sdk-object:
+                type: PowerShell:PowerShellHost
+                href: >-
+                  https://cvsd26vcfauto01.connect.lab:443/vco/api/catalog/PowerShell/PowerShellHost/0c675c7a-137b-40c3-af36-6f36223dfa59/
+                id: 0c675c7a-137b-40c3-af36-6f36223dfa59
+      type: Array/PowerShell:PowerShellHost
+      name: psHosts
+    - type: PowerShell:PowerShellHost
+      name: resolvedHost
+    - value:
+        number:
+          value: 25
+      type: number
+      name: maxItemsListed
+    - value:
+        properties:
+          property: []
+      type: Properties
+      name: scriptParameters
+    - value:
+        sdk-object:
+          type: ResourceElement
+          href: >-
+            https://cvsd26vcfauto01.connect.lab:443/vco/api/catalog/System/ResourceElement/5fc71d56-a5c4-4dd3-8489-72f91b38e845/
+          id: 5fc71d56-a5c4-4dd3-8489-72f91b38e845
+      type: ResourceElement
+      name: scriptElement
+    - value:
+        string:
+          value: ''
+      type: string
+      name: stagedScript
+    - value:
+        properties:
+          property: []
+      type: Properties
+      name: scriptRunResult
+    - value:
+        string:
+          value: ''
+      type: string
+      name: reportSubject
+    - value:
+        string:
+          value: ''
+      type: string
+      name: reportHtml
+    - value:
+        string:
+          value: mail.vcf.lab
+      type: string
+      name: smtpHost
+    - value:
+        number:
+          value: 587
+      type: number
+      name: smtpPort
+    - description: Username for authentication
+      value:
+        string:
+          value: ''
+      type: string
+      name: username
+    - description: Password for authentication
+      value:
+        secure-string:
+          value: ''
+          isPlainText: false
+      type: SecureString
+      name: password
+    - description: Sender's name
+      value:
+        string:
+          value: no-reply-infmonitoring@vcf.lab
+      type: string
+      name: fromName
+    - description: Sender's address
+      value:
+        string:
+          value: no-reply-infmonitoring@vcf.lab
+      type: string
+      name: fromAddress
+    - description: >-
+        If true, enables the use of the STARTTLS command (if supported by the
+        server) to switch the connection to a TLS-protected connection before
+        issuing any login commands.
+      value:
+        boolean:
+          value: true
+      type: boolean
+      name: useStartTls
+    - type: number
+      name: mailLoopCounter
+    - value:
+        string:
+          value: ''
+      type: string
+      name: emailAddress
+  workflow-item:
+    - display-name: findAdHostForDn
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.vcf.activedirectory").findAdHostForDn(distinguishedName);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: distinguishedName
+            type: string
+            export-name: distinguishedName
+      out-binding:
+        bind:
+          - name: actionResult
+            type: AD:AdHost
+            export-name: adHost
+      description: Add a note to the workflow schema.
+      position:
+        'y': 20
+        x: 140
+      name: item1
+      out-name: item2
+      type: task
+      script-module: com.broadcom.pso.vcf.activedirectory/findAdHostForDn
+      comparator: 0
+    - display-name: resolveAdGroup
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.vcf.activedirectory").resolveAdGroup(adGroupDn,adHost);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: adGroupDn
+            type: string
+            export-name: distinguishedName
+          - description: ''
+            name: adHost
+            type: AD:AdHost
+            export-name: adHost
+      out-binding:
+        bind:
+          - name: actionResult
+            type: AD:UserGroup
+            export-name: adGroup
+      description: Add a note to the workflow schema.
+      position:
+        'y': 20
+        x: 270
+      name: item2
+      out-name: item3
+      type: task
+      script-module: com.broadcom.pso.vcf.activedirectory/resolveAdGroup
+      comparator: 0
+    - display-name: Get Computers in AD Group - Direct Members
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.vcf.activedirectory").getADComputersGroupDirectMembers(adGroup);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: adGroup
+            type: AD:UserGroup
+            export-name: adGroup
+      out-binding:
+        bind:
+          - name: actionResult
+            type: Array/string
+            export-name: computerNames
+      description: Add a note to the workflow schema.
+      position:
+        'y': 20
+        x: 400
+      name: item3
+      out-name: item4
+      type: task
+      script-module: com.broadcom.pso.vcf.activedirectory/getADComputersGroupDirectMembers
+      comparator: 0
+    - display-name: selectPowerShellHost
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.powershell").selectPowerShellHost(psHosts);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: psHosts
+            type: Array/PowerShell:PowerShellHost
+            export-name: psHosts
+      out-binding:
+        bind:
+          - name: actionResult
+            type: PowerShell:PowerShellHost
+            export-name: resolvedHost
+      description: Add a note to the workflow schema.
+      position:
+        'y': 20
+        x: 540
+      name: item4
+      out-name: item5
+      type: task
+      script-module: com.broadcom.pso.powershell/selectPowerShellHost
+      comparator: 0
+    - display-name: Create Script Parameters
+      script:
+        value: >-
+          /* IN   computerNames   Array/string    attr    from element 3
+           *      adGroup         AD:UserGroup    attr    from element 2
+           *      folderTarget    Array/string    input
+           *      olderThanDays   number          input
+           *      folderIncluded  boolean         input
+           *      forceEnable     boolean         input
+           *      reportOnly      string          input
+           *      fileFilter      string          attr    ('*.*')
+           *      maxItemsListed  number          attr    (25)
+           *      emailReport     boolean         input
+           *      mailTo          Array/string    input
+           * OUT  scriptParameters  Properties    attr    → element 7 'parameters'
+           *
+           * Does no work of its own. Checks the request, turns it into the Properties bag
+           * Invoke-ServerDiskClean.ps1 expects, and says in the log what it decided. Nothing has
+           * touched the PowerShell host or any server yet, so every refusal here is free.
+           * ═════════════════════════════════════════════════════════════════════════════ */
+
+          function trim(value) {
+              return (value === null || value === undefined) ? "" : String(value).replace(/^\s+|\s+$/g, "");
+          }
+
+
+          // -- 1. Refuse to run against nothing
+          -----------------------------------------
+
+          if (computerNames === null || computerNames === undefined ||
+          computerNames.length === 0) {
+              throw new Error(
+                  "Create Script Parameters: no servers were resolved. The AD group has no enabled computer " +
+                  "accounts as DIRECT members -- nested groups are deliberately not expanded for a destructive " +
+                  "action. Check the 'Get Computers in AD Group' log: if it named nested groups, that is where " +
+                  "the servers are."
+              );
+          }
+
+          var groupName = String(adGroup.name);
+
+          System.log("Servers (" + computerNames.length + ") in '" + groupName +
+          "': " + computerNames.join(", "));
+
+
+          // -- 2. The safety gate
+          -------------------------------------------------------
+
+          // Only the exact value 'no' deletes. The script's -ReportOnly has
+          ValidateSet('yes','no'),
+
+          // so it would refuse anything else too -- but refusing here gives the
+          operator a message
+
+          // naming the input instead of a PowerShell parameter-binding error.
+
+          var gate = trim(reportOnly).toLowerCase();
+
+          if (gate !== "yes" && gate !== "no") {
+              throw new Error(
+                  "Create Script Parameters: reportOnly must be 'yes' (report only - delete nothing) or 'no' " +
+                  "(delete for real). Received: '" + reportOnly + "'."
+              );
+          }
+
+
+          // -- 3. Age
+          --------------------------------------------------------------------
+
+          var days = Number(olderThanDays);
+
+          if (olderThanDays === null || olderThanDays === undefined ||
+          isNaN(days) || days < 0 || Math.floor(days) !== days) {
+              throw new Error(
+                  "Create Script Parameters: olderThanDays must be a whole number, 0 or greater " +
+                  "(1 = older than a day, 0 = everything up to now). Received: " + olderThanDays
+              );
+          }
+
+
+          // -- 4. Folder targets
+          ----------------------------------------------------------
+
+          // The same refusals the script makes (Test-FolderTarget, S-36), made
+          here first so a bad
+
+          // path never reaches the host: a drive root, or anything that IS or
+          is INSIDE a protected
+
+          // operating-system tree -- except the known-safe cache folders below
+          (and anything inside
+
+          // them). c:\users is deliberately allowed -- two production templates
+          clean it.
+
+          //
+
+          // KEEP THESE TWO LISTS IDENTICAL TO THE SCRIPT'S. To allow another
+          folder inside a
+
+          // protected tree, add it here AND to $AllowedInsideProtected in
+          Invoke-ServerDiskClean.ps1.
+
+          var protectedTrees = ["\\windows", "\\program files", "\\program files
+          (x86)", "\\programdata",
+                                "\\boot", "\\recovery", "\\system volume information"];
+          var allowedInsideProtected = ["\\windows\\ccmcache",
+          "\\windows\\temp", "\\windows\\softwaredistribution\\download"];
+
+
+          function isOrInside(candidate, tree) {
+              return candidate === tree || candidate.indexOf(tree + "\\") === 0;
+          }
+
+          var folders = [];
+
+          if (folderTarget !== null && folderTarget !== undefined) {
+              for (var f = 0; f < folderTarget.length; f++) {
+                  var path = trim(folderTarget[f]).replace(/\//g, "\\");
+                  if (path === "") { continue; }
+                  if (!/^[a-zA-Z]:\\/.test(path)) {
+                      throw new Error("Create Script Parameters: folderTarget '" + path + "' must be an absolute local path with a drive letter, as seen on the server (e.g. c:\\Windows\\ccmcache).");
+                  }
+                  if (/[*?"<>|]/.test(path) || /(^|\\)\.\.(\\|$)/.test(path)) {
+                      throw new Error("Create Script Parameters: folderTarget '" + path + "' contains a wildcard, '..', or a character not valid in a path.");
+                  }
+                  var rest = path.substring(2).replace(/\\+$/, "").toLowerCase();
+                  if (rest === "") {
+                      throw new Error("Create Script Parameters: folderTarget '" + path + "' is the root of a drive. That is never a disk-clean target.");
+                  }
+                  var allowed = false;
+                  for (var a = 0; a < allowedInsideProtected.length; a++) {
+                      if (isOrInside(rest, allowedInsideProtected[a])) { allowed = true; break; }
+                  }
+                  if (!allowed) {
+                      for (var r = 0; r < protectedTrees.length; r++) {
+                          if (isOrInside(rest, protectedTrees[r])) {
+                              var drive = path.substring(0, 2);
+                              throw new Error(
+                                  "Create Script Parameters: folderTarget '" + path + "' is inside the protected operating-system folder " +
+                                  drive + protectedTrees[r] + " and is refused. The only folders allowed there are " +
+                                  allowedInsideProtected.map(function (x) { return drive + x; }).join(", ") + " (and anything inside them)."
+                              );
+                          }
+                      }
+                  }
+                  folders.push(path);
+              }
+          }
+
+          if (folders.length === 0) {
+              throw new Error("Create Script Parameters: folderTarget is empty. Give at least one folder, e.g. c:\\Windows\\ccmcache.");
+          }
+
+
+          // -- 5. Tick-boxes to the 'yes'/'no' the script expects
+          -------------------------
+
+          // Read, not tested for truth: if one of these inputs were ever
+          declared as a string,
+
+          // "no" is truthy in JavaScript and  value ? "yes" : "no"  would
+          silently turn it on.
+
+          // For forceEnable that would delete read-only files the operator
+          chose to protect.
+
+          function yesNo(value) {
+              if (value === true)  { return "yes"; }
+              if (value === false) { return "no"; }
+              var text = trim(value).toLowerCase();
+              return (text === "yes" || text === "true" || text === "1") ? "yes" : "no";
+          }
+
+          var folderFlag = yesNo(folderIncluded);
+
+          var forceFlag  = yesNo(forceEnable);
+
+
+          // -- 6. Email must be deliverable BEFORE anything is deleted
+          --------------------
+
+          // The OOTB 'Send notification (TLSv1.2)' workflow takes ONE toAddress
+          string, so the
+
+          // recipients are flattened here into a comma-separated list. An entry
+          may itself hold
+
+          // several addresses separated by , or ; -- each is trimmed and blanks
+          are dropped.
+
+          var recipients = [];
+
+          if (mailTo !== null && mailTo !== undefined) {
+              for (var m = 0; m < mailTo.length; m++) {
+                  var pieces = String(mailTo[m] === null || mailTo[m] === undefined ? "" : mailTo[m]).split(/[,;]/);
+                  for (var q = 0; q < pieces.length; q++) {
+                      var address = trim(pieces[q]);
+                      if (address === "") { continue; }
+                      // Catches the classic binding mistake: a scalar string bound where an array was
+                      // expected arrives split into single characters, none of which contain '@'.
+                      if (address.indexOf("@") < 1) {
+                          throw new Error("Create Script Parameters: '" + address + "' in mailTo is not an email address. Enter one address per row.");
+                      }
+                      recipients.push(address);
+                  }
+              }
+          }
+
+          mailToString = recipients.join(",");
+
+
+          if (yesNo(emailReport) === "yes" && recipients.length === 0) {
+              throw new Error("Create Script Parameters: emailReport is ticked but mailTo has no recipient. Add one, or untick emailReport.");
+          }
+
+
+          // -- 7. Say plainly what this run will do
+          ----------------------------------------
+
+          if (gate === "no") {
+              System.warn(
+                  "reportOnly='no' -- this run WILL DELETE items older than " + days + " day(s) from " + folders.join(", ") +
+                  " on " + computerNames.length + " server(s) in '" + groupName + "'" +
+                  (forceFlag === "yes" ? ", INCLUDING read-only items (forceEnable)" : "") +
+                  (folderFlag === "yes" ? ", and whole folders older than the cutoff" : "") + "."
+              );
+          }
+
+          else {
+              System.log("reportOnly='yes' -- report-only run; nothing will be deleted.");
+          }
+
+
+          // -- 7b. The folder rule (S-35 / P-71)
+          -------------------------------------------
+
+          // fileFilter applies to FILES only; folders are chosen by age,
+          whatever their name. But a
+
+          // folder is deleted WHOLE, with everything in it -- so folders are
+          deleted only when the
+
+          // request says so in full: a filter matching every file AND
+          permission to delete read-only
+
+          // items. With anything less, folder deletion is DECLINED but the run
+          continues and matching
+
+          // files are still cleaned. The decision is made by the SCRIPT (so its
+          log and the report
+
+          // record it); this task only says so up front. It never widens a
+          request.
+
+          var filter = trim(fileFilter);
+
+          if (filter === "") {
+              throw new Error("Create Script Parameters: fileFilter is empty. Use '*.*' for every file, or a pattern such as '*.tmp'.");
+          }
+
+          if (folderFlag === "yes") {
+              var problems = [];
+              if (filter !== "*" && filter !== "*.*") {
+                  problems.push("fileFilter is '" + filter + "', which does not match every file (use '*' or '*.*')");
+              }
+              if (forceFlag !== "yes") {
+                  problems.push("'delete read-only items' (forceEnable) is not ticked");
+              }
+              if (problems.length > 0) {
+                  System.warn(
+                      "'Delete folder' is ticked, but " + problems.join(" and ") + ". Deleting a folder deletes everything in it, " +
+                      "so FOLDERS WILL NOT BE DELETED on this run. Files matching '" + filter + "' are still processed. " +
+                      "To delete folders as well, set fileFilter to '*.*' AND tick 'delete read-only items'."
+                  );
+              }
+          }
+
+
+          var listed = Number(maxItemsListed);
+
+          if (isNaN(listed) || listed < 0) { listed = 25; }
+
+
+          // -- 8. Build the bag
+          -----------------------------------------------------------
+
+          // Keys are the script's parameter names; invokeStagedScript turns
+          each into -Key 'value'.
+
+          scriptParameters = new Properties();
+
+          scriptParameters.put("ComputerNames",  computerNames.join(","));
+
+          scriptParameters.put("FolderTarget",   folders.join("|"));      // '|'
+          can never appear in a path
+
+          scriptParameters.put("OlderThanDays",  String(days));
+
+          scriptParameters.put("FilterOn",       filter);
+
+          scriptParameters.put("FolderIncluded", folderFlag);
+
+          scriptParameters.put("ForceEnable",    forceFlag);
+
+          scriptParameters.put("ReportOnly",     gate);                   //
+          reportOnly 'yes' == ReportOnly 'yes'
+
+          scriptParameters.put("MaxItemsListed", String(Math.floor(listed)));
+
+
+          System.log(
+              "servers=" + computerNames.length + ", folders=" + folders.join(" | ") + ", olderThanDays=" + days +
+              ", folderIncluded=" + folderFlag + ", forceEnable=" + forceFlag + ", reportOnly=" + gate
+          );
+        encoded: false
+      in-binding:
+        bind:
+          - name: computerNames
+            type: Array/string
+            export-name: computerNames
+          - name: adGroup
+            type: AD:UserGroup
+            export-name: adGroup
+          - name: folderTarget
+            type: Array/string
+            export-name: folderTarget
+          - name: olderThanDays
+            type: number
+            export-name: olderThanDays
+          - name: folderIncluded
+            type: boolean
+            export-name: folderIncluded
+          - name: fileFilter
+            type: string
+            export-name: fileFilter
+          - name: maxItemsListed
+            type: number
+            export-name: maxItemsListed
+          - name: emailReport
+            type: boolean
+            export-name: emailReport
+          - name: mailTo
+            type: Array/string
+            export-name: mailTo
+          - name: reportOnly
+            type: string
+            export-name: reportOnly
+          - name: forceEnable
+            type: boolean
+            export-name: forceEnable
+      out-binding:
+        bind:
+          - name: scriptParameters
+            type: Properties
+            export-name: scriptParameters
+      description: Simple task with custom script capability.
+      position:
+        'y': 90
+        x: 140
+      name: item5
+      out-name: item6
+      type: task
+      comparator: 0
+    - display-name: stageScriptOnHost
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.powershell").stageScriptOnHost(psHost,script,targetPath);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: psHost
+            type: PowerShell:PowerShellHost
+            export-name: resolvedHost
+          - description: ''
+            name: script
+            type: ResourceElement
+            export-name: scriptElement
+          - description: ''
+            name: targetPath
+            type: string
+            export-name: targetPath
+      out-binding:
+        bind:
+          - name: actionResult
+            type: string
+            export-name: stagedScript
+      description: Add a note to the workflow schema.
+      position:
+        'y': 90
+        x: 260
+      name: item6
+      out-name: item7
+      type: task
+      script-module: com.broadcom.pso.powershell/stageScriptOnHost
+      comparator: 0
+    - display-name: invokeStagedScript
+      script:
+        value: >
+          //Auto generated script, cannot be modified !
+
+          actionResult =
+          System.getModule("com.broadcom.pso.powershell").invokeStagedScript(psHost,scriptPath,parameters);
+        encoded: false
+      in-binding:
+        bind:
+          - description: ''
+            name: psHost
+            type: PowerShell:PowerShellHost
+            export-name: resolvedHost
+          - description: ''
+            name: scriptPath
+            type: string
+            export-name: stagedScript
+          - description: ''
+            name: parameters
+            type: Properties
+            export-name: scriptParameters
+      out-binding:
+        bind:
+          - name: actionResult
+            type: Properties
+            export-name: scriptRunResult
+      description: Add a note to the workflow schema.
+      position:
+        'y': 90
+        x: 400
+      name: item7
+      out-name: item8
+      type: task
+      script-module: com.broadcom.pso.powershell/invokeStagedScript
+      comparator: 0
+    - display-name: Parse Results
+      script:
+        value: >-
+          /* IN   scriptRunResult   Properties                 attr    from
+          element 7
+           *      adGroup           AD:UserGroup               attr    from element 2
+           *      resolvedHost      PowerShell:PowerShellHost  attr    from element 4
+           *      stagedScript        string                     attr    from element 6
+           *      folderIncluded    boolean                    input
+           *      forceEnable       boolean                    input
+           *      mailSubject       string                     input
+           * OUT  executionSuccess  boolean     output
+           *      executionOutput   string      output
+           *      serversProcessed  number      output
+           *      itemsDeleted      number      output
+           *      bytesFreed        number      output
+           *      transcript        string      output
+           *      reportSubject     string      attr    → element 10
+           *      reportHtml        string      attr    → element 10
+           *      -- BIND ALL EIGHT
+           *
+           * Takes the script's result apart into the workflow outputs, logs the outcome, and builds
+           * the HTML report. It always builds the report, even when email is off: it costs nothing,
+           * and it keeps this task the same on both branches of the decision that follows.
+           * ═════════════════════════════════════════════════════════════════════════════ */
+
+          if (scriptRunResult === null || scriptRunResult === undefined) {
+              throw new Error(
+                  "Parse Results & Build Report: scriptRunResult is empty. Bind this task's scriptRunResult input to " +
+                  "the output of the 'Run Disk Clean' element."
+              );
+          }
+
+
+          var reported = scriptRunResult.get("result");
+
+          executionSuccess = scriptRunResult.get("success");
+
+          transcript       = scriptRunResult.get("transcript");
+
+
+          var wasReportOnly = (reported.get("reportOnly") === true);
+
+          var requested     = reported.get("serversRequested");
+
+          var unreachable   = reported.get("serversUnreachable");
+
+          var withErrors    = reported.get("serversWithErrors");
+
+          var matched       = reported.get("itemsMatched");
+
+          var failedItems   = reported.get("itemsFailed");
+
+          var errorCount    = reported.get("errorCount");
+
+
+          serversProcessed = reported.get("serversReachable");
+
+          itemsDeleted     = reported.get("itemsRemoved");
+
+          bytesFreed       = reported.get("bytes");
+
+
+          // invokeStagedScript hands structured values over as JSON TEXT, but
+          an EMPTY list is an
+
+          // array of strings as far as it can tell, so it arrives as a real
+          (empty) array. Accept both.
+
+          var servers = [];
+
+          var rawServers = reported.get("servers");
+
+          if (rawServers !== null && rawServers !== undefined) {
+              if (typeof rawServers === "string") {
+                  if (rawServers.replace(/^\s+|\s+$/g, "") !== "") {
+                      try { servers = JSON.parse(rawServers); } catch (eS) { System.warn("Could not read the per-server list: " + eS); }
+                  }
+              }
+              else if (rawServers.length !== undefined) {
+                  servers = [];
+                  for (var sv0 = 0; sv0 < rawServers.length; sv0++) { servers.push(rawServers[sv0]); }
+              }
+          }
+
+          if (servers === null || servers === undefined) { servers = []; }
+
+          if (!(servers instanceof Array)) { servers = [servers]; }   // one
+          server may arrive as a bare object
+
+
+          // Folder deletion requested but declined by the script's guard
+          (S-35). Empty otherwise.
+
+          var foldersDeclined = reported.get("foldersDeclined");
+
+          foldersDeclined = (foldersDeclined === null || foldersDeclined ===
+          undefined) ? "" : String(foldersDeclined);
+
+
+          var targets = reported.get("targets") || [];
+
+
+          function formatBytes(n) {
+              if (n === null || n === undefined || isNaN(Number(n))) { return "-"; }
+              n = Number(n);
+              var units = ["bytes", "KB", "MB", "GB", "TB"], u = 0;
+              while (n >= 1024 && u < units.length - 1) { n = n / 1024; u++; }
+              return (u === 0 ? String(n) : n.toFixed(u >= 3 ? 2 : 1)) + " " + units[u];
+          }
+
+
+          // -- The one-line summary
+          -----------------------------------------------------
+
+          if (wasReportOnly) {
+              executionOutput = "REPORT ONLY -- " + matched + " item(s), about " + formatBytes(bytesFreed) +
+                  ", would be deleted across " + serversProcessed + " of " + requested + " server(s). Nothing was deleted.";
+          }
+
+          else {
+              executionOutput = itemsDeleted + " item(s), " + formatBytes(bytesFreed) + ", deleted across " +
+                  serversProcessed + " of " + requested + " server(s)" +
+                  (failedItems > 0 ? "; " + failedItems + " item(s) could not be deleted" : "") + ".";
+          }
+
+          if (unreachable > 0) {
+              executionOutput += " " + unreachable + " server(s) unreachable.";
+          }
+
+          if (foldersDeclined !== "") {
+              executionOutput += " Folder deletion was requested but declined (files only).";
+              System.warn(foldersDeclined);
+          }
+
+
+          // -- Log it
+          ---------------------------------------------------------------------
+
+          if (executionSuccess) {
+              System.log("Finished. " + executionOutput);
+          }
+
+          else {
+              System.warn("Finished with " + errorCount + " error(s) on " + (withErrors + unreachable) + " server(s). " + executionOutput);
+              var errors = reported.get("errors");
+              if (errors !== null && errors !== undefined && errors.length > 0) {
+                  System.warn("The first errors were:");
+                  for (var i = 0; i < errors.length; i++) { System.warn("  " + errors[i]); }
+              }
+              for (var s = 0; s < servers.length; s++) {
+                  if (servers[s].status === "Unreachable" || servers[s].status === "Failed" || servers[s].status === "CleanedWithErrors") {
+                      System.warn("  " + servers[s].name + " -- " + servers[s].status + ": " + servers[s].detail);
+                  }
+              }
+          }
+
+
+          // -- The HTML report
+          --------------------------------------------------------------
+
+          function esc(text) {
+              return String(text === null || text === undefined ? "" : text)
+                  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+          }
+
+
+          var statusStyle = {
+              "Cleaned":           ["#1E7B34", "Cleaned"],
+              "CleanedWithErrors": ["#B00020", "Cleaned with errors"],
+              "ReportOnly":        ["#8A6D00", "Report only"],
+              "Unreachable":       ["#B00020", "UNREACHABLE"],
+              "Failed":            ["#B00020", "FAILED"]
+          };
+
+
+          // Problems first, then alphabetical: the rows someone has to act on
+          are at the top.
+
+          var rank = { "Unreachable": 0, "Failed": 0, "CleanedWithErrors": 1,
+          "ReportOnly": 2, "Cleaned": 3 };
+
+          servers.sort(function (a, b) {
+              var d = (rank[a.status] === undefined ? 9 : rank[a.status]) - (rank[b.status] === undefined ? 9 : rank[b.status]);
+              return d !== 0 ? d : String(a.name).localeCompare(String(b.name));
+          });
+
+
+          var font  = "font-family:Segoe UI,Arial,sans-serif;font-size:12px;";
+
+          var th    = "border:1px solid #B4B4B4;padding:5px
+          7px;background-color:#44546A;color:#FFFFFF;text-align:left;font-weight:600;";
+
+          var td    = "border:1px solid #B4B4B4;padding:4px
+          7px;vertical-align:top;";
+
+          var tdNum = td + "text-align:right;";
+
+
+          var rows = "";
+
+          for (var k = 0; k < servers.length; k++) {
+              var sv = servers[k];
+              var st = statusStyle[sv.status] || ["#000000", sv.status];
+              rows +=
+                  "<tr>" +
+                  "<td style=\"" + td + "\">" + esc(sv.name) + "</td>" +
+                  "<td style=\"" + td + "color:" + st[0] + ";font-weight:600;\">" + esc(st[1]) + "</td>" +
+                  "<td style=\"" + tdNum + "\">" + esc(sv.matched) + "</td>" +
+                  "<td style=\"" + tdNum + "\">" + (wasReportOnly ? "-" : esc(sv.removed)) + "</td>" +
+                  "<td style=\"" + tdNum + "\">" + (wasReportOnly ? "-" : esc(sv.failed)) + "</td>" +
+                  "<td style=\"" + tdNum + "\">" + esc(formatBytes(sv.bytes)) + "</td>" +
+                  "<td style=\"" + tdNum + "\">" + esc(formatBytes(sv.freeBefore)) + "</td>" +
+                  "<td style=\"" + tdNum + "\">" + esc(formatBytes(sv.freeAfter)) + "</td>" +
+                  "<td style=\"" + td + "\">" + esc(sv.detail) + "</td>" +
+                  "</tr>";
+          }
+
+
+          var sizeHeader = wasReportOnly ? "Would free (est.)" : "Freed";
+
+
+          reportHtml =
+              "<div style=\"" + font + "\">" +
+              "<p style=\"" + font + "font-size:14px;font-weight:600;\">" + esc(executionOutput) + "</p>" +
+              (wasReportOnly
+                  ? "<p style=\"" + font + "color:#8A6D00;font-weight:600;\">REPORT ONLY -- nothing was deleted. The counts show what a live run (whatIf = no) would remove.</p>"
+                  : "") +
+              (foldersDeclined !== ""
+                  ? "<p style=\"" + font + "color:#B00020;font-weight:600;\">" + esc(foldersDeclined) + "</p>"
+                  : "") +
+              "<table style=\"border-collapse:collapse;" + font + "margin-bottom:10px;\">" +
+              "<tr><td style=\"" + td + "font-weight:600;\">AD group</td><td style=\"" + td + "\">" + esc(adGroup.name) + " (direct, enabled computer members)</td></tr>" +
+              "<tr><td style=\"" + td + "font-weight:600;\">Folders</td><td style=\"" + td + "\">" + esc(targets.join("  |  ")) + "</td></tr>" +
+              "<tr><td style=\"" + td + "font-weight:600;\">Older than</td><td style=\"" + td + "\">" + esc(reported.get("olderThanDays")) + " day(s) -- last written before " + esc(reported.get("cutoff")) + "</td></tr>" +
+              "<tr><td style=\"" + td + "font-weight:600;\">Options</td><td style=\"" + td + "\">delete folders: " + (folderIncluded === true ? (foldersDeclined !== "" ? "requested, DECLINED (see above)" : "yes") : "no") + ", read-only items (force): " + (forceEnable === true ? "yes" : "no") + "</td></tr>" +
+              "<tr><td style=\"" + td + "font-weight:600;\">Script</td><td style=\"" + td + "\">" + esc(stagedScript) + " on " + esc(resolvedHost.name) + "</td></tr>" +
+              "</table>" +
+              "<table style=\"border-collapse:collapse;border:1px solid #B4B4B4;" + font + "width:100%;\">" +
+              "<tr>" +
+              "<th style=\"" + th + "\">Server</th><th style=\"" + th + "\">Status</th><th style=\"" + th + "\">Matched</th>" +
+              "<th style=\"" + th + "\">Deleted</th><th style=\"" + th + "\">Failed</th><th style=\"" + th + "\">" + sizeHeader + "</th>" +
+              "<th style=\"" + th + "\">Free before</th><th style=\"" + th + "\">Free after</th><th style=\"" + th + "\">Detail</th>" +
+              "</tr>" + rows +
+              "</table>" +
+              "<p style=\"" + font + "color:#555555;\">Always preserved: vmware-vmsvc-SYSTEM.log (exact name), items newer than the cutoff, " +
+              "hidden and system files directly in a folder, the folders named above themselves" +
+              (forceEnable === true ? "" : ", and read-only items") + ". A folder older than the cutoff is removed with everything in it. " +
+              "Free space is for the drive(s) holding the folders and can be affected by other activity on the server during the run. " +
+              "The full per-item log is in the Orchestrator run.</p>" +
+              "</div>";
+
+          var stem = trim(mailSubject) === "" ? "VCF Orchestrator: Windows
+          Server Disk Clean" : trim(mailSubject);
+
+          reportSubject = stem + " - " + adGroup.name + " - " +
+              (wasReportOnly
+                  ? "REPORT ONLY, " + formatBytes(bytesFreed) + " would be freed"
+                  : formatBytes(bytesFreed) + " freed on " + serversProcessed + " server(s)") +
+              (executionSuccess ? "" : " (WITH ERRORS)");
+
+          // Local helper used above; declared at the end because Rhino hoists
+          function declarations.
+
+          function trim(value) {
+              return (value === null || value === undefined) ? "" : String(value).replace(/^\s+|\s+$/g, "");
+          }
+        encoded: false
+      in-binding:
+        bind:
+          - name: scriptRunResult
+            type: Properties
+            export-name: scriptRunResult
+          - name: adGroup
+            type: AD:UserGroup
+            export-name: adGroup
+          - name: resolvedHost
+            type: PowerShell:PowerShellHost
+            export-name: resolvedHost
+          - name: stagedScript
+            type: string
+            export-name: stagedScript
+          - name: folderIncluded
+            type: boolean
+            export-name: folderIncluded
+          - name: mailSubject
+            type: string
+            export-name: mailSubject
+          - name: forceEnable
+            type: boolean
+            export-name: forceEnable
+      out-binding:
+        bind:
+          - name: executionSuccess
+            type: boolean
+            export-name: executionSuccess
+          - name: executionOuput
+            type: string
+            export-name: executionOuput
+          - name: ServersProcessed
+            type: number
+            export-name: ServersProcessed
+          - name: itemsDeleted
+            type: number
+            export-name: itemsDeleted
+          - name: bytesFreed
+            type: number
+            export-name: bytesFreed
+          - name: transcript
+            type: string
+            export-name: transcript
+          - name: reportSubject
+            type: string
+            export-name: reportSubject
+          - name: reportHtml
+            type: string
+            export-name: reportHtml
+      description: Simple task with custom script capability.
+      position:
+        'y': 90
+        x: 540
+      name: item8
+      out-name: item10
+      type: task
+      comparator: 0
+    - in-binding: {}
+      out-binding: {}
+      position:
+        'y': 150
+        x: 580
+      name: item9
+      type: end
+      end-mode: '0'
+      comparator: 0
+    - display-name: Email Report?
+      script:
+        value: return emailReport;
+        encoded: false
+      in-binding:
+        bind:
+          - name: emailReport
+            type: boolean
+            export-name: emailReport
+      out-binding: {}
+      description: Custom decision based on a custom script.
+      position:
+        'y': 150
+        x: 140
+      name: item10
+      out-name: item11
+      alt-out-name: item9
+      type: custom-condition
+      comparator: 0
+    - display-name: Set Mail Loop Counter
+      script:
+        value: mailLoopCounter = 0;
+        encoded: false
+      in-binding: {}
+      out-binding:
+        bind:
+          - name: mailLoopCounter
+            type: number
+            export-name: mailLoopCounter
+      description: Simple task with custom script capability.
+      position:
+        'y': 220
+        x: 140
+      name: item11
+      out-name: item13
+      type: task
+      comparator: 0
+    - in-binding: {}
+      out-binding: {}
+      position:
+        'y': 210
+        x: 580
+      name: item12
+      type: end
+      end-mode: '0'
+      comparator: 0
+    - display-name: More Emails to Send?
+      script:
+        value: |-
+          if (mailLoopCounter < mailTo.length){
+              return true;
+          }
+          else {
+              return false;
+          }
+        encoded: false
+      in-binding:
+        bind:
+          - name: mailTo
+            type: Array/string
+            export-name: mailTo
+          - name: mailLoopCounter
+            type: number
+            export-name: mailLoopCounter
+      out-binding: {}
+      description: Custom decision based on a custom script.
+      position:
+        'y': 210
+        x: 280
+      name: item13
+      out-name: item14
+      alt-out-name: item12
+      type: custom-condition
+      comparator: 0
+    - display-name: Select Email Address
+      script:
+        value: emailAddress = mailTo[mailLoopCounter]
+        encoded: false
+      in-binding:
+        bind:
+          - name: mailTo
+            type: Array/string
+            export-name: mailTo
+          - name: mailLoopCounter
+            type: number
+            export-name: mailLoopCounter
+      out-binding:
+        bind:
+          - name: emailAddress
+            type: string
+            export-name: emailAddress
+      description: Simple task with custom script capability.
+      position:
+        'y': 280
+        x: 360
+      name: item14
+      out-name: item15
+      type: task
+      comparator: 0
+    - display-name: Send notification (TLSv1.2)
+      script:
+        value: "//Auto generated script, cannot be modified !\nvar workflowToLaunch = Server.getWorkflowWithId(\"1295828b-7597-49ec-a117-5a7731a670f7\");\nif (workflowToLaunch == null) {\n\tthrow \"Workflow not found\";\n}\n\nvar workflowParameters = new Properties();\nworkflowParameters.put(\"smtpHost\",smtpHost);\nworkflowParameters.put(\"smtpPort\",smtpPort);\nworkflowParameters.put(\"username\",username);\nworkflowParameters.put(\"password\",password);\nworkflowParameters.put(\"fromName\",fromName);\nworkflowParameters.put(\"fromAddress\",fromAddress);\nworkflowParameters.put(\"toAddress\",toAddress);\nworkflowParameters.put(\"subject\",subject);\nworkflowParameters.put(\"content\",content);\nworkflowParameters.put(\"useStartTls\",useStartTls);\nwfToken = workflowToLaunch.execute(workflowParameters);\n"
+        encoded: false
+      in-binding:
+        bind:
+          - description: SMTP host
+            name: smtpHost
+            type: string
+            export-name: smtpHost
+          - description: SMTP port
+            name: smtpPort
+            type: number
+            export-name: smtpPort
+          - description: Username for authentication
+            name: username
+            type: string
+            export-name: username
+          - description: Password for authentication
+            name: password
+            type: SecureString
+            export-name: password
+          - description: Sender's name
+            name: fromName
+            type: string
+            export-name: fromName
+          - description: Sender's address
+            name: fromAddress
+            type: string
+            export-name: fromAddress
+          - description: Destination address
+            name: toAddress
+            type: string
+            export-name: emailAddress
+          - description: Email subject
+            name: subject
+            type: string
+            export-name: mailSubject
+          - description: Email content (text or HTML)
+            name: content
+            type: string
+            export-name: reportHtml
+          - description: >-
+              If true, enables the use of the STARTTLS command (if supported by
+              the server) to switch the connection to a TLS-protected connection
+              before issuing any login commands.
+            name: useStartTls
+            type: boolean
+            export-name: useStartTls
+      out-binding:
+        bind:
+          - name: wfToken
+            type: WorkflowToken
+      description: Start an asynchronous workflow.
+      position:
+        'y': 350
+        x: 280
+      name: item15
+      out-name: item16
+      type: task
+      launched-workflow-id: 1295828b-7597-49ec-a117-5a7731a670f7
+      comparator: 0
+    - display-name: Increase counter
+      script:
+        value: |-
+          //Auto-generated script
+          counter = counter + 1;
+        encoded: false
+      in-binding:
+        bind:
+          - description: Item to increase
+            name: counter
+            type: number
+            export-name: mailLoopCounter
+      out-binding:
+        bind:
+          - description: Increased item
+            name: counter
+            type: number
+            export-name: mailLoopCounter
+      description: Increment a counter by one.
+      position:
+        'y': 280
+        x: 200
+      name: item16
+      out-name: item13
+      type: task
+      prototype-id: increase-counter
+      content-mode: x
+      comparator: 0
+  root-name: item1
+  object-name: workflow:name=generic
+  id: bffab850-7dc1-489a-a620-a3fa02ca0c0b
+  version: 0.0.0
+  api-version: 6.0.0
+  restartMode: 1
+  resumeFromFailedMode: 0
+  editor-version: '2.0'

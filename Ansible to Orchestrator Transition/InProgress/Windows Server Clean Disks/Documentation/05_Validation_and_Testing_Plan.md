@@ -1,115 +1,115 @@
-# Windows Server Clean Disks — Validation & Testing Plan
+# Validation & Testing Plan — Windows Server Disk Cleans
 
-> Scope: Clean-ServerDisks-ByADGroup only. Shared items (`parseScriptOutput`,
-> `handlePSFailure`, OOTB *Invoke a PowerShell script*, PS host build) are referenced,
-> not re-tested here.
->
-> **Run every destructive test against non-production servers only.**
+Run the phases in order. Phases A–B need no targets; C–F need a **lab group** whose
+direct members are test servers seeded with `lab\New-DiskCleanTestData.ps1`. Never run
+Phase D's delete cases against production data.
+
+Record for each case: date, tester, result (Pass/Fail), and the workflow run ID.
 
 ---
 
-## Phase A — Environment pre-checks (before deploying vRO content)
+## Already verified in development (2026-09-29)
 
-| ID | Check | Expected / action |
+These were run on Windows PowerShell 5.1 against real SMB admin shares
+(`\\localhost\c$`), and against the vRO scriptable-task code with stubbed plug-in objects.
+They do not replace Phases C–F in the customer lab.
+
+| Area | Checks | Result |
 |---|---|---|
-| **A1** | PS host configured and registered in vRO; smoke test (`Invoke a PowerShell script` + `Write-Host`) passes | Registered and visible in Inventory → PowerShell. Full build/registration → **PS-Host guide** |
-| **A2** | `PowerShellRemotePSObject.getRootObject()` available | Method exists and is callable. `parseScriptOutput` uses it exclusively |
-| **A3** | Action value `clean-ServerDisk` present in the script `ValidateSet` | Confirmed in the deployed `cvs_functions.ps1` |
-| **A4** | Script params `-FolderTarget`, `-FolderIncluded`, `-ForceEnable`, `-FilterOn`, `-NumberOfDays`, `-WhatIf`, `-ADGroupMember` present | Confirmed in the deployed script param block |
-| **A5** | **S-14 / S-15 present on the deployed script** (the `whatIf` gate lives here) | `Select-String -Path 'C:\PSO\Scripts\cvs_functions.ps1' -SimpleMatch -Pattern 'Get-ListOfServers-Direct','[ReportOnly] WouldDelete','invalid WhatIf value'` → all match. **If absent, a report-only run will DELETE** |
-| **A6** | Script path on PS host | `Test-Path 'C:\PSO\Scripts\cvs_functions.ps1'` → `True`. If `False`, update the workflow `scriptPath` default |
-| **A7** | Service-account UNC **delete** access to the target | `Test-Path '\\<target>\C$\Windows\ccmcache'` → `True`, and a test file can be removed (run under the vRO service-account context). Normally requires local admin on the target |
-| **A8** | RSAT ActiveDirectory tools on PS host | `Get-Module -ListAvailable ActiveDirectory` lists the module |
-| **A9** | Kerberos constrained delegation (double-hop) configured on the PS host account | Delegation configured for the target servers' CIFS SPNs. If not, engage the AD team before live runs |
+| Script: selection rules, preserved items, report vs delete | 29 | Pass |
+| Script: folder rule (declined vs full request) on a copy of the lab `ccmcache` layout | 23 | Pass |
+| Folder-target guard, same 17 paths through the script and *Create Script Parameters* | 17 × 2 | Pass (identical) |
+| `stageScriptOnHost`: first copy, unchanged, same-length in-place edit, read-only host copy, multi-chunk, no leftovers | 8 + 13 | Pass |
+| `selectPowerShellHost`: least busy, tie-break, unreachable host, list of one, duplicates, real probe | 12 | Pass |
+| Scriptable tasks: parameters, folder-rule warning, results parsing, report, closing summary | 19 + 11 + 7 | Pass |
+| Admin-share reachability: accessible share, missing host (reason reported) | 2 | Pass |
 
-## Phase B — vRO content deployment checks
+---
+
+## Phase A — Environment pre-checks
 
 | ID | Check | Expected |
 |---|---|---|
-| **B-A** | Action `buildCleanDisksInvocation` deployed | Module `broadcom.pso.vcf.vm.guestOps.files.windows.diskcleanup`; return type **string** |
-| **B-A2** | Action `parseScriptOutput` deployed (shared) | Return type Properties |
-| **B-W** | Workflow `Clean-ServerDisks-ByADGroup` deployed | Folder `Production > Servers > Windows > Disk Cleanup` (lab/dev under `Workflows > Customer > <Customer Name> > …`) |
-| **B-D** | Input defaults set **directly on each input** — **no Configuration Element** | `scriptPath`, `domainName`, `folderTarget`, `olderThanDays` (1), `folderIncluded` (true), `forceEnable` (false), `whatIf` (**yes**) each have a default; `groupDN` has **NO** default |
-| **B-F** | **`fileFilter` is a fixed ATTRIBUTE = `*.*`, not a form input** | Attribute exists with value `*.*`; bound to the action's `fileFilter`; **absent from the custom form** |
-| **B-S** | `whatIf` presented as a yes/no dropdown defaulting to **yes** | Live delete requires a deliberate change |
-| **B-O** | OOTB `Invoke a PowerShell script` available and returns `PowerShellRemotePSObject` | Present in the vRO library |
+| A1 | `curl -vk https://<pshost>:5986/wsman` and read the certificate lines | *"signed using sha256WithRSAEncryption"* |
+| A2 | From Orchestrator, *Invoke a PowerShell script* on the host: `Get-ChildItem \\<testsrv>\c$\Windows -Name -ErrorAction Stop` | Returns an item (proves delegation and local admin through a **remote** session) |
+| A3 | Same, against a server not in the lab group | Also works, so the account's scope is known |
+| A4 | `Get-Item WSMan:\localhost\MaxTimeoutms` on the host | ≥ the longest expected run |
+| A5 | `telnet <relay> <port>` from the Orchestrator network | `220 ... ESMTP`, and `250-STARTTLS` after `EHLO` if TLS is used |
+| A6 | AD plug-in: `probeAdPlugin` against the lab group | Endpoint found; `computers`/`computerMembers` present |
 
-## Phase C — Unit tests (`buildCleanDisksInvocation`)
+## Phase B — Deployment checks
 
-| ID | Input | Expected |
+| ID | Check | Expected |
 |---|---|---|
-| **C1** | Valid: `scriptPath='C:\PSO\Scripts\cvs_functions.ps1'`, `groupDN='CN=Security-Servers,OU=Servers,DC=vcf,DC=lab'`, `domainName='vcf.lab'`, `folderTarget='c:\Windows\ccmcache'`, `fileFilter='*.*'`, `olderThanDays=1`, `folderIncluded=true`, `forceEnable=false`, `whatIf='yes'` | Returns `& "C:\PSO\Scripts\cvs_functions.ps1" -Action 'clean-ServerDisk' -ADGroupMember '…' -DomainName 'vcf.lab' -FolderTarget 'c:\Windows\ccmcache' -FilterOn '*.*' -NumberOfDays '-1' -FolderIncluded 'yes' -ForceEnable 'no' -WhatIf 'yes' *>&1 \| Out-String -Width 4096` |
-| **C2** | `olderThanDays=4` | Invocation contains `-NumberOfDays '-4'` (positive input negated) |
-| **C3** | `olderThanDays=0` | Invocation contains `-NumberOfDays '0'` (not `-0`) |
-| **C4** | `olderThanDays=-2` | Throws Error containing `olderThanDays must be 0 or greater` |
-| **C5** | `olderThanDays='abc'` / `''` | Throws `must be a whole number` / `olderThanDays is required` |
-| **C6** | `whatIf='maybe'` | Throws Error containing `whatIf must be 'yes' … or 'no'` |
-| **C7** | `whatIf='no'` | Returns the string **and** logs a `System.warn` naming the folder and group (live-delete warning) |
-| **C8** | `scriptPath=''` / `groupDN=''` / `domainName=''` / `folderTarget=''` / `fileFilter=''` | Throws `<name> is required` for each |
-| **C9** | `folderTarget='c:\'` or `'c:\Windows'` | Returns the string **and** logs a `System.warn` dangerous-root nudge |
-| **C10** | `groupDN='Security-Servers'` (no `DC=`) | Succeeds; logs a `System.warn` DN nudge |
-| **C11** | `groupDN` containing an apostrophe (e.g. `OU=O'Brien`) | Single quote is doubled in the output string (not truncated) |
-| **C12** | `folderIncluded=true`, `forceEnable=true` | Invocation contains `-FolderIncluded 'yes' -ForceEnable 'yes'` |
+| B1 | Workflow attributes (Implementation Guide §5) | `psHosts`, `scriptElement` show this environment's objects; SMTP values match the relay |
+| B2 | Resource Element name | Exactly `Invoke-ServerDiskClean.ps1` |
+| B3 | Workflow outputs | Named `executionOutput` and `serversProcessed` (Implementation Guide §3.1) |
+| B4 | Email section | One synchronous *Send notification (TLSv1.2)* element; exception routed to *Closing Summary* (§3.2) |
+| B5 | Request form | Defaults and required fields per §3.4 / §6; `olderThanDays` is an integer field |
 
-`parseScriptOutput` (shared — reference only):
+## Phase C — Script staging
 
-| ID | Input | Expected |
+| ID | Case | Expected |
 |---|---|---|
-| **C20** | OOTB PS workflow with `Write-Host 'test output'` → `parseScriptOutput` | Properties `{success, outputText, errorText}`; `success = true` |
-| **C21** | Output containing an `Error: something failed` line | `success = false`; error line captured in `errorText` |
+| C1 | First run on a host (script absent) | Log: `... is not on <host> yet - copying`, then `staged: ... first copy`; file exists in `targetPath` |
+| C2 | Second run, nothing changed | `exact match ... nothing copied`, `unchanged` |
+| C3 | Edit the host copy by hand (even one character), run | Warning with both hashes, `updated`; host copy replaced |
+| C4 | Re-import a changed script into the Resource Element, run | `updated`; the log shows the new version and hash |
+| C5 | Delete the host copy, run | `first copy` again; directory created if missing |
+| C6 | `targetPath` set to a UNC path or a relative path | Run fails at staging with *"must be an absolute local directory path"*; nothing touched |
 
-## Phase D — Workflow integration tests (non-production targets)
+## Phase D — Cleaning behaviour (lab data)
 
-**Seed first** on each test server:
-`lab\New-DiskCleanTestData.ps1 -ADGroup '<test group>' -DomainName <domain>`
-(add `-GrantModifyTo '<svc account>'` if the clean runs as a non-admin domain account).
+Seed first: `.\New-DiskCleanTestData.ps1 -ADGroup '<lab group>' -DomainName <domain>`.
 
-The seeder creates: aged `cache_*.tmp` files in the root + subfolders, today-dated
-`_current_*.txt` files, and three should-survive artifacts —
-`vmware-vmsvc-SYSTEM.log`, `_readonly_aged.txt`, `_hidden_aged.txt`.
-
-| ID | Pre-condition / run | Expected |
+| ID | Inputs | Expected |
 |---|---|---|
-| **D1** | **Report-only:** test group, `folderTarget='c:\Windows\ccmcache'`, `olderThanDays=1`, `folderIncluded=true`, `forceEnable=false`, **`whatIf='yes'`** | Log shows `ReportOnly=True` and `[ReportOnly] WouldDelete: …` for aged items. **Nothing is deleted** (re-inspect the folder to confirm). Ends *Completed Successfully* |
-| **D2** | **Live delete:** same inputs, **`whatIf='no'`** | Aged files and aged subfolders are deleted; `deleted N item(s); 0 failure(s)` per server |
-| **D3** | **Preservation checks** after D2 | `vmware-vmsvc-SYSTEM.log` **survives** (name exclusion); `_hidden_aged.txt` **survives** (hidden, never enumerated); `_readonly_aged.txt` **survives** (read-only, `forceEnable=false`) and logs an `Error:` line → run ends *Completed with Errors*; the target folder `ccmcache` itself **still exists** |
-| **D4** | **ForceEnable:** re-seed, run live with `forceEnable=true` | `_readonly_aged.txt` is now **deleted**; `_hidden_aged.txt` still survives (confirms `forceEnable` is a read-only switch only) |
-| **D5** | **Age boundary (keep today):** re-seed, run live with `olderThanDays=1` | Today-dated `_current_*.txt` files **survive**; aged files are deleted |
-| **D6** | **Age boundary (include today):** re-seed, run live with `olderThanDays=0` | Today-dated `_current_*.txt` files are **deleted** |
-| **D7** | **FolderIncluded=false:** re-seed, run live with `folderIncluded=false` | Aged **files** deleted (including inside subfolders); **subfolders remain** |
-| **D8** | **Disabled member:** add a disabled computer object to the test group; re-run | Log shows `Info: skipping disabled computer object <name>`; that server is not contacted; enabled members still processed |
-| **D9** | **Nested sub-group:** add a sub-group (containing a computer) as a member; re-run | The nested computer is **NOT** processed (non-recursive by design); `resolved to N enabled, direct computer member(s)` excludes it |
-| **D10** | **Unreachable member:** include an enabled-but-powered-off member plus a healthy one; re-run | `Error:` line naming the unreachable server; loop **continues** (healthy member still cleaned); ends *Completed with Errors*, **not** a hard Failed state |
-| **D11** | **Empty group:** point at a group with no enabled computer members | `Warn: … resolved to zero enabled, direct computer members. No action taken.`; ends *Completed Successfully*; nothing touched |
-| **D12** | **Total failure:** non-existent `groupDN`, or a PS host without the RSAT AD module | Script terminates; routes via `handlePSFailure` to **Failed: PS Execution**; `executionSuccess=false` |
-| **D13** | **Multiple folder targets:** `folderTarget='c:\Windows\ccmcache,c:\Temp\ScratchCache'` (seed both) | Both paths are cleaned; per-path log lines appear for each server |
-| **D14** | **User-profile template:** seed with `-Scenario profiles`; run `folderTarget='c:\users\_LabDiskCleanTest'`, `olderThanDays=0`, `forceEnable=true`, `whatIf='no'` | Contents removed including read-only; the `_LabDiskCleanTest` folder itself remains |
+| D1 | `c:\Windows\ccmcache`, `*.*`, 1 day, folders ☐, read-only ☐, **Report Only** | Would-delete lists the aged files, including inside sub-folders; nothing deleted; `executionSuccess = true`; email received |
+| D2 | As D1, **Report and Delete** | Aged files gone; sub-folders, the read-only file, `vmware-vmsvc-SYSTEM.log`, the hidden file and today's files remain; read-only file logged as an error; status `CleanedWithErrors` |
+| D3 | Re-seed. `*.*`, 1 day, folders ☑, read-only ☑, Report and Delete | Aged sub-folders removed whole; read-only file removed; newer files, `vmware-vmsvc-SYSTEM.log` (at top level), and the target folder remain; `Cleaned` |
+| D4 | Re-seed. `*.tmp`, folders ☐, Report and Delete | Only `.tmp` files deleted, at any depth; everything else remains |
+| D5 | Re-seed. folders ☑, `*.tmp`, read-only ☑, Report Only | **Warning** from *Create Script Parameters*; red *"Folder deletion was requested but NOT performed ... does not match every file"* in the email; only `.tmp` files listed; no folder listed |
+| D6 | folders ☑, `*.*`, read-only ☐, Report Only | Declined for the read-only reason; files listed, folders not |
+| D7 | 0 days, Report Only | Everything older than the moment of the run is listed |
+| D8 | Profile scenario: seed `-Scenario profiles`, target `c:\users\_LabDiskCleanTest`, `*.*`, 0 days, folders ☑, read-only ☑, Report and Delete | Contents removed, including read-only; `_LabDiskCleanTest` itself remains |
 
-## Phase E — Success criteria
+## Phase E — Email
 
-- [ ] PS host configured per the PS-Host guide and registered in vRO; smoke test passes.
-- [ ] All Phase A pre-checks pass — **especially A5** (S-14/S-15 on the deployed script)
-      and **A7** (service-account delete rights).
-- [ ] Workflow and action deploy without import errors.
-- [ ] `fileFilter` is a fixed attribute `*.*` and does **not** appear on the form (B-F).
-- [ ] `whatIf` defaults to **yes** on the form (B-S).
-- [ ] `buildCleanDisksInvocation` converts positive `olderThanDays` → negative
-      `-NumberOfDays` correctly, including `0` → `'0'` (C2, C3), and rejects negatives (C4).
-- [ ] **Report-only deletes nothing** (D1) and live delete removes aged items (D2).
-- [ ] All preserved categories behave as documented (D3, D4, D5, D7) — matching
-      Design Document §5.
-- [ ] Targeting is direct + enabled + computer-only: disabled skipped (D8), nested
-      sub-group excluded (D9).
-- [ ] Unreachable server is logged and non-fatal → *Completed with Errors* (D10);
-      total failures route to *Failed: PS Execution* (D12).
-- [ ] Executions produce a complete per-server/per-item transcript in vRO run history.
+| ID | Case | Expected |
+|---|---|---|
+| E1 | Two recipients in `mailTo`, Report Only | One email to both; subject = stem + group + outcome |
+| E2 | `smtpHost` pointed at a non-existent host (one run) | Run completes; `executionSuccess = false`; closing line *"report NOT emailed"* with the reason |
+| E3 | `emailReport` unticked | No email; closing line *"email off"* |
+| E4 | `mailTo` empty with `emailReport` ticked | Run fails in *Create Script Parameters* (*"no recipient"*) before anything touches a host |
+
+## Phase F — Guards and failure paths
+
+| ID | Case | Expected |
+|---|---|---|
+| F1 | `folderTarget` = `c:\` | Refused (*"root of a drive"*); nothing runs |
+| F2 | `folderTarget` = `c:\Windows\System32\drivers` | Refused (*"inside the protected operating-system folder c:\Windows"*) |
+| F3 | `folderTarget` = `c:\Program Files\<vendor>` | Refused |
+| F4 | `folderTarget` = `c:\Windows\Temp` | Allowed |
+| F5 | Group with only a nested group (no direct computers) | Run fails: *"no servers were resolved"*; warning names the nested group |
+| F6 | A disabled computer account in the group | Skipped and logged; not processed |
+| F7 | A powered-off member | `Unreachable` with *"The network path was not found"*; others processed; `executionSuccess = false` |
+| F8 | A member where the host account is not local admin | `Unreachable` with *"Access ... denied"* and the second-hop hint |
+| F9 | A folder that exists on no server (typo) | Error *"did not exist on ANY of the ... reachable server(s)"*; `executionSuccess = false` |
+| F10 | Empty filter | Run fails (*"fileFilter is empty"*) |
+| F11 | Fractional `olderThanDays` (if the form still allows it) | Run fails (*"must be a whole number"*) |
+| F12 | `psHosts` contains a host that is down, plus one that is up | Warning for the down host; run uses the other |
+
+## Phase G — Success criteria
+
+- A1–A6 and B1–B5 pass.
+- C1–C5, D1–D8, E1–E3 and F1–F12 pass, with no item deleted that the preserved-items
+  list says must remain.
+- A Report Only run against each production group completes within the WinRM timeout
+  with plausible counts, and the owners of those servers have reviewed the would-delete
+  list.
+- The cache-template decision (read-only / folders) is recorded in the Change Register.
 
 ## Rollback
 
-| Item | Approach |
-|---|---|
-| vRO content | All items are new. Rollback = delete the workflow and the `buildCleanDisksInvocation` action. **Do not** delete the shared `parseScriptOutput` / `handlePSFailure` — other packages use them |
-| `cvs_functions.ps1` | The `clean-ServerDisk` action already existed; changes are S-14 / S-15. To revert, redeploy the previous script — **this removes the `whatIf` safety gate** and reintroduces unfiltered targeting and silent failures |
-| Deleted files | **Not recoverable by this automation.** Restore from backup/VSS. This is why `whatIf` defaults to report-only and why D1 precedes D2 |
-| Lab test data | Delete the seeded folders, or let a live run remove them; the seeder only writes under the target you specify |
-| PS host registration / config | Remove the PS host from vRO Inventory → PowerShell; revert WinRM/Kerberos config per the PS-Host guide |
+Disable the schedules. Nothing persists in Orchestrator between runs. Files already
+deleted cannot be restored by the workflow.

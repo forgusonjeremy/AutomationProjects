@@ -1,198 +1,285 @@
-# Windows Server Clean Disks — Design Document
+# Design Document — Windows Server Disk Cleans
 
-## 1. Architecture overview
+Workflow **Windows Server Disk Cleans**, VCF Operations Orchestrator 9. Replaces the
+Ansible playbook `servers_diskclean.yml` (which ran `cvs_functions.ps1 -Action
+clean-ServerDisk`). The authoritative definition of the workflow is its export,
+`Code/serverDiskCleansWorkflow.yml`. Every change and its reason is in
+`Change-Register.md`.
 
-The workflow builds one PowerShell invocation string, executes it on a pre-staged PS
-host via the OOTB *Invoke a PowerShell script* workflow, and parses the result.
-**All AD resolution, per-server iteration, folder-list parsing, filtering and
-deletion happen inside `cvs_functions.ps1`** (action `clean-ServerDisk`), not in
-Orchestrator. **One workflow run = one script invocation; there is no
-Orchestrator-side loop.**
+---
+
+## 1. Architecture
 
 ```
-Operator (custom form)
-      │
-      ▼
-Clean-ServerDisks-ByADGroup workflow
-      │
-      ├─ buildCleanDisksInvocation (Action) ── invocation string
-      │                                            │
-      │        OOTB "Invoke a PowerShell script" (WinRM/HTTPS 5986)
-      │                                            ▼
-      │                                   PowerShell Host ── cvs_functions.ps1
-      │                                            │   (Action: clean-ServerDisk)
-      │                                            │   Get-ListOfServers-Direct (non-recursive, Enabled-only)
-      │                     ┌──────────────────────┼───────────────────────┐
-      │                     ▼                       ▼                       ▼
-      │            AD (Get-ADGroupMember     \\server\C$\<folderTarget>   Remove-files
-      │             / Get-ADComputer)         (admin share)              (age + filter + whatIf gate)
-      ▼
- parseScriptOutput (Action) ── success/outputText/errorText ── End state
+ Orchestrator                                       PowerShell host              Targets
+ ───────────────────────────────────────────        ────────────────────         ─────────
+ AD plug-in ── group DN → direct, enabled computers
+ selectPowerShellHost ── least-busy host ─────────► (WinRM/HTTPS 5986, Kerberos)
+ stageScriptOnHost ── copy script only if missing ─► C:\PSO\Scripts\
+                      or different (SHA-256)          Invoke-ServerDiskClean.ps1
+ invokeStagedScript ── run it with parameters ─────► script ── SMB 445 ─────────────► \\server\c$\<folder>
+ Parse Results ◄────── PSO_RESULT (JSON) ◄──────────
+ Mail plug-in ── HTML report ─────────────────────────────────────────────────────► SMTP relay
 ```
 
-- **Server targeting** is by AD group, resolved to **direct (non-recursive), enabled
-  computer objects only**; disabled and non-computer objects are skipped **and
-  logged**; each object is resolved in its own `try/catch`.
-- Each target path `c:\<path>` is rewritten to `\\<server>\c$\<path>` and cleaned via
-  `Remove-files`.
-- **Deleting files is destructive**, so targeting is deliberately non-recursive (nested
-  sub-groups are never expanded) and the workflow defaults to report-only.
+- **Active Directory** is read by the Orchestrator AD plug-in. No PowerShell and no
+  ActiveDirectory module are involved in resolving the group.
+- **All file work happens in one place:** the script on the PowerShell host, reaching
+  each target through its admin share. Nothing is installed or run on the targets.
+  Physical and virtual servers are treated identically.
+- **Mail leaves from Orchestrator**, not from the PowerShell host.
+
+### Second hop (delegation)
+
+The script runs in a WinRM *network* logon on the PowerShell host and then opens
+`\\server\c$` on each target. That second hop only works if the host's session can pass
+on its credential: Kerberos constrained delegation, as for the other transitioned
+workflows. The fact that an account can browse the share when logged on interactively
+proves nothing about the remote session. When access is refused, the script's error says
+so explicitly and names delegation as the likely cause.
+
+---
 
 ## 2. Components
 
-| Component | Role | Shared? |
-|---|---|---|
-| **Workflow: Clean-ServerDisks-ByADGroup** | Clean target folders on enabled AD-group members | No — this deliverable |
-| **Action: buildCleanDisksInvocation** | Build the `clean-ServerDisk` invocation string; validate inputs; convert `olderThanDays` → `-NumberOfDays` (return type: string) | No — this deliverable |
-| **Action: parseScriptOutput** | Parse the OOTB PSObject output → Properties `{success, outputText, errorText}` | Yes → shared (logs module) |
-| **Scriptable task: handlePSFailure** | Shared exception path for terminating PS/plugin failures | Yes → shared (logs module) |
-| **OOTB: Invoke a PowerShell script** | Executes the invocation string on the PS host | Yes → OOTB library |
-| **cvs_functions.ps1** | Shared PowerShell toolbox (AD resolution, clean); changes S-14, S-15 | Yes → Change-Register.md |
-| **PowerShell host** | Windows Server running `cvs_functions.ps1`; reaches targets via UNC | Yes → PS-Host guide |
-
-- **Module namespace (build action):** `broadcom.pso.vcf.vm.guestOps.files.windows.diskcleanup`
-- **Workflow folder:** `Production > Servers > Windows > Disk Cleanup` (lab/dev:
-  `Workflows > Customer > <Customer Name> > Production > Servers > Windows > Disk Cleanup`)
-- **No Configuration Element:** operator inputs use plain workflow inputs with defaults
-  set directly on each input. `fileFilter` is a fixed workflow **attribute** (`*.*`).
-
-## 3. Data flow
-
-1. `buildCleanDisksInvocation` validates inputs and returns:
-   `& "<scriptPath>" -Action 'clean-ServerDisk' -ADGroupMember '<groupDN>' -DomainName '<domain>' -FolderTarget '<folders>' -FilterOn '*.*' -NumberOfDays '<-olderThanDays>' -FolderIncluded '<yes|no>' -ForceEnable '<yes|no>' -WhatIf '<yes|no>' *>&1 | Out-String -Width 4096`
-   - `olderThanDays` (positive) is converted to the script's negative convention:
-     `-NumberOfDays = -olderThanDays`. Operators never type a negative number.
-   - `fileFilter` is fixed at `*.*` (matches all files **and** folders).
-   - `whatIf = no` logs a loud `System.warn`; `whatIf = yes` is report-only.
-   - The `*>&1 | Out-String -Width 4096` stream-capture is a shared requirement; without
-     it the plugin returns a null object.
-2. OOTB *Invoke a PowerShell script* runs the string on `psHost`; output → attribute
-   `psRawOutput`.
-3. In the script, `Get-ListOfServers-Direct` resolves the group (direct, enabled-only)
-   to computers; for each server × each folder target, `Remove-files` selects items
-   older than the cutoff and either lists them (`whatIf = yes`) or deletes them.
-4. `parseScriptOutput` receives `psOutput = psRawOutput` and
-   `executionContext = groupDN + " @ " + domainName + " (whatIf=" + whatIf + ")"` (a
-   **log label only**), returning Properties `{success, outputText, errorText}`.
-5. Decision `parsedResult.get("success") === true` → **End - Completed Successfully**;
-   false → **End - Completed with Errors**.
-
-**Outputs:** `executionSuccess` (boolean), `executionOutput` (string).
-
-## 4. Inputs and the fixed filter
-
-| Input | Type | Default | Maps to |
+| Component | Type | Module / location | Role |
 |---|---|---|---|
-| `psHost` | PowerShell:PowerShellHost | (none) | execution target |
-| `scriptPath` | string | `C:\PSO\Scripts\cvs_functions.ps1` | `& "<scriptPath>"` |
-| `groupDN` | string | (none) | `-ADGroupMember` |
-| `domainName` | string | `vcf.lab` | `-DomainName` |
-| `folderTarget` | string | `c:\Windows\ccmcache` | `-FolderTarget` |
-| `olderThanDays` | number | `1` | `-NumberOfDays` (`= -olderThanDays`) |
-| `folderIncluded` | boolean | `true` | `-FolderIncluded` (`yes`/`no`) |
-| `forceEnable` | boolean | `false` | `-ForceEnable` (`yes`/`no`) |
-| `whatIf` | string (yes/no) | `yes` | `-WhatIf` |
-| **`fileFilter`** | **fixed attribute** | **`*.*`** | `-FilterOn` |
+| **Windows Server Disk Cleans** | Workflow | — | Orchestrates the run |
+| `findAdHostForDn` | Action (shared) | `com.broadcom.pso.vcf.activedirectory` | Picks the AD endpoint from the DN's `DC=` parts |
+| `resolveAdGroup` | Action (shared) | `com.broadcom.pso.vcf.activedirectory` | Looks the group up **on that endpoint** |
+| `getADComputersGroupDirectMembers` | Action (shared) | `com.broadcom.pso.vcf.activedirectory` | Direct, enabled computer members; nested groups named, not expanded |
+| `selectPowerShellHost` | Action (shared) | `com.broadcom.pso.powershell` | Least-busy host from the `psHosts` list |
+| `stageScriptOnHost` | Action (shared) | `com.broadcom.pso.powershell` | Copies the script to the host only if missing or different; returns its verified path |
+| `invokeStagedScript` | Action (shared) | `com.broadcom.pso.powershell` | Runs the staged script and parses its result |
+| `Invoke-ServerDiskClean.ps1` | Resource Element | bound to attribute `scriptElement` | The cleaning script, fully commented |
+| *Send notification (TLSv1.2)* | Workflow (OOTB) | Library > Mail | Sends the HTML report |
 
-- `folderTarget` accepts one or more comma-separated local paths; each `c:\path` is
-  rewritten to `\\server\c$\path`.
-- `olderThanDays` = "delete items older than N days": `4` = 4 days old or older, `1` =
-  older than a day (default), `0` = delete everything up to now.
-- **`fileFilter` is not an operator input.** It is pinned to `*.*` because `-FilterOn`
-  is applied to **directory names too**; a restrictive filter (e.g. `*.txt`) matches no
-  folders, so `folderIncluded = yes` would silently fail to delete folders. `*.*`
-  matches all files and folders.
+Shared actions have one copy in the repository (`InProgress/_Shared/Code/`) and one copy in
+Orchestrator, used by every workflow that needs them.
 
-## 5. Items intentionally NOT deleted
+---
 
-The clean does **not** delete everything under a target. These categories are
-preserved by design (inherited from the original Ansible script except where noted).
-This is the customer-facing list; see Change-Register §2A for the mechanism.
+## 3. Workflow schema
 
-| Preserved item | Why | Configurable? |
+| # | Element | Type | Key bindings |
+|---|---|---|---|
+| 1 | findAdHostForDn | Action | `distinguishedName` → `adHost` |
+| 2 | resolveAdGroup | Action | `distinguishedName`, `adHost` → `adGroup` |
+| 3 | Get Computers in AD Group - Direct Members | Action | `adGroup` → `computerNames` |
+| 4 | selectPowerShellHost | Action | `psHosts` → `resolvedHost` |
+| 5 | Create Script Parameters | Scriptable task | form inputs → `scriptParameters`, `mailToString` |
+| 6 | stageScriptOnHost | Action | `resolvedHost`, `scriptElement`, `targetPath` → `stagedScript` (full path) |
+| 7 | invokeStagedScript | Action | `resolvedHost`, `stagedScript`, `scriptParameters` → `scriptRunResult` |
+| 8 | Parse Results | Scriptable task | `scriptRunResult` → outputs, `reportSubject`, `reportHtml` |
+| 9 | Email Report? | Decision | `emailReport` — true → 10, false → 11 |
+| 10 | Send notification (TLSv1.2) | Workflow (synchronous) | `mailToString`, `reportSubject`, `reportHtml`, SMTP attributes. **Exception → `emailError` → 11** |
+| 11 | Closing Summary | Scriptable task | folds the email outcome into `executionSuccess`; writes the closing log line |
+
+Nothing is deleted before element 7. Any failure up to and including element 6 means
+nothing was touched on any server.
+
+### Attributes
+
+| Attribute | Type | Set | Purpose |
+|---|---|---|---|
+| `psHosts` | Array/PowerShell:PowerShellHost | at build | The PowerShell hosts this workflow may run on |
+| `scriptElement` | ResourceElement | at build | The `Invoke-ServerDiskClean.ps1` Resource Element |
+| `maxItemsListed` | number | at build (`25`) | Items named per folder per server in the log |
+| `smtpHost`, `smtpPort` | string, number | at build | Relay and port (blank / `0` = Mail plug-in default) |
+| `useStartTls` | boolean | at build | STARTTLS on/off, to match the relay |
+| `username`, `password` | string, SecureString | at build | Only if the relay requires SMTP authentication |
+| `fromName`, `fromAddress` | string | at build | Sender |
+| `adHost`, `adGroup`, `computerNames`, `resolvedHost`, `scriptParameters`, `mailToString`, `stagedScript`, `scriptRunResult`, `reportSubject`, `reportHtml`, `emailError` | various | at run time | Passed between elements |
+
+### Outputs
+
+| Output | Type | Meaning |
 |---|---|---|
-| **`vmware-vmsvc-SYSTEM.log`** | Hardcoded name exclusion (`$FileExclude`). **Case-sensitive** — only that exact casing is protected. | No |
-| **Items newer than the cutoff** | Deletes only `LastWriteTime < (today − olderThanDays)`. | Yes (`olderThanDays`) |
-| **Loose hidden / system files** | Enumeration runs without `-Force`, so hidden files directly in a target are never listed — regardless of `forceEnable`. A hidden file *inside a deleted folder* still goes. | No (matches original) |
-| **The target root folder itself** | Only the folder's **contents** are cleaned; the target directory is never removed. | No |
-| **Read-only files when `forceEnable = no`** | `Remove-Item` without `-Force` cannot delete read-only items. `forceEnable = yes` deletes them. `forceEnable` has **no** effect on hidden files. | Yes (`forceEnable`) |
-| **All folders when `folderIncluded = no`** | Enumeration adds `-File`; directories are not candidates. | Yes (`folderIncluded`) |
-| **Everything when `whatIf = yes`** | Report-only; lists candidates, deletes nothing. | Yes (`whatIf`) |
+| `executionSuccess` | boolean | `true` only if every server was processed without error **and** (when requested) the report was sent |
+| `executionOutput` | string | One-line summary |
+| `serversProcessed` | number | Servers whose admin share could be opened |
+| `itemsDeleted` | number | Items removed (0 in a Report Only run) |
+| `bytesFreed` | number | Bytes removed; in Report Only, the estimate of what would be removed |
+| `transcript` | string | The script's full log |
 
-## 6. Failure-handling contract
+---
 
-| Condition | Behavior | End state |
-|---|---|---|
-| Disabled / non-computer member | Skipped during resolution; logged `Info: skipping disabled computer …` | Not fatal |
-| Enabled-but-unreachable member | `Remove-files` `Get-ChildItem` terminating error (`-ErrorAction Stop`), logged `Error:`; per-server loop **continues** | Completed with Errors |
-| Individual undeletable item (e.g. read-only under `forceEnable=no`) | Logged `Error:`; remaining items still delete | Completed with Errors |
-| Zero enabled members, or empty folder list | Logged `Warn:`/`Error:`; clean exit, no action | Completed Successfully |
-| Invalid `whatIf` value | Logged `Error:`, no action (fails safe); the build action also rejects non-`yes`/`no` up front | Completed with Errors / Failed: Bad Inputs |
-| Bad inputs (validation) | `buildCleanDisksInvocation` throws | Failed: Bad Inputs |
-| Total failure (AD module missing, group/domain unresolvable) | Script `throw`s; routes via `handlePSFailure` | Failed: PS Execution |
+## 4. Inputs (request form)
 
-## 7. Dependencies
+| Input | Form label | Type | Notes |
+|---|---|---|---|
+| `distinguishedName` | AD Group Distinguished Name | string | The group's full DN. The domain, AD endpoint and target list all follow from it |
+| `folderTarget` | Folder where files to be deleted are located | Array/string | One **local** path per row, as seen on each server, e.g. `c:\Windows\ccmcache` |
+| `fileFilter` | Delete files matching (wildcards supported) | string | Applies to **files only**. `*.*` = every file |
+| `reportOnly` | Report Only or Report and Delete? | string | `yes` = Report Only (default), `no` = Report and Delete |
+| `olderThanDays` | Delete items older than N days | number | Whole number ≥ 0 |
+| `forceEnable` | Delete read-only items? | boolean | |
+| `folderIncluded` | Delete folders as well? | boolean | Subject to the folder rule (§6) |
+| `emailReport` | Email report? | boolean | |
+| `mailTo` | Email addresses to whom the report is sent | Array/string | One address per row |
+| `mailSubject` | Email subject | string | Subject stem; the outcome is appended |
+| `targetPath` | Script directory on the PowerShell host | string | **Local directory**, e.g. `C:\PSO\Scripts`. Not a UNC path, not a file name |
 
-- **PS host** (domain-joined Windows Server) with the **RSAT ActiveDirectory module**
-  (`Get-ADGroupMember` / `Get-ADComputer`), a WinRM HTTPS listener (5986), and network
-  reach to each target's `C$` admin share.
-- **Updated `cvs_functions.ps1`** deployed (changes S-14, S-15 — Change-Register).
-- **AD group(s)** whose direct computer members are the servers to clean (identified by
-  DN).
-- **VCF Orchestrator 9** with the PowerShell plug-in and a registered PS host.
-- **Shared actions** `parseScriptOutput` / `handlePSFailure` (reused from the Windows
-  guest-ops logs module, as in the Move and Reboot packages).
-- **Certificate trust** between Orchestrator and the PS host.
+---
 
-## 8. Assumptions
+## 5. Targeting — which servers are cleaned
 
-- The PS host service account has delete rights on the target folders — normally by
-  being **local admin** on target servers (which is also what grants `\\server\C$`
-  access). A non-admin service account gets only read on `c:\Windows\ccmcache` and
-  cannot delete (see the Implementation Guide / lab `-GrantModifyTo`).
-- Servers requiring cleanup are **direct** members of the AD group.
-- `folderTarget`, `olderThanDays`, `folderIncluded`, and `forceEnable` match the
-  intended template (cache vs user-profile) per run.
-- Single-node Orchestrator in the lab; clustered deployments replicate host-side config
-  on each node.
+- Only computer accounts that are **direct** members of the group. **Nested groups are
+  not expanded.** Each nested group is named in a warning so the omission is visible.
+  This is deliberate for a destructive action: a group added later by someone else cannot
+  silently add its servers to a delete run.
+- **Disabled** computer accounts are skipped and logged.
+- Each computer's FQDN is built from its own DN, so members from another domain are
+  addressed correctly.
+- Zero direct, enabled computer members stops the run before anything touches a host.
 
-## 9. Risks and mitigations
+---
 
-| Risk | Mitigation |
+## 6. Selection — what is deleted
+
+For each folder target on each reachable server:
+
+1. **Files** under the target are found recursively, matching `fileFilter`. Hidden and
+   system items are not enumerated.
+2. **Folders** are considered only with **Delete folders as well**, and are chosen **by age
+   alone, whatever their name**. A folder is removed whole, with everything in it.
+3. An item is a candidate when its last-write time is older than the cutoff (now minus
+   `olderThanDays`) **and** its name is not exactly `vmware-vmsvc-SYSTEM.log`.
+4. Each candidate is removed individually. Read-only items are removed only with
+   **Delete read-only items**. One failure is logged and the rest continue.
+5. The target folder itself is never removed; it is emptied.
+
+### The folder rule
+
+Deleting a folder deletes everything in it, so folders are deleted **only** when
+**Delete folders as well** comes together with:
+
+- a filter that matches every file (`*` or `*.*`), **and**
+- **Delete read-only items**.
+
+With any other combination, **folder deletion is declined, not the run.** Every folder is
+left in place and files matching the filter are still cleaned (or listed, in Report
+Only). *Create Script Parameters* warns up front. The script makes the decision and
+returns the reason, and the summary and email show it in red. A request is never widened
+automatically.
+
+### What is never deleted
+
+| Item | Why |
 |---|---|
-| Destructive live run against the wrong target | `whatIf` defaults to report-only; live runs log a loud warn; the build action nudges on drive-root/critical-dir targets |
-| Restrictive filter silently skips folders | `fileFilter` is fixed to `*.*` and kept off the form |
-| Enabled AD object for an offline host is still targeted | Disable the account or remove from the group; "enabled" means intent-to-process, not reachability |
-| Service account lacks delete rights | Ensure it is local admin on targets (or grant Modify); a non-admin sees read-only failures |
-| RSAT AD module absent | Verify `Get-Module -ListAvailable ActiveDirectory` before go-live |
-| Script drift | Verify S-14 / S-15 present on the deployed script before use |
-| Second-hop auth fails without delegation | Kerberos + constrained delegation (prod) or Basic-over-HTTPS (lab); validate the hop explicitly |
+| `vmware-vmsvc-SYSTEM.log` (exact, case-sensitive name) | Live VMware Tools log. Exception: it goes with a folder that is itself removed |
+| Anything last written at or after the cutoff | Age rule. Same folder exception |
+| Loose hidden / system files directly in a target | Not enumerated |
+| The target folder itself | Emptied, not removed |
+| Read-only items, unless **Delete read-only items** | Delete fails and is logged |
+| All folders, unless the folder rule is met | See above |
+| **Everything**, in a Report Only run | Nothing is deleted |
 
-## 10. Security considerations
+> **A folder is removed whole.** A folder's own timestamp changes only when entries
+> directly in it change, so an old folder can hold newer files and they go with it. The
+> user-profile templates rely on this to remove whole profiles. It is harmless for the
+> SCCM cache, whose content is written once.
 
-- **Transport:** WinRM over **HTTPS (5986)** only; `AllowUnencrypted` stays `false`.
-- **Authentication:** Kerberos (preferred, production) enables the second hop **only
-  with constrained delegation**; Basic-over-HTTPS (lab) generally works without
-  delegation. Never use Basic over HTTP.
-- **Credentials:** managed by the Orchestrator PS host configuration (service account);
-  no secrets in the workflow or script.
-- **Least privilege vs capability:** deleting under `\\server\C$` requires local-admin
-  rights on targets. Scope the service account accordingly; it should not have rights
-  beyond what cleanup requires.
-- **`forceEnable`** deletes read-only files; it does not delete hidden/system files.
-  The `vmware-vmsvc-SYSTEM.log` exclusion is retained.
+### Folder-target guard
 
-## 11. Operational considerations
+Checked in *Create Script Parameters* and again in the script, before any server is touched:
 
-- **Execution model:** on-demand via custom form, or scheduled in Orchestrator. Default
-  to report-only; schedule a live run (`whatIf = no`) only after validating the target
-  and age on a report-only pass.
-- **Idempotency:** re-running is safe — already-deleted items are simply absent next
-  pass.
-- **Observability:** per-server and per-item progress/failures are in the workflow run
-  log; `executionSuccess`/`executionOutput` summarize the result.
-- **Maintenance:** keep AD group membership current (add/remove servers there, not in
-  code); monitor certificate expiry; re-verify Kerberos config after major Orchestrator
-  upgrades.
-- **Change control:** all `cvs_functions.ps1` and workflow-design changes are tracked in
-  the Change-Register (S-# and P-#).
+- Must be an absolute local path with a drive letter. No UNC paths, wildcards or `..`.
+- A **drive root** is refused.
+- Anything that **is, or is inside**, `\Windows`, `\Program Files`, `\Program Files (x86)`,
+  `\ProgramData`, `\Boot`, `\Recovery` or `\System Volume Information` (on any drive) is
+  refused, **except** `\Windows\ccmcache`, `\Windows\Temp` and
+  `\Windows\SoftwareDistribution\Download` and anything inside them.
+- `c:\users` is allowed (profile templates).
+
+---
+
+## 7. Script delivery and execution
+
+- **Staging.** `stageScriptOnHost` builds `targetPath\<Resource Element name>` and
+  compares the SHA-256 and size of the file on the host with the Resource Element:
+  - **absent:** copy it;
+  - **exact match:** run the existing copy, and nothing is sent;
+  - **any difference:** overwrite it, re-hash, and fail the run if it still does not match.
+
+  The copy is written through a temporary file and a move, so a half-written script is
+  never run. The log records the version, hash and outcome (`first copy` / `unchanged` /
+  `updated`).
+- **Execution.** `invokeStagedScript` runs the verified path through the host's own
+  session, merges all output streams, and parses the script's single `PSO_RESULT=` JSON
+  line. A missing result line means the script did not complete, and the run fails
+  rather than reporting "nothing found".
+- **Host selection.** `selectPowerShellHost` probes each host in `psHosts` (CPU, memory,
+  active remote PowerShell sessions) and picks the least busy. A list of one is used
+  without probing. A host that does not answer is skipped.
+- **Reachability.** Each server's admin share is checked by listing it, so a failure
+  reports the real reason: network path not found, share missing, or access denied.
+
+### Run time and the WinRM timeout
+
+The clean is one synchronous PowerShell call. Deleting over SMB costs time per item, not
+per byte, so a large cache takes minutes. The host's `WSMan:\localhost\MaxTimeoutms` and the
+PowerShell plug-in timeout must both exceed the longest run. A Report Only run's duration
+is a lower bound for the live run.
+
+---
+
+## 8. Reporting and end states
+
+- **Per-server statuses:** `Cleaned`, `CleanedWithErrors`, `ReportOnly`, `Unreachable`, `Failed`.
+- **Email** (Orchestrator Mail plug-in): summary, a red notice if folder deletion was
+  declined, the AD group, folders, cutoff, options and script, then a per-server table
+  (matched, deleted, failed, freed, free space before/after, detail). Problems are listed
+  first.
+- **A send failure does not fail the run.** The send's exception is routed to *Closing
+  Summary*, which sets `executionSuccess = false` and logs "report NOT emailed" with the
+  reason.
+
+| Condition | End |
+|---|---|
+| Bad inputs, empty group, no answering host, staging failure, script did not complete | Workflow fails (nothing deleted if before element 7) |
+| Unreachable server, undeletable item, folder missing on every server | Completes, `executionSuccess = false` |
+| Folder deletion declined | Completes; files cleaned; notice in summary and email |
+| Report could not be emailed | Completes, `executionSuccess = false` |
+| Everything handled | Completes, `executionSuccess = true` |
+
+---
+
+## 9. Security considerations
+
+- The PowerShell host's account needs **local administrator** on every target (required
+  for `\\server\c$`) and delegation for the second hop. Scope it to the servers this
+  workflow cleans.
+- The script directory (`C:\PSO\Scripts`) should be writable only by the account the
+  PowerShell host object connects as. Anything else written there is overwritten on the
+  next run, because the file is re-verified by hash every time.
+- Credentials: none are stored in the workflow for AD (the plug-in endpoint's account is
+  used) or for the host (the PowerShell host object's account). SMTP credentials, if
+  ever needed, are a SecureString attribute.
+- Destructive safeguards: Report Only default, direct-membership targeting, folder rule,
+  system-folder guard, protected VMware log.
+
+---
+
+## 10. Assumptions, dependencies and known limitations
+
+### Dependencies
+
+- PowerShell host(s) registered in Orchestrator (WinRM/HTTPS, Kerberos, SHA-256 listener
+  certificate) with delegation to the targets.
+- SMB (TCP 445) from the PowerShell host to every target.
+- AD plug-in endpoint registered for every domain whose groups are targeted.
+- **Network path from every Orchestrator appliance to the SMTP relay** (TCP 25, or the
+  configured port), DNS resolution of the relay name, and a relay allow-list covering the
+  appliance addresses. If the relay uses TLS, its certificate trusted in Orchestrator and
+  the port's security mode matched to `useStartTls`. See
+  `_Shared/Documentation/Email-Notification-Standard.md`.
+
+### Known limitations
+
+- Load-based host selection is a snapshot. Two runs starting together may pick the same host.
+- A folder older than the cutoff is removed with any newer content inside it (§6).
+- Loose hidden/system files directly in a target are never removed.
+- The free-space figures are for the whole drive and can be affected by other activity
+  during the run.
+- The OOTB mail workflow has no CC. All recipients go in `mailTo`.

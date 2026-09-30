@@ -6,6 +6,18 @@
  * Package:   com.broadcom.pso.servers.windows.serverDiskClean
  * ═══════════════════════════════════════════════════════════════════════════════
  *
+ * >>> SUPERSEDED AS THE REFERENCE, 2026-09-30 <<<
+ *   The workflow is deployed as "Windows Server Disk Cleans". Its export,
+ *   Code/serverDiskCleansWorkflow.yml, is now the authoritative definition, and
+ *   Documentation/02_Design_Document.md and 03_Implementation_Guide.md describe it.
+ *   The deployment renamed several items this sheet still uses:
+ *       adGroupDn -> distinguishedName     whatIf -> reportOnly
+ *       diskCleanScript -> scriptElement   scriptDirectory -> targetPath (input)
+ *       psHostCandidates -> psHosts        scriptPath -> stagedScript
+ *       getGroupComputersDirect -> getADComputersGroupDirectMembers
+ *   The Closing Summary task for the deployed names is Code/task_ClosingSummary.js.
+ *   Keep this file for its reasoning; build from the export.
+ *
  * THIS FILE IS THE BUILD SHEET FOR THE CANVAS.
  *   Everything needed to build the workflow in Orchestrator is here: the elements in
  *   order, every IN and OUT binding, the inputs and attributes, the outputs, the
@@ -61,7 +73,10 @@
  *
  *     stageScriptOnHost        com.broadcom.pso.vcf.powershell.staging   (P-67)
  *     invokeStagedScript       com.broadcom.pso.vcf.powershell.staging   (P-68)
- *     sendHtmlEmail            com.broadcom.pso.vcf.notification         (P-69)
+ *
+ *   OOTB workflow (ships with Orchestrator -- nothing to import):
+ *
+ *     Send notification (TLSv1.2)   Library > Mail                          (P-69)
  *
  *   No action is specific to this package. Everything project-specific is in the
  *   three scriptable tasks below and in the .ps1.
@@ -117,9 +132,9 @@
  *      │ true                 │ false
  *      ▼                      │
  *   ┌───────────────────────┐ │
- *   │ 10. Send Report Email │ │           Action  sendHtmlEmail
+ *   │ 10. Send Report Email │ │           Workflow  Send notification (TLSv1.2)  (OOTB)
  *   └───────────────────────┘ │
- *      │                      │
+ *      │   └─[Exception]──────┤           → attr emailError, then on to element 11
  *      ▼                      ▼
  *   ┌───────────────────────────────────┐
  *   │ 11. Closing Summary               │  Scriptable task  (code below)
@@ -212,11 +227,12 @@
  *          folderIncluded      boolean             ← input  folderIncluded
  *          forceEnable         boolean             ← input  forceEnable
  *          whatIf              string              ← input  whatIf
- *          fileFilter          string              ← attr   fileFilter
+ *          fileFilter          string              ← input  fileFilter
  *          maxItemsListed      number              ← attr   maxItemsListed
  *          emailReport         boolean             ← input  emailReport
  *          mailTo              Array/string        ← input  mailTo
  *    OUT   scriptParameters    Properties          → attr   scriptParameters
+ *          mailToString        string              → attr   mailToString
  *    Exception → [End: Failed - Bad Inputs]
  *
  *    Validates EVERYTHING before the host is touched -- including the email recipients,
@@ -281,30 +297,50 @@
  *    true  → element 10          false → element 11
  *
  * ── 10. Send Report Email ──────────────────────────────────────────────────────
- *    Action:    sendHtmlEmail
- *    IN    toAddresses         Array/string        ← input  mailTo
- *          ccAddresses         Array/string        ← input  mailCc
+ *    Type:      Workflow element  →  Library > Mail > "Send notification (TLSv1.2)"  (OOTB)
+ *    IN    smtpHost            string              ← input  smtpHost      (blank = plug-in default)
+ *          smtpPort            number              ← input  smtpPort      (0 = plug-in default)
+ *          username            string              (leave NOT BOUND)
+ *          password            SecureString        (leave NOT BOUND)
+ *          fromName            string              (leave NOT BOUND)
+ *          fromAddress         string              ← input  fromAddress   (blank = plug-in default)
+ *          toAddress           string              ← attr   mailToString  (built by element 5)
  *          subject             string              ← attr   reportSubject
- *          htmlBody            string              ← attr   reportHtml
- *          smtpHost            string              ← input  smtpHost
- *          smtpPort            number              ← input  smtpPort
- *          fromAddress         string              ← input  fromAddress
- *    OUT   actionResult        boolean             → attr   emailSent
- *    No exception binding needed: the action returns false instead of throwing.
+ *          content             string              ← attr   reportHtml
+ *          useStartTls         boolean             (leave NOT BOUND = false)
+ *    OUT   (none)
+ *    Exception → bind to attr emailError, and route to element 11 (NOT to a Failed end)
+ *
+ *    The OOTB workflow overrides a Mail plug-in default only when the input is non-empty,
+ *    so unbound / blank inputs use the settings from Library > Mail > Configuration >
+ *    'Configure mail'. username / password are deliberately left unbound: the customer's
+ *    relay is anonymous today. That also means any credentials stored in 'Configure mail'
+ *    WILL be used -- keep them empty there for an anonymous relay. The workflow logs
+ *    "sending mail to host: ... with user: ..." so one test run shows what it used.
+ *
+ *    WHY THE EXCEPTION GOES TO ELEMENT 11, NOT A FAILED END. Unlike a custom action, the
+ *    OOTB workflow THROWS when the relay rejects or cannot be reached. By then the clean
+ *    has already happened; ending on a Failed state would make a completed run look as if
+ *    nothing was done. Element 11 records it as "completed, report NOT emailed" instead.
+ *
+ *    NO CC. The OOTB workflow has no CC input, so this workflow has no mailCc input.
+ *    Put every recipient in mailTo.
  *
  * ── 11. Closing Summary ────────────────────────────────────────────────────────
  *    Scriptable task        ← code at the bottom of this file
  *    IN    executionSuccess    boolean             ← output executionSuccess
  *          executionOutput     string              ← output executionOutput
  *          emailReport         boolean             ← input  emailReport
- *          emailSent           boolean             ← attr   emailSent
+ *          emailError          string              ← attr   emailError
  *          adGroup             AD:UserGroup        ← attr   adGroup
  *          whatIf              string              ← input  whatIf
  *          scriptPath          string              ← attr   scriptPath
  *    OUT   executionSuccess    boolean             → output executionSuccess
  *
- *    executionSuccess is on BOTH tabs: it arrives from element 8 and leaves false if the
- *    report was wanted and not sent.
+ *    Reached three ways: from element 10 normally (report sent), from element 10's
+ *    exception (emailError holds the reason), or from decision 9's false branch (email
+ *    off). executionSuccess is on BOTH tabs: it arrives from element 8 and leaves false if
+ *    the report was wanted and not sent.
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  * WORKFLOW INPUTS
@@ -316,13 +352,13 @@
  *   ─────────────── ────────────────────────── ─────────────────────────────────────────── ─────
  *   adGroupDn       string                     (none)                                      Yes
  *   folderTarget    Array/string               [ c:\Windows\ccmcache ]                     Yes
+ *   fileFilter      string                     *.*                                         Yes
  *   olderThanDays   number                     1                                           Yes
- *   folderIncluded  boolean                    true                                        Yes
+ *   folderIncluded  boolean                    false                                       Yes
  *   forceEnable     boolean                    false                                       Yes
  *   whatIf          string                     yes                                         Yes
  *   emailReport     boolean                    true                                        Yes
  *   mailTo          Array/string               (set to real recipients)                    No
- *   mailCc          Array/string               (none)                                      No
  *   mailSubject     string                     VCF Orchestrator: Windows Server Disk Clean No
  *   smtpHost        string                     (blank = Mail plug-in default)              No
  *   smtpPort        number                     0 (= plug-in default)                       No
@@ -338,10 +374,16 @@
  *                 CN=CVS-DPT-AllServers,OU=Groups,DC=dom4,DC=invalid
  *                 The domain, the AD endpoint and the target list all follow from it.
  *
- *   folderTarget  One LOCAL path per row, as seen on each server. The production values:
+ *   folderTarget  One LOCAL path per row, as seen on each server. The production values
+ *                 (Ansible), and what each needs on this form (S-35 / P-71):
  *
- *                   Cache cleanup (6 templates)     c:\Windows\ccmcache  1 day  force off
- *                   Profile cleanup (2 templates)   c:\users             0 days force ON
+ *                   Cache cleanup (6)    c:\Windows\ccmcache  1 day   folders ON, force off
+ *                   Profile cleanup (2)  c:\users             0 days  folders ON, force ON
+ *
+ *                 The cache templates' combination (folders ON, force OFF) now cleans
+ *                 FILES ONLY -- the hash-named package folders stay. To keep removing them,
+ *                 tick "delete read-only items" too; decide with the cache owner before
+ *                 migrating those six templates.
  *
  *   olderThanDays Label: "Delete items older than N days". 0 = everything up to now.
  *
@@ -349,7 +391,17 @@
  *   folderIncluded / forceEnable / smtp* in an "Advanced" section. An operator running
  *   this day to day should see a DN, the folders, the age, and the safety gate.
  *
- *   fileFilter is deliberately NOT an input (P-19) -- see the attribute below.
+ *   fileFilter    Label: "Delete files matching (wildcards supported)". Default '*.*'.
+ *                 Applies to FILES only -- folders are chosen by age, whatever their name.
+ *
+ *   folderIncluded / forceEnable / fileFilter -- THE FOLDER RULE (S-35 / P-71):
+ *                 deleting a folder deletes EVERYTHING in it, so "delete folder" is only
+ *                 performed together with fileFilter '*' or '*.*' AND forceEnable ticked.
+ *                 With any other combination the run still goes ahead, but FOLDER DELETION
+ *                 IS DECLINED: element 5 warns, the script leaves every folder in place and
+ *                 cleans only the files matching fileFilter, and the log, summary and email
+ *                 say so. Nothing is ever escalated automatically. Put this in each field's
+ *                 custom help so the operator knows before pressing Run.
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  * WORKFLOW ATTRIBUTES
@@ -359,7 +411,6 @@
  *   ───────────────── ────────────────────────── ──────────────── ─────────────────────────────────────────
  *   diskCleanScript   ResourceElement            YOU, at build    PSO/Scripts/Invoke-ServerDiskClean.ps1
  *   scriptDirectory   string                     YOU, at build    C:\PSO\Scripts
- *   fileFilter        string                     YOU, at build    *.*          (P-19 -- do not change)
  *   maxItemsListed    number                     YOU, at build    25
  *   psHostCandidates  Array/PowerShell:          YOU, at build    the PowerShell host objects this
  *                     PowerShellHost                              workflow may run on (one or more)
@@ -372,7 +423,8 @@
  *   scriptRunResult   Properties                 element 7
  *   reportSubject     string                     element 8
  *   reportHtml        string                     element 8
- *   emailSent         boolean                    element 10       (default false)
+ *   mailToString      string                     element 5        mailTo joined with ','
+ *   emailError        string                     element 10       exception binding (default empty)
  *
  *   diskCleanScript is an ATTRIBUTE bound to the element, not a name looked up at run
  *   time, so the run record shows which Resource Element was staged.
@@ -413,6 +465,8 @@
  *   A candidate host does not answer its probe             4    warned, skipped → continues
  *   Zero direct enabled computer members                   5    Failed - Bad Inputs
  *   whatIf not 'yes'/'no'; bad age; bad/refused folder     5    Failed - Bad Inputs
+ *   'delete folder' without fileFilter '*'/'*.*' + force  5+7  warned; folders NOT deleted, files still cleaned
+ *   empty fileFilter                                       5    Failed - Bad Inputs
  *   Email on with no recipient                             5    Failed - Bad Inputs
  *   Resource Element empty                                 6    Failed - Script Staging
  *   Host copy could not be probed / written / verified     6    Failed - Script Staging
@@ -421,7 +475,7 @@
  *   A folder target missing on some servers                8    End (warning only)
  *   A folder target missing on EVERY reachable server      8    End, executionSuccess=false
  *   An item could not be deleted / a folder not read       8    End, executionSuccess=false
- *   Report could not be emailed                           11    End, executionSuccess=false
+ *   Report could not be emailed (element 10 threw)        11    End, executionSuccess=false
  *   Everything handled cleanly                            11    End, executionSuccess=true
  *
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -434,8 +488,16 @@
  *   (Script-Staging-Design.md §6.3). Test it with a report-only run: an 'Unreachable'
  *   server saying 'Access is denied' is a delegation or rights problem, not a network one.
  *
- *   MAIL. Run 'Configure mail' (Library > Mail > Configuration) once, or fill smtpHost and
- *   fromAddress on the inputs. sendHtmlEmail logs the relay it actually used.
+ *   MAIL -- A NETWORK REQUIREMENT, NOT JUST A SETTING. The report is sent by ORCHESTRATOR
+ *   (Mail plug-in), so every Orchestrator appliance node must reach the SMTP relay:
+ *   TCP 25 (or the configured port), DNS resolution of the relay name, and the relay must
+ *   accept mail from the appliance addresses. The PowerShell host's relay access does NOT
+ *   cover this -- request the firewall rule / relay allow-list for the appliance addresses.
+ *   Then run 'Configure mail' (Library > Mail > Configuration) once, or fill smtpHost and
+ *   fromAddress on the inputs; leave its username/password empty for an anonymous relay.
+ *   'Send notification (TLSv1.2)' logs the host and user it actually used; prove the path
+ *   with a report-only run with email on before the first live run. Details:
+ *   _Shared/Documentation/Email-Notification-Standard.md.
  *
  *   TIMEOUTS. The clean is ONE synchronous PowerShell invocation; deleting a large cache
  *   over SMB is slow (per item, not per byte). WinRM MaxTimeoutms on the host and the
@@ -467,11 +529,12 @@
  *      folderIncluded  boolean         input
  *      forceEnable     boolean         input
  *      whatIf          string          input
- *      fileFilter      string          attr    ('*.*')
+ *      fileFilter      string          input   (default '*.*')
  *      maxItemsListed  number          attr    (25)
  *      emailReport     boolean         input
  *      mailTo          Array/string    input
  * OUT  scriptParameters  Properties    attr    → element 7 'parameters'
+ *      mailToString      string        attr    → element 10 'toAddress'
  *
  * Does no work of its own. Checks the request, turns it into the Properties bag
  * Invoke-ServerDiskClean.ps1 expects, and says in the log what it decided. Nothing has
@@ -516,12 +579,20 @@ if (olderThanDays === null || olderThanDays === undefined || isNaN(days) || days
 }
 
 // -- 4. Folder targets ----------------------------------------------------------
-// The same refusals the script makes (Test-FolderTarget), made here first so a bad path
-// never reaches the host. c:\users is deliberately allowed -- two production templates
-// clean it.
-var refused = ["\\windows", "\\windows\\system32", "\\windows\\syswow64", "\\windows\\winsxs",
-               "\\program files", "\\program files (x86)", "\\programdata",
-               "\\boot", "\\recovery", "\\system volume information"];
+// The same refusals the script makes (Test-FolderTarget, S-36), made here first so a bad
+// path never reaches the host: a drive root, or anything that IS or is INSIDE a protected
+// operating-system tree -- except the known-safe cache folders below (and anything inside
+// them). c:\users is deliberately allowed -- two production templates clean it.
+//
+// KEEP THESE TWO LISTS IDENTICAL TO THE SCRIPT'S. To allow another folder inside a
+// protected tree, add it here AND to $AllowedInsideProtected in Invoke-ServerDiskClean.ps1.
+var protectedTrees = ["\\windows", "\\program files", "\\program files (x86)", "\\programdata",
+                      "\\boot", "\\recovery", "\\system volume information"];
+var allowedInsideProtected = ["\\windows\\ccmcache", "\\windows\\temp", "\\windows\\softwaredistribution\\download"];
+
+function isOrInside(candidate, tree) {
+    return candidate === tree || candidate.indexOf(tree + "\\") === 0;
+}
 var folders = [];
 if (folderTarget !== null && folderTarget !== undefined) {
     for (var f = 0; f < folderTarget.length; f++) {
@@ -537,9 +608,20 @@ if (folderTarget !== null && folderTarget !== undefined) {
         if (rest === "") {
             throw new Error("Create Script Parameters: folderTarget '" + path + "' is the root of a drive. That is never a disk-clean target.");
         }
-        for (var r = 0; r < refused.length; r++) {
-            if (rest === refused[r]) {
-                throw new Error("Create Script Parameters: folderTarget '" + path + "' is a core operating-system folder and is refused.");
+        var allowed = false;
+        for (var a = 0; a < allowedInsideProtected.length; a++) {
+            if (isOrInside(rest, allowedInsideProtected[a])) { allowed = true; break; }
+        }
+        if (!allowed) {
+            for (var r = 0; r < protectedTrees.length; r++) {
+                if (isOrInside(rest, protectedTrees[r])) {
+                    var drive = path.substring(0, 2);
+                    throw new Error(
+                        "Create Script Parameters: folderTarget '" + path + "' is inside the protected operating-system folder " +
+                        drive + protectedTrees[r] + " and is refused. The only folders allowed there are " +
+                        allowedInsideProtected.map(function (x) { return drive + x; }).join(", ") + " (and anything inside them)."
+                    );
+                }
             }
         }
         folders.push(path);
@@ -563,14 +645,29 @@ var folderFlag = yesNo(folderIncluded);
 var forceFlag  = yesNo(forceEnable);
 
 // -- 6. Email must be deliverable BEFORE anything is deleted --------------------
-if (yesNo(emailReport) === "yes") {
-    var anyRecipient = false;
-    if (mailTo !== null && mailTo !== undefined) {
-        for (var m = 0; m < mailTo.length; m++) { if (trim(mailTo[m]) !== "") { anyRecipient = true; break; } }
+// The OOTB 'Send notification (TLSv1.2)' workflow takes ONE toAddress string, so the
+// recipients are flattened here into a comma-separated list. An entry may itself hold
+// several addresses separated by , or ; -- each is trimmed and blanks are dropped.
+var recipients = [];
+if (mailTo !== null && mailTo !== undefined) {
+    for (var m = 0; m < mailTo.length; m++) {
+        var pieces = String(mailTo[m] === null || mailTo[m] === undefined ? "" : mailTo[m]).split(/[,;]/);
+        for (var q = 0; q < pieces.length; q++) {
+            var address = trim(pieces[q]);
+            if (address === "") { continue; }
+            // Catches the classic binding mistake: a scalar string bound where an array was
+            // expected arrives split into single characters, none of which contain '@'.
+            if (address.indexOf("@") < 1) {
+                throw new Error("Create Script Parameters: '" + address + "' in mailTo is not an email address. Enter one address per row.");
+            }
+            recipients.push(address);
+        }
     }
-    if (!anyRecipient) {
-        throw new Error("Create Script Parameters: emailReport is ticked but mailTo has no recipient. Add one, or untick emailReport.");
-    }
+}
+mailToString = recipients.join(",");
+
+if (yesNo(emailReport) === "yes" && recipients.length === 0) {
+    throw new Error("Create Script Parameters: emailReport is ticked but mailTo has no recipient. Add one, or untick emailReport.");
 }
 
 // -- 7. Say plainly what this run will do ----------------------------------------
@@ -586,9 +683,32 @@ else {
     System.log("whatIf='yes' -- report-only run; nothing will be deleted.");
 }
 
-var filter = trim(fileFilter) === "" ? "*.*" : trim(fileFilter);
-if (filter !== "*.*") {
-    System.warn("fileFilter attribute is '" + filter + "', not '*.*'. It applies to folder names too, so folders will not be removed unless they match it (P-19).");
+// -- 7b. The folder rule (S-35 / P-71) -------------------------------------------
+// fileFilter applies to FILES only; folders are chosen by age, whatever their name. But a
+// folder is deleted WHOLE, with everything in it -- so folders are deleted only when the
+// request says so in full: a filter matching every file AND permission to delete read-only
+// items. With anything less, folder deletion is DECLINED but the run continues and matching
+// files are still cleaned. The decision is made by the SCRIPT (so its log and the report
+// record it); this task only says so up front. It never widens a request.
+var filter = trim(fileFilter);
+if (filter === "") {
+    throw new Error("Create Script Parameters: fileFilter is empty. Use '*.*' for every file, or a pattern such as '*.tmp'.");
+}
+if (folderFlag === "yes") {
+    var problems = [];
+    if (filter !== "*" && filter !== "*.*") {
+        problems.push("fileFilter is '" + filter + "', which does not match every file (use '*' or '*.*')");
+    }
+    if (forceFlag !== "yes") {
+        problems.push("'delete read-only items' (forceEnable) is not ticked");
+    }
+    if (problems.length > 0) {
+        System.warn(
+            "'Delete folder' is ticked, but " + problems.join(" and ") + ". Deleting a folder deletes everything in it, " +
+            "so FOLDERS WILL NOT BE DELETED on this run. Files matching '" + filter + "' are still processed. " +
+            "To delete folders as well, set fileFilter to '*.*' AND tick 'delete read-only items'."
+        );
+    }
 }
 
 var listed = Number(maxItemsListed);
@@ -660,9 +780,27 @@ serversProcessed = reported.get("serversReachable");
 itemsDeleted     = reported.get("itemsRemoved");
 bytesFreed       = reported.get("bytes");
 
+// invokeStagedScript hands structured values over as JSON TEXT, but an EMPTY list is an
+// array of strings as far as it can tell, so it arrives as a real (empty) array. Accept both.
 var servers = [];
-try { servers = JSON.parse(reported.get("servers") || "[]"); } catch (eS) { System.warn("Could not read the per-server list: " + eS); }
+var rawServers = reported.get("servers");
+if (rawServers !== null && rawServers !== undefined) {
+    if (typeof rawServers === "string") {
+        if (rawServers.replace(/^\s+|\s+$/g, "") !== "") {
+            try { servers = JSON.parse(rawServers); } catch (eS) { System.warn("Could not read the per-server list: " + eS); }
+        }
+    }
+    else if (rawServers.length !== undefined) {
+        servers = [];
+        for (var sv0 = 0; sv0 < rawServers.length; sv0++) { servers.push(rawServers[sv0]); }
+    }
+}
+if (servers === null || servers === undefined) { servers = []; }
 if (!(servers instanceof Array)) { servers = [servers]; }   // one server may arrive as a bare object
+
+// Folder deletion requested but declined by the script's guard (S-35). Empty otherwise.
+var foldersDeclined = reported.get("foldersDeclined");
+foldersDeclined = (foldersDeclined === null || foldersDeclined === undefined) ? "" : String(foldersDeclined);
 
 var targets = reported.get("targets") || [];
 
@@ -686,6 +824,10 @@ else {
 }
 if (unreachable > 0) {
     executionOutput += " " + unreachable + " server(s) unreachable.";
+}
+if (foldersDeclined !== "") {
+    executionOutput += " Folder deletion was requested but declined (files only).";
+    System.warn(foldersDeclined);
 }
 
 // -- Log it ---------------------------------------------------------------------
@@ -758,11 +900,14 @@ reportHtml =
     (wasReportOnly
         ? "<p style=\"" + font + "color:#8A6D00;font-weight:600;\">REPORT ONLY -- nothing was deleted. The counts show what a live run (whatIf = no) would remove.</p>"
         : "") +
+    (foldersDeclined !== ""
+        ? "<p style=\"" + font + "color:#B00020;font-weight:600;\">" + esc(foldersDeclined) + "</p>"
+        : "") +
     "<table style=\"border-collapse:collapse;" + font + "margin-bottom:10px;\">" +
     "<tr><td style=\"" + td + "font-weight:600;\">AD group</td><td style=\"" + td + "\">" + esc(adGroup.name) + " (direct, enabled computer members)</td></tr>" +
     "<tr><td style=\"" + td + "font-weight:600;\">Folders</td><td style=\"" + td + "\">" + esc(targets.join("  |  ")) + "</td></tr>" +
     "<tr><td style=\"" + td + "font-weight:600;\">Older than</td><td style=\"" + td + "\">" + esc(reported.get("olderThanDays")) + " day(s) -- last written before " + esc(reported.get("cutoff")) + "</td></tr>" +
-    "<tr><td style=\"" + td + "font-weight:600;\">Options</td><td style=\"" + td + "\">folders included: " + (folderIncluded === true ? "yes" : "no") + ", read-only items (force): " + (forceEnable === true ? "yes" : "no") + "</td></tr>" +
+    "<tr><td style=\"" + td + "font-weight:600;\">Options</td><td style=\"" + td + "\">delete folders: " + (folderIncluded === true ? (foldersDeclined !== "" ? "requested, DECLINED (see above)" : "yes") : "no") + ", read-only items (force): " + (forceEnable === true ? "yes" : "no") + "</td></tr>" +
     "<tr><td style=\"" + td + "font-weight:600;\">Script</td><td style=\"" + td + "\">" + esc(scriptPath) + " on " + esc(resolvedHost.name) + "</td></tr>" +
     "</table>" +
     "<table style=\"border-collapse:collapse;border:1px solid #B4B4B4;" + font + "width:100%;\">" +
@@ -798,25 +943,33 @@ function trim(value) {
  * IN   executionSuccess  boolean       output (from element 8)
  *      executionOutput   string        output (from element 8)
  *      emailReport       boolean       input
- *      emailSent         boolean       attr   (from element 10; false if it did not run)
+ *      emailError        string        attr   (element 10's exception binding; empty if it
+ *                                             did not throw or did not run)
  *      adGroup           AD:UserGroup  attr
  *      whatIf            string        input
  *      scriptPath        string        attr
  * OUT  executionSuccess  boolean       output
  *
- * Both branches of the email decision end here, so the run record always finishes with
- * the same line: outcome, group, mode and script generation together. Someone opening the
- * log weeks later reads the last line and knows what this run did, to what, and with
- * which script.
+ * Every path after element 8 ends here -- email sent, email failed, email off -- so the run
+ * record always finishes with the same line: outcome, group, mode and script together.
+ * Someone opening the log weeks later reads the last line and knows what this run did, to
+ * what, and with which script.
+ *
+ * "Sent" is inferred: with email on, this task is reached either from element 10's normal
+ * exit (sent) or from its exception (emailError set). The OOTB workflow has no output to
+ * say so directly.
  * ═════════════════════════════════════════════════════════════════════════════ */
 
 var success = (executionSuccess === true);
+var emailFailed = (emailError !== null && emailError !== undefined && String(emailError).replace(/^\s+|\s+$/g, "") !== "");
 
-if (emailReport === true && emailSent !== true) {
+if (emailReport === true && emailFailed) {
     // The clean already happened; failing the workflow now would make a completed run
     // look as if nothing was done. It is recorded as not fully successful instead.
     success = false;
-    System.warn("The report email was NOT sent -- see the 'Send Report Email' log. The per-server detail is in this run's log.");
+    System.warn("The report email was NOT sent: " + emailError +
+        " -- check that this Orchestrator can reach the SMTP relay (see BEFORE THE FIRST PRODUCTION RUN). " +
+        "The per-server detail is in this run's log.");
 }
 executionSuccess = success;
 
@@ -825,7 +978,7 @@ var closing =
     " | whatIf=" + whatIf +
     " | script=" + scriptPath +
     " | " + executionOutput +
-    (emailReport === true ? (emailSent === true ? " | report emailed" : " | report NOT emailed") : " | email off");
+    (emailReport === true ? (emailFailed ? " | report NOT emailed" : " | report emailed") : " | email off");
 
 if (success) {
     System.log(closing);

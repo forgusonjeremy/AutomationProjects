@@ -1,6 +1,22 @@
+/* ===========================================================================
+ * SHARED COMPONENT -- used by every workflow in the programme that needs it.
+ *
+ * ONE copy lives here, in InProgress/_Shared/Code/. Project folders do not
+ * carry their own copies; a project's build sheet names the action and points
+ * here, and the project's .package export bundles it so the package still
+ * installs on its own.
+ *
+ * Create it ONCE per Orchestrator and let every workflow call it -- do not
+ * create a second copy under a different name. A fix made to one copy does
+ * not reach the others, and they drift apart silently.
+ * =========================================================================== */
+
 /**
- * Action:  getGroupComputers
- * Module:  com.broadcom.pso.windows.logs
+ * Action:  getADComputersGroupRecursiveSearch
+ * Module:  com.broadcom.pso.vcf.activedirectory
+ *
+ * (Formerly getGroupComputers in com.broadcom.pso.windows.logs, delivered with Move
+ *  Windows Event Logs. Renamed in Orchestrator and brought into _Shared on 2026-09-29.)
  *
  * WHAT IT DOES
  *   Takes an Active Directory group and returns the full names of every computer in it,
@@ -11,8 +27,13 @@
  *   PowerShell runs and no credentials go anywhere -- the plug-in uses the account
  *   already stored against the AD endpoint.
  *
+ *   RECURSIVE ON PURPOSE. Use it where "every server this group implies" is the right
+ *   scope (e.g. moving archived logs). Workflows that must act ONLY on computers placed
+ *   directly in the group -- reboots, disk cleans -- use the non-recursive direct-members
+ *   action instead, and must not be switched to this one.
+ *
  * INPUTS (in this order)
- *   adGroup  AD:UserGroup  the group to expand
+ *   adGroup  AD:Group  the group to expand
  *
  * RETURNS
  *   Array/string -- computer names such as ["srv01.connect.lab", "srv02.connect.lab"]
@@ -33,6 +54,10 @@
  *   Each computer's full name is built from its own distinguishedName, not from the
  *   group's. A group in one domain can contain computers from another, and building the
  *   name this way gets those right instead of quietly pointing at the wrong domain.
+ *
+ *   The log messages are deliberately generic -- they say what was found and what to do
+ *   about it, and nothing about what the calling workflow does with the list -- because
+ *   this one action serves every workflow that uses it.
  */
 
 /**
@@ -87,25 +112,24 @@ function isDisabled(computer) {
 /**
  * Returns the members of a group, split into the computers and the nested groups.
  *
- * This plug-in exposes them as typed lists on the group itself: 'computerMembers' holds
- * the AD:ComputerAD objects and 'groupMembers' the nested AD:UserGroup ones -- confirmed
- * against the deployed plug-in with probeAdPlugin. Some versions name the same pair
- * 'computers' and 'groups', and older ones give a single mixed list instead, so both are
- * tried after it and the mixed list is sorted out by type.
+ * This plug-in exposes them as typed lists on the group itself: 'computers' is an array
+ * of AD:Computer, and 'groups' the nested AD:Group objects. Other versions name that same
+ * pair computerMembers / groupMembers, and older ones give a single mixed list instead,
+ * so each is tried in turn and the mixed list is sorted out by type.
  *
  * Only lists of MEMBERS belong here. A property holding the groups this group is itself
  * a member of would walk the tree upwards and pull in machines that are not in scope, so
  * nothing is read on a guess -- run probeAdPlugin to see which of these a group carries.
  */
 function membersOf(group) {
-    var computers = readProperty(group, "computerMembers");
+    var computers = readProperty(group, "computers");
     if (computers === null) {
-        computers = readProperty(group, "computers");
+        computers = readProperty(group, "computerMembers");
     }
 
-    var groups = readProperty(group, "groupMembers");
+    var groups = readProperty(group, "groups");
     if (groups === null) {
-        groups = readProperty(group, "groups");
+        groups = readProperty(group, "groupMembers");
     }
 
     if (computers !== null || groups !== null) {
@@ -144,7 +168,7 @@ function membersOf(group) {
 // Walk the group
 // ---------------------------------------------------------------------------
 if (adGroup === null || adGroup === undefined) {
-    throw new Error("getGroupComputers: no group was supplied.");
+    throw new Error("getADComputersGroupRecursiveSearch: no group was supplied.");
 }
 
 var visitedGroups = {};    // group DNs already expanded
@@ -228,11 +252,11 @@ System.log(
 );
 
 // A group whose membership the plug-in would not report at all is not an empty group.
-// Treating it as one would move logs from an incomplete set of servers and call that a
-// successful run, so it stops here instead.
+// Treating it as one would let the calling workflow act on an incomplete set of servers
+// and call that a successful run, so it stops here instead.
 if (unreadableGroups.length > 0) {
     throw new Error(
-        "getGroupComputers: this Active Directory plug-in did not report the membership of " +
+        "getADComputersGroupRecursiveSearch: this Active Directory plug-in did not report the membership of " +
         unreadableGroups.join(", ") + ". None of computers / computerMembers / groups / " +
         "groupMembers / members was present on the group. Run the probeAdPlugin action to see " +
         "how this plug-in reports membership, and adjust membersOf to match."

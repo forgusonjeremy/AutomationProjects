@@ -1,97 +1,79 @@
-# Executive Summary — Windows Server Clean Disks
+# Executive Summary — Windows Server Disk Cleans
 
 ## Business objective
 
-Replace the Ansible `servers_diskclean.yml` playbook with a VCF Orchestrator
-workflow that frees disk space on the Windows servers in a designated Active
-Directory security group — deleting aged files (and, optionally, folders) from one
-or more target directories (by default the SCCM download cache
-`c:\Windows\ccmcache`). The workflow defaults to a **safe report-only preview** and
-deletes only when explicitly told to.
+Keep Windows servers from running out of disk space by regularly deleting aged,
+disposable files, chiefly the SCCM download cache (`c:\Windows\ccmcache`), and by
+clearing stale user profiles on the servers that need it. The Ansible playbook that does
+this today (`servers_diskclean.yml`) is being replaced by a VCF Operations Orchestrator
+workflow, **Windows Server Disk Cleans**, as part of the Ansible → Orchestrator
+transition.
 
 ## Scope
 
-- One workflow (`Clean-ServerDisks-ByADGroup`) that resolves an AD group to its
-  **direct, enabled computer members**, and for each server deletes items older than
-  a chosen age from one or more target folders — with a report-only safety gate.
-- Reuse of the proven `cvs_functions.ps1` PowerShell toolbox already deployed on the
-  customer's PowerShell (PS) host, invoked through Orchestrator's PowerShell plug-in.
-  Orchestrator passes inputs and classifies the result; all AD resolution, per-server
-  iteration, filtering, and deletion run inside the script.
-- Covers **both** production use cases that ran under the single `clean-ServerDisk`
-  action: the six **cache-cleanup** templates (`c:\Windows\ccmcache`) and the two
-  **user-profile cleanup** templates (`c:\users`) — the same action with different
-  inputs.
-
-Out of scope: cleanup of paths not supplied to the workflow, servers not in the
-target group, and hosts not reachable over the `\\server\C$` admin share from the PS
-host. The workflow **empties** target folders; it never deletes the target folder
-itself.
+- **Targets:** the enabled computer accounts that are **direct** members of an Active
+  Directory security group. Physical servers and virtual machines are handled
+  identically; nothing depends on vCenter.
+- **What runs:** one PowerShell script, `Invoke-ServerDiskClean.ps1`, executed on a
+  PowerShell host. The host reaches every target through its administrative share
+  (`\\server\c$`).
+- **Production use today:** eight Ansible templates. Six clean the SCCM cache
+  (`c:\Windows\ccmcache`, older than 1 day). Two clear user profiles (`c:\users`,
+  everything, including read-only items).
 
 ## What gets deleted (at a glance)
 
-On a live run, an item under a target folder is deleted only when **all** of the
-following are true (documented in full in the Design Document and User Guide):
+| Setting on the request form | Effect |
+|---|---|
+| **Folder(s)** | Where to clean, e.g. `c:\Windows\ccmcache`. The folder itself is never removed |
+| **File name filter** | Which files, e.g. `*.*` (all) or `*.tmp` |
+| **Older than N days** | Only items last written more than N days ago. `0` means everything up to now |
+| **Delete read-only items** | Also removes read-only files |
+| **Delete folders as well** | Removes whole sub-folders older than the cutoff, **only** when the filter matches every file **and** read-only deletion is on. Otherwise only matching files are cleaned and the report says so |
+| **Report Only / Report and Delete** | **Report Only is the default.** It lists what would be deleted and changes nothing |
 
-1. Its server is a **direct, enabled computer member** of the target AD group
-   (nested groups, disabled accounts, and non-computer objects are excluded).
-2. Its **last-modified time is older than** the chosen `olderThanDays` threshold.
-3. It is **not** on the intentional-preservation list (e.g. the hardcoded
-   `vmware-vmsvc-SYSTEM.log` exclusion; hidden/system files; read-only files when
-   `forceEnable` is off).
-4. The run is a **live** run (`whatIf = no`). The default (`whatIf = yes`) reports
-   what would be deleted and deletes nothing.
+Always kept: the live VMware Tools log (`vmware-vmsvc-SYSTEM.log`), anything newer than
+the cutoff, and the target folder itself. System folders such as `\Windows\System32`,
+`\Program Files` and `\ProgramData` are refused as targets. Only known cache folders
+inside them are allowed.
 
 ## Key improvements over the Ansible automation
 
-| Area | Ansible (before) | Orchestrator (now) |
+| Area | Ansible today | Orchestrator |
 |---|---|---|
-| **Safety preview** | None — the action always deleted | `whatIf` report-only mode (the **default**) lists what *would* be deleted and deletes nothing |
-| **Targeting** | Unfiltered group membership (users and disabled accounts included) | Direct, enabled, **computer** objects only (disabled skipped and logged) |
-| **Unreachable server** | Silent non-terminating error — the run looked clean | Terminating, **logged** `Error:`; the per-server loop continues; run ends *Completed with Errors* |
-| **Age input** | Negative value (`-1`) fed to `AddDays()` | Intuitive **positive** `olderThanDays` ("delete items older than N days") |
-| **File filter** | Free-text, easy to misuse | Fixed to `*.*` (matches all files **and** folders) so folder deletion works as expected |
-| **Failure isolation** | One failure could stop the run | Per-server and per-item isolation; failures logged, others still processed |
-| **Execution** | Script copied to a host every run over WinRM | Pre-staged script invoked centrally through the PS host plug-in |
-| **Auditability** | Ansible job log | Orchestrator run history + structured end states + full transcript |
-
-Several of these were **pre-existing weaknesses** in the current automation that the
-transition uncovered and fixed (details in the Change Register): silent failures on
-unreachable servers, no dry-run, and unfiltered targeting.
+| Safety | Always deleted; no preview | **Report Only** by default; a live run is a deliberate choice |
+| Folder deletion | A narrow filter silently kept every folder, or a folder took everything with it | Folders are deleted only when explicitly and fully requested; otherwise declined and reported |
+| System folders | No guard | Drive roots and OS folders refused before anything runs |
+| Targeting | All group members, including users and disabled accounts | Direct, enabled computer accounts only; nested groups named in a warning |
+| Failures | Silent: an unreachable server looked like a clean run | Each server's outcome recorded and reported with the reason |
+| Reporting | None | Per-server HTML email: items, space freed, free space before and after |
+| Script delivery | Whole script folder copied on every run | Script kept in Orchestrator and copied to the host **only when it has changed**, verified by SHA-256 |
+| Host selection | Fixed inventory host | Least-busy PowerShell host picked automatically |
 
 ## Benefits
 
-- **Safer:** report-only by default; a destructive live run is a deliberate choice.
-- **Predictable:** only direct, enabled computers are touched; disabled/decommissioned
-  and non-computer objects are excluded and logged.
-- **Auditable:** a full per-server, per-item transcript in Orchestrator history; a
-  clear *Completed with Errors* outcome when any server or item fails.
-- **Lower operational overhead:** scheduled or on-demand, centralized, no per-run
-  script staging.
-- **Intuitive:** operators enter a positive "older than N days" value and a plain
-  yes/no safety gate.
+- **Lower risk.** Preview by default, system-folder guard, and no automatic widening of
+  a request.
+- **Visibility.** Every run ends with a per-server account of what was, or would have
+  been, removed and why anything was skipped.
+- **One source of truth.** The script lives in Orchestrator and the host copy can never
+  drift from it.
+- **Operates the same way as the other transitioned workflows.** It shares their
+  AD, host-selection, staging and email building blocks.
 
 ## Key risks / decisions
 
-- **This automation deletes files.** The `whatIf` gate is the primary control and
-  defaults to report-only; a live run requires `whatIf = no`. The build action logs a
-  loud warning on any live run.
-- **`forceEnable` is a read-only switch only.** It deletes read-only files but does
-  **not** delete hidden/system files (matching the original script). Full behavior and
-  the complete list of intentionally-preserved items are in the Design Document.
-- **The `vmware-vmsvc-SYSTEM.log` exclusion is hardcoded** in the script and
-  **case-sensitive** — it cannot be turned off from the form.
-- **Membership of the target AD group is the control surface.** Adding a server makes
-  it eligible; removing or disabling it makes it ineligible.
-- **Environment rebinding required on import** (PS host, AD domain, script path,
-  target folders) — see the Implementation Guide.
+| Item | Status |
+|---|---|
+| **Cache templates and folder deletion.** The six cache templates run with folders on but read-only deletion off. Under the new rule they clean files only and leave the cache's package folders | **Decision needed:** enable "Delete read-only items" for those templates, or accept file-only cleaning |
+| **Second hop.** The PowerShell host must reach `\\server\c$` on every target with delegated credentials | Prerequisite: Kerberos delegation (same as the other transitioned workflows) |
+| **Mail relay path.** Reports are sent **by Orchestrator**, so every Orchestrator appliance needs network access to the SMTP relay | Prerequisite: firewall / relay allow-list for the appliance addresses |
+| **Long runs.** A large cache over SMB is slow and runs as one PowerShell call | WinRM and plug-in timeouts must exceed the longest run; prove with a Report Only run first |
+| **Folder removed whole.** A folder older than the cutoff goes with everything in it, including newer files inside it | By design (the profile templates depend on it); documented in the User Guide |
 
 ## Status
 
-Code complete and validated in the lab against the shared `cvs_functions.ps1`
-(report-only, live-delete, per-server isolation, age boundary, and preservation
-rules all confirmed). Script changes **S-14 / S-15** and workflow-design decisions
-**P-14 … P-19** are recorded in the Change Register. Outstanding before production:
-environment rebinding (PS host, domain, script path, target folders), building the
-workflow with its custom form and the fixed `fileFilter` attribute, and exporting the
-`com.broadcom.pso…diskcleanup` package.
+Built and validated in the lab against real SMB admin shares: script behaviour, staging,
+host selection, the folder rule and the system-folder guard. Remaining before production:
+the workflow changes listed in the Implementation Guide §3, the production mail and
+host settings, and the cache-template decision above.

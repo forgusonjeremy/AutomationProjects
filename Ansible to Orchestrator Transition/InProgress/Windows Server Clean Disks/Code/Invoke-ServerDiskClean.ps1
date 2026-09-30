@@ -48,18 +48,33 @@
 
     WHAT IS DELETED - THE SELECTION RULES
     These are the rules of the original Remove-files function (as hardened by change S-15),
-    carried over unchanged so the eight production templates behave exactly as before.
-    For each folder target on each server:
+    with one deliberate change to how folders are chosen (S-35). For each folder target on
+    each server:
 
-      1. Every item under the target is enumerated recursively (Get-ChildItem -Recurse),
+      1. Every FILE under the target is enumerated recursively (Get-ChildItem -Recurse),
          matching -FilterOn. Hidden and system items are NOT enumerated (no -Force).
-         With -FolderIncluded 'no', only files are enumerated.
-      2. An item is a candidate when its LastWriteTime is older than the cutoff
+      2. With -FolderIncluded 'yes', every FOLDER under the target is enumerated as well,
+         WHATEVER ITS NAME -- -FilterOn applies to files only (S-35). A folder is removed
+         whole, with everything in it.
+      3. An item is a candidate when its LastWriteTime is older than the cutoff
          (now minus -OlderThanDays days) AND its name is not exactly
          'vmware-vmsvc-SYSTEM.log'.
-      3. Each candidate is removed with Remove-Item -Recurse, adding -Force only when
+      4. Each candidate is removed with Remove-Item -Recurse, adding -Force only when
          -ForceEnable is 'yes'. One failure is logged and the rest continue.
-      4. The target folder itself is never a candidate: it is emptied, not removed.
+      5. The target folder itself is never a candidate: it is emptied, not removed.
+
+    DELETING FOLDERS MEANS DELETING EVERYTHING IN THEM -- SO IT MUST BE ASKED FOR IN FULL
+    Because a folder goes with all of its contents, folders are deleted ONLY when
+    -FolderIncluded 'yes' comes together with:
+        -FilterOn     '*' or '*.*'   (a filter that matches every file), AND
+        -ForceEnable  'yes'          (read-only contents are deleted too).
+    With any other combination, FOLDER DELETION IS DECLINED -- no folder is touched -- but
+    the rest of the request still runs: files matching -FilterOn are cleaned exactly as if
+    -FolderIncluded were 'no' (S-35). A WARN line says why, and PSO_RESULT carries the
+    reason in 'foldersDeclined' so Orchestrator puts it in its log and the report.
+
+    The guard never goes the other way: a narrow filter or protected read-only files are
+    never overridden by a folder deletion that would remove them anyway.
 
     WHAT IS PRESERVED - NEVER DELETED
       - vmware-vmsvc-SYSTEM.log (exact, case-sensitive name) - unless it sits inside a
@@ -88,16 +103,20 @@
     This is the positive form of the Ansible var_NumberOfDays (-1 there is 1 here).
 
 .PARAMETER FilterOn
-    Name filter for the enumeration. Leave it at '*.*' (Orchestrator fixes it there).
-    The filter applies to FOLDER names as well as file names, so a narrower filter such
-    as '*.log' would silently stop folders being removed even with -FolderIncluded 'yes'.
+    File-name filter, e.g. '*.tmp' or 'cache_*'. Default '*.*' (every file). It applies to
+    FILES only; folders are chosen by age alone when -FolderIncluded is 'yes'. Folders are
+    deleted only when it is '*' or '*.*' (see "DELETING FOLDERS" above).
 
 .PARAMETER FolderIncluded
-    'yes' (default) - folders are candidates as well as files. 'no' - files only.
+    'yes' - folders older than the cutoff are removed whole, as well as matching files --
+    PROVIDED -FilterOn is '*' or '*.*' AND -ForceEnable is 'yes'. Otherwise folder deletion
+    is declined (logged, reported in 'foldersDeclined') and only matching files are cleaned.
+    'no' (default) - files only; every folder is left in place.
 
 .PARAMETER ForceEnable
     'yes' - Remove-Item -Force, so read-only items are deleted too. 'no' (default) -
-    read-only items are left in place and each is logged as an error.
+    read-only items are left in place and each is logged as an error. Must be 'yes' for
+    -FolderIncluded 'yes' to delete folders.
 
 .PARAMETER ReportOnly
     THE SAFETY GATE. 'yes' (default) lists what WOULD be deleted and deletes nothing.
@@ -130,6 +149,9 @@
         olderThanDays       number    as received
         cutoff              string    the cutoff, yyyy-MM-dd HH:mm:ss (host local time)
         targets             string[]  the folder targets, as received
+        foldersDeclined     string    empty when folder deletion was not requested or was
+                                      performed; otherwise WHY it was declined (the files
+                                      were still cleaned)
         servers             object[]  one per server:
                                         name, status, matched, removed, failed, bytes,
                                         freeBefore, freeAfter, detail
@@ -170,9 +192,18 @@
       S-33  A folder target that does not exist on a server is a warning for that server
             (nothing to clean), and an ERROR only if it exists on NONE of the reachable
             servers - which almost always means a mistyped path.
-      S-33  Drive roots and core operating-system folders are refused as targets before
-            anything is touched.
+      S-36  Drive roots, and any folder that is or is INSIDE a protected OS tree (\Windows,
+            \Program Files, \Program Files (x86), \ProgramData, \Boot, \Recovery, \System
+            Volume Information), are refused before anything is touched -- except the
+            allow-listed caches \Windows\ccmcache, \Windows\Temp and
+            \Windows\SoftwareDistribution\Download. (Was: exact-match on a few folders only.)
       S-33  The number of individually named items is capped (-MaxItemsListed).
+      S-35  -FilterOn applies to FILES only; with -FolderIncluded 'yes' folders are chosen
+            by age alone, whatever their name (the original filtered folder names too, so
+            a narrow filter silently kept every folder). Folders are deleted only when
+            -FilterOn is '*' or '*.*' AND -ForceEnable is 'yes'; otherwise folder deletion
+            is DECLINED (WARN + foldersDeclined) and matching files are still cleaned.
+            -FolderIncluded now defaults to 'no' (Orchestrator always passes it).
 
     TIMEOUTS
     The whole run is ONE synchronous PowerShell invocation. Deleting a large cache over SMB
@@ -195,7 +226,7 @@ param(
     [string]$FilterOn = '*.*',
 
     [ValidateSet('yes', 'no')]
-    [string]$FolderIncluded = 'yes',
+    [string]$FolderIncluded = 'no',
 
     [ValidateSet('yes', 'no')]
     [string]$ForceEnable = 'no',
@@ -276,12 +307,28 @@ function Test-FolderTarget {
         Returns $null when the path is an acceptable folder target, or a sentence saying
         why it is not.
 
-        This is a guard against catastrophe, not a policy engine. It refuses only what no
-        disk-clean template should ever point at: a drive root, and the folders an
-        operating system cannot survive losing the contents of. c:\users is deliberately
-        NOT refused - two production templates clean it.
+        This is a guard against catastrophe, not a policy engine (S-36). It refuses:
+          - a drive root;
+          - any folder that IS, or is INSIDE, a protected operating-system tree
+            ($ProtectedTrees) -- deleting inside System32, Program Files or ProgramData
+            can leave a server unbootable or break installed software -- EXCEPT
+          - the known-safe cache folders in $AllowedInsideProtected, and anything inside
+            them (the SCCM cache, Windows temp, the Windows Update download cache).
+        c:\users is deliberately NOT refused - two production templates clean it.
+
+        To allow another folder inside a protected tree, add it to $AllowedInsideProtected
+        here AND to the same list in the workflow's 'Create Script Parameters' task, which
+        applies identical rules before the host is ever contacted.
     #>
     param([string]$Path)
+
+    $ProtectedTrees = @(
+        '\Windows', '\Program Files', '\Program Files (x86)', '\ProgramData',
+        '\Boot', '\Recovery', '\System Volume Information'
+    )
+    $AllowedInsideProtected = @(
+        '\Windows\ccmcache', '\Windows\Temp', '\Windows\SoftwareDistribution\Download'
+    )
 
     if ($Path -notmatch '^[A-Za-z]:\\') {
         return "must be an absolute local path with a drive letter, as seen on the server (e.g. c:\Windows\ccmcache)"
@@ -299,13 +346,21 @@ function Test-FolderTarget {
         return "is the root of a drive"
     }
 
-    $refused = @(
-        '\Windows', '\Windows\System32', '\Windows\SysWOW64', '\Windows\WinSxS',
-        '\Program Files', '\Program Files (x86)', '\ProgramData',
-        '\Boot', '\Recovery', '\System Volume Information'
-    )
-    foreach ($r in $refused) {
-        if ($rest -ieq $r) { return "is a core operating-system folder ($($Path.Substring(0,2))$r)" }
+    # "Is, or is inside": equal to the entry, or starting with the entry plus '\'. The '\'
+    # matters -- '\Windows' must not also catch a sibling such as '\WindowsApps-Old'.
+    function Test-IsOrInside([string]$Candidate, [string]$Tree) {
+        return ($Candidate -ieq $Tree) -or $Candidate.StartsWith($Tree + '\', [System.StringComparison]::OrdinalIgnoreCase)
+    }
+
+    foreach ($ok in $AllowedInsideProtected) {
+        if (Test-IsOrInside $rest $ok) { return $null }
+    }
+    foreach ($tree in $ProtectedTrees) {
+        if (Test-IsOrInside $rest $tree) {
+            $drive = $Path.Substring(0, 2)
+            return ("is inside the protected operating-system folder $drive$tree. The only folders allowed there are " +
+                    (($AllowedInsideProtected | ForEach-Object { "$drive$_" }) -join ', ') + " (and anything inside them)")
+        }
     }
     return $null
 }
@@ -320,6 +375,40 @@ function ConvertTo-AdminSharePath {
 
     $drive = $LocalPath.Substring(0, 1).ToLower()
     return ('\\{0}\{1}${2}' -f $Server, $drive, $LocalPath.Substring(2))
+}
+
+function Test-ShareAccess {
+    <#
+        Returns $null if the share root can be LISTED by the account this script runs as,
+        or the reason it cannot, as a sentence.
+
+        Listing (not just resolving) is the real test: it is the first thing the clean does,
+        and it exercises the SMB session, the share and the account's rights in one step.
+
+        When the reason is "access denied" but the same account can browse the share in an
+        interactive logon on this host, the cause is almost always the SECOND HOP: a remote
+        (WinRM) session has no credential to pass on to the target unless Kerberos
+        delegation or CredSSP is configured for the PowerShell host. The message says so,
+        because that is the one case where "it works when I log on" is true and irrelevant.
+    #>
+    param([string]$Share)
+
+    try {
+        $entries = [System.IO.Directory]::EnumerateFileSystemEntries($Share).GetEnumerator()
+        $null = $entries.MoveNext()
+        return $null
+    }
+    catch {
+        # PowerShell wraps .NET exceptions in a MethodInvocationException; the useful text
+        # is on the inner one.
+        $ex = $_.Exception
+        while ($ex.InnerException) { $ex = $ex.InnerException }
+        $reason = $ex.Message.Trim()
+        if ($ex -is [System.UnauthorizedAccessException] -or $reason -match 'denied|logon failure|user name or password') {
+            $reason += " (If this account can browse the share when logged on to the PowerShell host interactively, the remote session cannot pass its credential on -- the 'second hop'. Check Kerberos delegation / CredSSP for the PowerShell host; see Script-Staging-Design.md section 6.3.)"
+        }
+        return $reason
+    }
 }
 
 function Get-ShareFreeSpace {
@@ -385,18 +474,30 @@ function Invoke-TargetClean {
     # (S-33) - previously one such folder abandoned the whole target.
     $null = Get-Item -LiteralPath $UncPath -ErrorAction Stop
 
-    $gciParams = @{
-        LiteralPath   = $UncPath
-        Recurse       = $true
-        Filter        = $FilterOn
-        ErrorAction   = 'SilentlyContinue'
-        ErrorVariable = 'enumErrors'
-    }
-    if ($FolderIncluded -ne 'yes') { $gciParams['File'] = $true }
-
+    # FILES are matched by -FilterOn. FOLDERS (only with -FolderIncluded 'yes') are matched
+    # by age alone, whatever their name (S-35) -- they are enumerated separately, with no
+    # filter, so a folder called '2b54ffb5.1' is found even though it matches no file filter.
+    # Folders come first so a folder is removed before its contents are visited one by one;
+    # contents already removed with their folder are skipped by the Test-Path check below.
     $enumErrors = @()
-    $candidates = @(Get-ChildItem @gciParams |
+    $dirErrors  = @()
+    $folders = @()
+    if ($FolderIncluded -eq 'yes') {
+        $folders = @(Get-ChildItem -LiteralPath $UncPath -Recurse -Directory `
+                        -ErrorAction SilentlyContinue -ErrorVariable dirErrors |
+            Where-Object { $_.LastWriteTime -lt $Cutoff })
+    }
+    $files = @(Get-ChildItem -LiteralPath $UncPath -Recurse -File -Filter $FilterOn `
+                  -ErrorAction SilentlyContinue -ErrorVariable enumErrors |
         Where-Object { $_.LastWriteTime -lt $Cutoff -and $_.Name -cne $ProtectedFileName })
+    $candidates = @($folders) + @($files)
+
+    # One unreadable sub-folder is reported by both enumerations; count it once.
+    $seenErr = @{}
+    $enumErrors = @(@($dirErrors) + @($enumErrors) | Where-Object {
+        $k = [string]$_.TargetObject + '|' + $_.Exception.Message
+        if ($seenErr.ContainsKey($k)) { $false } else { $seenErr[$k] = $true; $true }
+    })
 
     $listed = 0
     foreach ($err in $enumErrors) {
@@ -542,6 +643,7 @@ $summary = @{
     olderThanDays      = $OlderThanDays
     cutoff             = $cutoff.ToString('yyyy-MM-dd HH:mm:ss')
     targets            = $targets
+    foldersDeclined    = ''
     servers            = @()
 }
 
@@ -570,16 +672,34 @@ if ($badTargets -gt 0) {
     return
 }
 
-if ($FilterOn -ne '*.*') {
-    Write-Log "FilterOn is '$FilterOn', not '*.*'. The filter applies to folder names too, so folders that do not match it will not be removed even with FolderIncluded 'yes'." 'WARN'
+if ([string]::IsNullOrWhiteSpace($FilterOn)) {
+    Write-Log "FilterOn is empty. Give a file-name filter, e.g. '*.*' for every file or '*.tmp'. Nothing was done on any server." 'ERROR'
+    Write-Result $summary
+    return
+}
+
+# Deleting folders deletes EVERYTHING in them, so it happens only when the request says so
+# in full: a filter that matches every file AND permission to delete read-only items. With
+# anything less, FOLDER DELETION IS DECLINED -- no folder is touched -- and the rest of the
+# request still runs: files matching the filter are cleaned as if FolderIncluded were 'no'.
+# The guard only ever narrows what is deleted; it never widens it (S-35).
+$matchesAllFiles = @('*', '*.*') -contains $FilterOn.Trim()
+if ($FolderIncluded -eq 'yes' -and (-not $matchesAllFiles -or $ForceEnable -ne 'yes')) {
+    $why = @()
+    if (-not $matchesAllFiles)  { $why += "the file filter '$FilterOn' does not match every file (it must be '*' or '*.*')" }
+    if ($ForceEnable -ne 'yes') { $why += "'delete read-only items' is not enabled" }
+    $summary.foldersDeclined = "Folder deletion was requested but NOT performed: " + ($why -join ', and ') +
+        ". Deleting a folder deletes everything in it, so it needs both. Files matching '$FilterOn' are still processed; every folder is left in place."
+    Write-Log $summary.foldersDeclined 'WARN'
+    $FolderIncluded = 'no'
 }
 
 Write-Log '==============================================='
 Write-Log "Servers           : $($servers.Count)"
 Write-Log "Folder targets    : $($targets -join ' | ')"
 Write-Log "Older than        : $OlderThanDays day(s) - cutoff $($summary.cutoff)"
-Write-Log "Filter            : $FilterOn"
-Write-Log "Folders included  : $FolderIncluded"
+Write-Log "File filter       : $FilterOn  (files only; folders are chosen by age)"
+Write-Log "Folders deleted   : $FolderIncluded$(if ($summary.foldersDeclined) { '  (requested, but DECLINED - see the warning above)' })"
 Write-Log "Force (read-only) : $ForceEnable"
 Write-Log "Mode              : $(if ($isReportOnly) { 'REPORT ONLY - nothing will be deleted' } else { 'DELETE' })"
 Write-Log '==============================================='
@@ -608,15 +728,21 @@ foreach ($server in $servers) {
     # Each server is isolated: nothing that goes wrong on one can stop the next.
     try {
         # ---- Reachability: can the admin share be opened? ------------------------
-        # Test-Path would say only "false"; Get-Item says WHY (network path not found,
-        # access denied), which is what the person reading the report needs.
+        # Checked by LISTING the share root through .NET, which proves the account can
+        # actually read it and, when it cannot, says WHY in words a person can act on:
+        #     "The network path was not found."      name / DNS / SMB 445 / host down
+        #     "The network name cannot be found."    the admin share itself is missing
+        #     "Access to the path ... is denied."    rights, or the second hop (below)
+        #
+        # NOT Get-Item: in Windows PowerShell 5.1, Get-Item on a share ROOT with a trailing
+        # '\' (\\srv\c$\) fails with "Could not find item" even when the share is fully
+        # accessible -- which reported every server as unreachable. Test-Path would give
+        # only True/False, with no reason.
         $firstShare = '\\{0}\{1}$\' -f $server, $driveLetters[0]
-        try {
-            $null = Get-Item -LiteralPath $firstShare -ErrorAction Stop
-        }
-        catch {
+        $shareError = Test-ShareAccess -Share $firstShare
+        if ($null -ne $shareError) {
             $record.status = 'Unreachable'
-            $record.detail = "Admin share $firstShare could not be opened: $($_.Exception.Message)"
+            $record.detail = "Admin share $firstShare could not be opened: $shareError"
             Write-Log "$server : UNREACHABLE - $($record.detail)" 'ERROR'
             $summary.serversUnreachable++
             $summary.servers += [pscustomobject]$record

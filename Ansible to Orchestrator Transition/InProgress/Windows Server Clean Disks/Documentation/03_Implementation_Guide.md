@@ -1,188 +1,257 @@
-# Implementation Guide — Windows Server Clean Disks
+# Implementation Guide — Windows Server Disk Cleans
 
-This guide covers staging the PowerShell script, importing/building the Orchestrator
-content, re-pointing environment-specific values (PS host, domain, script path, target
-folders), and configuring the custom form. Steps assume VCF Operations Orchestrator 9
+This guide covers preparing the environment, importing the Orchestrator content, loading
+the script, pointing the workflow at your PowerShell host and mail relay, and scheduling
+the production templates. Steps assume VCF Automation 9 / VCF Operations Orchestrator 9
 (Orchestrator Client HTML UI).
+
+What gets installed:
+
+| Object | Type | Module / folder |
+|---|---|---|
+| `Windows Server Disk Cleans` | Workflow | — |
+| `findAdHostForDn` | Action (shared) | `com.broadcom.pso.vcf.activedirectory` |
+| `resolveAdGroup` | Action (shared) | `com.broadcom.pso.vcf.activedirectory` |
+| `getADComputersGroupDirectMembers` | Action (shared) | `com.broadcom.pso.vcf.activedirectory` |
+| `selectPowerShellHost` | Action (shared) | `com.broadcom.pso.powershell` |
+| `stageScriptOnHost` | Action (shared) | `com.broadcom.pso.powershell` |
+| `invokeStagedScript` | Action (shared) | `com.broadcom.pso.powershell` |
+| `Invoke-ServerDiskClean.ps1` | Resource Element | — |
+| *Send notification (TLSv1.2)* | Workflow (OOTB, already present) | Library > Mail |
+
+The script is **not** installed on the PowerShell host by hand. The workflow copies it
+there on the first run and re-copies it only when the Resource Element changes.
 
 ---
 
 ## 1. Prerequisites
 
-Complete these before importing:
+- [ ] **PowerShell host(s) added to Orchestrator.** Windows Server reachable over
+      WinRM/HTTPS (5986) with Kerberos, added with *Add a PowerShell host*. See *How to
+      Build a PowerShell Host* (`_Shared/Documentation/PowerShell Host Build Guide`).
+- [ ] **Listener certificate is SHA-256.** A SHA-1-signed WinRM certificate is refused
+      and the only symptom is an empty result:
+      ```
+      curl -vk https://<pshost>:5986/wsman 2>&1 | grep 'signed using'
+      ```
+- [ ] **Kerberos constrained delegation** for the PowerShell host, so its remote session
+      can open `\\server\c$` on the targets (the second hop).
+- [ ] **Host account rights:** the account the PowerShell host object connects as is a
+      **local administrator on every target** (the admin share requires it).
+- [ ] **Network, PowerShell host → targets:** SMB, TCP 445.
+- [ ] **AD plug-in endpoint** registered for **every domain** whose groups will be
+      targeted. The endpoint is chosen from the group DN's `DC=` parts.
+- [ ] **Network, every Orchestrator appliance → SMTP relay** on the port the relay
+      listens on (25 today), DNS resolution of the relay name, and the appliance
+      addresses on the relay's allow-list. The PowerShell host's relay access **does not
+      cover** Orchestrator.
+- [ ] **If the relay uses TLS:** its certificate imported into Orchestrator (§7).
+- [ ] **WinRM timeout headroom** on the PowerShell host (§8).
 
-- [ ] **PowerShell host built and added to Orchestrator.** A Windows Server reachable
-      over WinRM/HTTPS (5986) with Kerberos, added under *Library → PowerShell → hosts*
-      (or the plug-in inventory). See the cross-project *How to Build a PowerShell
-      Host* reference, including its Kerberos and certificate notes.
-- [ ] **Kerberos constrained delegation** configured for the PS host so it can make the
-      second hop to AD and to each target server's `C$` admin share.
-- [ ] **ActiveDirectory module (RSAT)** installed on the PS host (the script resolves
-      the group with `Get-ADGroupMember` / `Get-ADComputer`).
-- [ ] **`cvs_functions.ps1` staged** on the PS host at the path you will pass as
-      `scriptPath` (default `C:\PSO\Scripts\cvs_functions.ps1`). Use the current version
-      containing changes **S-14 and S-15** (from `InProgress/_Shared/PowerShell/cvs_functions.ps1`).
-- [ ] **PS host service account permissions:** **local admin on each target server**
-      (this is what grants `\\server\C$` access *and* delete rights under
-      `c:\Windows\ccmcache`), plus read access to the AD group.
-- [ ] **Shared actions present** — `parseScriptOutput` and `handlePSFailure`, reused
-      from the Windows guest-ops logs module
-      (`broadcom.pso.vcf.vm.guestOps.files.windows.logs`, delivered with the Move
-      Windows Event Logs package). If that package is not installed, import it first or
-      include the shared actions in this package.
-
-> **Critical:** the `whatIf` safety gate lives **in the script (S-14/S-15)**. If the PS
-> host is running an older `cvs_functions.ps1`, `-WhatIf` is accepted but **ignored**,
-> and a "report-only" run will delete for real. Verify the staged script before use.
-
-Verify the staged script on the PS host:
-```powershell
-Test-Path 'C:\PSO\Scripts\cvs_functions.ps1'
-Select-String -Path 'C:\PSO\Scripts\cvs_functions.ps1' -SimpleMatch `
-  -Pattern 'Get-ListOfServers-Direct','[ReportOnly] WouldDelete','invalid WhatIf value','ReportOnly'
-# All should match (confirms S-14 and S-15 are present).
-```
+The ActiveDirectory (RSAT) module is **not** needed on the PowerShell host.
 
 ---
 
-## 2. Import / build the Orchestrator content
+## 2. Import the Orchestrator package
 
-1. In the **Orchestrator Client**, go to **Assets → Packages**, click **Import**, and
-   select the delivered `com.broadcom.pso…diskcleanup.package`.
-   *(If no package has been exported yet, create the action and workflow manually per
-   §3–§5 using `Code/buildCleanDisksInvocation.js` and
-   `Code/Clean-ServerDisks-ByADGroup_spec.js`.)*
-2. On the import dialog:
-   - Review the content list (the workflow, the `buildCleanDisksInvocation` action, and
-     any bundled shared actions).
-   - **Certificate:** accept/trust the signing certificate if prompted.
-   - Overwrite the server version only if you intend to replace an existing copy.
-3. Confirm the workflow **`Clean-ServerDisks-ByADGroup`** and the action
-   **`buildCleanDisksInvocation`** appear in the library.
-
-> If `parseScriptOutput` shows as missing after import, the logs module is not present
-> — import the Event Log package (or the shared actions) first, then re-open the
-> workflow.
+1. **Assets → Packages → Import**, and select
+   `com.broadcom.pso.servers.windows.serverDiskClean.package` (re-exported after §3).
+2. Trust the signing certificate if prompted.
+3. **Shared actions:** the actions in the table above are shared with other transitioned
+   workflows and may **already exist**. Do not create second copies under other names.
+   Overwrite an existing action only if this package carries a newer version.
+4. Confirm the workflow and actions appear in the library.
 
 ---
 
-## 3. Create the action (if building manually)
+## 3. Workflow changes to complete (as of 2026-09-30)
 
-1. **Library → Actions → New Action.**
-2. Module: **`broadcom.pso.vcf.vm.guestOps.files.windows.diskcleanup`**
-   Name: **`buildCleanDisksInvocation`**  Return type: **string**
-3. Add inputs (all used by the script content):
-   `scriptPath` (string), `groupDN` (string), `domainName` (string),
-   `folderTarget` (string), `fileFilter` (string), `olderThanDays` (number),
-   `folderIncluded` (boolean), `forceEnable` (boolean), `whatIf` (string).
-4. Paste the contents of `Code/buildCleanDisksInvocation.js` and save.
+The deployed workflow (`Code/serverDiskCleansWorkflow.yml`, exported 2026-09-30) is up to
+date except for the items below. Make them, test (§10), then re-export the package and
+the `.yml`.
+
+**3.1 Fix two output names.** In *Parse Results* the script sets `executionOutput` and
+`serversProcessed`, but the task's OUT bindings and the workflow outputs are named
+`executionOuput` and `ServersProcessed`, so both outputs are always empty. Rename the
+workflow outputs **and** the task's OUT binding names to `executionOutput` and
+`serversProcessed`.
+
+**3.2 Send one email, synchronously.** Replace the per-recipient loop (*Set Mail Loop
+Counter*, *More Emails to Send?*, *Select Email Address*, the asynchronous *Send
+notification (TLSv1.2)*, *Increase counter*, and the attributes `mailLoopCounter` /
+`emailAddress`) with:
+
+1. **Create Script Parameters:** add an OUT binding `mailToString` (string) to a new
+   attribute `mailToString`. The task already builds it: all recipients, comma-separated.
+2. **Send notification (TLSv1.2)** as a **Workflow element** (drag the workflow itself onto
+   the canvas, *not* "Start an asynchronous workflow"), bound:
+
+   | OOTB input | Bind to |
+   |---|---|
+   | `smtpHost`, `smtpPort`, `username`, `password`, `fromName`, `fromAddress`, `useStartTls` | the attributes of the same names |
+   | `toAddress` | attribute `mailToString` |
+   | `subject` | attribute `reportSubject` (subject stem plus the outcome) |
+   | `content` | attribute `reportHtml` |
+
+   **Exception handling:** bind the exception to a new string attribute `emailError`
+   (default empty), and route it to *Closing Summary*, **not** to an error end.
+3. **Closing Summary**, a new scriptable task with the code in `Code/task_ClosingSummary.js`.
+   IN: `executionSuccess`, `executionOutput`, `emailReport`, `emailError`, `adGroup`,
+   `reportOnly`, `stagedScript`. OUT: `executionSuccess`.
+4. **Wiring:** *Email Report?* true → Send notification → Closing Summary; false →
+   Closing Summary; Send notification exception → Closing Summary. Closing Summary →
+   one **End**.
+
+**3.3 Parse Results report text.** In the Report Only banner, replace `(whatIf = no)`
+with `(Report and Delete)` to match the form.
+
+**3.4 Request form.**
+
+| Field | Change |
+|---|---|
+| `targetPath` | Label: *Script directory on the PowerShell host (local path)*. Input description: *Local directory, e.g. C:\PSO\Scripts*. It is not a UNC path or a file name |
+| `olderThanDays` | Display type **Integer** (fractions are refused at run time) |
+| `fileFilter` | Label: *Delete files matching (wildcards supported)*. Help: *Applies to files only. Folders are deleted only with `*` or `*.*` and "Delete read-only items".* |
+| `folderIncluded` | Label: *Delete folders as well?*. Help: the folder rule, as above |
+| `distinguishedName`, `folderTarget`, `fileFilter`, `reportOnly`, `olderThanDays`, `targetPath` | Mark **required** |
+| Defaults | See §6 |
 
 ---
 
-## 4. Build the workflow
+## 4. Load the script into the Resource Element
 
-Workflow folder: **`Production > Servers > Windows > Disk Cleanup`**
-(lab/dev: under `Workflows > Customer > <Customer Name> > …`).
+1. **Assets → Resources**, and open (or import) the element bound to `scriptElement`.
+2. Load **`Code/Invoke-ServerDiskClean.ps1`**, the fully commented source. No stripped
+   build is needed: the script crosses WinRM only when it changes.
+3. The element's **name must be exactly `Invoke-ServerDiskClean.ps1`.** The name becomes the
+   file name on the host. A name that is not a plain `.ps1` file name is refused.
+4. Keep the file **ASCII-only** and saved as UTF-8.
 
-**Schema** (per `Code/Clean-ServerDisks-ByADGroup_spec.js`):
+> After **any** change to the script, re-import it. The next run logs
+> `stageScriptOnHost | ... does NOT match ... Overwriting it`, then `updated`.
 
-1. **Action** `buildCleanDisksInvocation` → OUT `invocationString` (attribute).
-   Exception path → **End - Failed: Bad Inputs**.
-2. **Workflow** `Library/PowerShell/Invoke a PowerShell script`
-   IN `host = psHost`, `script = invocationString`; OUT `output = psRawOutput`.
-   Exception path → scriptable task **`handlePSFailure`** → **End - Failed: PS Execution**.
-3. **Action** `parseScriptOutput`
-   IN `psOutput = psRawOutput`, `executionContext = groupDN + " @ " + domainName + " (whatIf=" + whatIf + ")"`;
-   OUT `parsedResult` (attribute, Properties).
-4. **Decision** `parsedResult.get("success") === true`
-   → true: **End - Completed Successfully**; false: **End - Completed with Errors**.
-5. End-state scriptable tasks: use the two blocks at the bottom of the spec file to set
-   `executionSuccess` / `executionOutput`.
+---
 
-**Attributes:**
+## 5. Re-point the workflow attributes (most important step)
 
-| Attribute | Type | Value |
+Open **Windows Server Disk Cleans → Edit → Variables** and set:
+
+| Attribute | Set to | Build-environment value |
 |---|---|---|
-| **`fileFilter`** | string | **`*.*`** (fixed — see §5) |
-| `invocationString` | string | (set by the build action) |
-| `psRawOutput` | PowerShell:PowerShellRemotePSObject | (set by the OOTB workflow) |
-| `parsedResult` | Properties | (set by `parseScriptOutput`) |
+| `psHosts` | **Your PowerShell host object(s)** | one host, id `0c675c7a-137b-40c3-af36-6f36223dfa59` |
+| `scriptElement` | The `Invoke-ServerDiskClean.ps1` element from §4 | id `5fc71d56-a5c4-4dd3-8489-72f91b38e845` |
+| `maxItemsListed` | Items named per folder per server in the log | `25` |
+| `smtpHost` | Your relay (blank = *Configure mail* default) | `mail.vcf.lab` |
+| `smtpPort` | Relay port (`0` = default) | `587` (lab) — production today is **25** |
+| `useStartTls` | Must match the relay port's security mode | `true` (lab) — production today is **false** |
+| `username`, `password` | Only if the relay requires SMTP AUTH | empty |
+| `fromName` | Display name, e.g. `Infrastructure Monitoring` | `no-reply-infmonitoring@vcf.lab` |
+| `fromAddress` | Sender address the relay accepts | `no-reply-infmonitoring@vcf.lab` |
 
-**Outputs:** `executionSuccess` (boolean), `executionOutput` (string).
-
----
-
-## 5. Set the fixed file filter (do not skip)
-
-Bind the build action's `fileFilter` input to the **workflow attribute** `fileFilter`
-= `*.*`, and **leave `fileFilter` off the custom form**.
-
-`-FilterOn` is applied to **directory names as well as files**. `*.*` matches every
-file *and* every folder, so `folderIncluded = yes` actually deletes folders. A
-restrictive filter such as `*.txt` matches no folders, so folders would be silently
-skipped. All eight production templates use `*.*`.
+List in `psHosts` only hosts whose account can reach **these** targets (local admin +
+delegation). The workflow picks the least busy of them and does not check domains.
 
 ---
 
-## 6. Set environment-specific input defaults
+## 6. Request form defaults
 
-These live on the **custom form** (workflow → **Version/Edit → Custom Form**) and/or as
-input defaults:
-
-| Field | Change to | Notes |
-|---|---|---|
-| `scriptPath` | Your staged path | Default `C:\PSO\Scripts\cvs_functions.ps1` |
-| `domainName` | **Your AD domain** | Default is the lab value `vcf.lab` — **must** be changed |
-| `groupDN` | (leave blank; operators/schedule supply it) | e.g. `CN=Security-Servers,OU=Servers,DC=vcf,DC=lab` |
-| `folderTarget` | Your target path(s) | Default `c:\Windows\ccmcache`; comma-separate multiple paths |
-| `olderThanDays` | `1` (cache) or `0` (profiles) | Positive: "delete items older than N days" |
-| `folderIncluded` | `true` | Allows folder deletion |
-| `forceEnable` | `false` (cache) / `true` (profiles) | Deletes read-only files when true |
-| `whatIf` | **`yes`** | Keep report-only as the default |
+| Field | Default |
+|---|---|
+| `folderTarget` | `c:\Windows\ccmcache` |
+| `fileFilter` | `*.*` |
+| `reportOnly` | `yes` (Report Only) |
+| `olderThanDays` | `1` |
+| `folderIncluded` | unchecked |
+| `forceEnable` | unchecked |
+| `emailReport` | checked |
+| `mailTo` | The team distribution list |
+| `mailSubject` | `VCF Orchestrator: Windows Server Disk Clean` |
+| `targetPath` | `C:\PSO\Scripts` |
 
 ### Production template values
 
-| Use case | `folderTarget` | `olderThanDays` | `folderIncluded` | `forceEnable` |
-|---|---|---|---|---|
-| **Cache cleanup** (6 templates) | `c:\Windows\ccmcache` | `1` | `true` | `false` |
-| **User-profile cleanup** (2 templates) | `c:\users` | `0` | `true` | `true` |
+| Template | `folderTarget` | `fileFilter` | `olderThanDays` | `folderIncluded` | `forceEnable` |
+|---|---|---|---|---|---|
+| Cache cleanup (6) | `c:\Windows\ccmcache` | `*.*` | `1` | checked | **decision** |
+| Profile cleanup (2) | `c:\users` | `*.*` | `0` | checked | checked |
 
-### Custom form notes
-- **`whatIf`** should be a **yes/no dropdown**, defaulting to **`yes` (Report Only)**, so
-  a live delete is a deliberate choice. The build action logs a loud `System.warn` when
-  `whatIf = no`.
-- **`olderThanDays`** is a positive number. Label it *"Delete items older than N days"*.
-  Negative values are rejected by the build action.
-- **`fileFilter` must not appear on the form** (see §5).
+> **Cache templates:** with `forceEnable` unchecked, folder deletion is declined and only
+> files are cleaned; the cache's package folders stay. Tick `forceEnable` to keep removing
+> them, as the Ansible templates effectively did.
 
 ---
 
-## 7. Validate the deployment
+## 7. Mail relay
 
-Run in order (full plan in `05_Validation_and_Testing_Plan.md`):
+1. **Configure mail** (*Library > Mail > Configuration*) once, or rely on the workflow's
+   SMTP attributes. Leave its username/password **empty** for an anonymous relay. Any
+   credentials stored there are used even when the workflow passes none.
+2. **Match the security mode.** Plain SMTP on 25 → `useStartTls = false`. STARTTLS on 587 →
+   the relay port must be set to **STARTTLS**, not "SSL/TLS". A mismatch does not fail;
+   **the send hangs indefinitely**.
+3. **Pre-flight** from a machine on the same network path:
+   ```
+   telnet <relay> <port>
+   ```
+   A `220 ... ESMTP` banner is good, and `EHLO test` should list `250-STARTTLS` if TLS is
+   used. A blank screen means implicit TLS, which will hang.
+4. **If TLS is used:** import the relay's certificate with *Library > Configuration > SSL
+   Trust Manager > Import a certificate from URL*, and confirm TLS 1.2 is enabled on the
+   relay (the OOTB workflow pins it).
 
-1. **Seed test data** on non-production servers:
-   `lab\New-DiskCleanTestData.ps1 -ADGroup '<test group>' -DomainName <domain>`
-   (add `-GrantModifyTo '<svc account>'` if the clean runs as a non-admin domain account).
-2. **Report-only run** (`whatIf = yes`) against the test group. Expect
-   `ReportOnly=True` and `[ReportOnly] WouldDelete: …` lines, and **nothing deleted**.
-3. **Live run** (`whatIf = no`) against the test group. Confirm aged items are deleted
-   and the preserved items remain (see §5 of the Design Document).
-4. **Negative checks:** a powered-off/unreachable member should log an `Error:` and the
-   run should end *Completed with Errors* while other servers still process.
+Full detail: `_Shared/Documentation/Email-Notification-Standard.md`.
 
 ---
 
-## 8. Rollback
+## 8. Size the WinRM timeout
 
-- The workflow performs no persistent change in Orchestrator; deleting the workflow and
-  the `buildCleanDisksInvocation` action removes the content. Do **not** delete the
-  shared `parseScriptOutput` / `handlePSFailure` actions — other packages use them.
-- To revert the PowerShell behaviour, restore the previously released
-  `cvs_functions.ps1` on the PS host (the pre-S-14 baseline is preserved in source
-  control — see the Change Register). **Note this removes the `whatIf` safety gate** and
-  reintroduces unfiltered targeting and silent failures.
-- **Deleted files are not recoverable** by this automation. There is no undo — restore
-  from backup/VSS if required. This is why `whatIf` defaults to report-only.
-- Removing a server from the target AD group (or disabling its account) makes it
-  ineligible on the next run without any workflow change.
+The clean is one synchronous PowerShell call; deleting over SMB costs time per item. On
+the PowerShell host:
+
+```powershell
+Get-Item WSMan:\localhost\MaxTimeoutms          # must exceed the longest run
+Set-Item WSMan:\localhost\MaxTimeoutms 3600000  # example: 60 minutes
+```
+
+The PowerShell plug-in's operation timeout must also exceed it. Time a Report Only run
+against the largest group first; the live run takes at least as long.
+
+---
+
+## 9. Configure the schedules
+
+After §10 passes, schedule one run per production template (**Schedule** on the workflow)
+with the §6 values, `reportOnly = no`, `emailReport = true`, and the template's group DN.
+Allow for the run time measured in §8.
+
+---
+
+## 10. Validate the deployment
+
+Run in this order; each step proves something the previous one cannot. Full test cases:
+`05_Validation_and_Testing_Plan.md`.
+
+1. **Report Only against a lab group** seeded with `lab\New-DiskCleanTestData.ps1`. Expect:
+   the resolved servers listed, `stageScriptOnHost ... first copy` (then `unchanged` on
+   the next run), a would-delete list per server, the email received, and
+   `executionSuccess = true`.
+2. **Report Only against the real group.** Check the would-delete counts are plausible, and
+   look for any `Unreachable` servers. "Access ... denied" points to rights or delegation.
+3. **Report and Delete against a group holding one test server.** Confirm the files are
+   gone, the preserved items are still there, and the email shows the space freed.
+4. **Mail failure path:** point `smtpHost` at a non-existent host for one Report Only run.
+   It should complete with `executionSuccess = false` and "report NOT emailed".
+5. Only then schedule the production templates.
+
+---
+
+## 11. Rollback
+
+- Disabling or deleting a schedule stops that template immediately. The workflow keeps no
+  state in Orchestrator.
+- Removing a computer account from the group (or disabling it) excludes that server from
+  the next run.
+- To return to a previous script version, re-import it into the Resource Element. The next
+  run overwrites the host copy.
+- Deleted files are not recoverable by the workflow. Rely on Report Only runs before any
+  new target or template goes live.

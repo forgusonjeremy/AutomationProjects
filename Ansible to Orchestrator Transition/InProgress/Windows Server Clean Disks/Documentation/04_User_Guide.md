@@ -1,187 +1,172 @@
-# User Guide — Windows Server Clean Disks
+# User Guide — Windows Server Disk Cleans
 
 ## 1. What this workflow does
 
-It frees disk space on the Windows servers in a chosen Active Directory security group
-by deleting **aged files (and optionally folders)** from one or more target
-directories — by default the SCCM download cache `c:\Windows\ccmcache`.
+**Windows Server Disk Cleans** frees disk space on the Windows servers in an Active
+Directory group. For every server that is a **direct, enabled** member of the group, it
+looks in the folders you give it and finds files (and optionally folders) that are older
+than the age you set. It then either **reports** what it would delete or **deletes** it,
+and emails you a per-server report.
 
-It runs in one of two modes:
+It works the same way for physical servers and VMs. All the work is done from a
+PowerShell host over each server's admin share (`\\server\c$`); nothing is installed on
+the servers.
 
-- **Report Only** (`whatIf = yes`) — the **default and safe** mode. Lists everything
-  that *would* be deleted and deletes nothing.
-- **Delete** (`whatIf = no`) — actually deletes.
-
-> **This automation deletes files and there is no undo.** Always do a Report Only run
-> first and check the list before running in Delete mode.
+**Report Only is the default.** Nothing is deleted unless you choose **Report and Delete**.
 
 ---
 
 ## 2. What gets deleted
 
-On a **Delete** run, an item is removed only when **all** of the following are true:
+An item is deleted (or, in Report Only, listed) when **all** of these are true:
 
-1. **Its server is in the target group, directly.** The computer account is a **direct
-   member** of the group you specify. Servers only in a **nested sub-group are not
-   included**.
-2. **Its account is enabled and is a computer.** Disabled accounts and non-computer
-   objects (users, groups) are ignored and logged.
-3. **It is older than your age threshold** — its last-modified time is older than
-   `olderThanDays` days ago.
-4. **It is not on the preserved list** (see §3).
+- it is under one of the folders you listed, at any depth;
+- it is a **file whose name matches your filter**, or a **folder** (see below);
+- it was last written **more than N days ago** (your "older than" value);
+- it is not `vmware-vmsvc-SYSTEM.log`.
 
-Each target path `c:\...` is reached over the server's admin share as
-`\\<server>\c$\...`.
+Read-only files are deleted only if you tick **Delete read-only items**. Without it they
+stay, and each is listed as an error in the report.
+
+### Deleting folders as well
+
+Ticking **Delete folders as well** removes whole sub-folders older than the cutoff,
+**whatever their names**, together with everything inside them. Because that removes
+everything in the folder, it only happens when you also:
+
+- set the filter to `*.*` (or `*`), **and**
+- tick **Delete read-only items**.
+
+If either is missing, **the folders are left alone but the run still goes ahead:** files
+matching your filter are cleaned as normal. The run log and the email show a red notice
+saying folder deletion was declined and why.
 
 ---
 
 ## 3. What is NOT deleted (important)
 
-The clean deliberately preserves the following. If you expect something to be removed
-and it survives, check this list first.
+| Never deleted | Why |
+|---|---|
+| The folders you listed themselves | They are emptied, not removed |
+| `vmware-vmsvc-SYSTEM.log` | The live VMware Tools log (exact name) |
+| Anything newer than the cutoff | The age rule |
+| Hidden or system files sitting directly in a listed folder | Not picked up by the search |
+| Read-only files, unless **Delete read-only items** | Protected unless you say otherwise |
+| Folders, unless the folder rule above is met | Protected unless fully requested |
+| **Everything**, in a Report Only run | Report Only changes nothing |
 
-| Not deleted | Why | Can you change it? |
-|---|---|---|
-| **`vmware-vmsvc-SYSTEM.log`** | Built into the script as a protected file name. **Case-sensitive** — only this exact spelling is protected. | **No** — hardcoded |
-| **Anything newer than your threshold** | Only items older than `olderThanDays` are removed. | Yes — `olderThanDays` |
-| **Hidden and system files** | The clean does not list hidden files at all, so they are never removed — even with *Delete read-only files* on. (A hidden file *inside a folder that gets deleted* still goes.) | **No** — matches the original automation |
-| **The target folder itself** | The workflow **empties** the target (e.g. `c:\Windows\ccmcache`); it never deletes the target folder. | **No** — by design |
-| **Read-only files** (when *Delete read-only files* is off) | A read-only file cannot be removed without force. | Yes — `forceEnable` |
-| **All folders** (when *Delete folders* is off) | Only files are considered. | Yes — `folderIncluded` |
-| **Everything** (in Report Only mode) | Nothing is deleted in a preview run. | Yes — `whatIf` |
+> **Watch out: a folder goes with everything in it.** A folder's own date changes only
+> when something directly inside it is added, removed or renamed. So an old folder can
+> contain newer files, and when the folder is removed, they go too, including any
+> `vmware-vmsvc-SYSTEM.log` inside it. That is what the profile clean-up relies on to
+> remove whole profiles.
 
-**Note on "Delete read-only files" (`forceEnable`):** it controls **read-only files
-only**. It does **not** make the clean delete hidden or system files.
+**Folders you cannot target.** Drive roots, and anything in or under `\Windows`,
+`\Program Files`, `\Program Files (x86)`, `\ProgramData`, `\Boot`, `\Recovery` or
+`\System Volume Information`, are refused before anything runs. The exceptions are
+`\Windows\ccmcache`, `\Windows\Temp` and `\Windows\SoftwareDistribution\Download`.
+`c:\users` is allowed.
 
 ---
 
 ## 4. Running the workflow
 
-1. In the **Orchestrator Client**, open **`Clean-ServerDisks-ByADGroup`** and click
-   **Run**.
-2. Fill in the form (fields below).
-3. Leave **Report Only?** set to **Yes** for a safe preview.
-4. Click **Run** and watch the **Logs** tab.
-5. Review the `[ReportOnly] WouldDelete:` lines. When satisfied, re-run with **Report
-   Only? = No** to delete.
-
 ### Form fields
 
 | Field | What to enter |
 |---|---|
-| **psHost** | The PowerShell host that runs the clean (usually leave default) |
-| **scriptPath** | Path to `cvs_functions.ps1` on the PowerShell host (usually leave default) |
-| **groupDN** | The target AD group. A full distinguished name is best, e.g. `CN=Security-Servers,OU=Servers,DC=vcf,DC=lab`. A plain group name also works |
-| **domainName** | Your AD domain (e.g. `vcf.lab`) |
-| **folderTarget** | Folder(s) to clean, e.g. `c:\Windows\ccmcache`. Separate multiple paths with commas |
-| **olderThanDays** | Delete items **older than this many days**. `4` = 4 days old or older; `1` = older than a day; `0` = everything up to now. Must be 0 or greater |
-| **folderIncluded** | Tick to delete **folders** as well as files |
-| **forceEnable** | Tick to delete **read-only** files (has no effect on hidden files) |
-| **whatIf (Report Only?)** | **Yes** = preview only (default). **No** = actually delete |
+| **AD Group Distinguished Name** | The group's full DN, e.g. `CN=Monitoring-Servers,OU=Servers,DC=vcf,DC=lab` |
+| **Folder where files to be deleted are located** | One local path per row, as seen on each server, e.g. `c:\Windows\ccmcache` |
+| **Delete files matching** | `*.*` for every file, or a pattern such as `*.tmp` or `cache_*` |
+| **Report Only or Report and Delete?** | **Report Only** to preview; **Report and Delete** to delete |
+| **Delete items older than N days** | Whole number. `1` = older than one day, `0` = everything up to now |
+| **Delete read-only items?** | Tick to include read-only files |
+| **Delete folders as well?** | Tick to remove whole old sub-folders. Needs `*.*` and read-only ticked |
+| **Email report?** | Tick to receive the report |
+| **Email addresses** | One address per row |
+| **Email subject** | Subject stem; the outcome is added automatically |
+| **Script directory on the PowerShell host** | Normally leave the default, `C:\PSO\Scripts` |
 
-### Understanding `olderThanDays`
+### Common scenarios
 
-Read it as **"delete items older than N days."**
+| Goal | Folder | Filter | Days | Read-only | Folders |
+|---|---|---|---|---|---|
+| SCCM cache, everything older than a day | `c:\Windows\ccmcache` | `*.*` | `1` | ✓ | ✓ |
+| SCCM cache, files only | `c:\Windows\ccmcache` | `*.*` | `1` | | |
+| Only old `.tmp` files | e.g. `c:\Windows\Temp` | `*.tmp` | `7` | | |
+| User profiles, everything | `c:\users` | `*.*` | `0` | ✓ | ✓ |
 
-| Value | Deletes | Today's files? |
-|---|---|---|
-| `4` | items 4 days old or older | kept |
-| `1` | items older than a day | kept |
-| `0` | everything up to right now | **deleted** |
-
----
-
-## 5. Common scenarios
-
-**Cache cleanup (the six standard templates)**
-```
-folderTarget: c:\Windows\ccmcache   olderThanDays: 1
-folderIncluded: yes   forceEnable: no   whatIf: yes → then no
-```
-
-**User-profile cleanup (the two profile templates)**
-```
-folderTarget: c:\users   olderThanDays: 0
-folderIncluded: yes   forceEnable: yes   whatIf: yes → then no
-```
-> The profile templates are far more aggressive: `olderThanDays = 0` removes everything
-> up to now, and `forceEnable = yes` also removes read-only files. **Always** preview
-> first.
+**Always run Report Only first** against a new group or folder, and read the list before
+switching to Report and Delete.
 
 ---
 
-## 6. Reading the results
+## 5. Reading the results
 
-Key transcript lines:
+### The email
 
-| Line | Meaning |
+- **Top line:** the summary, e.g. *"REPORT ONLY -- 1,204 item(s), about 3.41 GB, would be
+  deleted across 48 of 50 server(s)"*.
+- **Amber line (Report Only):** nothing was deleted.
+- **Red line:** folder deletion was requested but declined, and why.
+- **Settings:** group, folders, cutoff date, options, and the script that ran.
+- **Per-server table:** status, items matched, deleted, failed, space freed (or estimated),
+  free space before and after, and detail. Servers with problems are listed first.
+
+### Per-server status
+
+| Status | Meaning |
 |---|---|
-| `Info: skipping disabled computer object <name>` | A disabled account was excluded |
-| `Info: group '<dn>' resolved to N enabled, direct computer member(s).` | How many servers will be processed |
-| `Info: clean-ServerDisk - N server(s), … ReportOnly=True/False …` | Run summary; confirms preview vs live |
-| `Info: [ReportOnly] WouldDelete: <path>` | Preview — this item *would* be deleted |
-| `Info: [<server>] deleted N item(s); M failure(s)` | Live run per-server result |
-| `Error: [<server>] failed to delete '<path>': …` | An item could not be removed |
-| `Error: [<server>] failed cleaning …` | The server or path was unreachable |
+| `Cleaned` | Everything matched was deleted |
+| `CleanedWithErrors` | Some items could not be deleted, or part of a folder could not be read. See Detail |
+| `ReportOnly` | Report Only run; nothing deleted |
+| `Unreachable` | The server's admin share could not be opened. Detail gives the reason |
+| `Failed` | Unexpected error on that server; the others were still processed |
 
-Overall run outcome:
+### Overall outcome
 
-- **Completed Successfully** — no errors; all eligible servers were processed.
-- **Completed with Errors** — at least one server or item had a problem (unreachable
-  server, undeletable item). Other servers were still processed. Open the logs to see
-  which and why.
-- **Failed** — the run could not proceed at all (bad inputs, or the AD module/group
-  could not be resolved so *every* server would have failed).
-
----
-
-## 7. Known limitations
-
-- **No undo.** Deleted files are not recoverable by this automation; restore from
-  backup/VSS if needed.
-- **No per-server structured report or email.** The record of a run is the Orchestrator
-  transcript and run history.
-- **Hidden/system files are never removed** when loose in a target folder (§3).
-- **The `vmware-vmsvc-SYSTEM.log` exclusion cannot be disabled** and is case-sensitive.
-- **The target folder itself is never deleted** — only emptied.
-- **Servers are processed one after another**, not in parallel.
+- `executionSuccess = true`: every server processed cleanly and, if requested, the email
+  was sent.
+- `executionSuccess = false`, run completed: something needs attention (an unreachable
+  server, undeletable items, a folder missing on every server, or the email not sent).
+  The work that could be done was done.
+- **Run failed:** it stopped before or during the script (bad input, empty group, no
+  PowerShell host available, the script could not be staged or did not finish). Anything
+  that failed before the script ran touched nothing.
 
 ---
 
-## 8. Testing with lab data
+## 6. Testing with lab data
 
-To exercise the workflow safely, seed test data on non-production servers with
-`lab/New-DiskCleanTestData.ps1`:
+`lab\New-DiskCleanTestData.ps1` creates aged files, nested folders and the "must survive"
+items (a `vmware-vmsvc-SYSTEM.log`, a read-only file, a hidden file and files newer than
+the cutoff) in the target folders of test servers:
 
 ```powershell
-# Seed the default ccmcache target on the direct members of a test group
-.\New-DiskCleanTestData.ps1 -ADGroup 'Security-Servers' -DomainName vcf.lab
+# Seed the default ccmcache target on every direct member of a test group
+.\New-DiskCleanTestData.ps1 -ADGroup 'Monitoring-Servers' -DomainName vcf.lab
 
-# Or explicit servers; add today-dated files to test the age boundary
-.\New-DiskCleanTestData.ps1 -ComputerName winsrv01,winsrv02 -CurrentFiles 3
-
-# If the clean runs as a NON-admin domain account, grant it delete rights
-.\New-DiskCleanTestData.ps1 -ADGroup 'Security-Servers' -GrantModifyTo 'VCF\svc_diskclean'
+# Reproduce the profile clean-up safely, in a throwaway sub-folder of c:\users
+.\New-DiskCleanTestData.ps1 -ComputerName winsrv01 -Scenario profiles
 ```
 
-It creates aged files in the target root and subfolders, today-dated `_current_*.txt`
-files (to demonstrate the age boundary), and three artifacts that **should survive**:
-`vmware-vmsvc-SYSTEM.log` (name exclusion), `_readonly_aged.txt` (survives unless
-`forceEnable` is on), and `_hidden_aged.txt` (always survives).
+Run Report Only, compare the list with what was seeded, then Report and Delete and check
+the survivors are still there.
 
 ---
 
-## 9. Troubleshooting
+## 7. Troubleshooting
 
-| Symptom | Likely cause / fix |
+| Symptom | Cause and fix |
 |---|---|
-| **Report Only still deleted files** | The PS host is running an **old `cvs_functions.ps1`** without the `whatIf` gate (S-14/S-15). The old script accepts `-WhatIf` but ignores it. Re-stage the current script — see Implementation Guide §1 |
-| **Folders were not deleted** | The file filter must match folder names. `fileFilter` is fixed at `*.*` for this reason; if it was changed to something like `*.txt`, no folders will match. Also confirm `folderIncluded` is ticked |
-| **Today's files were not deleted** | Expected with `olderThanDays = 1` (keeps anything less than a day old). Use `olderThanDays = 0` to include today |
-| **A read-only file was not deleted** | Expected when `forceEnable` is off. Tick *Delete read-only files* |
-| **A hidden file was not deleted** | Expected — hidden files are never listed by the clean (§3). Not configurable |
-| **`vmware-vmsvc-SYSTEM.log` was not deleted** | Expected — protected file name (§3) |
-| **`Error: … failed to delete …: You do not have sufficient access rights`** | Either the file is read-only and `forceEnable` is off, or the service account lacks delete rights on the target. It must be local admin on the server |
-| **`ActiveDirectory module not available`** / group won't resolve | RSAT AD module missing on the PS host, or the group DN/domain is wrong |
-| **Run ends *Completed with Errors*** | One or more servers/items failed; the rest still processed. Check the `Error:` lines |
-| **Nothing was found to delete** | The group resolved to zero enabled direct members, the folder is empty, or nothing is older than `olderThanDays`. Check the `resolved to N …` line |
+| *"no servers were resolved"* | The group has no enabled computer accounts as **direct** members. If the log names nested groups, the servers are in those; add them directly or run against each nested group |
+| Server `Unreachable` — *"The network path was not found"* | Name, DNS, SMB (445) or the server is down |
+| Server `Unreachable` — *"The network name cannot be found"* | The admin share (`c$`) is disabled on that server |
+| Server `Unreachable` — *"Access ... denied"* | The host account is not local admin there, or delegation (second hop) is not configured. Browsing the share interactively does not prove the remote session can |
+| *"is inside the protected operating-system folder"* | The folder is under `\Windows`, `\Program Files` and so on, and is not an allowed cache. Choose another folder |
+| Red notice *"Folder deletion was requested but NOT performed"* | Set the filter to `*.*` **and** tick *Delete read-only items*, or untick *Delete folders as well* |
+| Nothing matched although files are there | The filter does not match them (e.g. `Archive-*.evtx` in the SCCM cache), or they are newer than the cutoff |
+| Many `could not delete ... read-only` errors | Tick *Delete read-only items*, or leave those files |
+| Report not received; closing line says *"report NOT emailed"* | The mail relay refused or could not be reached from Orchestrator. Check with the Orchestrator administrator |
+| Run never finishes at the email step | The relay port's security mode does not match STARTTLS (e.g. port set to SSL/TLS). Administrator: Implementation Guide §7 |
+| `stageScriptOnHost ... does NOT match ... Overwriting it` | Expected after the script is updated in Orchestrator; unexpected otherwise (someone edited the copy on the host). The host copy is replaced either way |

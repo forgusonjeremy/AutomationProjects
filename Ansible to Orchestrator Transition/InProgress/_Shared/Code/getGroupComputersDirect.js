@@ -12,8 +12,8 @@
  * =========================================================================== */
 
 /**
- * Action:  getGroupComputersDirect
- * Module:  com.broadcom.pso.windows.servers.reboot
+ * Action:  getGroupComputersDirectMembers
+ * Module:  com.broadcom.pso.vcf.activedirectory
  *
  * WHAT IT DOES
  *   Takes an Active Directory group and returns the full names of the enabled computers
@@ -33,24 +33,29 @@
  *   making it recursive to match.
  *
  *   Moving a log file off a machine that should not have been in scope wastes a little
- *   time. Rebooting one takes a production service down. So the two automations draw the
- *   line in different places on purpose:
+ *   time. Rebooting one takes a production service down; deleting files from one cannot
+ *   be undone. So the automations draw the line in different places on purpose:
  *
  *       getGroupComputers        recursive    -- find every server this group implies
- *       getGroupComputersDirect  NOT          -- reboot only what someone put in the group
+ *       getGroupComputersDirect  NOT          -- act only on what someone put in the group
  *
- *   Targeting for a destructive action is explicit: what the operator placed directly in
- *   the group is the target list, and nothing else is. A sub-group added to the group
- *   later -- by someone who never saw this workflow -- cannot silently enrol its members
- *   into a reboot schedule.
+ *   Used by every DESTRUCTIVE workflow in the programme -- Server Reboots and Windows
+ *   Server Clean Disks today. Targeting for a destructive action is explicit: what the
+ *   operator placed directly in the group is the target list, and nothing else is. A
+ *   sub-group added to the group later -- by someone who never saw the workflow -- cannot
+ *   silently enrol its members into a reboot or a disk clean.
  *
- *   This is change S-7 in the Change Register, and it is the reason that entry exists.
+ *   This is change S-7 in the Server Reboots Change Register (P-15 / P-66 for Clean Disks).
+ *
+ *   The log messages below are deliberately generic -- they say what was and was not
+ *   targeted and what to do about it, and nothing about what the calling workflow does
+ *   with the list -- because this one action serves every workflow that uses it.
  *
  * A NESTED GROUP IS REPORTED, NOT SILENTLY DROPPED
- *   Ignoring a sub-group quietly would be its own trap: someone nests
- *   'Security-Reboot-Servers-London' inside the group, sees the workflow run green, and
- *   assumes London was rebooted. Every direct sub-group is named in the log and in a
- *   warning, so the omission is visible on the run that made it.
+ *   Ignoring a sub-group quietly would be its own trap: someone nests 'Servers-London'
+ *   inside the group, sees the workflow run green, and assumes London was covered. Every
+ *   direct sub-group is named in the log and in a warning, so the omission is visible on
+ *   the run that made it.
  *
  * INPUTS (in this order -- vRO passes action inputs positionally)
  *   adGroup  AD:UserGroup  the group whose direct members are the targets
@@ -64,8 +69,8 @@
  *
  * Each computer's full name is built from its OWN distinguishedName, not the group's.
  * A group in one domain can hold computers from another, and building the name this way
- * gets those right instead of quietly pointing at the wrong domain -- which for a reboot
- * would mean issuing shutdown at a machine of the same short name in the wrong place.
+ * gets those right instead of quietly pointing at the wrong domain -- which would mean
+ * rebooting, or deleting files from, a machine of the same short name in the wrong place.
  */
 function domainFromDn(distinguishedName) {
     var parts = String(distinguishedName).split(",");
@@ -95,7 +100,7 @@ function readProperty(object, propertyName) {
 
 /**
  * A computer account that has been disabled is skipped -- a decommissioned machine
- * should not be a reboot target, and should not be reported as a failure every run.
+ * should not be a target, and should not be reported as a failure every run.
  *
  * Active Directory records this in two ways and plug-in versions differ over which they
  * expose, so both are checked. Bit 2 of userAccountControl is the disabled flag.
@@ -176,13 +181,13 @@ if (adGroup === null || adGroup === undefined) {
 }
 
 System.log("Reading the DIRECT members of Active Directory group: " + adGroup.distinguishedName);
-System.log("Nested groups are NOT expanded -- only what is directly in this group is a reboot target.");
+System.log("Nested groups are NOT expanded -- only computers placed directly in this group are targets.");
 
 var members = directMembersOf(adGroup);
 
 // A group whose membership the plug-in would not report at all is not an empty group.
-// Treating it as one would end the run reporting "no servers require a reboot" while
-// every server in it sat unpatched, so it stops here instead.
+// Treating it as one would end the run reporting "nothing to do" while every server in
+// it was silently skipped, so it stops here instead.
 if (members.readByName === false) {
     throw new Error(
         "getGroupComputersDirect: this Active Directory plug-in did not report the membership of '" +
@@ -200,7 +205,7 @@ System.log(
 // ---------------------------------------------------------------------------
 // Keep the enabled computers
 // ---------------------------------------------------------------------------
-var foundComputers = {};   // keyed by name, so a machine listed twice is rebooted once
+var foundComputers = {};   // keyed by name, so a machine listed twice is processed once
 var skippedDisabled = [];
 
 for (var c = 0; c < members.computers.length; c++) {
@@ -226,10 +231,10 @@ computerNames.sort();
 // ---------------------------------------------------------------------------
 // Say what was left out, and why
 // ---------------------------------------------------------------------------
-// A sub-group sitting in the reboot group is the one thing most likely to be
-// misread as "those servers are covered". It is deliberately not expanded, so it
-// has to be said out loud on the run that ignored it -- not left for someone to
-// notice months later when those machines turn out never to have been rebooted.
+// A sub-group sitting in the target group is the one thing most likely to be misread
+// as "those servers are covered". It is deliberately not expanded, so it has to be said
+// out loud on the run that ignored it -- not left for someone to notice months later
+// when those machines turn out never to have been processed.
 if (members.groups.length > 0) {
     var nestedNames = [];
     for (var g = 0; g < members.groups.length; g++) {
@@ -238,11 +243,10 @@ if (members.groups.length > 0) {
 
     System.warn(
         "'" + adGroup.name + "' contains " + members.groups.length + " nested group(s): " +
-        nestedNames.join(", ") + ". Their members were NOT included and will NOT be rebooted. " +
-        "Reboot targeting is deliberately direct-membership only (change S-7) so that a group " +
-        "added here cannot enrol its servers into a reboot without anyone deciding to. To reboot " +
-        "those servers, add the computer accounts to '" + adGroup.name + "' directly, or run this " +
-        "workflow again against each nested group."
+        nestedNames.join(", ") + ". Computers in nested groups are NOT included in this run -- " +
+        "only computers that are direct members of '" + adGroup.name + "' are targeted. To include " +
+        "them, add their computer accounts to '" + adGroup.name + "' directly, or run this workflow " +
+        "against each nested group."
     );
 }
 
@@ -255,7 +259,7 @@ System.log(
 // Finding nothing is a legitimate answer, but it is far more often a sign that the
 // wrong group was picked -- or that the servers are one level down in a sub-group that
 // this action will not open. The calling workflow stops on an empty list rather than
-// reporting a successful run that rebooted nothing.
+// reporting a successful run that did nothing.
 if (computerNames.length === 0) {
     System.warn(
         "No enabled computers are DIRECT members of '" + adGroup.name + "'." +
